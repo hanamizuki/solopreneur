@@ -8,7 +8,7 @@ description: |
   and runs the full review loop. Designed for /loop periodic execution.
   Use when the user says "babysit todos", "sweep backlog", "scan todos",
   "watch backlog", "what todos can I work on", or sets up a periodic loop
-  (e.g., `/loop 30m /todos-babysit`).
+  (e.g., `/loop 24h /todos-babysit`).
 ---
 
 # Babysit Todos

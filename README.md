@@ -50,7 +50,7 @@ Start them and walk away — they loop until the job is done.
 |----------|-------|--------------|
 | **Auto Build** | `/autopilot` | Splits a large feature into multiple PRs and orchestrates unattended implementation, review, and merge — supports scheduling for off-hours execution |
 | **Code Review Loop** | `/greenlight` | Triggers external reviewers (Codex, Gemini, CodeRabbit), fixes issues, re-triggers — loops until the PR is clean |
-| **Backlog Monitor** | `/todos-babysit` | Scans backlog and in-progress todos, cross-references PR status, reviews new items, and maintains worktrees. **Interactive mode**: presents a confirmation checkpoint before acting. **Loop mode** (`/loop 30m /todos-babysit`): auto-executes safe operations and auto-implements bug fixes that pass the readiness gate — notifies only for items that need human judgment |
+| **Backlog Monitor** | `/todos-babysit` | Scans backlog and in-progress todos, cross-references PR status, reviews new items, and maintains worktrees. **Interactive mode**: presents a confirmation checkpoint before acting. **Loop mode** (`/loop 24h /todos-babysit`): auto-executes safe operations and auto-implements bug fixes that pass the readiness gate — notifies only for items that need human judgment |
 
 ### How Skills Work Together
 
