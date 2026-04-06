@@ -124,7 +124,7 @@ Key difference: `$DOING` items never get `needs_review` (they're already approve
 for work). A doing item with no PR is `stale` — possible causes: PR closed without
 merge, item manually moved, or branch deleted.
 
-### Phase 2.5: Confirmation Checkpoint
+### Phase 3: Confirmation Checkpoint
 
 After classification, **before any action**, present a summary table and wait
 for user confirmation.
@@ -162,9 +162,9 @@ User can:
 - Move to `$DONE` (was completed manually)
 - Keep in `$DOING` (user will handle it)
 
-### Phase 3: Housekeeping
+### Phase 4: Housekeeping
 
-Execute non-review actions confirmed in Phase 2.5:
+Execute non-review actions confirmed in Phase 3:
 
 1. **Merged items** (both backlog and doing):
    - Clean up worktree if it exists:
@@ -197,7 +197,7 @@ Execute non-review actions confirmed in Phase 2.5:
      - Complex → notify user with conflict file list, wait for instructions
    - Push after successful rebase: `git push --force-with-lease`
 
-4. **Stale items** → execute per user's instruction from Phase 2.5
+4. **Stale items** → execute per user's instruction from Phase 3
 
 Commit all file moves:
 ```bash
@@ -206,7 +206,7 @@ git commit -m "chore: babysit — move completed/stale todos"
 git push
 ```
 
-### Phase 4: Review
+### Phase 5: Review
 
 For each `needs_review` backlog todo, invoke `/todos-review {file-path}`.
 
@@ -217,7 +217,7 @@ If many `needs_review` items (>10), prioritize:
 2. Bug-type items
 3. Remaining by date
 
-### Phase 5: Notify
+### Phase 6: Notify
 
 #### Discord mode
 
@@ -289,7 +289,7 @@ Recommendation: {summary}
 Action? (go / later / done / skip)
 ```
 
-### Phase 6: Process User Responses
+### Phase 7: Process User Responses
 
 | User reply | Action |
 |-----------|--------|
