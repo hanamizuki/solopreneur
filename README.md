@@ -4,22 +4,37 @@ A Claude Code plugin for solo developers — ship, review, debug, and think thro
 
 ## Install
 
+This plugin is not yet on a public marketplace. To install from GitHub directly:
+
 ```bash
-claude plugin add hanamizuki/solopreneur
+# Add this repo as a marketplace source
+claude plugin marketplace add hanamizuki/solopreneur
+
+# Install the plugin
+claude plugin install solopreneur
+```
+
+To update later:
+
+```bash
+claude plugin marketplace update solopreneur
+claude plugin update solopreneur
 ```
 
 ## Skills
 
 ### Development Workflow
 
+Skills listed in the order you'd use them during a typical development cycle:
+
 | Skill | Trigger | What it does |
 |-------|---------|--------------|
+| **second-opinion** | `/second-opinion` | Independent adversarial review of plans and specs using Codex CLI as a second pair of eyes |
 | **preflight** | `/preflight` | Reviews a technical plan against platform-specific best practices before you start coding |
+| **worktree-handoff** | `/worktree-handoff` | Creates an isolated git worktree with full context so the next session picks up seamlessly |
+| **autopilot** | `/autopilot` | Splits a large feature into multiple PRs and orchestrates unattended implementation |
 | **specialist-review** | `/specialist-review` | Multi-perspective code review using specialized subagents matched to your tech stack |
 | **greenlight** | `/greenlight` | Automated PR review loop — triggers external reviewers, fixes issues, re-triggers until clean |
-| **second-opinion** | `/second-opinion` | Independent adversarial review of plans and specs using Codex CLI as a second pair of eyes |
-| **autopilot** | `/autopilot` | Splits a large feature into multiple PRs and orchestrates unattended implementation |
-| **worktree-handoff** | `/worktree-handoff` | Creates an isolated git worktree with full context so the next session picks up seamlessly |
 
 ### Debugging & Retrospective
 
