@@ -77,6 +77,28 @@ In terminal mode, after presenting all reviews, prompt the user for each item:
 [todo-title]: go / later / done / skip?
 ```
 
+## Operating Modes
+
+Babysit runs in one of two modes, detected automatically:
+
+| Mode | Trigger | Behavior |
+|------|---------|----------|
+| **Interactive** | User invokes directly (`/todos-babysit`) | Show confirmation checkpoint, wait for user decisions |
+| **Auto** | Running inside `/loop` | Execute safe operations automatically, only notify for risky actions |
+
+**Auto mode safety principle:** only take actions that are safe to do without human
+judgment. Anything that requires a judgment call → notify and stop.
+
+| Action | Interactive | Auto |
+|--------|------------|------|
+| Housekeeping (worktree rebase, merged cleanup) | Confirm first | Auto-execute |
+| Move merged → done | Confirm first | Auto-execute |
+| Move stale doing items | Ask user | Notify only |
+| Review new backlog items | Execute | Execute |
+| Implement (readiness=Auto) | Ask user "go?" | Auto-implement |
+| Implement (readiness=Needs Discussion) | Ask user | Notify only |
+| /greenlight fails to resolve | Ask user | Stop, leave PR, notify |
+
 ## Main Flow
 
 ### Phase 1: Pull & Scan
@@ -126,10 +148,9 @@ merge, item manually moved, or branch deleted.
 
 ### Phase 3: Confirmation Checkpoint
 
-After classification, **before any action**, present a summary table and wait
-for user confirmation.
+After classification, present a summary table. Behavior depends on operating mode.
 
-**Discord mode — post to main channel:**
+**Summary table (same for both modes):**
 ```
 📊 **Scan Results** ({YYYY-MM-DD HH:MM})
 
@@ -146,21 +167,22 @@ for user confirmation.
 | auth-flow.md | in_progress | #45 | Maintain worktree (rebase) |
 | dark-mode.md | merged | #40 | Move to done + cleanup |
 | old-feature.md | stale | — | ⚠️ No PR found |
-
-Reply `yes` to proceed, or specify changes.
 ```
 
-**Terminal mode:** Same table, then `AskUserQuestion` to confirm.
-
-User can:
+**Interactive mode:**
+Post/print the table, then wait for user confirmation:
 - `yes` / `go` → proceed with all proposed actions
 - Override specific items (e.g., "skip add-export, move old-feature to done")
 - `stop` → abort the scan
+- Stale items: user picks per item (move to backlog / done / keep)
 
-**Stale item options** (user picks per item):
-- Move back to `$BACKLOG` (reset)
-- Move to `$DONE` (was completed manually)
-- Keep in `$DOING` (user will handle it)
+**Auto mode:**
+Post/print the table as a notification (no wait). Then auto-proceed with safe
+actions only:
+- `merged` → auto-move to `$DONE` + cleanup
+- `in_progress` → auto-maintain worktree
+- `needs_review` → auto-review
+- `stale` → **notify only**, do not move (requires human judgment)
 
 ### Phase 4: Housekeeping
 
@@ -210,14 +232,33 @@ git push
 
 For each `needs_review` backlog todo, invoke `/todos-review {file-path}`.
 
-Extract from results: Destructiveness, Value, Effort, completion %, recommendation.
+Extract from results: Destructiveness, Value, Effort, completion %, recommendation,
+and **Readiness** (`Auto` or `Needs Discussion`).
 
 If many `needs_review` items (>10), prioritize:
 1. High value + low destructiveness
 2. Bug-type items
 3. Remaining by date
 
-### Phase 6: Notify
+### Phase 6: Readiness Gate
+
+After review, classify each reviewed todo by readiness:
+
+| Readiness | Criteria (all must be true) | Interactive | Auto |
+|-----------|---------------------------|-------------|------|
+| `Auto` | Bug fix + Effort=S + Destructiveness=Low + clear spec + no ambiguity | Ask user "go?" | Auto-implement |
+| `Needs Discussion` | Any criterion fails | Ask user how to proceed | Notify only |
+
+**Auto mode implementation flow:**
+For `Auto`-ready items, proceed directly to the Implementation Flow (below).
+If `/greenlight` fails to resolve all issues → **stop**, leave the PR open,
+and notify the user. Do not retry or force-merge.
+
+**Interactive mode:**
+Present the readiness assessment alongside the review results. User decides
+whether to `go` for each item regardless of readiness rating.
+
+### Phase 7: Notify
 
 #### Discord mode
 
@@ -251,6 +292,7 @@ unmatched todos.
 | Value | {Low/Medium/High} |
 | Effort | {S/M/L} |
 | Completion | {N}% |
+| Readiness | {Auto / Needs Discussion} |
 
 **Recommendation**: {summary from todos-review}
 
@@ -289,7 +331,7 @@ Recommendation: {summary}
 Action? (go / later / done / skip)
 ```
 
-### Phase 7: Process User Responses
+### Phase 8: Process User Responses
 
 | User reply | Action |
 |-----------|--------|
@@ -371,11 +413,15 @@ After `/greenlight` completes:
 
 ## Important Notes
 
-- **Confirmation checkpoint**: All actions are presented for user approval before execution
-- **No auto-implementation**: Code implementation requires explicit user approval (`go`)
+- **Two operating modes**: Interactive (confirm before acting) vs Auto (safe actions only)
+- **Readiness gate**: Only bug fixes with S effort, low destructiveness, and clear spec
+  can be auto-implemented — everything else requires human approval
+- **Auto mode fail-safe**: If `/greenlight` can't resolve issues, stop and leave the PR
+  for the user — never force-merge or retry indefinitely
 - **Worktree isolation**: Each todo works in an isolated worktree for parallel development
 - **Scans both directories**: `$BACKLOG` for new items, `$DOING` for PR tracking and cleanup
-- **Auto-cleanup**: Merged PR worktrees and local branches are cleaned up after confirmation
+- **Auto-cleanup**: Merged PR worktrees and local branches are cleaned up
 - **Noise avoidance**: Previously reviewed, unchanged todos are not re-notified
 - **Conflict escalation**: Simple conflicts auto-resolved, complex ones escalated to user
-- **Preflight gate**: Implementation plan must pass preflight; wait for user confirmation
+- **Preflight gate**: Implementation plan must pass preflight; in interactive mode wait
+  for user confirmation

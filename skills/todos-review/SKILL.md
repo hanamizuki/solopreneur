@@ -183,6 +183,17 @@ One sentence describing what this todo is really solving.
 | Destructiveness | Low/Medium/High + explanation |
 | Value | Low/Medium/High + explanation |
 | Effort | S/M/L + explanation |
+| Readiness | Auto / Needs Discussion + explanation |
+
+**Readiness criteria** — mark `Auto` only when **all** conditions are met:
+1. Todo is a bug fix (not a new feature, refactor, or exploratory task)
+2. Effort = S
+3. Destructiveness = Low
+4. Has clear acceptance criteria (how to verify the fix)
+5. Mentions specific files or code paths
+6. Solution has no ambiguity (only one reasonable interpretation)
+
+If any condition fails, mark `Needs Discussion` and state which conditions failed.
 
 ### Implementation Benefits
 [List only applicable items:]
