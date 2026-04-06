@@ -23,7 +23,7 @@ claude plugin update solopreneur
 
 ## Skills
 
-### Your Virtual Engineering Team
+### Your Virtual Product Team
 
 | Role | Skill | What it does |
 |------|-------|--------------|
