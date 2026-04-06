@@ -1,9 +1,10 @@
 ---
 name: todos-babysit
 description: |
-  Periodic backlog scanner that cross-references todos with GitHub PR status,
-  runs /todos-review on unhandled items, and notifies via Discord (if configured)
-  or terminal output. When the user approves an item, auto-implements in a worktree
+  Periodic scanner for backlog and in-progress todos. Cross-references with GitHub
+  PR status, reviews unhandled items, maintains worktrees, and notifies via Discord
+  (if configured) or terminal output. Presents a confirmation checkpoint before
+  executing actions. When the user approves an item, auto-implements in a worktree
   and runs the full review loop. Designed for /loop periodic execution.
   Use when the user says "babysit todos", "sweep backlog", "scan todos",
   "watch backlog", "what todos can I work on", or sets up a periodic loop
@@ -12,8 +13,8 @@ description: |
 
 # Babysit Todos
 
-Periodic scanner for the backlog directory. Cross-references with GitHub PR status,
-reviews unhandled todos, notifies the user, and auto-implements on approval.
+Periodic scanner for backlog and in-progress todos. Cross-references with GitHub
+PR status, reviews unhandled items, notifies the user, and auto-implements on approval.
 
 ## Config Discovery
 
@@ -81,8 +82,9 @@ In terminal mode, after presenting all reviews, prompt the user for each item:
 ### Phase 1: Pull & Scan
 
 1. `git pull --rebase` to get latest
-2. List all `.md` files in `$BACKLOG`
-3. Fetch PR status:
+2. List all `.md` files in **both `$BACKLOG` and `$DOING`**
+3. Tag each item with its source directory (`backlog` or `doing`)
+4. Fetch PR status:
    ```bash
    gh pr list --state open --json number,title,headRefName,url
    gh pr list --state closed --json number,title,headRefName,url,mergedAt --limit 20
@@ -91,57 +93,122 @@ In terminal mode, after presenting all reviews, prompt the user for each item:
 
 ### Phase 2: Status Comparison
 
-For each todo file:
+For each todo file, extract keywords from the filename (strip date prefix
+`2026-03-15-` and type prefix `feature-request-` / `bug-`), then match against
+PR titles and branch names.
 
-1. **Extract keywords**: From filename — strip date prefix (`2026-03-15-`) and
-   type prefix (`feature-request-` / `bug-`).
-2. **Match PRs**: Search keywords against PR titles and branch names.
-3. **Classify**:
-   - `merged` — has a merged PR → clean up worktree/branch, suggest moving to `$DONE`
-   - `in_progress` — has an open PR → maintain worktree (Phase 2.5)
-   - `needs_review` — no matching PR → run review
-   - `unchanged` — previously reviewed with no status change → skip
+**Classification rules differ by source directory:**
 
-   **Detecting `unchanged`:**
-   - Discord mode: check if the todo's thread exists and has no user reply after the last bot message
-   - Terminal mode: skip detection (always re-present in terminal)
+#### $BACKLOG items
 
-### Phase 2.5: Worktree Maintenance
+| Status | Condition | Proposed Action |
+|--------|-----------|-----------------|
+| `merged` | Has a merged PR | Move to `$DONE` + cleanup worktree/branch |
+| `in_progress` | Has an open PR | Move to `$DOING` + maintain worktree |
+| `needs_review` | No matching PR | Run `/todos-review` |
+| `unchanged` | Previously reviewed, no status change | Skip |
 
-#### For `in_progress` todos (open PR):
+**Detecting `unchanged`:**
+- Discord mode: todo's thread exists and has no user reply after the last bot message
+- Terminal mode: skip detection (always re-present)
 
-1. Check for existing worktree:
-   ```bash
-   git worktree list | grep {branch-name}
-   ```
-2. **Has worktree** → rebase from main:
-   ```bash
-   cd .worktrees/{slug} && git fetch origin main && git rebase origin/main
-   ```
-3. **No worktree** → create one:
-   ```bash
-   git worktree add .worktrees/{slug} {branch-name}
-   ```
-4. **Conflict handling:**
-   - Simple (< 3 files, clear resolution) → auto-resolve
-   - Complex → notify user with conflict file list, wait for instructions
-5. Push after successful rebase: `git push --force-with-lease`
+#### $DOING items
 
-#### For `merged` todos:
+| Status | Condition | Proposed Action |
+|--------|-----------|-----------------|
+| `merged` | PR merged | Move to `$DONE` + cleanup worktree/branch |
+| `in_progress` | PR still open | Maintain worktree (rebase + push) |
+| `stale` | No matching PR found | Flag — ask user what to do |
 
-1. Clean up worktree if it exists:
-   ```bash
-   git worktree remove .worktrees/{slug} --force
-   ```
-2. Delete local branch:
-   ```bash
-   git branch -d {branch-name}
-   ```
-3. Notify user, suggest moving to `$DONE`
+Key difference: `$DOING` items never get `needs_review` (they're already approved
+for work). A doing item with no PR is `stale` — possible causes: PR closed without
+merge, item manually moved, or branch deleted.
 
-### Phase 3: Review
+### Phase 2.5: Confirmation Checkpoint
 
-For each `needs_review` todo, invoke `/todos-review {file-path}`.
+After classification, **before any action**, present a summary table and wait
+for user confirmation.
+
+**Discord mode — post to main channel:**
+```
+📊 **Scan Results** ({YYYY-MM-DD HH:MM})
+
+### Backlog ({N} items)
+| Todo | Status | PR | Proposed Action |
+|------|--------|----|-----------------|
+| add-export.md | needs_review | — | Review |
+| fix-sync.md | in_progress | #42 | Move to doing + maintain worktree |
+| update-ui.md | merged | #38 | Move to done + cleanup |
+
+### Doing ({N} items)
+| Todo | Status | PR | Proposed Action |
+|------|--------|----|-----------------|
+| auth-flow.md | in_progress | #45 | Maintain worktree (rebase) |
+| dark-mode.md | merged | #40 | Move to done + cleanup |
+| old-feature.md | stale | — | ⚠️ No PR found |
+
+Reply `yes` to proceed, or specify changes.
+```
+
+**Terminal mode:** Same table, then `AskUserQuestion` to confirm.
+
+User can:
+- `yes` / `go` → proceed with all proposed actions
+- Override specific items (e.g., "skip add-export, move old-feature to done")
+- `stop` → abort the scan
+
+**Stale item options** (user picks per item):
+- Move back to `$BACKLOG` (reset)
+- Move to `$DONE` (was completed manually)
+- Keep in `$DOING` (user will handle it)
+
+### Phase 3: Housekeeping
+
+Execute non-review actions confirmed in Phase 2.5:
+
+1. **Merged items** (both backlog and doing):
+   - Clean up worktree if it exists:
+     ```bash
+     git worktree remove .worktrees/{slug} --force
+     ```
+   - Delete local branch:
+     ```bash
+     git branch -d {branch-name}
+     ```
+   - Move todo file to `$DONE`
+
+2. **In-progress backlog items** → move to `$DOING`
+
+3. **In-progress items** (both sources) — maintain worktrees:
+   - Check for existing worktree:
+     ```bash
+     git worktree list | grep {branch-name}
+     ```
+   - **Has worktree** → rebase from main:
+     ```bash
+     cd .worktrees/{slug} && git fetch origin main && git rebase origin/main
+     ```
+   - **No worktree** → create one:
+     ```bash
+     git worktree add .worktrees/{slug} {branch-name}
+     ```
+   - **Conflict handling:**
+     - Simple (< 3 files, clear resolution) → auto-resolve
+     - Complex → notify user with conflict file list, wait for instructions
+   - Push after successful rebase: `git push --force-with-lease`
+
+4. **Stale items** → execute per user's instruction from Phase 2.5
+
+Commit all file moves:
+```bash
+git add -A todos/
+git commit -m "chore: babysit — move completed/stale todos"
+git push
+```
+
+### Phase 4: Review
+
+For each `needs_review` backlog todo, invoke `/todos-review {file-path}`.
 
 Extract from results: Destructiveness, Value, Effort, completion %, recommendation.
 
@@ -150,7 +217,7 @@ If many `needs_review` items (>10), prioritize:
 2. Bug-type items
 3. Remaining by date
 
-### Phase 4: Notify
+### Phase 5: Notify
 
 #### Discord mode
 
@@ -199,17 +266,16 @@ Reply: `go` — implement / `later` — defer / `done` — mark complete
 
 Skip notification if thread exists and no status change (avoid noise).
 
-**Digest (main channel):**
+**Digest (main channel, after all phases complete):**
 ```
-📊 **Backlog Scan** ({YYYY-MM-DD HH:MM})
+📊 **Babysit Report** ({YYYY-MM-DD HH:MM})
 
-Scanned {N} todos
-✅ Completed (merged PR): {n}
-🔄 In progress (open PR): {n}
+Scanned: {N} backlog + {M} doing
+✅ Completed (merged PR): {n} — moved to done
+🔄 In progress (open PR): {n} — worktrees maintained
 🆕 New reviews: {n}
+⚠️ Stale (doing, no PR): {n}
 ⏸️ Unchanged: {n}
-
-{list items suggested for moving to done/}
 ```
 
 #### Terminal mode
@@ -223,7 +289,7 @@ Recommendation: {summary}
 Action? (go / later / done / skip)
 ```
 
-### Phase 5: Process User Responses
+### Phase 6: Process User Responses
 
 | User reply | Action |
 |-----------|--------|
@@ -305,10 +371,11 @@ After `/greenlight` completes:
 
 ## Important Notes
 
-- **No auto-implementation**: All implementation requires user approval (`go`)
+- **Confirmation checkpoint**: All actions are presented for user approval before execution
+- **No auto-implementation**: Code implementation requires explicit user approval (`go`)
 - **Worktree isolation**: Each todo works in an isolated worktree for parallel development
-- **No auto-move on merge**: Merged todos are suggested for `$DONE` but not auto-moved
-- **Auto-cleanup**: Merged PR worktrees and local branches are cleaned up automatically
+- **Scans both directories**: `$BACKLOG` for new items, `$DOING` for PR tracking and cleanup
+- **Auto-cleanup**: Merged PR worktrees and local branches are cleaned up after confirmation
 - **Noise avoidance**: Previously reviewed, unchanged todos are not re-notified
 - **Conflict escalation**: Simple conflicts auto-resolved, complex ones escalated to user
 - **Preflight gate**: Implementation plan must pass preflight; wait for user confirmation
