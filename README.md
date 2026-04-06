@@ -93,16 +93,16 @@ This plugin integrates with tools across the Claude Code ecosystem. All integrat
 
 ### Claude Code Built-in Skills
 
-`/greenlight` uses these built-in skills during internal review:
+`/greenlight` uses this built-in skill during internal review:
 
 - `/simplify` — code quality, reuse, efficiency
-- `/review` — SQL safety, trust boundaries, structural issues
 
-### Plugin Skills
+### Skills from Other Sources
 
-| Plugin | Skills used | Used by |
+| Source | Skills used | Used by |
 |--------|------------|---------|
-| [superpowers](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/superpowers) | `requesting-code-review`, `receiving-code-review` | `/greenlight`, `/specialist-review` |
+| [superpowers](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/superpowers) (plugin) | `requesting-code-review`, `receiving-code-review` | `/greenlight`, `/specialist-review` |
+| [gstack](https://github.com/gstack-dev/gstack) (user-level skill) | `/review` — SQL safety, trust boundaries, structural issues | `/greenlight` |
 
 ### Third-Party Skill Libraries
 
