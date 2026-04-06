@@ -41,7 +41,7 @@ Start them and walk away — they loop until the job is done.
 
 | Pipeline | Skill | What it does |
 |----------|-------|--------------|
-| **Auto Build** | `/autopilot` | Splits a large feature into multiple PRs and orchestrates unattended implementation, review, and merge |
+| **Auto Build** | `/autopilot` | Splits a large feature into multiple PRs and orchestrates unattended implementation, review, and merge — supports scheduling for off-hours execution |
 | **Code Review Loop** | `/greenlight` | Triggers external reviewers (Codex, Gemini, CodeRabbit), fixes issues, re-triggers — loops until the PR is clean |
 
 ### How Skills Work Together
