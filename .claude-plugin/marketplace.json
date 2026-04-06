@@ -1,0 +1,18 @@
+{
+  "name": "solopreneur",
+  "owner": {
+    "name": "Hana Chang"
+  },
+  "metadata": {
+    "description": "A virtual engineering team for solo founders — plan review, code review, automated PR cycles, and multi-platform expertise in one plugin."
+  },
+  "plugins": [
+    {
+      "name": "solopreneur",
+      "source": "./",
+      "description": "Skills and agents for solopreneurs — ship, review, debug, and think through problems with AI.",
+      "version": "0.1.0",
+      "license": "MIT"
+    }
+  ]
+}
