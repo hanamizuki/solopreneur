@@ -25,19 +25,24 @@ claude plugin update solopreneur
 
 ### Your Virtual Engineering Team
 
-Skills listed in the order you'd use them during a typical development cycle:
-
 | Role | Skill | What it does |
 |------|-------|--------------|
 | **Advisor** | `/second-opinion` | Challenges your plan across 5 dimensions (completeness, consistency, clarity, scope, feasibility) using an independent reviewer |
 | **Tech Lead** | `/preflight` | Reviews your technical plan against platform-specific best practices before you write a single line of code |
 | **Coworker** | `/worktree-handoff` | Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
-| **Autopilot** | `/autopilot` | Splits a large feature into multiple PRs and orchestrates unattended implementation, review, and merge |
 | **Code Reviewer** | `/specialist-review` | Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
-| **QA Gate** | `/greenlight` | Triggers external reviewers (Codex, Gemini, CodeRabbit), fixes issues, re-triggers — loops until the PR is clean |
 | **SRE** | `/post-mortem` | Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
 | **Coach** | `/session-retro` | Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
 | **Thinking Partner** | `/perspective` | Switch between 6 thinker perspectives (Musk, Feynman, Munger, Naval, Jobs, Taleb) to analyze problems from a different angle |
+
+### Automation Pipelines
+
+Start them and walk away — they loop until the job is done.
+
+| Pipeline | Skill | What it does |
+|----------|-------|--------------|
+| **Auto Build** | `/autopilot` | Splits a large feature into multiple PRs and orchestrates unattended implementation, review, and merge |
+| **Code Review Loop** | `/greenlight` | Triggers external reviewers (Codex, Gemini, CodeRabbit), fixes issues, re-triggers — loops until the PR is clean |
 
 ### How Skills Work Together
 
