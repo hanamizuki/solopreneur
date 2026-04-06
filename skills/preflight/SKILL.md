@@ -5,7 +5,8 @@ description: |
   platform-specific best practices before coding begins. Use when the user says
   "preflight", "review the plan", "best practice review", "sanity check this
   approach", or wants to verify a technical plan is sound before implementation.
-  Requires context7 MCP server for documentation lookups.
+  Works best with context7 MCP server for documentation lookups (gracefully
+  degrades without it).
 ---
 
 # Preflight: Plan Review
@@ -45,12 +46,18 @@ Based on **specific APIs or frameworks mentioned** in the plan, query official d
 3. Query at most 2-3 critical API points per platform — don't over-query
 
 **Skip context7 when:**
+- context7 MCP tools are not available in the current environment
 - The plan only contains high-level architecture decisions without specific API usage
 - The APIs involved are fundamental knowledge that doesn't need doc lookup
 
 ## Step 4: Dispatch Subagents for Best Practice Review
 
 Based on detected platforms, dispatch corresponding subagents **in parallel**.
+
+**Subagent selection with fallback:**
+Use the platform-specific subagent type from the table above (e.g., `ios-dev`, `python-dev`).
+If the preferred subagent type is not available in the current environment, fall back to
+`general-purpose` with the same prompt — the review will be less specialized but still useful.
 
 **Subagent prompt template:**
 

@@ -99,7 +99,7 @@ In this case:
 - Commits in the version window (good → bad) are the "trigger", not the root cause
 - The real root cause lies before the good version
 
-判Criterion: if the "suspicious commit" you found in the version window cannot
+Criterion: if the "suspicious commit" you found in the version window cannot
 logically explain the crash mechanism, widen your search to earlier commits.
 
 ```bash
