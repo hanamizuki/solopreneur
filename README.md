@@ -35,6 +35,12 @@ claude plugin update solopreneur
 | **Coach** | `/session-retro` | Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
 | **Thinking Partner** | `/perspective` | Switch between 6 thinker perspectives (Musk, Feynman, Munger, Naval, Jobs, Taleb) to analyze problems from a different angle |
 
+### Your Virtual GTM Team
+
+| Role | Skill | What it does |
+|------|-------|--------------|
+| **Editor** | `/humanly` | Removes AI writing patterns from text — 36 pattern categories, 3-tier word tables, severity-based audit (P0/P1/P2), with English and Traditional Chinese support |
+
 ### Backlog Management
 
 | Role | Skill | What it does |
