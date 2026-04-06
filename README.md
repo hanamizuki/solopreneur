@@ -35,6 +35,14 @@ claude plugin update solopreneur
 | **Coach** | `/session-retro` | Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
 | **Thinking Partner** | `/perspective` | Switch between 6 thinker perspectives (Musk, Feynman, Munger, Naval, Jobs, Taleb) to analyze problems from a different angle |
 
+### Backlog Management
+
+| Role | Skill | What it does |
+|------|-------|--------------|
+| **Backlog Reviewer** | `/todos-review` | Deep-reviews a single todo/spec for feasibility, best practices, and priority — dispatches platform-specific expert agents |
+| **Backlog Janitor** | `/todos-cleanup` | Batch-scans backlog, matches against git history, moves completed/partial items to done/ or doing/ |
+| **Backlog Monitor** | `/todos-babysit` | Periodic scanner: reviews backlog, cross-references PR status, notifies via Discord or terminal, auto-implements on approval |
+
 ### Automation Pipelines
 
 Start them and walk away — they loop until the job is done.
@@ -59,7 +67,12 @@ Idea
  │   └─ /greenlight ────────── External review loop per PR
  │
  ├─ /post-mortem ───── Something broke? Trace the root cause
- └─ /session-retro ─── What did we learn?
+ ├─ /session-retro ─── What did we learn?
+ │
+ └─ Backlog
+     ├─ /todos-review ──── Review a single todo before implementing
+     ├─ /todos-cleanup ─── Batch-triage: match todos against git history
+     └─ /todos-babysit ─── Periodic loop: review → notify → implement on approval
 ```
 
 ## Agents
