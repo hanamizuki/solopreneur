@@ -39,6 +39,7 @@ claude plugin update solopreneur
 
 | Role | Skill | What it does |
 |------|-------|--------------|
+| **Strategist** | `/gtm` | Generates a complete Go-To-Market strategy — analyzes the codebase, interviews you across multiple sessions, and produces 4 strategy docs (brand, market landscape, messaging, channel playbook). Supports weekly incremental updates |
 | **Editor** | `/humanly` | Removes AI writing patterns from text — 36 pattern categories, 3-tier word tables, severity-based audit (P0/P1/P2), with English and Traditional Chinese support |
 
 ### Backlog Management
