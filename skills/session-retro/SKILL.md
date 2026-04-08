@@ -223,9 +223,10 @@ Present the report directly in conversation (not as a file):
 
 ## After Presenting the Report
 
-1. **Ask which actions to execute.** List all proposed actions with numbers —
-   including actions from Path A/B and from Token Efficiency (Path C).
-   The user may approve all, some, or none. Only execute approved actions.
+1. **Ask which actions to execute.** Combine actions from both "Proposed Actions"
+   (Path A/B) and "Optimization Opportunities" (Path C) into a single numbered
+   list for user approval. The user may approve all, some, or none. Only execute
+   approved actions.
 
 2. **Execute approved actions.** For each:
    - Read the target file before modifying
@@ -238,8 +239,9 @@ Present the report directly in conversation (not as a file):
 
 ## Edge Cases
 
-- **Very short session** (< 5 exchanges): Tell the user there's not enough context
-  for a meaningful retro. Offer to note any specific concern instead.
+- **Very short session** (< 5 exchanges, where one exchange = one user message +
+  one assistant response): Tell the user there's not enough context for a meaningful
+  retro. Offer to note any specific concern instead.
 
 - **User was wrong, not Claude**: If investigation reveals the user's correction was
   based on a misunderstanding, say so respectfully with evidence. Don't create
