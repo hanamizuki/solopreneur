@@ -7,6 +7,16 @@
 Don't just track likes. Structure your metrics as a funnel that maps to
 LinkedIn's ranking signals:
 
+### Engagement Rate Denominator Warning
+
+Different reports use different denominators, causing wildly different numbers:
+- Socialinsider (2026, 1.3M posts, **by impressions**): ~5.20% overall, ~7% for documents
+- Hootsuite (2025, **per post / by followers**): ~2-4% across industries, ~3.4% average
+
+Neither is "wrong" — they measure different things. When citing benchmarks
+in plans or reports, always specify the denominator. Don't compare a 5.2%
+(by impressions) with a 3.4% (by followers) as if they're the same metric.
+
 ### Layer 1: Exposure Metrics
 - **Impressions per post** (median, P75, P90 — avoid being misled by outliers)
 - **Profile appearances** (how often your name shows up in search, feeds, comments)

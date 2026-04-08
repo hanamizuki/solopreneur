@@ -66,7 +66,7 @@ engagement bait and may be penalized.
 
 ## Content Formats (Ranked by Effectiveness, 2026 Data)
 
-### 1. Document Carousel / PDF (Highest engagement ~6.6%+)
+### 1. Document Carousel / PDF (Highest engagement ~7% by impressions)
 
 The format best aligned with dwell time signals. Users flip through pages,
 spending more time per impression.
@@ -270,7 +270,8 @@ topic consistency to build your "Topic DNA."
 
 ## The Zero-Link Strategy
 
-External links in post body reduce reach ~60%. But the workaround of
+External links in post body reduce reach significantly (estimates range
+from 40-60% depending on the source — see algorithm.md for details). The workaround of
 "link in first comment" is reportedly being detected and penalized in 2026.
 
 **Better alternatives:**

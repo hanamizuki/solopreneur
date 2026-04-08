@@ -114,7 +114,7 @@ full attribution to you.
 
 ## The Golden 60-Minute Window
 
-The first 60 minutes after posting are critical. During this time:
+The first 60-90 minutes after posting are critical. During this time:
 
 1. Stay online and reply to every comment immediately
 2. If a comment asks a great question, give a thorough reply (this extends

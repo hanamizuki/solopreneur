@@ -122,8 +122,12 @@ post gets broader distribution:
 
 Things the algorithm actively suppresses:
 
-1. **External links in post body**: reach drops ~60%. The system prefers
-   content that keeps users on-platform.
+1. **External links in post body**: significant reach reduction.
+   > **DISPUTED (2026-04)**: Exact penalty magnitude
+   > - Grok/Gemini research (2026-04): ~60% reach drop
+   > - GPT deep research (2026-04): ~40% initial reach penalty
+   > - **Current stance**: Expect 40-60% reduction. Direction is clear
+   >   even if exact number varies. Avoid links in post body regardless.
 2. **AI-generated generic content**: the 360Brew system (reportedly 150B
    parameter AI) can detect template-heavy, personality-free AI text and
    reduces its distribution.

@@ -31,7 +31,9 @@ conversation stage.
 | `references/engagement-engine.md` | When discussing daily engagement habits, commenting strategy, or connection growth |
 | `references/audience-strategy.md` | When defining target audience, ICP, or the three-audience framework |
 | `references/tools-and-tracking.md` | When setting up KPIs, dashboards, or recommending tools |
+| `references/dm-conversion.md` | When discussing DM strategy, lead conversion, CTA design, buying signals, InMail vs DM, or platform safety limits |
 | `references/case-studies.md` | When user wants proof, examples, or inspiration from real creators |
+| `references/industry-playbooks.md` | When advising users in specific roles (SaaS founder, consultant, job seeker, engineer, recruiter) or when the user is in Taiwan/Asia market |
 
 ---
 
