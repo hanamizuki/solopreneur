@@ -25,9 +25,10 @@ and forgets by next conversation. Retro breaks this cycle by tracing errors to t
 1. Scan conversation for correction signals
 2. Classify: errors found → Path A | smooth session → Path B
 3. For each finding: analyze → attribute → propose action
-4. Present report with action proposals
-5. Ask user which actions to execute
-6. Ask user if they want to save the report
+4. Run Path C (token efficiency analysis)
+5. Present report with action proposals
+6. Ask user which actions to execute
+7. Ask user if they want to save the report
 ```
 
 ### Step 1: Scan for Correction Signals
@@ -50,6 +51,7 @@ Claude should have done (e.g., user manually ran a command Claude skipped).
 - **Errors found** → Path A (analyze each error)
 - **No errors found** → Path B (extract successful patterns)
 - **Mixed** → Do both Path A and Path B
+After completing Path A and/or Path B, proceed to Path C (step 4).
 
 ### Path A: Error Analysis
 
@@ -121,6 +123,58 @@ For each pattern, assess:
 
 Only propose extraction for patterns scoring high on at least 2 of 3 criteria.
 
+### Path C: Token Efficiency Analysis
+
+Runs after Path A/B. The goal is to find **token waste within this session** and
+suggest concrete improvements for future sessions.
+
+Claude Code cannot access exact token counts, so use heuristic estimation based on
+observable signals: file sizes read, tool call count, subagent dispatches, and conversation
+round-trips. Focus on actionable patterns, not precise numbers.
+
+#### 4a. Scan for Cost Signals
+
+Review the conversation for these patterns:
+
+| Signal | What to look for |
+|---|---|
+| **Subagent model mismatch** | Opus agent dispatched for tasks a cheaper model could handle (simple grep, file lookup, straightforward code generation) |
+| **Redundant operations** | Same file read multiple times, identical or near-identical searches repeated |
+| **Oversized reads** | Large files (>500 lines) read in full when only a small section was needed |
+| **Agent overuse** | Subagent spawned for tasks achievable with direct Grep/Glob/Read (see 4c for skill-required dispatches) |
+| **Sequential round-trips** | Multiple dependent tool calls that could have been parallelized, or information gathered piecemeal that could have been collected in one pass |
+| **Wasted exploration** | Dead-end research paths that could have been avoided with a better starting question |
+
+#### 4b. Assess Each Finding
+
+For each cost signal found:
+
+1. **What happened**: Describe the specific operation(s)
+2. **Why it was expensive**: Which factor — model tier, data volume, or round-trips
+3. **Better alternative**: What could have been done instead
+4. **Estimated saving**: `high` (different model tier or eliminated agent), `medium` (fewer round-trips or targeted reads), `low` (minor optimization)
+5. **Proposed action**: [save feedback memory / update skill / update agent definition / update CLAUDE.md / no action]
+
+#### 4c. Subagent Dispatch Review
+
+If no subagent dispatches occurred in this session, skip this section.
+
+Review each subagent dispatch in the session:
+
+1. **Was the agent necessary?** Could the task have been done with direct tool calls instead?
+   Exception: if a skill's instructions explicitly require dispatching a subagent (e.g.,
+   preflight dispatching platform expert agents, todos-review using Explore), that is
+   expected behavior — do not flag it as overuse.
+2. **Was the subagent type appropriate?** (e.g., using `Explore` for a task that only needed `Grep`)
+3. **Was the model tier justified?** Check the actual model used — subagents may have a
+   `model` set in their agent definition frontmatter, not just via the dispatch `model`
+   parameter. If the agent definition pins a model, use that as the actual tier for
+   cost assessment. When a skill required dispatching that specific agent type and the
+   agent definition pins the model: do not blame the caller — but DO evaluate whether
+   the skill or agent definition itself is over-specified. If so, propose updating the
+   skill or agent definition as an actionable finding (e.g., "agent X pins opus but
+   its tasks only need sonnet-level reasoning — consider changing the agent definition").
+
 ## Report Format
 
 Present the report directly in conversation (not as a file):
@@ -147,12 +201,31 @@ Present the report directly in conversation (not as a file):
 ## Proposed Actions
 1. [Action type] [target file] — [one-line description]
 2. ...
+
+## Token Efficiency (omit if Path C was skipped or no cost signals found)
+
+### Cost Signals
+- Subagents dispatched: N (by type: Explore: N, ios-dev: N, ...)
+- Large file reads (>500 lines): N
+- Redundant operations: N
+- Avoidable round-trips: N
+
+### Optimization Opportunities
+1. [Specific suggestion] — estimated saving: high/medium/low
+   - **Proposed action**: [save feedback memory / update skill / update agent definition / update CLAUDE.md / no action]
+   - **Target**: [file path or "feedback memory: ..."]
+2. ...
+
+### Subagent Dispatch Issues (if any)
+- [Agent description] used [type/model] → [recommend alternative] because [reason]
 ```
 
 ## After Presenting the Report
 
-1. **Ask which actions to execute.** List the proposed actions with numbers.
-   The user may approve all, some, or none. Only execute approved actions.
+1. **Ask which actions to execute.** Combine actions from both "Proposed Actions"
+   (Path A/B) and "Optimization Opportunities" (Path C) into a single numbered
+   list for user approval. The user may approve all, some, or none. Only execute
+   approved actions.
 
 2. **Execute approved actions.** For each:
    - Read the target file before modifying
@@ -165,8 +238,9 @@ Present the report directly in conversation (not as a file):
 
 ## Edge Cases
 
-- **Very short session** (< 5 exchanges): Tell the user there's not enough context
-  for a meaningful retro. Offer to note any specific concern instead.
+- **Very short session** (< 5 exchanges, where one exchange = one user message +
+  one assistant response): Tell the user there's not enough context for a meaningful
+  retro. Offer to note any specific concern instead.
 
 - **User was wrong, not Claude**: If investigation reveals the user's correction was
   based on a misunderstanding, say so respectfully with evidence. Don't create
