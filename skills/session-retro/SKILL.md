@@ -51,7 +51,7 @@ Claude should have done (e.g., user manually ran a command Claude skipped).
 - **Errors found** → Path A (analyze each error)
 - **No errors found** → Path B (extract successful patterns)
 - **Mixed** → Do both Path A and Path B
-- **Path C** (token efficiency analysis) — runs after A/B, skipped for short sessions (< 5 exchanges)
+After completing Path A and/or Path B, proceed to Path C (step 4).
 
 ### Path A: Error Analysis
 
@@ -125,15 +125,15 @@ Only propose extraction for patterns scoring high on at least 2 of 3 criteria.
 
 ### Path C: Token Efficiency Analysis
 
-Runs after Path A/B — unless the session is too short (< 5 exchanges), in which case
-skip Path C along with the rest of the retro. The goal is to find **token waste within
+Runs after Path A/B. Skipped for short sessions (< 5 exchanges).
+The goal is to find **token waste within
 this session** and suggest concrete improvements for future sessions.
 
 Claude Code cannot access exact token counts, so use heuristic estimation based on
 observable signals: file sizes read, tool call count, subagent dispatches, and conversation
 round-trips. Focus on actionable patterns, not precise numbers.
 
-#### 3a. Scan for Cost Signals
+#### 4a. Scan for Cost Signals
 
 Review the conversation for these patterns:
 
@@ -142,11 +142,11 @@ Review the conversation for these patterns:
 | **Subagent model mismatch** | Opus agent dispatched for tasks a cheaper model could handle (simple grep, file lookup, straightforward code generation) |
 | **Redundant operations** | Same file read multiple times, identical or near-identical searches repeated |
 | **Oversized reads** | Large files (>500 lines) read in full when only a small section was needed |
-| **Agent overuse** | Subagent spawned for tasks achievable with direct Grep/Glob/Read — but only if the dispatch was NOT required by an active skill's instructions |
+| **Agent overuse** | Subagent spawned for tasks achievable with direct Grep/Glob/Read (see 4c for skill-required dispatches) |
 | **Sequential round-trips** | Multiple dependent tool calls that could have been parallelized, or information gathered piecemeal that could have been collected in one pass |
 | **Wasted exploration** | Dead-end research paths that could have been avoided with a better starting question |
 
-#### 3b. Assess Each Finding
+#### 4b. Assess Each Finding
 
 For each cost signal found:
 
@@ -154,8 +154,11 @@ For each cost signal found:
 2. **Why it was expensive**: Which factor — model tier, data volume, or round-trips
 3. **Better alternative**: What could have been done instead
 4. **Estimated saving**: `high` (different model tier or eliminated agent), `medium` (fewer round-trips or targeted reads), `low` (minor optimization)
+5. **Proposed action**: [save feedback memory / update skill / update agent definition / update CLAUDE.md / no action]
 
-#### 3c. Subagent Dispatch Review
+#### 4c. Subagent Dispatch Review
+
+If no subagent dispatches occurred in this session, skip this section.
 
 Review each subagent dispatch in the session:
 
@@ -200,7 +203,7 @@ Present the report directly in conversation (not as a file):
 1. [Action type] [target file] — [one-line description]
 2. ...
 
-## Token Efficiency
+## Token Efficiency (omit if Path C was skipped or no cost signals found)
 
 ### Cost Signals
 - Subagents dispatched: N (by type: Explore: N, ios-dev: N, ...)
@@ -210,7 +213,7 @@ Present the report directly in conversation (not as a file):
 
 ### Optimization Opportunities
 1. [Specific suggestion] — estimated saving: high/medium/low
-   - **Proposed action**: [save feedback memory / update skill / update CLAUDE.md / no action]
+   - **Proposed action**: [save feedback memory / update skill / update agent definition / update CLAUDE.md / no action]
    - **Target**: [file path or "feedback memory: ..."]
 2. ...
 
