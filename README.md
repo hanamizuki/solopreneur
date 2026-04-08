@@ -41,6 +41,8 @@ claude plugin update solopreneur
 |------|-------|--------------|
 | **Strategist** | `/gtm` | Generates a complete Go-To-Market strategy — analyzes the codebase, interviews you across multiple sessions, and produces 4 strategy docs (brand, market landscape, messaging, channel playbook). Supports weekly incremental updates |
 | **Editor** | `/humanly` | Removes AI writing patterns from text — 36 pattern categories, 3-tier word tables, severity-based audit (P0/P1/P2), with English and Traditional Chinese support |
+| **X Growth Consultant** | `/x-growth` | Diagnoses X/Twitter profiles, co-creates personalized 12-week growth plans — covers algorithm mechanics, content strategy, engagement tactics, monetization, and Dream 100 outreach. Integrates with GTM docs |
+| **LinkedIn Growth Consultant** | `/linkedin-growth` | Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans — covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
 
 ### Backlog Management
 
