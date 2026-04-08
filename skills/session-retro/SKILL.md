@@ -25,7 +25,7 @@ and forgets by next conversation. Retro breaks this cycle by tracing errors to t
 1. Scan conversation for correction signals
 2. Classify: errors found → Path A | smooth session → Path B
 3. For each finding: analyze → attribute → propose action
-4. Run Path C (token efficiency analysis) — unless session is too short (< 5 exchanges)
+4. Run Path C (token efficiency analysis)
 5. Present report with action proposals
 6. Ask user which actions to execute
 7. Ask user if they want to save the report
@@ -125,9 +125,8 @@ Only propose extraction for patterns scoring high on at least 2 of 3 criteria.
 
 ### Path C: Token Efficiency Analysis
 
-Runs after Path A/B. Skipped for short sessions (< 5 exchanges).
-The goal is to find **token waste within
-this session** and suggest concrete improvements for future sessions.
+Runs after Path A/B. The goal is to find **token waste within this session** and
+suggest concrete improvements for future sessions.
 
 Claude Code cannot access exact token counts, so use heuristic estimation based on
 observable signals: file sizes read, tool call count, subagent dispatches, and conversation
