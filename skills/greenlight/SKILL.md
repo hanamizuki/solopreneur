@@ -476,11 +476,13 @@ gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int!){
 
 **3b. Process feedback:**
 
-1. **Invoke `receiving-code-review` skill first** (via `Skill` tool) to load the processing mindset
+1. **Invoke `receiving-code-review` skill first** (via `Skill` tool) to load the processing mindset.
+   If the skill is not available, proceed without it — evaluate each suggestion using your own
+   judgment on whether it's a genuine issue or a false positive.
 2. Check whether any suggestions were already pushed back in previous rounds. If so, reconsider. If still deciding to push back, consider whether to add a code comment or note in CONTEXT.md so the reviewer understands the reasoning. If the same issue has been raised multiple times, it can be ignored.
 3. **Dispatch subagent** (via `Agent` tool) to handle all unresolved threads. Prompt must include:
    - Full content of all unresolved threads (body, path, line, **thread id**)
-   - Instruction: "Use the `superpowers:receiving-code-review` skill framework to evaluate each suggestion"
+   - Instruction: "Use the `superpowers:receiving-code-review` skill framework to evaluate each suggestion. If the skill is not available, evaluate each suggestion on its own merits — fix genuine issues, push back on false positives with solid technical reasoning."
    - Instruction: "False positives require solid technical reasoning to push back"
    - Instruction: "After fixes, commit + push"
    - Commit message format: `fix: code review fixes — <summary>`
