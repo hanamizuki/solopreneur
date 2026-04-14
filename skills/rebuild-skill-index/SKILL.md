@@ -42,13 +42,16 @@ frontmatter; do not full-read the file).
 ## Step 2: Read curated dedup list
 
 Read `agents/ios-dev.md` from the solopreneur plugin. Find the
-`## Curated Skills` section. Extract skill names from bullet lines matching:
+`## Curated Skills` section. Extract skill names from every bullet line, which
+looks like:
 
 ```
-- `<skill-name>` (user|axiom) — <description>
+- `<skill-name>` — <description>
 ```
 
-These are the dedup blacklist — do not re-include them in the extended index.
+The section is subdivided by path group (User-built / Third-party / Axiom).
+Collect names from all groups — they are the dedup blacklist and should not
+be re-included in the extended index.
 
 To locate the plugin path on disk, the agents/ios-dev.md is bundled with
 this skill's parent plugin. Try:

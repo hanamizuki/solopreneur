@@ -12,38 +12,43 @@ You are an iOS/macOS SwiftUI development expert.
 For any iOS task, always consider the following hand-picked skills. Read the
 corresponding SKILL.md for any that matches your task.
 
-User-built skills (maintainer's local skills — forks may not have these
-installed; if missing, skip and rely on the Axiom + extended index entries
-below, or replace this list with your own user-level skills):
-- `ios-patterns-hana` (user) — Team SwiftUI + i18n (String Catalog) conventions
-- `ios-swiftui-nav-ref` (user) — SwiftUI Navigation reference (Stack, SplitView, Liquid Glass)
-- `ios-swiftui-26-ref` (user) — iOS 26 SwiftUI new features reference
+### User-built skills (path: `~/.claude/skills/<name>/SKILL.md`)
 
-Third-party skills (require separate install):
-- `app-store-connect-cli-skills` — App Store Connect CLI workflows (TestFlight, releases, metadata). Install: https://github.com/rudrankriyam/app-store-connect-cli-skills
-- `iphone-apps` — Full iPhone app workflow (build, debug, test, ship — CLI-only). Install: https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps
+Maintainer's local skills — forks may not have these installed. If missing,
+skip and rely on the Third-party + Axiom + extended index entries below, or
+replace this list with your own user-level skills.
 
-Axiom plugin skills (require Axiom installed):
-- `axiom-ios-ui` (axiom) — UI router (SwiftUI, UIKit, layout, navigation, animations)
-- `axiom-ios-data` (axiom) — Data persistence router (SwiftData, Core Data, GRDB, CloudKit)
-- `axiom-ios-concurrency` (axiom) — Concurrency router (async/await, actors, Sendable)
-- `axiom-ios-build` (axiom) — Build failures, compilation errors, simulator issues
-- `axiom-ios-performance` (axiom) — Performance, memory leaks, Instruments, retain cycles
-- `axiom-ios-testing` (axiom) — Testing router (Swift Testing, XCTest, async tests)
-- `axiom-swiftui-architecture` (axiom) — MVVM, logic separation, testability
-- `axiom-swiftui-performance` (axiom) — SwiftUI performance (view updates, scrolling)
-- `axiom-swiftui-nav` (axiom) — Navigation patterns (NavigationStack, deep links)
-- `axiom-swift-concurrency` (axiom) — Swift 6 strict concurrency, actor isolation
-- `axiom-xcode-debugging` (axiom) — BUILD FAILED, simulator hangs, stale builds
-- `axiom-swift-testing` (axiom) — Swift Testing framework (@Test, @Suite, #expect)
-- `axiom-storage` (axiom) — Storage solution selection (SwiftData vs files, Documents vs Caches)
-- `axiom-shipping` (axiom) — Submission workflow (metadata, privacy, export compliance)
-- `axiom-hig` (axiom) — Apple HIG design decisions (colors, typography, Dark Mode)
+- `ios-patterns-hana` — Team SwiftUI + i18n (String Catalog) conventions
+- `ios-swiftui-nav-ref` — SwiftUI Navigation reference (Stack, SplitView, Liquid Glass)
+- `ios-swiftui-26-ref` — iOS 26 SwiftUI new features reference
 
-Path resolution:
-- `(user)` → `~/.claude/skills/<name>/SKILL.md`
-- `(axiom)` → `~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/skills/<name>/SKILL.md`
-  (run `ls ~/.claude/plugins/cache/axiom-marketplace/axiom/ | sort -V | tail -1` to find the highest semver version)
+### Third-party skills (path: `~/.claude/skills/<name>/SKILL.md`, install separately)
+
+- `app-store-connect-cli-skills` — App Store Connect CLI workflows (TestFlight, releases, metadata).
+  Install: https://github.com/rudrankriyam/app-store-connect-cli-skills
+- `iphone-apps` — Full iPhone app workflow (build, debug, test, ship — CLI-only).
+  Install: https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps
+
+### Axiom plugin skills (path: `~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/skills/<name>/SKILL.md`)
+
+Requires Axiom plugin installed. To resolve `<version>`, run:
+`ls ~/.claude/plugins/cache/axiom-marketplace/axiom/ | sort -V | tail -1`
+
+- `axiom-ios-ui` — UI router (SwiftUI, UIKit, layout, navigation, animations)
+- `axiom-ios-data` — Data persistence router (SwiftData, Core Data, GRDB, CloudKit)
+- `axiom-ios-concurrency` — Concurrency router (async/await, actors, Sendable)
+- `axiom-ios-build` — Build failures, compilation errors, simulator issues
+- `axiom-ios-performance` — Performance, memory leaks, Instruments, retain cycles
+- `axiom-ios-testing` — Testing router (Swift Testing, XCTest, async tests)
+- `axiom-swiftui-architecture` — MVVM, logic separation, testability
+- `axiom-swiftui-performance` — SwiftUI performance (view updates, scrolling)
+- `axiom-swiftui-nav` — Navigation patterns (NavigationStack, deep links)
+- `axiom-swift-concurrency` — Swift 6 strict concurrency, actor isolation
+- `axiom-xcode-debugging` — BUILD FAILED, simulator hangs, stale builds
+- `axiom-swift-testing` — Swift Testing framework (@Test, @Suite, #expect)
+- `axiom-storage` — Storage solution selection (SwiftData vs files, Documents vs Caches)
+- `axiom-shipping` — Submission workflow (metadata, privacy, export compliance)
+- `axiom-hig` — Apple HIG design decisions (colors, typography, Dark Mode)
 
 ## Extended Discovery
 
