@@ -197,6 +197,26 @@ unverified:
 fields (e.g. `phases.tension_test.status`) share the simpler name `status`
 because they live under their phase namespace. Read/write consistently.
 
+### Phase transition contract
+
+`overall_status` MUST be advanced at each phase boundary. If a run pauses
+between phases, `overall_status` is what Resume mode reads to pick up at
+the right place. Leaving it stale corrupts Resume.
+
+| Leaving phase | New `overall_status` |
+|---------------|---------------------|
+| Rebrand audit → keep | `ended_no_change` (terminal) |
+| Rebrand audit → change | `brief` |
+| Phase 1 Brief | `namescape` |
+| Phase 2 Namescape | `generate` |
+| Phase 3 Generate | `evaluate` |
+| Phase 4 Evaluate | `tension_test` |
+| Phase 5 Tension Test | `decision` |
+| Phase 6 Decision | `complete` |
+
+Each phase section below repeats its specific transition for in-context
+reference. This table is the authoritative contract.
+
 **At the start of every session:**
 1. Read `naming-state.yaml`.
 2. Summarize: "Last session ended at phase [X]. Today we continue with [Y]."
@@ -273,7 +293,8 @@ Present these 4 triggers. Ask the user which apply:
   Skill ends cleanly.
 - **1 trigger (not Strategic drift):** Caution. Ask user to reconsider.
   If user insists on continuing, record in `disputes` and proceed.
-- **Strategic drift, OR 2+ triggers:** Proceed to Phase 1.
+- **Strategic drift, OR 2+ triggers:** Proceed to Phase 1. **Advance
+  state: `overall_status: brief`.**
 
 Record the triggers and decision in `phases.rebrand_audit`. On
 `overall_status: ended_no_change`, `naming-state.yaml` is preserved so the
@@ -327,7 +348,8 @@ creative springboard — 1-2 words the entire generation phase pivots on.
 
 Distill to 1–2 words. Write into `findings.ultimate_concept`.
 
-Output: `01-brief.md` (see templates). Update state.
+Output: `01-brief.md` (see templates). **Advance state:
+`overall_status: namescape`.**
 
 ---
 
@@ -349,7 +371,8 @@ Output: `01-brief.md` (see templates). Update state.
 `disputes` and accept the user's classification. Agent taxonomy is
 advisory.
 
-Output: `02-namescape.md`. Update state.
+Output: `02-namescape.md`. **Advance state:
+`overall_status: generate`.**
 
 ---
 
@@ -497,7 +520,8 @@ Use these angles when generating:
 4. Sound patterns (K/T/P strong; L/M/S soft; V daring).
 5. Metaphors and physical objects.
 
-Output: `03-candidates.md`. Update state.
+Output: `03-candidates.md`. **Advance state:
+`overall_status: evaluate`.**
 
 ---
 
@@ -568,7 +592,7 @@ Output only: top 15 scored, user picks 10 to advance. The winner is NOT
 selected in this phase — that happens in Phase 6 after the tension test.
 
 Output: `04-evaluation.md` — full rubric for top 15, shortlist of 10 for
-tension testing.
+tension testing. **Advance state: `overall_status: tension_test`.**
 
 ---
 
@@ -655,7 +679,8 @@ If fewer than 3: set `phases.tension_test.status: skipped_low_sample`.
 Final decision proceeds on Score rubric alone, with explicit "not
 validated with users" warning in `05-decision.md`.
 
-Narrow to top 3 finalists.
+Narrow to top 3 finalists. **Advance state:
+`overall_status: decision`.**
 
 ---
 
