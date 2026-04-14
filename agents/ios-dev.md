@@ -32,7 +32,11 @@ replace this list with your own user-level skills.
 
 ### Third-party skills (path: `~/.claude/skills/<name>/SKILL.md`, install separately)
 
-- `app-store-connect-cli-skills` — App Store Connect CLI workflows (TestFlight, releases, metadata).
+- `asc-*` — App Store Connect CLI workflow skills (TestFlight, releases,
+  metadata, ASO, crash triage, signing, etc.). Installs ~20 skills all
+  prefixed `asc-` (e.g. `asc-release-flow`, `asc-testflight-orchestration`,
+  `asc-whats-new-writer`). List available ones with
+  `ls ~/.claude/skills/ | grep '^asc-'`, then read the matching SKILL.md.
   Install: https://github.com/rudrankriyam/app-store-connect-cli-skills
 - `iphone-apps` — Full iPhone app workflow (build, debug, test, ship — CLI-only).
   Install: https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps
