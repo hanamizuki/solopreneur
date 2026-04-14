@@ -124,11 +124,14 @@ Taxonomy types under-represented in the category (opportunity):
 
 ## Generation Summary
 
-| Model | Assigned types | Candidates produced |
-|-------|---------------|---------------------|
-| Claude | Suggestive, Metaphorical, Real-word-out-of-context | {N} |
-| Codex | Compound, Descriptive, Misspelled/Truncated | {N} |
-| Gemini | Invented, Greek/Latin root, Portmanteau | {N} |
+| Model | Candidates produced |
+|-------|---------------------|
+| Claude | {N} |
+| Codex | {N} |
+| Gemini | {N} |
+
+All selected models received the same full brief; taxonomy coverage
+emerges from model priors, not forced assignment.
 
 After dedupe: {final N}
 
@@ -153,8 +156,11 @@ After dedupe: {final N}
 
 ## Raw Model Outputs (for traceability)
 
-- `/tmp/naming-codex-batch.txt` (archived to `.raw/codex.txt`)
-- `/tmp/naming-gemini-batch.txt` (archived to `.raw/gemini.txt`)
+Per-session, timestamped paths under `docs/naming/.raw/`:
+
+- `brief-{TS}.md` — the exact brief sent to external models
+- `codex-{TS}.txt` — codex stdout (if codex was selected)
+- `gemini-{TS}.txt` — gemini stdout (if gemini was selected)
 - Claude batches: inline above
 ```
 
@@ -333,7 +339,7 @@ Candidates (pick 1-2):
 |--------|--------|------|
 | {name}.com | {available / taken / premium} | {register / acquire / substitute} |
 | {name}.co | {status} | {plan} |
-| {name}.io | {status} | ⚠ long-term geopolitical risk (ICANN 2024) |
+| {name}.io | {status} | ⚠ long-term uncertainty: UK–Mauritius Chagos transfer (Oct 2024) could eventually trigger ISO 3166-1 BIOT removal |
 | {name}.ai | {status} | |
 | get{name}.com | {status} | |
 | {name}hq.com | {status} | |

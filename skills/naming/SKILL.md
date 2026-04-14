@@ -12,10 +12,11 @@ description: |
 
 # Naming Skill
 
-A structured workflow for naming one product, one company, or one product+company
-that share the same name. Uses multi-model ensemble (Claude + optional Codex /
-Gemini) to generate diverse candidates, filters through a two-layer rubric
-(Gate + Score), tests with real humans, and produces a finalist.
+A structured workflow for naming one product, one company, or one brand
+where product and company share the same name. Uses multi-model ensemble
+(Claude + optional Codex / Gemini) to generate diverse candidates, filters
+through a two-layer rubric (Gate + Score), tests with real humans, and
+produces a finalist.
 
 ## Scope
 
@@ -23,10 +24,10 @@ Gemini) to generate diverse candidates, filters through a two-layer rubric
   product and company share the same name (treated as a single entity).
 - **Separate entities → run twice.** If product and company need different
   names, run the skill once for each. Do not merge briefs.
-- **Language:** English-first. Non-English markets handled only as gate check,
-  not name generation.
+- **Language:** English-first. Non-English markets handled only as gate
+  check, not name generation.
 - **Out of scope:** multi-product portfolio governance (brand architecture,
-  nomenclature systems). See the appendix.
+  nomenclature systems). See `references/out-of-scope.md`.
 
 ## Output
 
@@ -40,28 +41,68 @@ docs/naming/
 ├── 03-candidates.md          # All candidates grouped by taxonomy + source model
 ├── 04-evaluation.md          # Gate survivors + score rubric
 ├── test-kit.md               # Phase 5 tension test materials (printable)
-└── 05-decision.md            # Final choice, rationale, limitations, announcement
+├── 05-decision.md            # Final choice, rationale, limitations, announcement
+└── .raw/                     # Raw model outputs + briefs (per-session, timestamped)
 ```
 
 **Document schemas** — see `references/templates.md` for the full markdown
-template of each output file. Every phase output must match the template so
-that `resume` can reliably re-read state.
+template of each output file. Every phase output must match the template
+so outputs are consistent across sessions and can be audited or diffed.
 
 ---
 
+## Taxonomy Reference (11 Types)
+
+Full definitions and examples: `references/taxonomy.md`. Phases 2 and 3
+both depend on this list:
+
+1. Descriptive · 2. Suggestive / Evocative · 3. Invented / Coined ·
+4. Metaphorical · 5. Real word out of context · 6. Compound ·
+7. Portmanteau · 8. Greek / Latin root · 9. Founder · 10. Acronym ·
+11. Misspelled / Truncated.
+
+Phase 2 uses it to classify competitors. Phase 3 uses it as the generation
+palette. Always load `references/taxonomy.md` before either phase runs.
+
+---
+
+## First-Run Flow (Mode Ordering)
+
+The state file can only be created after the user tells us whether this
+is a greenfield or a rebrand. Order of operations on first run:
+
+1. Ask the **Starting Context** question (A/B/C) below.
+2. Derive `mode` from the answer: A or B → `greenfield`, C → `rebrand`.
+3. Create `docs/naming/naming-state.yaml` with the derived mode. Do not
+   hard-code `mode` before this step.
+4. Check for `docs/gtm/gtm-state.yaml` (see GTM Integration).
+5. If rebrand, run Phase 0; otherwise start at Phase 1.
+
+### Starting Context question
+
+> What's your situation?
+> - **A)** I have an idea but no code yet.
+> - **B)** I have code (or a working product) but no name — or just a placeholder.
+> - **C)** I have code and a name, but I want to consider a rebrand.
+
+- **A** → `mode: greenfield`, skip codebase scan, go to Phase 1.
+- **B** → `mode: greenfield`, light codebase scan (README, package.json,
+  top-level dirs) to pre-fill product description, then Phase 1.
+- **C** → `mode: rebrand`, run Phase 0 first.
+
 ## Modes
 
-| Mode | Trigger | Description |
-|------|---------|-------------|
-| **Greenfield** | No state file, user naming something new | Full 6-phase flow |
-| **Rebrand** | No state file, user has an existing name and wants to change | Phase 0 audit first → if "change" → full flow |
-| **Resume** | State file exists with `status != complete` and `status != ended_no_change` | Continue from last phase |
+| Mode | Trigger |
+|------|---------|
+| **Greenfield** | First run, user answered A or B |
+| **Rebrand** | First run, user answered C |
+| **Resume** | State file exists with `overall_status` not `complete` / `ended_no_change` |
 
 ---
 
 ## State Management
 
-On first run, create `docs/naming/naming-state.yaml`:
+After the Starting Context answer, create `docs/naming/naming-state.yaml`:
 
 ```yaml
 project: {repo name}
@@ -69,15 +110,15 @@ repo_path: {absolute path}
 created: {YYYY-MM-DD}
 last_updated: {YYYY-MM-DD}
 
-mode: greenfield              # greenfield | rebrand
-entity_scope: product         # product | company | both_same_name
-starting_context: B           # A (idea only) | B (code, no name) | C (code, has name → rebrand)
+mode: {greenfield|rebrand}     # derived from Starting Context
+entity_scope: product          # product | company | both_same_name
+starting_context: B            # A | B | C
 has_gtm_docs: false
 
-# Overall status enum — must be exactly one of these:
+# Top-level enum — must be exactly one of:
 # rebrand_audit | brief | namescape | generate | evaluate | tension_test |
 # decision | complete | ended_no_change
-status: brief
+overall_status: brief
 
 # Available model ensemble for Phase 3 generation (filled after detection)
 models_available:
@@ -123,11 +164,15 @@ disputes: []                    # any user disagreement; see Dispute Handling
 
 # Fallback flags — any "unverified" entry bubbles up to 05-decision.md Limitations
 unverified:
-  trademark: []                 # names we could not prescreen reliably
+  trademark: []
   domain: []
   handles: []
   cross_cultural: []
 ```
+
+**Naming note:** the top-level field is `overall_status`; per-phase status
+fields (e.g. `phases.tension_test.status`) share the simpler name `status`
+because they live under their phase namespace. Read/write consistently.
 
 **At the start of every session:**
 1. Read `naming-state.yaml`.
@@ -138,7 +183,8 @@ unverified:
 1. Update `findings` and phase status.
 2. Bump `last_updated`.
 3. Write the relevant phase file using the template from `references/templates.md`.
-4. Commit the state file.
+4. **Save the state file. Do not auto-commit** — the user decides when to
+   commit naming-state.yaml and phase outputs.
 
 ### Re-running a phase (invalidation rules)
 
@@ -146,41 +192,38 @@ When the user re-runs phase N, everything downstream is stale. Before
 executing, the skill MUST:
 
 1. Mark `phases.{N+1..}.status: pending` and zero their counters.
-2. Archive (rename) downstream files: `03-candidates.md` → `03-candidates.v1.md`
-   etc. Never silently overwrite.
-3. Clear `findings` keys owned by downstream phases.
-4. Announce to user: "Re-running Phase N will invalidate [list]. Proceed?"
+2. Archive downstream files with version suffix. Scan for the highest
+   existing `.vN.md` for that phase file and archive to `.v(N+1).md`
+   (e.g. if `03-candidates.v1.md` and `03-candidates.v2.md` exist,
+   archive current to `03-candidates.v3.md`). Never silently overwrite.
+3. Before archiving, check `git status` for that file. If it has
+   uncommitted changes, warn the user and ask whether to commit or
+   discard before proceeding.
+4. Clear `findings` keys owned by downstream phases.
+5. Announce to user: "Re-running Phase N will invalidate [list]. Proceed?"
 
 Dirty state at decision time is a failure mode — not a feature.
 
 ---
 
-## Starting Context
-
-On first run (before any phase), ask:
-
-> What's your situation?
-> - **A)** I have an idea but no code yet.
-> - **B)** I have code (or a working product) but no name — or just a placeholder.
-> - **C)** I have code and a name, but I want to consider a rebrand.
-
-- **A** → skip codebase scan, go to Phase 1.
-- **B** → light codebase scan (README, package.json, top-level dirs) to pre-fill product description, then Phase 1.
-- **C** → set `mode: rebrand`, run Phase 0 first.
-
 ## GTM Skill Integration
 
-After context is set, check for `{repo}/docs/gtm/gtm-state.yaml`. **Do not
-trust file existence alone** — check the state file for `status: complete`.
+After the state file is created, check for `{repo}/docs/gtm/gtm-state.yaml`.
+**Do not trust file existence alone** — check the state file for
+`status: complete`.
 
 **If `gtm-state.yaml` exists AND `status: complete`:**
 - Read all three relevant docs:
   - `01-brand-strategy.md` → Mission, Values, Personality, Positioning
   - `02-market-landscape.md` → ICP archetypes, competitors, JTBD
   - `03-messaging-framework.md` → Voice, tone, content pillars
-- Announce: "I see a completed GTM. I'll reuse personality, audience, voice,
-  and competitor list. If anything's changed since GTM was written, tell me now."
-- Skip overlapping Phase 1B (personality) and Phase 2 competitor discovery.
+- Announce: "I see a completed GTM. I'll reuse personality, audience,
+  voice, and competitor list. If anything's changed since GTM was written,
+  tell me now."
+- **Skip Phase 1B (personality) and Phase 2 competitor discovery.**
+  Phase 2 still runs taxonomy classification + no-go zone analysis on
+  the reused competitor list — those are naming-specific and GTM does
+  not produce them.
 - Set `has_gtm_docs: true`.
 
 **If `gtm-state.yaml` is missing, incomplete, or unreadable:**
@@ -191,8 +234,8 @@ trust file existence alone** — check the state file for `status: complete`.
 
 ## Phase 0 (Rebrand only): Keep or Change Audit
 
-Before any naming work, decide if renaming is actually the right move. Default
-answer is **no** — brand equity is expensive to rebuild.
+Before any naming work, decide if renaming is actually the right move.
+Default answer is **no** — brand equity is expensive to rebuild.
 
 Present these 4 triggers. Ask the user which apply:
 
@@ -202,15 +245,16 @@ Present these 4 triggers. Ask the user which apply:
 4. **Severe reputation damage** — name itself has become a liability (rename alone rarely fixes this).
 
 **Decision rule:**
-- **0 triggers:** Strongly recommend NOT renaming. Set `status: ended_no_change`.
-  Write summary to `01-brief.md`. Skill ends cleanly.
-- **1 trigger (not Strategic drift):** Caution. Ask user to reconsider. If user
-  insists on continuing, record in `disputes` and proceed.
+- **0 triggers:** Strongly recommend NOT renaming. Set
+  `overall_status: ended_no_change`. Write summary to `01-brief.md`.
+  Skill ends cleanly.
+- **1 trigger (not Strategic drift):** Caution. Ask user to reconsider.
+  If user insists on continuing, record in `disputes` and proceed.
 - **Strategic drift, OR 2+ triggers:** Proceed to Phase 1.
 
-Record the triggers and decision in `phases.rebrand_audit`. On `status:
-ended_no_change`, `naming-state.yaml` is preserved so the user can re-enter
-later by manually setting `status: brief`.
+Record the triggers and decision in `phases.rebrand_audit`. On
+`overall_status: ended_no_change`, `naming-state.yaml` is preserved so the
+user can re-enter later by manually setting `overall_status: brief`.
 
 ---
 
@@ -220,8 +264,8 @@ One question at a time. Skip overlapping questions if GTM docs are loaded.
 
 ### A. Benefit Ladder
 
-Climb feature → functional → emotional → ultimate. This produces the creative
-springboard — 1-2 words the entire generation phase pivots on.
+Climb feature → functional → emotional → ultimate. This produces the
+creative springboard — 1-2 words the entire generation phase pivots on.
 
 1. **Feature:** What does the product actually do? (mechanics)
 2. **Functional benefit:** What problem does that solve?
@@ -266,13 +310,21 @@ Output: `01-brief.md` (see templates). Update state.
 
 ## Phase 2: Namescape (Competitive Naming Map)
 
-1. List 20 competitors (reuse from GTM if loaded).
-2. Categorize each competitor name by taxonomy type (Phase 3 taxonomy).
-3. Identify dominant patterns — which taxonomy types saturate? Which suffixes / prefixes / sound profiles recur?
-4. **Declare no-go zones** — patterns so common you'd be invisible.
+1. **Competitor list:**
+   - If GTM loaded (`has_gtm_docs: true`): reuse competitor list from
+     `02-market-landscape.md`.
+   - Otherwise: discover 20 competitors from scratch.
+2. Classify each competitor name by taxonomy type (see
+   `references/taxonomy.md`). This step runs regardless of GTM state —
+   GTM does not produce taxonomy classifications.
+3. Identify dominant patterns — which taxonomy types saturate? Which
+   suffixes / prefixes / sound profiles recur?
+4. **Declare no-go zones** — patterns so common you'd be invisible. This
+   also runs regardless of GTM state.
 
-**If the user disagrees with a taxonomy classification**, record in `disputes`
-and accept the user's classification. Agent taxonomy is advisory.
+**If the user disagrees with a taxonomy classification**, record in
+`disputes` and accept the user's classification. Agent taxonomy is
+advisory.
 
 Output: `02-namescape.md`. Update state.
 
@@ -285,17 +337,27 @@ different priors for "good name."
 
 ### Step 1: Detect available models
 
-Run these probes:
+Run these availability probes, then (separately) auth probes:
 
 ```bash
-# Codex CLI
-command -v codex && codex login status
+# Codex CLI — availability
+command -v codex && codex --version
 
-# Gemini CLI
-command -v gemini
+# Gemini CLI — availability
+command -v gemini && gemini --version
 ```
 
-Populate `models_available.{claude,codex,gemini}`. Claude is always `true`.
+Availability check answers "is the binary installed and runnable?" If that
+passes, try a cheap authenticated smoke test (e.g. a trivial prompt with a
+1-token max output, or the vendor's recommended auth-check command). If
+the smoke test fails, report the specific reason and instruct the user:
+
+- codex: "codex installed but auth check failed — run `codex login`."
+- gemini: "gemini installed but auth check failed — re-auth with your
+  usual flow."
+
+Populate `models_available.{claude,codex,gemini}` based on the combined
+availability + auth result. Claude is always `true`.
 
 ### Step 2: Ask the user
 
@@ -305,27 +367,19 @@ Populate `models_available.{claude,codex,gemini}`. Claude is always `true`.
 > - **Claude + 1 other** (~200 candidates) — recommended baseline
 > - **All three** (~300 candidates) — maximum diversity
 >
-> You can also pick custom model set.
+> You can also pick a custom model set.
 
-Record in `models_selected`. Default `candidates_per_model: 100` (user-tunable).
+Record in `models_selected`. Default `candidates_per_model: 100`
+(user-tunable).
 
-### Step 3: Model-specific taxonomy assignments
+### Step 3: Shared brief for all models
 
-To maximize diversity, each model takes a different slice of the taxonomy
-(they overlap slightly on purpose):
+**All selected models receive the same full brief.** Diversity comes from
+model priors, not from forced taxonomy assignments. Each model generates
+`candidates_per_model` candidates across whichever taxonomy types it
+considers fit for the brief.
 
-| Model | Assigned taxonomy types | Rationale |
-|-------|------------------------|-----------|
-| **Claude** | Suggestive/Evocative, Metaphorical, Real-word-out-of-context | Literary intuition, metaphor fluency |
-| **Codex** | Compound, Descriptive, Misspelled/Truncated | Technical-domain naming conventions |
-| **Gemini** | Invented/Coined, Greek/Latin root, Portmanteau | Cross-linguistic + morphology strength |
-
-Always-included types (Founder, Acronym) are only generated if the brief
-requires them.
-
-### Step 4: Shared brief for all models
-
-Every model receives the same base brief (JSON or markdown):
+The brief (markdown):
 
 ```
 Ultimate concept: {findings.ultimate_concept}
@@ -333,28 +387,67 @@ Personality axes: {findings.personality}
 Target markets: {constraints.markets}
 Syllable preference: {constraints.syllable_preference}
 No-go patterns (skip these): {findings.no_go_patterns}
-Your assigned taxonomy types: {...}
+Taxonomy palette: see references/taxonomy.md (11 types)
 Target count: {candidates_per_model}
 ```
 
-### Step 5: Invocation
+### Step 4: Invocation
 
-- **Claude** (this skill's executor) — generate in-session, batched by type.
-- **Codex:**
-  ```bash
-  echo "{brief}" | codex exec - > /tmp/naming-codex-batch.txt
-  ```
-- **Gemini:**
-  ```bash
-  gemini -p "{brief}" -m "gemini-3-pro-preview" > /tmp/naming-gemini-batch.txt
-  ```
+**Never string-interpolate the brief into a shell command.** The brief
+contains free-form user text and would be a command-injection vector.
+Always write the brief to a file first with the Write tool, then pass it
+to the external CLI via stdin heredoc or (if supported) a `--file` flag.
+
+1. Generate a session timestamp: `TS=$(date +%Y%m%dT%H%M%S)`.
+2. Write the brief to `docs/naming/.raw/brief-{TS}.md` using the Write
+   tool — not via shell `echo`/`cat <<EOF`.
+3. Invoke each selected external model, reading that file:
+
+```bash
+# Codex — read brief from file via stdin
+codex exec - < docs/naming/.raw/brief-${TS}.md \
+  > docs/naming/.raw/codex-${TS}.txt
+CODEX_EXIT=$?
+
+# Gemini — read brief from file via stdin
+gemini -m "gemini-3-pro-preview" < docs/naming/.raw/brief-${TS}.md \
+  > docs/naming/.raw/gemini-${TS}.txt
+GEMINI_EXIT=$?
+```
+
+Claude (the skill executor) generates in-session against the same brief.
+
+### Step 5: Guard each external invocation
+
+External CLIs fail for many reasons (rate limit, auth expiry, network,
+model outage). **Never silently proceed on failure.** After each
+invocation, in this order:
+
+1. Check exit code. Non-zero → failure.
+2. Check output file line count. If the model was asked for ~100
+   candidates, require at least ~50 lines of output. Fewer → truncation
+   or error response.
+3. On failure: (a) downgrade `models_selected` by removing the failed
+   model; (b) notify the user explicitly with the reason; (c) ask
+   whether to retry, drop the model, or abort Phase 3. Do not merge the
+   failed model's output into `03-candidates.md`.
 
 ### Step 6: Merge + dedupe
 
-Claude (as the skill executor) reads all outputs, dedupes (case-insensitive
-string match + near-spelling variants), and writes `03-candidates.md`
-grouped by taxonomy type. Each entry records its source model so later
-analysis can see which model tends to win.
+Claude reads all successful outputs and dedupes. Dedupe rules:
+
+- **Case-insensitive exact match** → drop duplicate.
+- **Levenshtein distance ≤ 2 for names ≥ 5 characters** → drop duplicate
+  (preserve the one with the clearer etymology or lower taxonomy
+  saturation).
+- **Names < 5 characters** → exact match only (short names legitimately
+  diverge at low edit distance).
+- **Borderline cases** (distance = 2 on 5-char names, or phonetically
+  near-identical spellings) → keep both and flag for human review in
+  `04-evaluation.md`.
+
+Write `03-candidates.md` grouped by taxonomy type. Each entry records its
+source model so later analysis can see which model tends to win.
 
 ### Generation Discipline
 
@@ -363,27 +456,12 @@ analysis can see which model tends to win.
 Gate — not here. This preserves the approximate-thinking zone.
 
 Use these angles when generating:
-1. Synonyms of ultimate benefit
-2. Latin / Greek roots (etymonline.com)
-3. Adjacent fields (e.g. "clarity" → optics, water, weather, music)
-4. Sound patterns (K/T/P strong; L/M/S soft; V daring)
-5. Metaphors and physical objects
 
-### Taxonomy reference (11 types)
-
-| # | Type | Definition | Examples |
-|---|------|------------|----------|
-| 1 | Descriptive | Literally describes function | Hotels.com, Whole Foods |
-| 2 | Suggestive / Evocative | Evokes feeling, not literal | Netflix, Gatorade, Amazon |
-| 3 | Invented / Coined | Pure new word | Kodak, Xerox, Häagen-Dazs |
-| 4 | Metaphorical | Borrowed concept | Apple, Nike, Impossible Foods |
-| 5 | Real word out of context | Existing word, new category | Orange (telecom), Square, BlackBerry |
-| 6 | Compound | Two words joined | Facebook, YouTube, DoorDash |
-| 7 | Portmanteau | Fragments fused | Pinterest, Instagram, Microsoft |
-| 8 | Greek/Latin root | Classical morphemes | Pentium, Vercel, Verizon |
-| 9 | Founder | Person's name | Ford, Disney |
-| 10 | Acronym | Initial letters | IBM, BBC, 3M |
-| 11 | Misspelled / Truncated | Deliberate variant | Lyft, Flickr, Tumblr |
+1. Synonyms of ultimate benefit.
+2. Latin / Greek roots (etymonline.com).
+3. Adjacent fields (e.g. "clarity" → optics, water, weather, music).
+4. Sound patterns (K/T/P strong; L/M/S soft; V daring).
+5. Metaphors and physical objects.
 
 Output: `03-candidates.md`. Update state.
 
@@ -401,7 +479,7 @@ Cut any candidate that fails. No scoring — pass or cut.
 | **Spelling-on-hearing** | Can you spell it after hearing once? If not, cut. |
 | **Competitor echo** | Sounds similar to a direct competitor? Cut. |
 | **Literal description** | Just names the function? Cut (unless brief required descriptive). |
-| **Cross-cultural red flag** | Check meanings in Spanish, French, Chinese, German, Japanese (major markets). Known case: Mitsubishi Pajero = Spanish slur. ⚠ Urban-legend warning: Chevy Nova → "no va" is documented false (Snopes). Do not cut on superficial syllable overlap. Mark `unverified` if you cannot check reliably. |
+| **Cross-cultural red flag (quick pass)** | Quick LLM-based check across Spanish, French, Chinese, German, Japanese. LLM knowledge is unreliable here — mark `unverified` liberally rather than cutting. Known case: Mitsubishi Pajero = Spanish slur. ⚠ Urban-legend warning: Chevy Nova → "no va" is documented false (Snopes). Do not cut on superficial syllable overlap. The authoritative cross-cultural check runs at Phase 5 entry via WebSearch. |
 | **Core domain unavailable** | If brief requires `.com` and no reasonable modifier works, cut. Otherwise flag `unverified` and keep. |
 | **Trademark knockout** | USPTO Public Search for exact matches and confusing similarity in target class. If you lack tooling to query, mark `unverified` and keep. |
 
@@ -432,6 +510,15 @@ Score each gate survivor 1–10 on each dimension × weight:
 | **Cross-cultural portability** | 10 | No obvious landmines in target markets |
 | **Aesthetic / vibe** | 5 | "Do I want to say this every day?" |
 
+**Weight rationale:** Strategy fit and memorability dominate because those
+are the hardest dimensions to retrofit after launch — you can re-skin
+aesthetics and chase ownability with modifiers, but a name that doesn't
+connect to positioning or that people can't remember is a permanent tax.
+Aesthetic sits lowest because personal taste is the least predictive
+signal for market success. If your category has different priors (e.g.
+consumer fashion where aesthetic is load-bearing), adjust the weights and
+record the deviation.
+
 ### Funnel shape
 
 ```
@@ -441,14 +528,10 @@ Score each gate survivor 1–10 on each dimension × weight:
   → Take top 15 → user picks 10 for tension test
 ```
 
-### Decision Rule (Critical)
+### Phase 4 outcome
 
-**The winner is NOT the highest average.** A balanced 7-across-the-board
-name is the invisible zone — safe, forgettable, friction.
-
-**The winner scores 9–10 on Strategy fit AND Memorability AND creates
-tension in Phase 5** (polarizing reactions). Remarkable beats balanced
-(Placek / Andy Grove on Pentium).
+Output only: top 15 scored, user picks 10 to advance. The winner is NOT
+selected in this phase — that happens in Phase 6 after the tension test.
 
 Output: `04-evaluation.md` — full rubric for top 15, shortlist of 10 for
 tension testing.
@@ -459,6 +542,24 @@ tension testing.
 
 Skill cannot execute this — it requires real humans reacting cold. Skill
 produces a test kit, pauses, and interprets returns.
+
+### Phase 5 entry: cross-cultural WebSearch (authoritative)
+
+Before emitting the test kit, for each of the **top 10–15 survivors** from
+the Score rubric, run WebSearch for:
+
+- `{name} meaning in {language}` for each target market language.
+- `{name} slang {language}` for each target market language.
+
+This is the authoritative cross-cultural check. Phase 4's Gate pass was
+LLM-knowledge-only and deliberately conservative; this step catches things
+like regional slang, cultural associations, and trademark collisions the
+LLM did not know. Only names that come back clean (or clean-with-context)
+proceed to the tension test. Flagged names move to `unverified.cross_cultural`
+or are cut here depending on severity.
+
+Do NOT run this search on all 30–50 gate survivors — it's expensive and
+unnecessary before the Score filter narrows the field.
 
 ### Tester requirements
 
@@ -499,15 +600,26 @@ When patterns conflict, use this precedence:
 3. **Category mismatch + positive feeling** → CUT. Wrong category is a harder problem than wrong mood.
 4. **Polarizing ICP reactions** → SHORTLIST. Tension is the signal.
 
+### Completion rule
+
+Phase 5 is **done** when either:
+
+- The user explicitly confirms the results are final, OR
+- `tester_count ≥ 3` **AND** the user confirms no more responses are
+  coming.
+
+Never auto-advance based on tester count alone. Waiting is the default;
+the user decides when to close the window.
+
 ### Low-sample fallback
 
-If only 3 testers responded: set `phases.tension_test.status: complete`
-with `tester_count: 3` and note in Limitations. Weight tension test
-signals less heavily in final decision.
+If only 3 testers responded and user closes: set
+`phases.tension_test.status: complete` with `tester_count: 3` and note in
+Limitations. Weight tension test signals less heavily in final decision.
 
-If fewer than 3: set `status: skipped_low_sample`. Final decision proceeds
-on Score rubric alone, with explicit "not validated with users" warning
-in `05-decision.md`.
+If fewer than 3: set `phases.tension_test.status: skipped_low_sample`.
+Final decision proceeds on Score rubric alone, with explicit "not
+validated with users" warning in `05-decision.md`.
 
 Narrow to top 3 finalists.
 
@@ -524,9 +636,13 @@ For each of the top 3:
   at every pitch and interview for the next decade.
 - **Tagline candidates** — 3–5 short taglines leaning on the name.
 - **Domain strategy** — exact `.com`, then `.co` / `.io` / `.ai`, then
-  modifiers (`get{name}.com`, `{name}hq.com`, `{name}app.com`). ⚠ `.io`
-  has long-term geopolitical risk (ICANN 2024: BIOT code may be removed
-  from ISO 3166-1, triggering retirement policy).
+  modifiers (`get{name}.com`, `{name}hq.com`, `{name}app.com`).
+  ⚠ **`.io` faces long-term uncertainty.** The UK announced in October
+  2024 the transfer of Chagos Islands sovereignty to Mauritius, which
+  could eventually trigger ISO 3166-1 removal of the BIOT code and
+  ICANN's ccTLD retirement policy. As of ICANN's November 2024 blog, IO
+  still persists in ISO 3166-1 — no immediate action required, but watch
+  the space before committing `.io` as primary.
 - **Social handle check** — X, LinkedIn, Instagram, TikTok, GitHub.
 - **International risk flags** — WIPO Global Brand Database scan + quick
   translation check across major languages.
@@ -536,39 +652,37 @@ For each of the top 3:
 Any field that can't be verified → mark `unverified` and bubble to
 Limitations.
 
+### Winner Selection Rule (Critical)
+
+**The winner is NOT the highest average.** A balanced 7-across-the-board
+name is the invisible zone — safe, forgettable, friction.
+
+**The winner meets ALL three criteria:**
+
+1. Scores **9–10 on Strategy fit** in Phase 4 rubric.
+2. Scores **9–10 on Memorability / fluency** in Phase 4 rubric.
+3. Landed in the **tension zone** during Phase 5 (polarizing reactions,
+   not uniform approval).
+
+If no candidate meets all three, present the closest matches and
+escalate to the user — do not silently pick the highest total. Remarkable
+beats balanced (Placek / Andy Grove on Pentium).
+
 ### Final Selection
 
 Present the 3 finalists. User picks. Skill produces `05-decision.md`:
 
-- **Chosen name** + why it won over the other two
-- **Full brand origin story**
+- **Chosen name** + why it won over the other two.
+- **Full brand origin story.**
 - **Limitations block** (top of doc) — list every `unverified` field with
   explicit instruction: "Before filing trademark / launching, do X."
-- **Announcement draft** (rebrand mode only)
+- **Announcement draft** (rebrand mode only) — see
+  `references/rebrand-announcement.md` for the three-stage rollout
+  playbook and equity-preservation guidance by company stage.
 - **30-day launch checklist** — register trademark, secure domains, claim
-  handles, update README / site / packaging
+  handles, update README / site / packaging.
 
-### Rebrand Announcement Template (rebrand mode only)
-
-Three-stage rollout:
-
-1. **Pre-announce (internal, 2–4 weeks)** — trademark filed, domains
-   secured, handles claimed, team trained, landing page staged. Nothing public.
-2. **Announce (external, day 0)** — one blog post, one reason. Not "we
-   wanted to feel modern." Instead: strategic pivot, architecture clarity,
-   or legal necessity. Template: Vercel's "Zeit is now Vercel" (2020).
-3. **Transition (dual-brand, 3–12 months)** — every mention is
-   "{New}, formerly {Old}" in press, docs, app stores. Domain 301-redirect.
-   Old social handles rename rather than delete.
-
-**Equity preservation by stage:**
-- **Pre-Series B:** minimal equity, rename is cheap. Do it now.
-- **Growth stage:** need transition story + customer-by-customer outreach.
-  Expect 3–6 month SEO dip.
-- **Mature:** only if current name is actively harmful. Bar is high
-  (Tribune → tronc → Tribune as cautionary tale).
-
-Update state: `status: complete`.
+Update state: `overall_status: complete`.
 
 ---
 
@@ -588,8 +702,9 @@ Be explicit with the user about what it does NOT do:
   consumer research, brand-architecture strategy, and legal co-ordination
   this skill does not.
 - **Not qualified for multilingual naming.** Output is English-first;
-  non-English markets get a gate check only. For Chinese / Japanese /
-  Arabic markets, hire a native-speaker naming consultant.
+  non-English markets get a gate check plus Phase 5 WebSearch only. For
+  Chinese / Japanese / Arabic markets, hire a native-speaker naming
+  consultant.
 - **Tension test is small-sample.** 3–10 testers is directional, not
   statistically significant. Treat results as signal, not proof.
 
@@ -610,10 +725,11 @@ Users can disagree with agent judgment at any phase. The skill must:
    overrode" section, so future rebrand audits have the history.
 
 Common dispute points:
-- Rebrand audit verdict (user insists on renaming despite 0 triggers)
-- Taxonomy classification in Phase 2
-- Gate cuts in Phase 4 ("this one was unfairly killed")
-- Tension test interpretation
+
+- Rebrand audit verdict (user insists on renaming despite 0 triggers).
+- Taxonomy classification in Phase 2.
+- Gate cuts in Phase 4 ("this one was unfairly killed").
+- Tension test interpretation.
 
 ---
 
@@ -625,50 +741,17 @@ Common dispute points:
 - **Push once.** If still vague, note and move on.
 - **Summarize after each phase.** Confirm before proceeding.
 - **Respect rich answers.** Skip next topic if current answer already covers it.
-- **Update state file after every meaningful exchange.**
+- **Update state file after every meaningful exchange** (save only — no
+  auto-commit).
 
 ---
 
-## Out of Scope
+## References
 
-This skill names **one entity**. When you have 2+ products sharing brand
-equity, naming becomes an architecture problem — a different discipline
-with its own frameworks.
-
-If you reach that point, read:
-
-- **Brand architecture** (Branded House / Sub-brands / Endorsed / House of Brands): Aaker & Joachimsthaler, *Brand Leadership* (2000)
-- **Brand hierarchy** (Corporate → Family → Individual → Modifier): Keller, *Strategic Brand Management*, Chapter 11
-- **Nomenclature systems** for product lines: Siegel+Gale, Lippincott, Landor, Wolff Olins case studies
-
-**Patterns worth studying:**
-- Alphabet / Google (2015) — Sub-brand architecture
-- Block / Square (2021) — House of Brands pivot
-- Meta / Facebook (2021) — Branded House at corporate, House of Brands at product
-- Adobe Creative Cloud — Endorsed Brand with 30-year sub-brand equity
-
-When your portfolio grows to 3+ products, treat it as architecture, not a
-single name.
-
----
-
-## Methodology Sources
-
-**Practitioners:**
-- David Placek / Lexicon Branding — tension zone, sound symbolism, processing power (Vercel, BlackBerry, Swiffer, Pentium, Impossible Foods)
-- Scott Bair / Lunour — "How to Name Your Company" playbook (2026)
-- Anthony Shore / Operative Words — concepts before words
-- Eli Altman / A Hundred Monkeys — distillation, writerly naming
-- Interbrand, *In a Word* — funnel methodology
-- Siegel+Gale — naming strategy / nomenclature / validation
-
-**Books:**
-- Alexandra Watkins, *Hello My Name Is Awesome* — SMILE / SCRATCH
-- Rob Meyerson, *Brand Naming* (2021) — process handbook
-
-**Research:**
-- Alter & Oppenheimer (2006) — processing fluency and short-term judgments
-- Klink (2000) — sound symbolism in brand names
-- Motoki et al. (2022) — connotative meaning framework
-- Lewis & Frank (2016) — word length reflects conceptual complexity
-- Köhler (1929) / Ramachandran & Hubbard (2001) — Bouba-Kiki effect
+- `references/templates.md` — per-phase markdown schemas.
+- `references/taxonomy.md` — 11 naming taxonomy types (used by Phase 2 + 3).
+- `references/methodology.md` — practitioners, books, and research behind
+  the rubric.
+- `references/out-of-scope.md` — multi-product brand architecture pointers.
+- `references/rebrand-announcement.md` — three-stage rollout + equity
+  preservation by company stage (rebrand mode only).
