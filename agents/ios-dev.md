@@ -39,19 +39,20 @@ Axiom plugin skills (require Axiom installed):
 Path resolution:
 - `(user)` → `~/.claude/skills/<name>/SKILL.md`
 - `(axiom)` → `~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/skills/<name>/SKILL.md`
-  (run `ls ~/.claude/plugins/cache/axiom-marketplace/axiom/` to find the version)
+  (run `ls ~/.claude/plugins/cache/axiom-marketplace/axiom/ | sort -V | tail -1` to find the highest semver version)
 
 ## Extended Discovery
 
-Before producing any output (code, review, recommendation), Read:
+Before producing any output (code, review, recommendation), try to Read:
 `~/.claude/solopreneur/skill-index/ios.md`
 
 This file lists every iOS-relevant skill installed on this machine — both
 user-built and Axiom — that is not already in the curated list above. Each
 entry includes the resolved Path so you can Read directly.
 
-If the file does not exist, ask the user to run `/rebuild-skill-index`,
-then fall back to context7 + built-in knowledge.
+If the file does not exist, proceed with the curated list above + context7
++ built-in knowledge — do not block. (The user can run `/rebuild-skill-index`
+to generate it.)
 
 ## Optional: context7 Documentation Lookup
 

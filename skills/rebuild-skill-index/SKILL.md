@@ -29,14 +29,15 @@ unnecessary tokens.
 
 2. **Axiom plugin skills** (optional):
    ```bash
-   ls ~/.claude/plugins/cache/axiom-marketplace/axiom/
+   ls ~/.claude/plugins/cache/axiom-marketplace/axiom/ | sort -V | tail -1
    ```
-   - If the directory exists, take the first version directory listed and
-     glob: `~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/skills/*/SKILL.md`
+   - If the directory exists, use the highest semver version returned above
+     and glob: `~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/skills/*/SKILL.md`
    - If it does not exist, record a "missing" warning for the output file.
 
-For each SKILL.md found, Read just the top of the file (limit ~30 lines is
-plenty for frontmatter) to extract `name` and `description`.
+For each SKILL.md found, extract `name` and `description` from the frontmatter
+using `Read file_path=<path> limit=30 offset=0` (30 lines is plenty for
+frontmatter; do not full-read the file).
 
 ## Step 2: Read curated dedup list
 

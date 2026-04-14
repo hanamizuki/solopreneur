@@ -138,7 +138,7 @@ The `ios-dev` agent's curated list and extended index pull from these sources. I
 | Source | Platform | Skills |
 |--------|----------|--------|
 | [Axiom](https://github.com/CharlesWiltgen/Axiom) | iOS/macOS | 100+ skills covering SwiftUI, SwiftData, concurrency, networking, testing, App Store, camera, system integration, AI, graphics |
-| User-level skills (`~/.claude/skills/`) | All | Your own project-specific patterns and conventions — auto-classified into the iOS extended index by `/rebuild-skill-index` |
+| User-level skills (`~/.claude/skills/`) | iOS (v1) | Your own project-specific patterns and conventions — auto-classified into the iOS extended index by `/rebuild-skill-index` (other platforms TBD) |
 
 ### CLI Tools
 
