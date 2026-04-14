@@ -73,8 +73,11 @@ is a greenfield or a rebrand. Order of operations on first run:
 
 1. Ask the **Starting Context** question (A/B/C) below.
 2. Derive `mode` from the answer: A or B → `greenfield`, C → `rebrand`.
-3. Create `docs/naming/naming-state.yaml` with the derived mode. Do not
-   hard-code `mode` before this step.
+3. Create `docs/naming/naming-state.yaml` with the derived mode AND the
+   matching initial `overall_status`:
+   - `mode: greenfield` → `overall_status: brief`
+   - `mode: rebrand`    → `overall_status: rebrand_audit`
+   Do not hard-code `mode` or `overall_status` before this step.
 4. Check for `docs/gtm/gtm-state.yaml` (see GTM Integration).
 5. If rebrand, run Phase 0; otherwise start at Phase 1.
 
@@ -118,7 +121,11 @@ has_gtm_docs: false
 # Top-level enum — must be exactly one of:
 # rebrand_audit | brief | namescape | generate | evaluate | tension_test |
 # decision | complete | ended_no_change
-overall_status: brief
+#
+# Initial value depends on mode:
+# - greenfield → overall_status: brief
+# - rebrand    → overall_status: rebrand_audit  (Phase 0 must run first)
+overall_status: brief           # or rebrand_audit when mode: rebrand
 
 # Available model ensemble for Phase 3 generation (filled after detection)
 models_available:
@@ -661,8 +668,11 @@ name is the invisible zone — safe, forgettable, friction.
 
 **The winner meets ALL three criteria:**
 
-1. Scores **9–10 on Strategy fit** in Phase 4 rubric.
-2. Scores **9–10 on Memorability / fluency** in Phase 4 rubric.
+1. **Raw** score **9 or 10 (out of 10)** on Strategy fit in the Phase 4
+   rubric. ⚠ This is the raw 1–10 rating the rubric asks for BEFORE
+   multiplying by the 25-point weight — not 9 out of the weighted 25.
+2. **Raw** score **9 or 10 (out of 10)** on Memorability / fluency
+   (before the ×20 weight is applied).
 3. Landed in the **tension zone** during Phase 5 (polarizing reactions,
    not uniform approval).
 
