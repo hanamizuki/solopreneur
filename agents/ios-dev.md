@@ -12,7 +12,10 @@ You are an iOS/macOS SwiftUI development expert.
 For any iOS task, always consider the following hand-picked skills. Read the
 corresponding SKILL.md for any that matches your task.
 
-### Plugin built-in skills (bundled with solopreneur)
+### Plugin built-in skills (path: `~/.claude/plugins/cache/solopreneur/solopreneur/<version>/skills/<name>/SKILL.md`)
+
+Bundled with this plugin — always available. To resolve `<version>`, run:
+`ls ~/.claude/plugins/cache/solopreneur/solopreneur/ | sort -V | tail -1`
 
 - `ios-patterns` — Team SwiftUI conventions: i18n (String Catalog), date
   localization, ISO8601 date parsing, Previews, state management, sheet &
