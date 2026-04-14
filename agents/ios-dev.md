@@ -12,7 +12,9 @@ You are an iOS/macOS SwiftUI development expert.
 For any iOS task, always consider the following hand-picked skills. Read the
 corresponding SKILL.md for any that matches your task.
 
-User-built skills:
+User-built skills (maintainer's local skills — forks may not have these
+installed; if missing, skip and rely on the Axiom + extended index entries
+below, or replace this list with your own user-level skills):
 - `ios-patterns-hana` (user) — Team SwiftUI + i18n (String Catalog) conventions
 - `ios-iphone-apps` (user) — Full iPhone app workflow (build, debug, test, ship — CLI-only)
 - `ios-kavsoft-reference` (user) — 140+ SwiftUI UI example reference catalog
