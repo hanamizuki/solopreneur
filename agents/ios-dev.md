@@ -17,7 +17,6 @@ installed; if missing, skip and rely on the Axiom + extended index entries
 below, or replace this list with your own user-level skills):
 - `ios-patterns-hana` (user) — Team SwiftUI + i18n (String Catalog) conventions
 - `ios-iphone-apps` (user) — Full iPhone app workflow (build, debug, test, ship — CLI-only)
-- `ios-kavsoft-reference` (user) — 140+ SwiftUI UI example reference catalog
 - `ios-swiftui-nav-ref` (user) — SwiftUI Navigation reference (Stack, SplitView, Liquid Glass)
 - `ios-swiftui-26-ref` (user) — iOS 26 SwiftUI new features reference
 
