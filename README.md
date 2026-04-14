@@ -119,7 +119,7 @@ Solopreneur's agents and skills auto-discover tools from other installed plugins
 |--------|------|---------|---------|
 | [Axiom](https://github.com/CharlesWiltgen/Axiom) | Plugin | `ios-dev` agent | 200+ skills covering SwiftUI, SwiftData, concurrency, testing, App Store, camera, AI, graphics |
 | [app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills) | Skills | `ios-dev` agent | App Store Connect CLI — TestFlight, releases, metadata |
-| [build-iphone-apps](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps) | Skill | `ios-dev` agent | Full iPhone app workflow (build, debug, test, ship — CLI-only) |
+| [iphone-apps](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps) | Skill | `ios-dev` agent | Full iPhone app workflow (build, debug, test, ship — CLI-only) |
 
 User-level skills in `~/.claude/skills/` are auto-classified into the iOS extended index by `/rebuild-skill-index` (other platforms TBD).
 

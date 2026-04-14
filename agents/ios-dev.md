@@ -21,7 +21,7 @@ below, or replace this list with your own user-level skills):
 
 Third-party skills (require separate install):
 - `app-store-connect-cli-skills` — App Store Connect CLI workflows (TestFlight, releases, metadata). Install: https://github.com/rudrankriyam/app-store-connect-cli-skills
-- `build-iphone-apps` — Full iPhone app workflow (build, debug, test, ship — CLI-only). Install: https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps
+- `iphone-apps` — Full iPhone app workflow (build, debug, test, ship — CLI-only). Install: https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps
 
 Axiom plugin skills (require Axiom installed):
 - `axiom-ios-ui` (axiom) — UI router (SwiftUI, UIKit, layout, navigation, animations)
