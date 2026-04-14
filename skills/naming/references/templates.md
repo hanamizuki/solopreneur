@@ -201,7 +201,7 @@ Names kept with `unverified` flags (must appear in 05-decision.md Limitations):
 
 | Name | Unverified field | Reason |
 |------|-----------------|--------|
-| {name} | trademark / domain / cross-cultural | {why we couldn't verify} |
+| {name} | trademark / domain / handles / cross-cultural | {why we couldn't verify} |
 
 ## Layer 2: Score (top 15)
 
