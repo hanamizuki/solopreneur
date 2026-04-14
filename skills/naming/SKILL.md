@@ -445,15 +445,19 @@ invocation, in this order:
 
 Claude reads all successful outputs and dedupes. Dedupe rules:
 
-- **Case-insensitive exact match** → drop duplicate.
-- **Levenshtein distance ≤ 2 for names ≥ 5 characters** → drop duplicate
-  (preserve the one with the clearer etymology or lower taxonomy
-  saturation).
-- **Names < 5 characters** → exact match only (short names legitimately
-  diverge at low edit distance).
-- **Borderline cases** (distance = 2 on 5-char names, or phonetically
-  near-identical spellings) → keep both and flag for human review in
-  `04-evaluation.md`.
+Apply in order — first rule that matches wins:
+
+1. **Case-insensitive exact match** → drop duplicate.
+2. **Names < 5 characters** → exact match only. Different spellings are
+   kept (short names legitimately diverge at low edit distance).
+3. **Names = 5 characters, Levenshtein distance = 1** → drop duplicate
+   (preserve the one with clearer etymology or lower taxonomy saturation).
+4. **Names = 5 characters, Levenshtein distance = 2** → borderline: keep
+   both and flag in `04-evaluation.md` for human review.
+5. **Names ≥ 6 characters, Levenshtein distance ≤ 2** → drop duplicate
+   (same preservation rule as #3).
+6. **Phonetically near-identical spellings** regardless of Levenshtein
+   (e.g., Kava / Cava, Klair / Clare) → borderline: keep both and flag.
 
 Write `03-candidates.md` grouped by taxonomy type. Each entry records its
 source model so later analysis can see which model tends to win.

@@ -10,7 +10,11 @@ shorter announcement-draft block.
 
 Before any public signal:
 
-- Trademark filed (at least the US provisional).
+- Trademark application filed — e.g., USPTO §1(a) if the mark is already
+  in use in commerce, or §1(b) Intent-to-Use if launch is still ahead.
+  (There is no such thing as a "provisional trademark" — that's a patent
+  concept. Don't confuse the two.) Full clearance still requires an
+  attorney.
 - Primary domain + 2 modifiers secured.
 - Social handles claimed (even if not yet posting).
 - Team trained on the new name, pronunciation, and the "why" talking point.

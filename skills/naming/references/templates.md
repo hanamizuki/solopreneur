@@ -205,9 +205,22 @@ Names kept with `unverified` flags (must appear in 05-decision.md Limitations):
 
 ## Layer 2: Score (top 15)
 
-| Rank | Name | Strat (25) | Mem (20) | Sound (15) | Extend (15) | Own (10) | Cross (10) | Vibe (5) | Total |
+**Record raw 1–10 ratings AND the weighted totals.** The Phase 6 winner rule
+checks raw Strategy and Memorability scores (must be 9 or 10); the weighted
+total is only for ranking. Losing the raw values breaks winner auditability.
+
+### Raw scores (1–10 per dimension)
+
+| Rank | Name | Strat | Mem | Sound | Extend | Own | Cross | Vibe |
+|------|------|-------|-----|-------|--------|-----|-------|------|
+| 1 | {name} | 9 | 9 | 8 | 9 | 8 | 9 | 8 |
+| ... | ... | ... | ... | ... | ... | ... | ... | ... |
+
+### Weighted totals (raw × weight)
+
+| Rank | Name | Strat (×25) | Mem (×20) | Sound (×15) | Extend (×15) | Own (×10) | Cross (×10) | Vibe (×5) | Total |
 |------|------|-----------|----------|-----------|-------------|---------|-----------|---------|-------|
-| 1 | {name} | 22 | 18 | 12 | 13 | 8 | 9 | 4 | 86 |
+| 1 | {name} | 22.5 | 18 | 12 | 13.5 | 8 | 9 | 4 | 87 |
 | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 
 ## Shortlist for Tension Test
