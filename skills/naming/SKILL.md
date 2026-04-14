@@ -379,13 +379,14 @@ model priors, not from forced taxonomy assignments. Each model generates
 `candidates_per_model` candidates across whichever taxonomy types it
 considers fit for the brief.
 
-The brief (markdown):
+The brief (markdown). **All placeholder paths are relative to
+`naming-state.yaml` — use the full dotted path when substituting.**
 
 ```
 Ultimate concept: {findings.ultimate_concept}
 Personality axes: {findings.personality}
-Target markets: {constraints.markets}
-Syllable preference: {constraints.syllable_preference}
+Target markets: {findings.constraints.markets}
+Syllable preference: {findings.constraints.syllable_preference}
 No-go patterns (skip these): {findings.no_go_patterns}
 Taxonomy palette: see references/taxonomy.md (11 types)
 Target count: {candidates_per_model}
@@ -399,8 +400,9 @@ Always write the brief to a file first with the Write tool, then pass it
 to the external CLI via stdin heredoc or (if supported) a `--file` flag.
 
 1. Generate a session timestamp: `TS=$(date +%Y%m%dT%H%M%S)`.
-2. Write the brief to `docs/naming/.raw/brief-{TS}.md` using the Write
-   tool — not via shell `echo`/`cat <<EOF`.
+2. Write the brief to `docs/naming/.raw/brief-${TS}.md` using the Write
+   tool — not via shell `echo`/`cat <<EOF`. **Use `${TS}` throughout —
+   the Write path MUST match the read paths in Step 3.**
 3. Invoke each selected external model, reading that file:
 
 ```bash
@@ -664,9 +666,17 @@ name is the invisible zone — safe, forgettable, friction.
 3. Landed in the **tension zone** during Phase 5 (polarizing reactions,
    not uniform approval).
 
-If no candidate meets all three, present the closest matches and
-escalate to the user — do not silently pick the highest total. Remarkable
-beats balanced (Placek / Andy Grove on Pentium).
+**Exception — `skipped_low_sample` runs:** when Phase 5 was skipped
+because fewer than 3 testers responded, criterion 3 cannot be evaluated.
+Waive it and decide on criteria 1 + 2 alone, but explicitly add
+"Not validated with users — tension zone unverified" to the
+`05-decision.md` Limitations block so the user treats the pick as
+provisional.
+
+If no candidate meets all three (or both, in the low-sample case),
+present the closest matches and escalate to the user — do not silently
+pick the highest total. Remarkable beats balanced (Placek / Andy Grove
+on Pentium).
 
 ### Final Selection
 
