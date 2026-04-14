@@ -35,7 +35,7 @@ Reference: [Vico GitHub Discussion #795](https://github.com/patrykandpatrick/vic
 | 2 | Simplified preview-only copy | Legacy code or special cases where refactoring is too costly | ⭐⭐ Avoid when possible — two copies diverge |
 | 3 | Internal-implementation pattern | Component depends on ViewModel / Flow and has non-trivial logic | ⭐⭐⭐⭐⭐ Best choice for complex components |
 
-**Solution 1 is covered below.** For solutions 2 and 3, see `compose-preview-solutions.md`. For debugging when previews still fail, see `compose-preview-debugging.md`.
+**Solution 1 is covered below.** For solutions 2 and 3, see `compose-preview-solutions.md`. For debugging when previews still fail, see `compose-preview-debugging.md`. For chart-specific preview patterns (Vico, fake data providers, multi-state previews), see `compose-preview-charts.md`.
 
 ---
 
@@ -75,35 +75,29 @@ fun SingleLineChart(
     val isInPreview = LocalInspectionMode.current
     val modelProducer = remember { CartesianChartModelProducer() }
 
-    if (isInPreview) {
-        // Preview: initialize synchronously
-        remember(validEntries) {
-            if (validEntries.isNotEmpty()) {
-                runBlocking {
-                    modelProducer.runTransaction {
-                        lineSeries {
-                            series(
-                                x = validEntries.map { it.first },
-                                y = validEntries.map { it.second },
-                            )
-                        }
-                    }
-                }
+    // Shared body for both paths — avoids duplicating the transaction logic.
+    val updateChart: suspend () -> Unit = {
+        modelProducer.runTransaction {
+            lineSeries {
+                series(
+                    x = validEntries.map { it.first },
+                    y = validEntries.map { it.second },
+                )
             }
+        }
+    }
+
+    if (isInPreview) {
+        // Preview: initialize synchronously. `remember` here is used for its
+        // side effect — an unusual but intentional idiom for preview-only
+        // synchronous init.
+        remember(validEntries) {
+            if (validEntries.isNotEmpty()) runBlocking { updateChart() }
         }
     } else {
         // Production: initialize asynchronously
         LaunchedEffect(validEntries) {
-            if (validEntries.isNotEmpty()) {
-                modelProducer.runTransaction {
-                    lineSeries {
-                        series(
-                            x = validEntries.map { it.first },
-                            y = validEntries.map { it.second },
-                        )
-                    }
-                }
-            }
+            if (validEntries.isNotEmpty()) updateChart()
         }
     }
 
@@ -146,12 +140,7 @@ private fun SingleLineChartPreview_MainChart() {
 - `runBlocking` is normally forbidden in UI code, but the preview environment is single-shot rendering, not a live app — synchronous init is acceptable there
 - Branching keeps production code on the proper async path
 
-### Required imports
-
-```kotlin
-import androidx.compose.ui.platform.LocalInspectionMode
-import kotlinx.coroutines.runBlocking
-```
+> Caveat: this branches on `LocalInspectionMode.current`, which is also `true` in Paparazzi and other screenshot-test harnesses. Those harnesses run on the main thread and can deadlock under `runBlocking`. If you target those harnesses, prefer the internal-implementation pattern (solution 3) instead.
 
 ### Pros
 

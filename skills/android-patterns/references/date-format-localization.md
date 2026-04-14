@@ -135,7 +135,9 @@ When the app's UI language can differ from the system locale, you need to split 
 When calling `formatMonthDay()` from a composable, pass the app locale explicitly as `displayLocale`:
 
 ```kotlin
-val appLocale = LocalConfiguration.current.locales[0]
+val appLocale = LocalConfiguration.current.locales
+    .takeIf { !it.isEmpty }?.get(0)
+    ?: DateDisplayFormatter.getEffectiveLocale()
 DateDisplayFormatter.formatMonthDay(date, MonthDayStyle.ABBREV, appLocale)
 ```
 
@@ -168,7 +170,9 @@ Checklist before calling a formatter:
 
 1. ✅ Get the app locale from the composable scope:
    ```kotlin
-   val appLocale = LocalConfiguration.current.locales[0]
+   val appLocale = LocalConfiguration.current.locales
+       .takeIf { !it.isEmpty }?.get(0)
+       ?: DateDisplayFormatter.getEffectiveLocale()
    ```
 
 2. ✅ Pass `displayLocale`:
@@ -185,7 +189,9 @@ Checklist before calling a formatter:
 DateDisplayFormatter.formatMonthDay(date, MonthDayStyle.ABBREV)
 
 // ✅ Uses app locale
-val appLocale = LocalConfiguration.current.locales[0]
+val appLocale = LocalConfiguration.current.locales
+    .takeIf { !it.isEmpty }?.get(0)
+    ?: DateDisplayFormatter.getEffectiveLocale()
 DateDisplayFormatter.formatMonthDay(date, MonthDayStyle.ABBREV, appLocale)
 ```
 

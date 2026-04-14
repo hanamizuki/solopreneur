@@ -6,11 +6,7 @@ Patterns for writing high-quality previews of chart components (especially Vico)
 
 ## Choosing a solution
 
-| Scenario | Recommended solution |
-|---|---|
-| Chart has complex business logic or depends on ViewModel/Flow | Solution 3 (internal-implementation) |
-| Standalone chart, no ViewModel, only async-init issue | Solution 1 (`LocalInspectionMode`) |
-| Legacy / can't refactor right now | Solution 2 (simplified copy, as last resort) |
+See the solution-selection table in `compose-preview-overview.md`. Charts almost always want Solution 3 — see below.
 
 ### Why solution 3 is usually right for charts
 
@@ -141,7 +137,7 @@ Prefer a realistic *size* of series too — 60 points is a better stress test th
 private fun ChartPreview_Sizes() { /* ... */ }
 ```
 
-Compose's multi-preview annotations (`@Preview` applied multiple times) are the concise way to do this.
+`@Preview` is `@Repeatable` — stack multiple for different configs at once. For common matrices (sizes, light/dark, font scales), Compose 1.6+ also ships `@PreviewScreenSizes`, `@PreviewLightDark`, `@PreviewFontScale` as shorthand.
 
 ---
 

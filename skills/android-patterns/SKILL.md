@@ -1,7 +1,7 @@
 ---
 name: android-patterns
-description: "Battle-tested Jetpack Compose patterns for Kotlin/Android projects. Covers @Preview setup (LocalInspectionMode, Vico charts rendering blank in preview), Scaffold + bottom navigation + status bar insets, ModalBottomSheet nested-scroll jitter, Ripple clipping on rounded corners, SwipeToDismissBox with transparent content, and locale-aware date formatting (MM/DD vs DD/MM, MIUI locale quirks). Use this skill whenever writing Kotlin or Jetpack Compose code, building a new @Preview, debugging a blank preview, handling window insets with Scaffold/TopAppBar, implementing swipe-to-dismiss or bottom sheets, or displaying user-facing dates across locales — even if the user does not explicitly mention 'pattern' or 'best practice'."
-disable-model-invocation: true
+description: Use when building Android apps with Jetpack Compose — covers @Preview setup (LocalInspectionMode, Vico charts), Scaffold + bottom nav + status bar insets, ModalBottomSheet nested-scroll jitter, ripple clipping on rounded corners, SwipeToDismissBox with transparent content, and locale-aware date formatting (MIUI quirks).
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
 # Android / Jetpack Compose Patterns
@@ -14,11 +14,8 @@ Decide by the symptom or the task at hand, then read the matching reference befo
 
 | Task / Symptom | Reference |
 |---|---|
-| Writing a new `@Preview`, or existing preview renders blank / shows no data | `references/compose-preview-overview.md` — start here, then branch |
-| Preview involves Vico charts, `LaunchedEffect`, or `CartesianChartModelProducer` | `references/compose-preview-overview.md` (solution 1) |
-| Component depends on a ViewModel / Flow and preview needs real logic | `references/compose-preview-solutions.md` (solution 3: internal implementation) |
-| Preview still blank after applying a solution — need a debug workflow | `references/compose-preview-debugging.md` |
-| Writing chart previews or setting up fake data providers for charts | `references/compose-preview-charts.md` |
+| Writing a new `@Preview`, preview is blank, or any preview question | `references/compose-preview-overview.md` — start here (it branches to solutions/debugging/charts) |
+| Preview involves Vico charts, `CartesianChartModelProducer`, or complex chart logic | `references/compose-preview-charts.md` |
 | Designing `Scaffold` + `BottomNavigationBar` + `TopAppBar` with edge-to-edge / status bar | `references/scaffold-bottom-nav.md` |
 | Content inside `ModalBottomSheet` jitters when scrolled to top | `references/bottomsheet-scroll.md` |
 | Ripple on a rounded/shaped clickable is rectangular or spills past corners | `references/compose-ripple-clipping.md` |

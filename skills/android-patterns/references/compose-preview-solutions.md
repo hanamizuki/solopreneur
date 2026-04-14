@@ -1,6 +1,6 @@
 # Compose Preview — Solutions 2 and 3
 
-For the problem statement and solution 1 (`LocalInspectionMode`), see `compose-preview-overview.md`.
+For the problem statement and solution 1 (`LocalInspectionMode`), see `compose-preview-overview.md`. For chart-specific preview patterns (Vico, fake data providers, multi-state previews), see `compose-preview-charts.md`.
 
 ---
 
@@ -16,7 +16,10 @@ For the problem statement and solution 1 (`LocalInspectionMode`), see `compose-p
 
 ```kotlin
 /**
- * Preview-only simplified copy: takes data directly, no ViewModel.
+ * Preview-only simplified copy: takes data directly, bypassing the
+ * ViewModel. Keep this thin — any real ordering / scroll / sizing logic
+ * belongs in the production component. For the full ordering logic see
+ * Solution 3 (`TrendChartViewInternal`) below.
  */
 @Composable
 private fun TrendChartViewSimplified(
@@ -26,47 +29,9 @@ private fun TrendChartViewSimplified(
     dateRange: ClosedRange<LocalDate>,
     modifier: Modifier = Modifier,
 ) {
-    val weightColor = MaterialTheme.colorScheme.onBackground
-    val muscleColor = MaterialTheme.colorScheme.secondary
-    val fatColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
-
-    val weightLabel = stringResource(R.string.weight)
-    val muscleLabel = stringResource(R.string.muscle)
-    val fatLabel = stringResource(R.string.body_fat)
-
-    // Dynamic ordering based on latest values
-    val chartConfigs = remember(
-        muscleData, fatData, weightData,
-        weightColor, muscleColor, fatColor,
-        weightLabel, muscleLabel, fatLabel,
-    ) {
-        val latestMuscle = muscleData.lastOrNull { it.hasValue }?.value
-        val latestFat = fatData.lastOrNull { it.hasValue }?.value
-
-        val weightConfig = ChartConfig(data = weightData, color = weightColor, label = weightLabel)
-
-        if (latestFat != null && latestMuscle != null && latestFat > latestMuscle) {
-            listOf(
-                weightConfig,
-                ChartConfig(fatData, fatColor, fatLabel),
-                ChartConfig(muscleData, muscleColor, muscleLabel),
-            )
-        } else {
-            listOf(
-                weightConfig,
-                ChartConfig(muscleData, muscleColor, muscleLabel),
-                ChartConfig(fatData, fatColor, fatLabel),
-            )
-        }
-    }
-
     Column(modifier = modifier.fillMaxWidth()) {
-        chartConfigs.forEach { config ->
-            SingleLineChart(
-                data = config.data,
-                dateRange = dateRange,
-                lineColor = config.color,
-            )
+        listOf(weightData, muscleData, fatData).forEach { data ->
+            SingleLineChart(data = data, dateRange = dateRange, lineColor = Color.Black)
         }
     }
 }
@@ -190,6 +155,8 @@ private fun TrendChartViewInternal(
     // Chart width calculation — defend against preview returning 0
     val density = LocalDensity.current
     val containerWidth = with(density) {
+        // Requires Compose UI 1.6+. On older Compose use
+        // `LocalConfiguration.current.screenWidthDp.dp`.
         val width = LocalWindowInfo.current.containerSize.width.toDp()
         if (width > 0.dp) width else 360.dp  // fallback for preview
     }

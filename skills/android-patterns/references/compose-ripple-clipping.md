@@ -86,3 +86,5 @@ Card(
 ```
 
 The `shape` on `Card` gives the card its outline; `clip` on the modifier chain ensures the ripple (drawn by `clickable`) is bounded by that same shape.
+
+Note: Material3 also ships a `Card(onClick = ...)` overload that clips the ripple to the card's `shape` automatically. The manual `clip + clickable` pattern above is only needed when wiring `clickable` onto the parameter-less `Card { ... }` form.

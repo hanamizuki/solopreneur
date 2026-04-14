@@ -157,6 +157,8 @@ fun SomeFullScreenScreen(onBack: () -> Unit) {
 
 ## Presenting a full screen inside a `ModalBottomSheet`
 
+If the sheet content is scrollable, also apply the `NestedScrollConnection` from `bottomsheet-scroll.md` to avoid drag jitter at the top of the scroll.
+
 Reuse the screen in case A with `showTopBar = false`:
 
 ```kotlin
