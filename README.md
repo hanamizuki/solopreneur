@@ -97,50 +97,31 @@ Platform-specific development experts used by `/preflight`, `/specialist-review`
 | `python-dev` | Python/FastAPI | Curated list (extended index coming in a later release) |
 | `llm-dev` | LLM/LangGraph | Curated list (extended index coming in a later release) |
 
-## Ecosystem
+## Auto-Integrations
 
-This plugin integrates with tools across the Claude Code ecosystem. All integrations are optional and degrade gracefully — the plugin works with just `git` and `gh`.
+Solopreneur's agents and skills auto-discover tools from other installed plugins and skill libraries. Install what matches your work — no config, `/preflight`, `/specialist-review`, and `/greenlight` will pick them up.
 
-### External Code Reviewers
+### Any Stack
 
-`/greenlight` orchestrates these reviewers with automatic fallback:
+| Source | Type | Used by | Purpose |
+|--------|------|---------|---------|
+| [superpowers](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/superpowers) | Plugin | `/greenlight`, `/specialist-review` | `requesting-code-review`, `receiving-code-review` |
+| [gstack](https://github.com/gstack-dev/gstack) | User skill | `/greenlight` | `/review` — SQL safety, trust boundaries, structural issues |
+| [context7](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/context7) | MCP | `/preflight`, `/specialist-review` | Current official docs for APIs and frameworks |
+| [Codex GitHub Bot](https://github.com/apps/chatgpt-codex-connector) | GitHub App | `/greenlight` | External PR reviewer (`@codex review`) |
+| [Codex CLI](https://github.com/openai/codex) | CLI | `/greenlight`, `/second-opinion` | External reviewer, local |
+| [Gemini Code Assist](https://github.com/apps/gemini-code-assist) | GitHub App | `/greenlight` | External PR reviewer (`/gemini review`) |
+| [CodeRabbit](https://coderabbit.ai) | GitHub App | `/greenlight` | External PR reviewer (auto-triggered) |
 
-| Reviewer | How it works | Setup |
-|----------|-------------|-------|
-| [Codex GitHub Bot](https://github.com/apps/chatgpt-codex-connector) | Triggers via `@codex review` PR comment | Enable Codex GitHub App on your repo |
-| [Codex CLI](https://github.com/openai/codex) | Runs `codex review` locally | `npm i -g @openai/codex && codex login` |
-| [Gemini Code Assist](https://github.com/apps/gemini-code-assist) | Triggers via `/gemini review` PR comment | Enable Gemini Code Assist on your repo |
-| [CodeRabbit](https://coderabbit.ai) | Auto-triggers on push (passive) | Enable CodeRabbit on your repo |
+### iOS / macOS
 
-### MCP Servers
+| Source | Type | Used by | Purpose |
+|--------|------|---------|---------|
+| [Axiom](https://github.com/CharlesWiltgen/Axiom) | Plugin | `ios-dev` agent | 200+ skills covering SwiftUI, SwiftData, concurrency, testing, App Store, camera, AI, graphics |
 
-| Server | Used by | Purpose |
-|--------|---------|---------|
-| [context7](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/context7) | `/preflight`, `/specialist-review` | Fetches current official docs for APIs and frameworks |
+User-level skills in `~/.claude/skills/` are auto-classified into the iOS extended index by `/rebuild-skill-index` (other platforms TBD).
 
-### Claude Code Built-in Skills
-
-`/greenlight` uses this built-in skill during internal review:
-
-- `/simplify` — code quality, reuse, efficiency
-
-### Skills from Other Sources
-
-| Source | Skills used | Used by |
-|--------|------------|---------|
-| [superpowers](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/superpowers) (plugin) | `requesting-code-review`, `receiving-code-review` | `/greenlight`, `/specialist-review` |
-| [gstack](https://github.com/gstack-dev/gstack) (user-level skill) | `/review` — SQL safety, trust boundaries, structural issues | `/greenlight` |
-
-### Third-Party Skill Libraries
-
-The `ios-dev` agent's curated list and extended index pull from these sources. Install them for deeper platform expertise:
-
-| Source | Platform | Skills |
-|--------|----------|--------|
-| [Axiom](https://github.com/CharlesWiltgen/Axiom) | iOS/macOS | 100+ skills covering SwiftUI, SwiftData, concurrency, networking, testing, App Store, camera, system integration, AI, graphics |
-| User-level skills (`~/.claude/skills/`) | iOS (v1) | Your own project-specific patterns and conventions — auto-classified into the iOS extended index by `/rebuild-skill-index` (other platforms TBD) |
-
-### CLI Tools
+## CLI Tools
 
 | Tool | Required? | Used by |
 |------|-----------|---------|
