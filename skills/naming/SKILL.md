@@ -239,9 +239,13 @@ executing, the skill MUST:
    existing `.vN.md` for that phase file and archive to `.v(N+1).md`
    (e.g. if `03-candidates.v1.md` and `03-candidates.v2.md` exist,
    archive current to `03-candidates.v3.md`). Never silently overwrite.
-3. Before archiving, check `git status` for that file. If it has
-   uncommitted changes, warn the user and ask whether to commit or
-   discard before proceeding.
+3. Before archiving, **only if the repo is git-tracked**
+   (`git rev-parse --is-inside-work-tree` succeeds), check `git status`
+   for the file. If it has uncommitted changes, warn the user and ask
+   whether to commit or discard before proceeding. **In non-git
+   projects**, skip the git check and instead ask the user directly:
+   "The current `0N-*.md` will be archived as `.v(N+1).md`. Any unsaved
+   edits? Confirm proceed."
 4. Clear `findings` keys owned by downstream phases.
 5. Announce to user: "Re-running Phase N will invalidate [list]. Proceed?"
 
@@ -453,11 +457,20 @@ to the external CLI via stdin heredoc or (if supported) a `--file` flag.
 3. Write the brief to `docs/naming/.raw/brief-${TS}.md` using the Write
    tool — not via shell `echo`/`cat <<EOF`. **Use `${TS}` throughout —
    the Write path MUST match the read paths in Step 4.**
-4. Invoke each selected external model, reading that file:
+4. Invoke each selected external model, reading that file.
+   **Codex requires a git repository by default** (OpenAI Codex
+   non-interactive docs). In greenfield mode A (no code yet) or any
+   non-git workspace, add `--skip-git-repo-check`. Detect:
+   `git rev-parse --is-inside-work-tree 2>/dev/null` — falsy means add
+   the flag.
 
 ```bash
+# Detect git workspace once
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 && CODEX_GIT_FLAG="" \
+  || CODEX_GIT_FLAG="--skip-git-repo-check"
+
 # Codex — read brief from file via stdin
-codex exec - < docs/naming/.raw/brief-${TS}.md \
+codex exec $CODEX_GIT_FLAG - < docs/naming/.raw/brief-${TS}.md \
   > docs/naming/.raw/codex-${TS}.txt
 CODEX_EXIT=$?
 
