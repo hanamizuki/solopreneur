@@ -72,7 +72,9 @@ Box(
 
 ## `Card` and `Surface`
 
-`Card` and `Surface` accept a `shape` parameter. The **clickable overloads** (`Surface(onClick = ...)`, `Card(onClick = ...)`) already clip children and ripple to that `shape`. The **non-clickable forms** (`Card { ... }`, `Surface { ... }`) do not clip children — so if you attach your own `Modifier.clickable` to a non-clickable `Card`/`Surface`, the ripple will ignore `shape` unless you also add `Modifier.clip(...)`:
+`Surface` (and therefore `Card`, which is built on `Surface`) clips its content to its `shape` internally. So if you use `Card(onClick = ...)` or `Surface(onClick = ...)`, the ripple is drawn inside that internal clip and is bounded correctly by `shape` — no extra work needed.
+
+The catch is when you attach a **modifier-chain** `Modifier.clickable` to a non-clickable `Card { ... }` / `Surface { ... }`. Modifiers in that chain run *outside* the Surface's internal clip, so the ripple drawn by `clickable` is not bounded by `shape`. Apply `Modifier.clip(shape)` before `Modifier.clickable` in the chain to fix it:
 
 ```kotlin
 Card(
@@ -85,6 +87,4 @@ Card(
 }
 ```
 
-The `shape` on `Card` gives the card its outline; `clip` on the modifier chain ensures the ripple (drawn by `clickable`) is bounded by that same shape.
-
-Note: Material3 also ships a `Card(onClick = ...)` overload that clips the ripple to the card's `shape` automatically. The manual `clip + clickable` pattern above is only needed when wiring `clickable` onto the parameter-less `Card { ... }` form.
+Prefer `Card(onClick = ...)` when your design fits it — that overload handles ripple clipping correctly without the extra `Modifier.clip`.

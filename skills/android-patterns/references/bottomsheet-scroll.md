@@ -2,7 +2,7 @@
 
 ## The problem
 
-When a `ModalBottomSheet` contains a scrollable child (`Modifier.verticalScroll(...)` or `LazyColumn`), flinging the content up to the top causes visible **jitter**: the remaining scroll velocity propagates through the nested-scroll chain to the sheet's own drag gesture, which starts to react mid-fling.
+When a `ModalBottomSheet` contains a scrollable child (`Modifier.verticalScroll(...)` or `LazyColumn`), flinging the content up to the top causes visible **jitter**: the remaining **fling velocity** propagates through the nested-scroll chain to the sheet's own drag gesture, which starts to react mid-fling.
 
 Switching from `Column + verticalScroll` to `LazyColumn` does **not** fix this on its own — both participate in the same nested-scroll chain.
 
@@ -10,22 +10,21 @@ Switching from `Column + verticalScroll` to `LazyColumn` does **not** fix this o
 
 ### Fix 1: Intercept overscroll with a `NestedScrollConnection` (recommended)
 
-Wrap the scrollable content in a `Modifier.nestedScroll(...)` that consumes the leftover delta/velocity once the inner scroller reaches its bounds, so nothing reaches the sheet drag gesture.
+Wrap the scrollable content in a `Modifier.nestedScroll(...)` that consumes the leftover **fling velocity** once the inner scroller reaches its bounds, so the velocity does not leak into the sheet drag gesture. Critically, we only override `onPostFling` — we do **not** touch `onPostScroll`, so normal scroll deltas still propagate and swipe-down-to-dismiss continues to work when the user drags from inside the scrollable content.
 
-**Pros**: keeps swipe-to-dismiss working, no structural change to the content.
+**Pros**: genuinely keeps swipe-to-dismiss working (scroll deltas propagate), no structural change to the content.
 **Applies to**: any scroll-inside-sheet case, both `verticalScroll` and `LazyColumn`.
 
+**Why this works**: the jitter is caused by the fling **velocity** leaking past the inner scroller's boundary into the sheet's drag gesture — not by scroll deltas. Consuming only the post-fling velocity kills the jitter without blocking intentional drag-to-dismiss gestures that originate inside the scroll area.
+
 ```kotlin
-// Consume overscroll velocity at the boundary so it doesn't propagate
-// into the bottom sheet's drag gesture (which is what causes the jitter).
+// Consume only the leftover fling velocity at the inner scroller's boundary,
+// so it doesn't propagate into the bottom sheet's drag gesture (which is
+// what causes the jitter). We deliberately do NOT override onPostScroll,
+// so scroll deltas still propagate and swipe-down-to-dismiss works when the
+// user drags from inside the scrollable content.
 val consumeOverscrollConnection = remember {
     object : NestedScrollConnection {
-        override fun onPostScroll(
-            consumed: Offset,
-            available: Offset,
-            source: NestedScrollSource,
-        ): Offset = available  // consume leftover delta at boundary
-
         override suspend fun onPostFling(
             consumed: Velocity,
             available: Velocity,
