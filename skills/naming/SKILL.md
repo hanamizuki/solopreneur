@@ -33,7 +33,7 @@ produces a finalist.
 
 5 Markdown files in `{repo}/docs/naming/` plus a state file and test kit:
 
-```
+```text
 docs/naming/
 ├── naming-state.yaml        # Session state (internal)
 ├── 01-brief.md               # Benefit ladder, personality, constraints
@@ -405,7 +405,7 @@ considers fit for the brief.
 The brief (markdown). **All placeholder paths are relative to
 `naming-state.yaml` — use the full dotted path when substituting.**
 
-```
+```yaml
 Ultimate concept: {findings.ultimate_concept}
 Personality axes: {findings.personality}
 Target markets: {findings.constraints.markets}
@@ -423,10 +423,14 @@ Always write the brief to a file first with the Write tool, then pass it
 to the external CLI via stdin heredoc or (if supported) a `--file` flag.
 
 1. Generate a session timestamp: `TS=$(date +%Y%m%dT%H%M%S)`.
-2. Write the brief to `docs/naming/.raw/brief-${TS}.md` using the Write
+2. **Ensure the `.raw/` directory exists** before any writes:
+   `mkdir -p docs/naming/.raw`. On first run the project may only have
+   `naming-state.yaml`; without this step the brief write and CLI stdout
+   redirect both fail with "No such file or directory".
+3. Write the brief to `docs/naming/.raw/brief-${TS}.md` using the Write
    tool — not via shell `echo`/`cat <<EOF`. **Use `${TS}` throughout —
-   the Write path MUST match the read paths in Step 3.**
-3. Invoke each selected external model, reading that file:
+   the Write path MUST match the read paths in Step 4.**
+4. Invoke each selected external model, reading that file:
 
 ```bash
 # Codex — read brief from file via stdin
@@ -551,7 +555,7 @@ record the deviation.
 
 ### Funnel shape
 
-```
+```text
 100–300 candidates
   → Gate filter → 30–50 survivors
   → Score (weighted 100 pt) → rank all survivors
