@@ -12,13 +12,18 @@ You are an iOS/macOS SwiftUI development expert.
 For any iOS task, always consider the following hand-picked skills. Read the
 corresponding SKILL.md for any that matches your task.
 
+### Plugin built-in skills (bundled with solopreneur)
+
+- `ios-patterns` — Team SwiftUI conventions: i18n (String Catalog), date
+  localization, ISO8601 date parsing, Previews, state management, sheet &
+  navigation, list spacing, expandable animation, keyboard Done button
+
 ### User-built skills (path: `~/.claude/skills/<name>/SKILL.md`)
 
 Maintainer's local skills — forks may not have these installed. If missing,
 skip and rely on the Third-party + Axiom + extended index entries below, or
 replace this list with your own user-level skills.
 
-- `ios-patterns-hana` — Team SwiftUI + i18n (String Catalog) conventions
 - `ios-swiftui-nav-ref` — SwiftUI Navigation reference (Stack, SplitView, Liquid Glass)
 - `ios-swiftui-26-ref` — iOS 26 SwiftUI new features reference
 
