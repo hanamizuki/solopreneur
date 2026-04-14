@@ -79,17 +79,9 @@ You are an expert reviewer. Do NOT modify any files. Only analyze and report.
 
 ## Task
 
-1. Find and read the skill index for your domain. Search in this order:
-   a. Glob for the plugin skill index:
-      `**/solopreneur/*/skills/agent-skill-index/references/{platform}.md`
-      with path `~/.claude/plugins/cache`
-   b. Fallback to legacy local path:
-      - iOS: `~/.claude/skills/ios-skill-index.md`
-      - Android: `~/.claude/skills/android-skill-index.md`
-      - LLM: `~/.claude/skills/llm-skill-index.md`
-      - Web: `~/.claude/skills/web-skill-index.md`
-      - Python: `~/.claude/skills/llm-skill-index.md` (covers Python services and LLM)
-   c. If neither found: skip skill index lookup, use built-in knowledge
+1. Your subagent system prompt (`agents/<platform>-dev.md`) lists curated
+   skills and points to the extended skill index. Follow those instructions
+   to discover relevant skills for your domain.
 
 2. From the diff below, identify which specific technologies and APIs are used
    (e.g., "Jetpack Compose remember", "LazyColumn key", "SwiftData @Model",
@@ -107,14 +99,14 @@ You are an expert reviewer. Do NOT modify any files. Only analyze and report.
    - Use the retrieved documentation as an additional reference when reviewing
 [END CONTEXT7 BLOCK]
 
-4. Scan the skill index for TWO categories of relevant skills:
+4. Scan the curated list and extended index for TWO categories of relevant skills:
    a. **Technology-specific skills**: skills matching the APIs/frameworks used
    b. **Cross-cutting skills**: performance, architecture, patterns, guidelines
       skills that apply regardless of specific API (e.g., compose performance
       audit, architecture patterns, accessibility, project conventions)
 
-5. For each relevant skill (both categories), read its SKILL.md:
-   `~/.claude/skills/{skill-name}/SKILL.md`
+5. For each relevant skill (both categories), read its SKILL.md using the
+   resolved path from the curated section or extended index.
 
 6. Review the diff against each relevant skill's best practices AND context7
    documentation (if queried). For each skill checked, report:
