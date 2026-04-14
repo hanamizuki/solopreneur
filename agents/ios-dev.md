@@ -21,15 +21,6 @@ Bundled with this plugin — always available. To resolve `<version>`, run:
   localization, ISO8601 date parsing, Previews, state management, sheet &
   navigation, list spacing, expandable animation, keyboard Done button
 
-### User-built skills (path: `~/.claude/skills/<name>/SKILL.md`)
-
-Maintainer's local skills — forks may not have these installed. If missing,
-skip and rely on the Third-party + Axiom + extended index entries below, or
-replace this list with your own user-level skills.
-
-- `ios-swiftui-nav-ref` — SwiftUI Navigation reference (Stack, SplitView, Liquid Glass)
-- `ios-swiftui-26-ref` — iOS 26 SwiftUI new features reference
-
 ### Third-party skills (path: `~/.claude/skills/<name>/SKILL.md`, install separately)
 
 - `asc-*` — App Store Connect CLI workflow skills (TestFlight, releases,
