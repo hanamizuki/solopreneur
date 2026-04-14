@@ -4,7 +4,7 @@ A layout recipe for an edge-to-edge Compose app with a root `Scaffold` holding a
 
 ## Insets responsibility model
 
-```
+```text
 MainScreen Scaffold
 ├── Owns: bottom padding (the NavigationBar)
 ├── Does NOT own: top padding (status bar)

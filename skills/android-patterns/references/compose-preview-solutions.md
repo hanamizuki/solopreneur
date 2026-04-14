@@ -94,8 +94,11 @@ fun TrendChartView(
     val weightData by dataProvider.weightChartData.collectAsState(initial = emptyList())
     val muscleData by dataProvider.muscleChartData.collectAsState(initial = emptyList())
     val fatData by dataProvider.fatChartData.collectAsState(initial = emptyList())
+    // Cache `today` once so the 60-day range can't straddle midnight
+    // between the two LocalDate.now() calls.
+    val today = LocalDate.now()
     val dateRange by dataProvider.unifiedDateRange.collectAsState(
-        initial = LocalDate.now().minusDays(59)..LocalDate.now()
+        initial = today.minusDays(59)..today
     )
 
     TrendChartViewInternal(
@@ -167,10 +170,14 @@ private fun TrendChartViewInternal(
 
     val scrollState = rememberScrollState()
 
-    // Scroll to latest data on mount
+    // Scroll to latest data on mount. Guard against preview: in Layoutlib
+    // `maxValue` stays 0 and `.first { it > 0 }` would suspend forever.
+    val isInPreview = LocalInspectionMode.current
     LaunchedEffect(Unit) {
-        snapshotFlow { scrollState.maxValue }.first { it > 0 }
-        scrollState.animateScrollTo(scrollState.maxValue)
+        if (!isInPreview) {
+            snapshotFlow { scrollState.maxValue }.first { it > 0 }
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
     }
 
     Column(modifier = modifier.fillMaxWidth()) {

@@ -104,6 +104,8 @@ A small static helper, e.g. `DateDisplayFormatter`, exposes locale-aware methods
 | `formatInstantWithTime(instant)` | Instant → date + time | `Dec 13, 2025, 3:30 PM` | `13 Dec 2025, 3:30 pm` |
 | `formatISODateString(iso, LONG)` | ISO string → date | `December 13, 2025` | `13 December 2025` |
 
+`Instant` is a UTC instant, so converting it to a local date/time requires a `ZoneId`. The helpers above use `ZoneId.systemDefault()` internally; expose an overload that accepts an explicit `ZoneId` if you need to render a fixed timezone (e.g. server-authoritative times).
+
 ### Helpers
 
 | Method | Purpose |

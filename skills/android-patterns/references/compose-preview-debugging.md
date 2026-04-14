@@ -46,11 +46,13 @@ Check: point count > 0, valid count > 0, numeric range plausible.
 
 ## 2. Look for async initialization
 
-These never run inside a preview:
+Preview uses Layoutlib — it has no real coroutine scheduler and no
+composition-exit lifecycle, so:
 
-- `LaunchedEffect { ... }`
-- `DisposableEffect { ... }`
-- `rememberCoroutineScope().launch { ... }`
+- `LaunchedEffect { ... }` — the coroutine block never starts
+- `rememberCoroutineScope().launch { ... }` — the coroutine never runs
+- `DisposableEffect { ... }` — the synchronous setup block may run, but
+  `onDispose { ... }` is never called (preview doesn't leave composition)
 
 Fix by branching on `LocalInspectionMode.current` (see `compose-preview-overview.md` solution 1):
 

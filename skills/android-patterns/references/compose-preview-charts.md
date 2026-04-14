@@ -167,7 +167,9 @@ When a screen composes multiple ViewModels, fake DAOs are the most pragmatic way
 
 ```kotlin
 private class FakeBodyMeasurementDao : BodyMeasurementDao {
-    private val today = LocalDate.now()
+    // Fixed reference date keeps previews deterministic across days
+    // (important if you run screenshot tests like Paparazzi/Roborazzi).
+    private val today = LocalDate.of(2024, 1, 1)
 
     private val fakeMeasurements = (0..29).map { dayOffset ->
         val date = today.minusDays((29 - dayOffset).toLong())

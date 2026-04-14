@@ -72,7 +72,7 @@ Box(
 
 ## `Card` and `Surface`
 
-`Card` and `Surface` accept a `shape` parameter for their visual appearance, but that parameter does not clip children. For a clickable card with a correctly-clipped ripple, add `Modifier.clip(...)` alongside:
+`Card` and `Surface` accept a `shape` parameter. The **clickable overloads** (`Surface(onClick = ...)`, `Card(onClick = ...)`) already clip children and ripple to that `shape`. The **non-clickable forms** (`Card { ... }`, `Surface { ... }`) do not clip children — so if you attach your own `Modifier.clickable` to a non-clickable `Card`/`Surface`, the ripple will ignore `shape` unless you also add `Modifier.clip(...)`:
 
 ```kotlin
 Card(
