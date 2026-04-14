@@ -489,10 +489,16 @@ model outage). **Never silently proceed on failure.** After each
 invocation, in this order:
 
 1. Check exit code. Non-zero → failure.
-2. Check output file line count. Require at least
-   **`candidates_per_model * 0.5`** lines of output (e.g., 100 requested
-   → 50-line minimum, 30 requested → 15-line minimum). Fewer →
-   truncation or error response. Do not hard-code 50.
+2. **Parse the output into a candidate list first, then count.**
+   Models may emit one-per-line, numbered lists, bullets, wrapped
+   paragraphs, or comma-separated — count the parsed candidates, not
+   raw `wc -l`. The brief instructs models to output one candidate per
+   line (see Step 3 brief template), but tolerate the common
+   alternatives: strip bullets/numbering, split on commas inside a
+   wrapped paragraph, merge multi-line bullets. Require at least
+   **`candidates_per_model * 0.5`** parsed candidates (e.g., 100
+   requested → 50 minimum, 30 requested → 15 minimum). Fewer than
+   that → truncation or error response.
 3. On failure: (a) downgrade `models_selected` by removing the failed
    model; (b) notify the user explicitly with the reason; (c) ask
    whether to retry, drop the model, or abort Phase 3. Do not merge the

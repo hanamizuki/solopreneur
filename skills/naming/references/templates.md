@@ -216,7 +216,13 @@ total is only for ranking. Losing the raw values breaks winner auditability.
 | 1 | {name} | 9 | 9 | 8 | 9 | 8 | 9 | 8 |
 | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 
-### Weighted totals (raw × weight)
+### Weighted totals — formula: **`(raw / 10) × weight`**
+
+The rubric is a 100-point scale. Each weighted dimension = raw score
+(1–10) divided by 10, then multiplied by the dimension weight. Example:
+raw Strategy = 9 → weighted = (9 / 10) × 25 = **22.5**. Total across all
+7 dimensions is capped at 100. Never use `raw × weight` literally —
+that produces a 0–1000 scale and breaks cross-run comparison.
 
 | Rank | Name | Strat (×25) | Mem (×20) | Sound (×15) | Extend (×15) | Own (×10) | Cross (×10) | Vibe (×5) | Total |
 |------|------|-----------|----------|-----------|-------------|---------|-----------|---------|-------|
