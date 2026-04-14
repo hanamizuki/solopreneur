@@ -86,16 +86,16 @@ Idea
 
 ## Agents
 
-Platform-specific development experts used by `/preflight` and `/specialist-review`. Each agent consults a skill index of best practices for its platform.
+Platform-specific development experts used by `/preflight`, `/specialist-review`, and `/todos-review`. Each agent's system prompt embeds a hand-curated list of recommended skills, plus instructions to consult an auto-generated extended index of every relevant skill installed on the machine.
 
-| Agent | Platform | Skill Index Coverage |
-|-------|----------|---------------------|
-| `ios-dev` | iOS/macOS SwiftUI | Development patterns, SwiftUI reference, iOS 26 features |
-| `android-dev` | Android/Kotlin | Compose UI, Navigation, Room, Coroutines, testing |
-| `web-dev` | React/frontend | React/Next.js performance optimization (Vercel guide) |
+| Agent | Platform | Curated + Extended Index |
+|-------|----------|--------------------------|
+| `ios-dev` | iOS/macOS SwiftUI | Curated list of ~20 user + Axiom skills; extended index at `~/.claude/solopreneur/skill-index/ios.md` (rebuild with `/rebuild-skill-index`) |
+| `android-dev` | Android/Kotlin | Curated list (extended index coming in a later release) |
+| `web-dev` | React/frontend | Curated list (extended index coming in a later release) |
 | `nextjs-dev` | Next.js/React | Same as web-dev, specialized for Next.js projects |
-| `python-dev` | Python/FastAPI | LangGraph, service lifecycle, RAG pipelines, prompt engineering |
-| `llm-dev` | LLM/LangGraph | Agent optimization, prompt architecture, eval tools |
+| `python-dev` | Python/FastAPI | Curated list (extended index coming in a later release) |
+| `llm-dev` | LLM/LangGraph | Curated list (extended index coming in a later release) |
 
 ## Ecosystem
 
@@ -133,12 +133,12 @@ This plugin integrates with tools across the Claude Code ecosystem. All integrat
 
 ### Third-Party Skill Libraries
 
-The agent skill indices reference skills from these sources. Install them for deeper platform expertise:
+The `ios-dev` agent's curated list and extended index pull from these sources. Install them for deeper platform expertise:
 
 | Source | Platform | Skills |
 |--------|----------|--------|
 | [Axiom](https://github.com/CharlesWiltgen/Axiom) | iOS/macOS | 100+ skills covering SwiftUI, SwiftData, concurrency, networking, testing, App Store, camera, system integration, AI, graphics |
-| User-level skills (`~/.claude/skills/`) | All | Your own project-specific patterns and conventions |
+| User-level skills (`~/.claude/skills/`) | All | Your own project-specific patterns and conventions — auto-classified into the iOS extended index by `/rebuild-skill-index` |
 
 ### CLI Tools
 
