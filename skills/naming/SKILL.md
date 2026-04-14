@@ -72,14 +72,18 @@ The state file can only be created after the user tells us whether this
 is a greenfield or a rebrand. Order of operations on first run:
 
 1. Ask the **Starting Context** question (A/B/C) below.
-2. Derive `mode` from the answer: A or B → `greenfield`, C → `rebrand`.
-3. Create `docs/naming/naming-state.yaml` with the derived mode AND the
-   matching initial `overall_status`:
-   - `mode: greenfield` → `overall_status: brief`
-   - `mode: rebrand`    → `overall_status: rebrand_audit`
-   Do not hard-code `mode` or `overall_status` before this step.
-4. Check for `docs/gtm/gtm-state.yaml` (see GTM Integration).
-5. If rebrand, run Phase 0; otherwise start at Phase 1.
+2. Ask the **Entity Scope** question (product / company / both-same-name)
+   below.
+3. Derive `mode` from the Starting Context answer: A or B → `greenfield`,
+   C → `rebrand`.
+4. Create `docs/naming/naming-state.yaml` with:
+   - `mode:` derived from step 3
+   - `entity_scope:` from step 2 answer
+   - `overall_status:` matching the mode (`brief` for greenfield,
+     `rebrand_audit` for rebrand)
+   Do not hard-code any of these before the user answers.
+5. Check for `docs/gtm/gtm-state.yaml` (see GTM Integration).
+6. If rebrand, run Phase 0; otherwise start at Phase 1.
 
 ### Starting Context question
 
@@ -92,6 +96,18 @@ is a greenfield or a rebrand. Order of operations on first run:
 - **B** → `mode: greenfield`, light codebase scan (README, package.json,
   top-level dirs) to pre-fill product description, then Phase 1.
 - **C** → `mode: rebrand`, run Phase 0 first.
+
+### Entity Scope question
+
+> What are you naming?
+> - **product** — one specific product. Company already has a name.
+> - **company** — the company / parent brand. Products stay separate.
+> - **both_same_name** — company and flagship product share a single
+>   name (e.g., Notion, Linear, Figma). Treated as one naming exercise.
+
+Record the answer in `entity_scope`. This shapes Phase 1 brief framing
+(company-level mission/vision vs product-level feature focus) and Phase 6
+Final Selection deliverables.
 
 ## Modes
 
@@ -433,9 +449,10 @@ model outage). **Never silently proceed on failure.** After each
 invocation, in this order:
 
 1. Check exit code. Non-zero → failure.
-2. Check output file line count. If the model was asked for ~100
-   candidates, require at least ~50 lines of output. Fewer → truncation
-   or error response.
+2. Check output file line count. Require at least
+   **`candidates_per_model * 0.5`** lines of output (e.g., 100 requested
+   → 50-line minimum, 30 requested → 15-line minimum). Fewer →
+   truncation or error response. Do not hard-code 50.
 3. On failure: (a) downgrade `models_selected` by removing the failed
    model; (b) notify the user explicitly with the reason; (c) ask
    whether to retry, drop the model, or abort Phase 3. Do not merge the
