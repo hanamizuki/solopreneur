@@ -90,7 +90,9 @@ findings:
 1. Update `findings` with new information
 2. Update phase statuses
 3. Update `last_updated`
-4. Commit the state file
+4. **Save the state file. Do not auto-commit** — the user owns the git
+   decision. Suggest `git add docs/gtm/ && git commit` if they want a
+   checkpoint, but never run it for them.
 
 ---
 
@@ -275,7 +277,9 @@ Present to user:
 
 Iterate based on feedback. When the user approves:
 - Update state: `status: complete`, `phases.review.completed_at: {date}`
-- Commit all files
+- Save all files. If the user uses git, suggest committing the whole
+  `docs/gtm/` directory in one commit — but do not run `git commit`
+  automatically.
 
 ---
 
@@ -283,12 +287,18 @@ Iterate based on feedback. When the user approves:
 
 When `gtm-state.yaml` exists with `status: complete`:
 
-1. Run `git log --oneline --since="7 days ago"` (or since `last_scan_commit`)
-2. Analyze changes: new features, modified features, removed features
+1. **Check if the repo is git-tracked** (`git rev-parse --is-inside-work-tree`).
+   - **If git:** run `git log --oneline --since="7 days ago"` (or since
+     `last_scan_commit`) to detect code changes automatically.
+   - **If not git:** skip the log step and ask the user directly:
+     "What changed in the product since the last scan?"
+2. Analyze changes: new features, modified features, removed features.
 3. Present changelog to user:
    > "Since last scan, I see these codebase changes: [list]. Any strategic direction changes this week?"
-4. Update affected documents (usually 01-brand-strategy § Product Profile and 03-messaging-framework)
-5. Update `last_updated` and `last_scan_commit` in state file
+4. Update affected documents (usually 01-brand-strategy § Product Profile and 03-messaging-framework).
+5. Update `last_updated` in state file. If using git, also update
+   `last_scan_commit` with the current HEAD commit hash. **Save only —
+   do not auto-commit.**
 
 ---
 
