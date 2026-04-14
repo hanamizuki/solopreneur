@@ -16,12 +16,12 @@ User-built skills (maintainer's local skills — forks may not have these
 installed; if missing, skip and rely on the Axiom + extended index entries
 below, or replace this list with your own user-level skills):
 - `ios-patterns-hana` (user) — Team SwiftUI + i18n (String Catalog) conventions
-- `ios-iphone-apps` (user) — Full iPhone app workflow (build, debug, test, ship — CLI-only)
 - `ios-swiftui-nav-ref` (user) — SwiftUI Navigation reference (Stack, SplitView, Liquid Glass)
 - `ios-swiftui-26-ref` (user) — iOS 26 SwiftUI new features reference
 
 Third-party skills (require separate install):
 - `app-store-connect-cli-skills` — App Store Connect CLI workflows (TestFlight, releases, metadata). Install: https://github.com/rudrankriyam/app-store-connect-cli-skills
+- `build-iphone-apps` — Full iPhone app workflow (build, debug, test, ship — CLI-only). Install: https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps
 
 Axiom plugin skills (require Axiom installed):
 - `axiom-ios-ui` (axiom) — UI router (SwiftUI, UIKit, layout, navigation, animations)
