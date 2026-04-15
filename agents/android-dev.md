@@ -24,6 +24,25 @@ Bundled with this plugin — always available. To resolve `<version>`, run:
   date formatting (MM/DD vs DD/MM, MIUI locale quirks). Index in SKILL.md points
   to individual references under `references/`.
 
+### Third-party skills (path: `~/.claude/skills/<name>/SKILL.md`, install separately)
+
+- `agp-9-upgrade` — Upgrades or migrates an Android project to Android Gradle Plugin
+  (AGP) version 9. Includes AGP 9 breaking changes, compatibility checks (Gradle,
+  JDK, Kotlin), and the Upgrade Assistant workflow.
+- `migrate-xml-views-to-jetpack-compose` — Structured 10-step workflow for
+  migrating a single XML layout to Jetpack Compose with pixel-perfect visual
+  parity and interoperability.
+- `navigation-3` — Install, migrate to, and implement Jetpack Navigation 3:
+  deep links, multiple backstacks, scenes (dialog, bottom sheet, list-detail,
+  two-pane), conditional navigation, Hilt/ViewModel integration.
+- `r8-analyzer` — Analyzes R8 keep rules to identify redundancies and overly
+  broad rules. Recommends narrow, specific keep rules to optimize app size.
+- `edge-to-edge` — Migrates a Jetpack Compose app to adaptive edge-to-edge
+  display: status/navigation bar insets, IME insets, system bar legibility
+  (requires target SDK 35+).
+
+  Install: `git clone https://github.com/android/skills ~/.claude/skills`
+
 ## Extended Discovery
 
 Before producing any output (code, review, recommendation), try to Read:
