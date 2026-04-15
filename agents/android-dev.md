@@ -40,6 +40,12 @@ Bundled with this plugin — always available. To resolve `<version>`, run:
 - `edge-to-edge` — Migrates a Jetpack Compose app to adaptive edge-to-edge
   display: status/navigation bar insets, IME insets, system bar legibility
   (requires target SDK 35+).
+- `gplay-*` — Google Play Console CLI skills covering build, signing, release
+  flows, metadata, in-app purchases (setup, purchase verification,
+  subscription localization), testing tracks, rollout management, review
+  management, vitals monitoring, and reports. Full list with
+  `ls ~/.claude/skills/ | grep '^gplay-'`, then read the matching SKILL.md.
+  Install: `npx skills add tamtom/gplay-cli-skills`
 
   Install: `git clone https://github.com/android/skills ~/.claude/skills`
 
