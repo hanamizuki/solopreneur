@@ -118,6 +118,7 @@ Solopreneur's agents and skills auto-discover tools from other installed plugins
 | Source | Type | Used by | Purpose |
 |--------|------|---------|---------|
 | [android/skills](https://github.com/android/skills) | Skills | `android-dev` agent | AI-optimized modular instructions covering Jetpack Compose, navigation, Play Billing, performance, and more — grounded in official developer.android.com best practices |
+| [gplay-cli-skills](https://github.com/tamtom/gplay-cli-skills) | Skills | `android-dev` agent | Google Play Console CLI workflows — build, signing, release flows, metadata, IAP, testing tracks, rollout, reviews, vitals |
 
 ### iOS / macOS
 
