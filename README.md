@@ -113,6 +113,12 @@ Solopreneur's agents and skills auto-discover tools from other installed plugins
 | [Gemini Code Assist](https://github.com/apps/gemini-code-assist) | GitHub App | `/greenlight` | External PR reviewer (`/gemini review`) |
 | [CodeRabbit](https://coderabbit.ai) | GitHub App | `/greenlight` | External PR reviewer (auto-triggered) |
 
+### Android / Kotlin
+
+| Source | Type | Used by | Purpose |
+|--------|------|---------|---------|
+| [android/skills](https://github.com/android/skills) | Skills | `android-dev` agent | AI-optimized modular instructions covering Jetpack Compose, navigation, Play Billing, performance, and more — grounded in official developer.android.com best practices |
+
 ### iOS / macOS
 
 | Source | Type | Used by | Purpose |
