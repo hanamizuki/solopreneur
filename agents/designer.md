@@ -26,13 +26,32 @@ your work — consumers auto-detect what's available.
   Path: `~/.claude/skills/teach-impeccable/SKILL.md`
   Install: https://github.com/pbakaus/impeccable
 
-- `taste-skill` (+ `taste-soft`, `taste-brutalist`, `taste-minimalist`,
-  `taste-redesign`, `taste-stitch`, `taste-output`) — Taste-coded design
-  archetypes that override default LLM biases. Pick the one that matches the
-  product's personality; list all installed with
-  `ls ~/.claude/skills/ | grep '^taste-'`.
-  Path: `~/.claude/skills/taste-skill/SKILL.md` (and siblings)
-  Install: https://github.com/Leonxlnx/taste-skill
+The `taste-*` family — archetype skills from the same repo that override
+default LLM design biases. Pick the one that matches the product's
+personality; list all installed with `ls ~/.claude/skills/ | grep '^taste-'`.
+All share the install source: https://github.com/Leonxlnx/taste-skill
+
+- `taste-skill` — Senior UI/UX engineer baseline. Metric-based rules, strict
+  component architecture, balanced design engineering.
+  Path: `~/.claude/skills/taste-skill/SKILL.md`
+- `taste-soft` — High-end agency aesthetic. Premium fonts, generous spacing,
+  soft shadows, tasteful animations.
+  Path: `~/.claude/skills/taste-soft/SKILL.md`
+- `taste-brutalist` — Raw mechanical Swiss/terminal aesthetic. Rigid grids,
+  extreme type contrast, utilitarian color, data-heavy dashboards.
+  Path: `~/.claude/skills/taste-brutalist/SKILL.md`
+- `taste-minimalist` — Clean editorial style. Warm monochrome palette,
+  typographic contrast, flat bento grids, muted pastels.
+  Path: `~/.claude/skills/taste-minimalist/SKILL.md`
+- `taste-redesign` — Upgrades existing sites to premium quality without
+  breaking functionality. Works with any CSS framework.
+  Path: `~/.claude/skills/taste-redesign/SKILL.md`
+- `taste-stitch` — Semantic design system for Google Stitch. Generates
+  agent-friendly DESIGN.md files.
+  Path: `~/.claude/skills/taste-stitch/SKILL.md`
+- `taste-output` — Overrides default LLM truncation. Enforces complete code
+  generation, bans placeholder patterns.
+  Path: `~/.claude/skills/taste-output/SKILL.md`
 
 - `frontend-design` — Create distinctive, production-grade frontend interfaces.
   Generates creative, polished code that avoids generic AI aesthetics. To
