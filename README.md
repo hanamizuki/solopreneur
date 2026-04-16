@@ -43,6 +43,7 @@ claude plugin update solopreneur
 | `/humanly` | **Editor.** Removes AI writing patterns from text — 36 pattern categories, 3-tier word tables, severity-based audit (P0/P1/P2), with English and Traditional Chinese support |
 | `/x-growth` | **X Growth Consultant.** Diagnoses X/Twitter profiles, co-creates personalized 12-week growth plans — covers algorithm mechanics, content strategy, engagement tactics, monetization, and Dream 100 outreach. Integrates with GTM docs |
 | `/linkedin-growth` | **LinkedIn Growth Consultant.** Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans — covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
+| `/slide-design` | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase — bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, 13 reusable layout components, and Chinese AI-slop review via `/humanly` |
 
 ### Backlog Management
 
@@ -140,6 +141,13 @@ User-level skills in `~/.claude/skills/` are auto-classified into the iOS extend
 
 User-level skills in `~/.claude/skills/` and the above plugins are
 auto-classified into the design extended index by `/rebuild-skill-index`.
+
+### Presentations
+
+| Source | Type | Used by | Purpose |
+|--------|------|---------|---------|
+| [frontend-slides](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-slides) | Plugin | `/slide-design` | Single-HTML, animation-rich slide engine (recommended) |
+| [revealjs](https://github.com/anthropics/claude-code/tree/main/plugins/revealjs) | Plugin | `/slide-design` | Reveal.js-based slides — fragments, vertical stacks, speaker notes, Chart.js |
 
 ## CLI Tools
 
