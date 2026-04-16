@@ -8,17 +8,24 @@ description: |
   external reviewers, and `/greenlight external gemini` to specify a starting
   reviewer. Use when the user says "greenlight", "run reviews until clean",
   "get this PR approved", or wants automated review cycling on an open PR.
+
+  Also auto-detects uncommitted mode: when on main branch with uncommitted
+  changes and no PR, runs Codex CLI `--uncommitted` review loop only, fixes
+  in-place without committing, until codex reports clean.
 ---
 
 # Greenlight
 
-Automated review loop for open PRs. Three phases:
+Automated review loop. Two modes:
 
-```
-Phase 1: Internal Review (4 subagents review in parallel, report-only)
-Phase 2: Consolidate + Fix (merge reports → fix via /receiving-code-review → commit + push)
-Phase 3: External Review Loop (Codex/Gemini/CodeRabbit cycle until clean)
-```
+- **PR mode** (default, for open PRs on feature branches) — three phases:
+  ```
+  Phase 1: Internal Review (4 subagents review in parallel, report-only)
+  Phase 2: Consolidate + Fix (merge reports → fix via /receiving-code-review → commit + push)
+  Phase 3: External Review Loop (Codex/Gemini/CodeRabbit cycle until clean)
+  ```
+- **Uncommitted mode** (auto-detected when on `main` + uncommitted changes + no PR):
+  Codex CLI `--uncommitted` loop only. Fixes in-place, does NOT commit.
 
 ### Arguments
 
@@ -30,15 +37,46 @@ Phase 3: External Review Loop (Codex/Gemini/CodeRabbit cycle until clean)
 **Parsing rules:** Extract `external` keyword from args (case-insensitive); the remainder
 is the reviewer specification. If no `external`, run the full three-phase flow.
 
+Arguments are ignored in **Uncommitted mode** — the only flow is codex CLI loop.
+
 ## Pre-flight Checks
 
-1. Confirm current branch has an open PR:
-   ```bash
-   gh pr view --json number,url,state
-   ```
-   If no PR or PR is closed, stop and tell the user.
+### Step 1: Mode detection
 
-2. Confirm working directory is clean (no uncommitted changes):
+Determine whether to run **PR mode** or **Uncommitted mode** based on current repo state:
+
+```bash
+CURRENT_BRANCH=$(git branch --show-current)
+HAS_UNCOMMITTED=$(git status --porcelain | grep -q . && echo yes || echo no)
+# Probe PR existence for current branch (stderr suppressed; no PR → non-zero exit)
+if gh pr view --json number,state >/tmp/gl-pr.json 2>/dev/null; then
+  PR_EXISTS=yes
+  PR_STATE=$(jq -r .state /tmp/gl-pr.json)
+else
+  PR_EXISTS=no
+  PR_STATE=none
+fi
+echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STATE"
+```
+
+**Mode table:**
+
+| Branch | Uncommitted | PR (open) | MODE | Action |
+|---|---|---|---|---|
+| `main` | yes | no | **uncommitted** | Enter Uncommitted mode (skip all phases below) |
+| `main` | yes | yes (open) | **ask** | Unusual — ask user: "On main with uncommitted + open PR. Run uncommitted mode on working tree, or abort?" |
+| `main` | no | — | **stop** | Nothing to review on main; tell user |
+| feature / worktree | — | yes (open) | **pr** | Continue with Pre-flight Step 2 below (default flow) |
+| feature / worktree | yes | no | **ask** | Ambiguous — ask user: "On feature branch with uncommitted and no PR yet. (A) Commit and push first to create PR, then review (B) Run uncommitted mode on working tree (C) Abort" |
+| feature / worktree | no | no | **stop** | No PR + no changes; tell user to commit or create PR first |
+
+If `MODE=uncommitted`, skip Steps 2-5 below and Argument Parsing; jump directly to **[Uncommitted Mode](#uncommitted-mode)**.
+
+### Step 2: PR mode pre-flight (MODE=pr only)
+
+1. PR info already recorded in Step 1 (`/tmp/gl-pr.json`). Confirm state is `OPEN`; if not, stop.
+
+2. Confirm working directory is clean:
    ```bash
    git status --porcelain
    ```
@@ -46,24 +84,30 @@ is the reviewer specification. If no `external`, run the full three-phase flow.
 
 3. Record the PR number and repo owner/name (from `gh repo view --json owner,name`).
 
-4. Detect Codex CLI availability:
-   ```bash
-   command -v codex &>/dev/null && echo "CODEX_INSTALLED=true" || echo "CODEX_INSTALLED=false"
-   codex login status 2>/dev/null && echo "CODEX_AUTH=true" || echo "CODEX_AUTH=false"
-   ```
-   Remember this result (best-effort hint, not a guarantee — may still fail at runtime).
-   Codex CLI is the only reviewer-specific local dependency (gh, git, jq are base dependencies).
-
-5. Read reviewer fallback config:
+4. Read reviewer fallback config:
    ```bash
    jq -r '.greenlight // empty' ~/.claude/solopreneur.json 2>/dev/null || echo "NO_CONFIG"
    ```
    If config exists, read `fallback_order` from the `greenlight` key.
    If absent (`NO_CONFIG`), use default: codex-bot as starting reviewer, ask user on failure.
 
+### Step 3: Codex CLI availability (both modes)
+
+```bash
+command -v codex &>/dev/null && echo "CODEX_INSTALLED=true" || echo "CODEX_INSTALLED=false"
+codex login status 2>/dev/null && echo "CODEX_AUTH=true" || echo "CODEX_AUTH=false"
+```
+
+- **PR mode**: Best-effort hint. Used later by Argument Parsing to gate `codex cli` reviewer selection.
+- **Uncommitted mode**: Required. If `CODEX_INSTALLED=false` or `CODEX_AUTH=false`, stop with install instructions:
+  - Not installed → `npm install -g @openai/codex`
+  - Not authenticated → `codex login`
+
 ---
 
 ## Argument Parsing
+
+> **⏭️ Skip this section entirely if `MODE=uncommitted`** — jump to [Uncommitted Mode](#uncommitted-mode).
 
 ```
 # Parse external mode and reviewer from args
@@ -88,8 +132,101 @@ if current_reviewer == "codex cli" and pre-flight detected CLI not installed or 
 
 ---
 
+## Uncommitted Mode
+
+> **Only runs when `MODE=uncommitted` from Pre-flight Step 1.** PR mode skips this section entirely.
+
+Codex CLI `--uncommitted` review loop. Fixes in-place, does NOT commit. User reviews and commits manually afterwards.
+
+### Loop
+
+```
+round = 0
+LOOP (max 10 rounds):
+  round += 1
+
+  1. Verify still on main with uncommitted changes:
+     ```bash
+     git branch --show-current  # must be main
+     git status --porcelain     # must be non-empty
+     ```
+     If either changed (e.g., user switched branch or committed mid-loop) → stop and tell user.
+
+  2. Run codex CLI:
+     ```bash
+     codex review --uncommitted -c 'model_reasoning_effort="high"' --enable web_search_cached 2>&1
+     ```
+     Capture full stdout/stderr. Timeout: 5 min.
+
+  3. Parse output:
+     - No `[P*]` tags (only summary paragraphs like "looks good" / "no issues") → **clean pass, exit loop**
+     - Has `[P*]` tags → extract findings (file, line, priority, description, suggested fix)
+     - Stderr contains "usage limit" / "rate limit" / non-zero exit → stop, tell user codex CLI unavailable, preserve working tree
+
+  4. Dispatch fix subagent — see Step 4 below.
+
+  5. After subagent returns, verify working tree still has uncommitted changes (subagent might have accidentally committed).
+     If working tree is clean but commits were added → stop and tell user (violates no-commit invariant).
+
+  6. Back to step 1 (next round). Pass prior-round findings to next subagent for push-back awareness.
+
+End: max 10 rounds reached → stop and report to user.
+```
+
+### Step 4: Fix subagent (per round)
+
+Dispatch subagent with these explicit instructions. Use `Agent` tool, `general-purpose` type.
+
+```
+Agent(
+  description: "Fix codex uncommitted review findings (round N)",
+  prompt: <see below>
+)
+```
+
+**Prompt must contain:**
+
+1. **Context**: "You are in uncommitted mode. All changes live in the working tree on the `main` branch. Your job is to address codex review findings by editing files directly."
+
+2. **Findings list** (full stdout from codex, or parsed list with file + line + priority + description + suggested fix).
+
+3. **Prior push-backs** (if round > 1): list of findings from earlier rounds that were pushed back with reasoning. Subagent should reconsider before pushing back again.
+
+4. **Evaluation framework**: "Invoke `superpowers:receiving-code-review` skill first to load the review-receiving mindset. If unavailable, evaluate each finding: fix genuine issues, push back on false positives with solid technical reasoning."
+
+5. **Hard constraints**:
+   - **Do NOT run `git commit`, `git push`, `git add && commit`, or any commit operation.**
+   - **Do NOT create branches, worktrees, or PRs.**
+   - Edit source files directly. Leave all changes uncommitted.
+   - If you want to push back on a finding, write reasoning in your final report — do not add code comments explaining the push-back (keeps the diff clean).
+
+6. **Return format**: report what was fixed (file + line + fix summary) and what was pushed back (finding + reasoning).
+
+### Exit Conditions
+
+1. **Clean pass**: codex stdout has no `[P*]` tags → report rounds run, items fixed, items pushed back.
+2. **Push-back exit**: all findings this round were already pushed back in prior rounds with the same reasoning → report and exit.
+3. **Max 10 rounds**: stop and report last round's findings; let user decide.
+4. **Aborted invariants**: branch changed / commits appeared / codex CLI unavailable → stop with specific reason.
+
+### Final report (on any exit)
+
+```
+Uncommitted review loop complete.
+- Exit reason: <clean pass / push-back / max rounds / aborted>
+- Rounds run: <N>
+- Items fixed: <M>
+- Items pushed back: <K>
+- Working tree: has uncommitted changes (run `git diff` to review, then commit manually)
+```
+
+**Do not offer to commit or push.** User's CLAUDE.md rule on product repo main branch: wait for explicit user instruction.
+
+---
+
 ## Phase 1: Internal Review
 
+> **⏭️ Skip entirely if `MODE=uncommitted`.**
 > **⏭️ If `external_only == true`, skip this phase — go to [Phase 3](#phase-3-external-review-loop).**
 
 **Dispatch 4 subagents in parallel (`run_in_background: true`), each running a review skill. All report-only — no code changes.**
@@ -117,6 +254,7 @@ Wait for all successful subagents to report, then proceed to Phase 2.
 
 ## Phase 2: Consolidate + Fix
 
+> **⏭️ Skip entirely if `MODE=uncommitted`.**
 > **⏭️ If `external_only == true`, skip this phase — go to [Phase 3](#phase-3-external-review-loop).**
 
 ### 2a. Consolidate reports
@@ -147,6 +285,8 @@ Agent(
 ---
 
 ## Phase 3: External Review Loop
+
+> **⏭️ Skip entirely if `MODE=uncommitted`.**
 
 ### Step 0: Read existing PR feedback
 
