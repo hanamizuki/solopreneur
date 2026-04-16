@@ -2,30 +2,40 @@
 name: rebuild-skill-index
 description: |
   Rebuild the per-machine extended skill index used by platform subagents.
-  Scans installed Claude Code skills (user-level + Axiom plugin), classifies
-  each as iOS-relevant by reading its frontmatter description, and writes
-  ~/.claude/solopreneur/skill-index/ios.md with resolved paths. Use when the
-  user says "rebuild skill index", "refresh skill index", or after installing
-  / removing iOS-related skills.
+  Scans installed Claude Code skills, classifies each by platform relevance
+  (iOS, design, …) using the frontmatter description, and writes one file per
+  platform under ~/.claude/solopreneur/skill-index/. Use when the user says
+  "rebuild skill index", "refresh skill index", or after installing / removing
+  platform-related skills.
 ---
 
 # Rebuild Skill Index
 
-Generate `~/.claude/solopreneur/skill-index/ios.md` — the per-machine extended
-index of every iOS-relevant skill installed on this machine that is not
-already in the curated list inside `agents/ios-dev.md`.
+Generate one index file per platform under
+`~/.claude/solopreneur/skill-index/` — each one is the extended list of every
+platform-relevant skill installed on this machine that is not already in the
+curated list inside the matching agent's markdown file.
 
-The output is consumed by the `ios-dev` subagent (and any consumer that
-dispatches it: `/specialist-review`, `/preflight`, `/todos-review`).
+Current platforms: **iOS** and **design**. (Others — android, web, python,
+llm — will be added when they need extended indexing.)
+
+Outputs are consumed by the matching subagents (`ios-dev`, `designer`, …) and
+any caller that dispatches them (`/specialist-review`, `/preflight`,
+`/todos-review`).
 
 ## Step 1: Collect candidate skills
 
-Glob both sources and read **frontmatter only** (the `name:` and
+For each source below, read **frontmatter only** (the `name:` and
 `description:` fields). Do not read full SKILL.md bodies — that would burn
-unnecessary tokens.
+unnecessary tokens. Use `Read file_path=<path> limit=30` (30 lines covers any
+reasonable frontmatter).
+
+Shared sources (used by every platform's classifier):
 
 1. **User-level skills:**
    `Glob pattern: ~/.claude/skills/*/SKILL.md`
+
+iOS-specific sources:
 
 2. **Axiom plugin skills** (optional):
    ```bash
@@ -33,58 +43,105 @@ unnecessary tokens.
    ```
    - If the directory exists, use the highest semver version returned above
      and glob: `~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/skills/*/SKILL.md`
-   - If it does not exist, record a "missing" warning for the output file.
+   - If it does not exist, record a "missing" warning for the iOS output file.
 
-For each SKILL.md found, extract `name` and `description` from the frontmatter
-using `Read file_path=<path> limit=30 offset=0` (30 lines is plenty for
-frontmatter; do not full-read the file).
+Design-specific sources:
 
-## Step 2: Read curated dedup list
+3. **frontend-design plugin** (optional):
+   ```bash
+   ls -t ~/.claude/plugins/cache/claude-plugins-official/frontend-design/ | head -1
+   ```
+   - This plugin uses hash directories, not semver; `ls -t | head -1` picks
+     the newest by mtime — matches "the one currently installed" even when
+     multiple hash dirs coexist.
+   - If present: `~/.claude/plugins/cache/claude-plugins-official/frontend-design/<hash>/skills/*/SKILL.md`
+   - If absent, record a "missing" warning for the design output file.
 
-Read `agents/ios-dev.md` from the solopreneur plugin. Find the
-`## Curated Skills` section. Extract skill names from every bullet line, which
+4. **ui-ux-pro-max-skill plugin** (optional):
+   ```bash
+   ls ~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/ | sort -V | tail -1
+   ```
+   - If present: `~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/*/SKILL.md`
+   - If absent, record a "missing" warning for the design output file.
+
+5. **frontend-slides plugin** (optional):
+   ```bash
+   ls ~/.claude/plugins/cache/frontend-slides/frontend-slides/ | sort -V | tail -1
+   ```
+   - Slide-oriented skills — included in the design index because
+     presentation design overlaps with product UI work.
+   - If present: `~/.claude/plugins/cache/frontend-slides/frontend-slides/<version>/skills/*/SKILL.md`
+   - If absent, skip silently (no warning — this is bonus, not required).
+
+## Step 2: Read curated dedup lists
+
+Read each agent's markdown from the solopreneur plugin. Find the
+`## Curated Skills` section. Extract skill names from every bullet line that
 looks like:
 
 ```
 - `<skill-name>` — <description>
 ```
 
-The section is subdivided by path group (User-built / Third-party / Axiom).
-Collect names from all groups — they are the dedup blacklist and should not
-be re-included in the extended index.
+The section is subdivided by source (Plugin built-in / Third-party / …).
+Collect names from all subsections — they form the per-agent dedup blacklist
+and should not be re-included in that agent's extended index.
 
-To locate the plugin path on disk, the agents/ios-dev.md is bundled with
-this skill's parent plugin. Try:
-- `~/.claude/plugins/cache/solopreneur-marketplace/solopreneur/<version>/agents/ios-dev.md`
-- Or use Glob: `~/.claude/plugins/**/solopreneur/**/agents/ios-dev.md`
+Agents to read:
+- `agents/ios-dev.md` → iOS dedup list
+- `agents/designer.md` → design dedup list
 
-If you can't find it, ask the user where the solopreneur plugin is installed
-and continue with an empty dedup list (extended file will have duplicates
-with curated, which is fine — costs one extra entry).
+To locate the plugin path on disk, try:
+- `~/.claude/plugins/cache/solopreneur/solopreneur/<version>/agents/<name>.md`
+- Or use Glob: `~/.claude/plugins/**/solopreneur/**/agents/<name>.md`
 
-## Step 3: Classify each candidate as iOS-relevant
+If you can't find an agent file, ask the user where the solopreneur plugin is
+installed and continue with an empty dedup list for that platform (the
+extended file will have duplicates with curated, which is fine — costs one
+extra entry per dup).
 
-For each skill not in the dedup list, judge from `name` + `description`
-whether it is iOS-relevant. Be inclusive but not sloppy:
+## Step 3: Classify each candidate
 
-- **Yes**: anything Swift / SwiftUI / UIKit / Xcode / iOS / macOS / iPadOS /
-  watchOS / tvOS / visionOS / Apple frameworks (CoreData, AVFoundation,
-  CoreLocation, etc.) / Apple toolchain (lldb, Instruments, asc CLI, App
-  Store Connect)
+For each skill not in a given platform's dedup list, judge from `name` +
+`description` whether it is relevant to that platform. Each candidate can be
+classified into **multiple** platforms (e.g., a SwiftUI-specific design skill
+belongs in both ios.md and design.md).
+
+Be inclusive but not sloppy.
+
+### iOS classification
+
+- **Yes**: Swift / SwiftUI / UIKit / Xcode / iOS / macOS / iPadOS / watchOS /
+  tvOS / visionOS / Apple frameworks (CoreData, AVFoundation, CoreLocation,
+  etc.) / Apple toolchain (lldb, Instruments, asc CLI, App Store Connect)
 - **No**: web (React, Vue, Next.js, CSS), Android (Kotlin, Compose, Room),
-  Python, LLM/agent frameworks, design tools, infra/devops, generic prose
+  Python, LLM/agent frameworks, generic design tools, infra/devops, prose
   helpers
-- **Borderline cases** (e.g. cross-platform performance audit, generic git
-  workflow): exclude from the iOS index. The curated list catches the
-  must-haves; extended is best-effort.
+- **Borderline** (e.g. cross-platform performance audit, generic git
+  workflow): exclude. Curated catches must-haves; extended is best-effort.
 
-## Step 4: Write the output file
+### Design classification
+
+- **Yes**: visual design / typography / color / spacing / layout / motion /
+  component styling / design systems / design review / critique / UX copy /
+  information architecture / presentation slides / mockup generation /
+  responsive design / accessibility when it's about visual contrast or type
+- **No**: pure frontend implementation (React hooks, Next.js routing) without
+  design framing, QA testing, backend, iOS/Android development patterns that
+  aren't design-focused, devops
+- **Borderline** (polish / audit / harden / normalize and other "action verb"
+  skills): include only when the description explicitly mentions UI / visual /
+  design. When in doubt, skip — curated catches the must-haves.
+
+## Step 4: Write output files
 
 ```bash
 mkdir -p ~/.claude/solopreneur/skill-index
 ```
 
-Write `~/.claude/solopreneur/skill-index/ios.md` with this structure:
+Write one file per platform.
+
+### `~/.claude/solopreneur/skill-index/ios.md`
 
 ```markdown
 # iOS Skills Index — Extended
@@ -107,17 +164,60 @@ Classified by: <model name running this skill>
   (https://github.com/CharlesWiltgen/Axiom)
 ```
 
+### `~/.claude/solopreneur/skill-index/design.md`
+
+```markdown
+# Design Skills Index — Extended
+Generated: <ISO 8601 timestamp with timezone>
+Classified by: <model name running this skill>
+
+## Auto-classified user skills
+- `<name>` — <one-line description trimmed to ~120 chars>
+  Path: ~/.claude/skills/<name>/SKILL.md
+- ... (alphabetical by name)
+
+## Auto-classified frontend-design plugin skills (v<hash>)
+- `<name>` — <one-line description trimmed to ~120 chars>
+  Path: ~/.claude/plugins/cache/claude-plugins-official/frontend-design/<hash>/skills/<name>/SKILL.md
+- ... (alphabetical by name)
+
+## Auto-classified ui-ux-pro-max plugin skills (v<version>)
+- `<name>` — <one-line description trimmed to ~120 chars>
+  Path: ~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/<name>/SKILL.md
+- ... (alphabetical by name)
+
+## Auto-classified frontend-slides plugin skills (v<version>)
+- `<name>` — <one-line description trimmed to ~120 chars>
+  Path: ~/.claude/plugins/cache/frontend-slides/frontend-slides/<version>/skills/<name>/SKILL.md
+- ... (alphabetical by name)
+
+## Missing
+<warnings for any optional source not found>
+```
+
 Skip a section entirely if it would be empty (except `## Missing` — always
 emit it for transparency).
 
 ## Step 5: Report to the user
 
-Print a short summary:
+Print a short summary (one `Wrote` line per file actually written — skip
+platforms that had no sources available):
 
 ```
 Wrote ~/.claude/solopreneur/skill-index/ios.md
+Wrote ~/.claude/solopreneur/skill-index/design.md
+
+iOS:
 - N user skills classified as iOS-relevant
 - M Axiom skills classified as iOS-relevant (axiom v<version>)
+- K curated skills excluded from extended index
+- Warnings: <list, or "none">
+
+Design:
+- N user skills classified as design-relevant
+- M frontend-design plugin skills classified as design-relevant (v<hash>)
+- L ui-ux-pro-max plugin skills classified as design-relevant (v<version>)
+- S frontend-slides plugin skills classified as design-relevant (v<version>)
 - K curated skills excluded from extended index
 - Warnings: <list, or "none">
 ```
@@ -126,10 +226,12 @@ Wrote ~/.claude/solopreneur/skill-index/ios.md
 
 - This skill is **manual**. There is no auto-rebuild on subagent invocation
   or on plugin update.
-- Output is **per-machine**. The plugin git repo only ships the curated list
-  inside `agents/ios-dev.md`.
-- v1 covers iOS only. Other platforms (android, web, python, llm) will get
-  the same treatment if/when they need it.
+- Output is **per-machine**. The plugin git repo only ships the curated lists
+  inside each `agents/<name>.md`.
+- A single candidate skill can land in multiple platform indexes (design +
+  iOS overlap is common for SwiftUI-focused visual skills).
 - Classification is LLM judgment, not regex. Output may shift slightly
   between runs at the margin; that's acceptable because the curated list is
   the deterministic top-priority layer.
+- Other platforms (android, web, python, llm) will get the same treatment if
+  their agents start hitting the limits of the curated list.
