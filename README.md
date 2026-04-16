@@ -94,6 +94,7 @@ Platform-specific development experts used by `/preflight`, `/specialist-review`
 - **`nextjs-dev`** — Next.js/React. Same as web-dev, specialized for Next.js projects.
 - **`python-dev`** — Python/FastAPI. Curated list for Python backend development.
 - **`llm-dev`** — LLM/LangGraph. Curated list for LLM application development.
+- **`designer`** — UI/UX design (cross-platform). Curated list of third-party design skills. Extended index at `~/.claude/solopreneur/skill-index/design.md`, rebuild with `/rebuild-skill-index`.
 
 ## Auto-Integrations
 
@@ -127,6 +128,18 @@ Solopreneur's agents and skills auto-discover tools from other installed plugins
 | [iphone-apps](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps) | Skill | `ios-dev` agent | Full iPhone app workflow (build, debug, test, ship — CLI-only) |
 
 User-level skills in `~/.claude/skills/` are auto-classified into the iOS extended index by `/rebuild-skill-index` (other platforms TBD).
+
+### Design / UI
+
+| Source | Type | Used by | Purpose |
+|--------|------|---------|---------|
+| [impeccable](https://github.com/pbakaus/impeccable) | Skill | `designer` agent | `teach-impeccable` — one-time interview that writes persistent project design guidelines |
+| [taste-skill](https://github.com/Leonxlnx/taste-skill) | Skills | `designer` agent | `taste-*` archetype family (soft / brutalist / minimalist / redesign / stitch / output) — overrides default LLM design biases |
+| [frontend-design](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design) | Plugin | `designer` agent | Creative, polished frontend code generation that avoids generic AI aesthetics |
+| [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | Plugin | `designer` agent | UI/UX intelligence library — styles, palettes, font pairings, product types, UX guidelines, chart types across 10 stacks |
+
+User-level skills in `~/.claude/skills/` and the above plugins are
+auto-classified into the design extended index by `/rebuild-skill-index`.
 
 ## CLI Tools
 
