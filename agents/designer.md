@@ -15,11 +15,6 @@ systems when they exist.
 For any design task, always consider the following hand-picked skills. Read the
 corresponding SKILL.md for any that matches your task.
 
-### Plugin built-in skills (path: `~/.claude/plugins/cache/solopreneur/solopreneur/<version>/skills/<name>/SKILL.md`)
-
-(None yet — design patterns are too broad to bundle generically. Rely on the
-third-party skills below plus project-specific design guidelines.)
-
 ### Third-party skills
 
 Each entry lists the resolved path and install source. Install what matches
@@ -41,8 +36,8 @@ your work — consumers auto-detect what's available.
 
 - `frontend-design` — Create distinctive, production-grade frontend interfaces.
   Generates creative, polished code that avoids generic AI aesthetics. To
-  resolve `<version>` (hash directory), run:
-  `ls ~/.claude/plugins/cache/claude-plugins-official/frontend-design/ | tail -1`
+  resolve `<version>` (hash directory — pick newest by mtime), run:
+  `ls -t ~/.claude/plugins/cache/claude-plugins-official/frontend-design/ | head -1`
   Path: `~/.claude/plugins/cache/claude-plugins-official/frontend-design/<version>/skills/frontend-design/SKILL.md`
   Install: https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design
 
@@ -84,8 +79,10 @@ If not available, skip this step.
 
 Before applying any generic design pattern, check for project-specific rules:
 
-1. Glob `**/design/guidelines/design-system.md` and
-   `**/design/guidelines/icon-mapping.md`
+1. Glob for common design-documentation locations:
+   - `**/design-system.md`, `**/DESIGN.md`, `**/style-guide.md`
+   - `**/design/guidelines/*.md`
+   - Any top-level `design/` directory
 2. Read any matches — these define the project's palette, typography, icon
    conventions, and spacing scale
 3. **Project rules override generic skills.** If the project uses Material

@@ -49,10 +49,11 @@ Design-specific sources:
 
 3. **frontend-design plugin** (optional):
    ```bash
-   ls ~/.claude/plugins/cache/claude-plugins-official/frontend-design/ | tail -1
+   ls -t ~/.claude/plugins/cache/claude-plugins-official/frontend-design/ | head -1
    ```
-   - This plugin uses hash directories, not semver; `tail -1` picks the
-     alphabetically-last hash (good enough — there's usually one).
+   - This plugin uses hash directories, not semver; `ls -t | head -1` picks
+     the newest by mtime — matches "the one currently installed" even when
+     multiple hash dirs coexist.
    - If present: `~/.claude/plugins/cache/claude-plugins-official/frontend-design/<hash>/skills/*/SKILL.md`
    - If absent, record a "missing" warning for the design output file.
 
@@ -65,10 +66,11 @@ Design-specific sources:
 
 5. **frontend-slides plugin** (optional):
    ```bash
-   ls ~/.claude/plugins/cache/claude-plugins-official/frontend-slides/ | tail -1
+   ls ~/.claude/plugins/cache/frontend-slides/frontend-slides/ | sort -V | tail -1
    ```
    - Slide-oriented skills — included in the design index because
      presentation design overlaps with product UI work.
+   - If present: `~/.claude/plugins/cache/frontend-slides/frontend-slides/<version>/skills/*/SKILL.md`
    - If absent, skip silently (no warning — this is bonus, not required).
 
 ## Step 2: Read curated dedup lists
@@ -90,7 +92,7 @@ Agents to read:
 - `agents/designer.md` → design dedup list
 
 To locate the plugin path on disk, try:
-- `~/.claude/plugins/cache/solopreneur-marketplace/solopreneur/<version>/agents/<name>.md`
+- `~/.claude/plugins/cache/solopreneur/solopreneur/<version>/agents/<name>.md`
 - Or use Glob: `~/.claude/plugins/**/solopreneur/**/agents/<name>.md`
 
 If you can't find an agent file, ask the user where the solopreneur plugin is
@@ -184,9 +186,9 @@ Classified by: <model name running this skill>
   Path: ~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
-## Auto-classified frontend-slides plugin skills (v<hash>)
+## Auto-classified frontend-slides plugin skills (v<version>)
 - `<name>` — <description>
-  Path: ~/.claude/plugins/cache/claude-plugins-official/frontend-slides/<hash>/skills/<name>/SKILL.md
+  Path: ~/.claude/plugins/cache/frontend-slides/frontend-slides/<version>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Missing
@@ -198,10 +200,12 @@ emit it for transparency).
 
 ## Step 5: Report to the user
 
-Print a short summary:
+Print a short summary (one `Wrote` line per file actually written — skip
+platforms that had no sources available):
 
 ```
-Wrote ~/.claude/solopreneur/skill-index/{ios,design}.md
+Wrote ~/.claude/solopreneur/skill-index/ios.md
+Wrote ~/.claude/solopreneur/skill-index/design.md
 
 iOS:
 - N user skills classified as iOS-relevant
@@ -213,7 +217,7 @@ Design:
 - N user skills classified as design-relevant
 - M frontend-design plugin skills classified as design-relevant (v<hash>)
 - L ui-ux-pro-max plugin skills classified as design-relevant (v<version>)
-- S frontend-slides plugin skills classified as design-relevant (v<hash>)
+- S frontend-slides plugin skills classified as design-relevant (v<version>)
 - K curated skills excluded from extended index
 - Warnings: <list, or "none">
 ```
