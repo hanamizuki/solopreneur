@@ -172,22 +172,22 @@ Generated: <ISO 8601 timestamp with timezone>
 Classified by: <model name running this skill>
 
 ## Auto-classified user skills
-- `<name>` — <description>
+- `<name>` — <one-line description trimmed to ~120 chars>
   Path: ~/.claude/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Auto-classified frontend-design plugin skills (v<hash>)
-- `<name>` — <description>
+- `<name>` — <one-line description trimmed to ~120 chars>
   Path: ~/.claude/plugins/cache/claude-plugins-official/frontend-design/<hash>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Auto-classified ui-ux-pro-max plugin skills (v<version>)
-- `<name>` — <description>
+- `<name>` — <one-line description trimmed to ~120 chars>
   Path: ~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Auto-classified frontend-slides plugin skills (v<version>)
-- `<name>` — <description>
+- `<name>` — <one-line description trimmed to ~120 chars>
   Path: ~/.claude/plugins/cache/frontend-slides/frontend-slides/<version>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
