@@ -4,7 +4,7 @@ Building alone doesn't mean building without a team. This Claude Code plugin giv
 
 ## Install
 
-Not yet on a public marketplace. Install from GitHub:
+Install from GitHub:
 
 ```bash
 # Add this repo as a marketplace source
