@@ -131,6 +131,8 @@ Result: an illustration that looks like it's bleeding in from the corner, no sha
 
 **Webkit prefix is still required** in Safari / iOS as of 2026. Keep both the standard and `-webkit-` versions.
 
+**Print-to-PDF caveat.** Chrome's print pipeline mis-composites these two mask layers and paints the `.bg-art` bounding box as a solid black rectangle in the exported PDF. If the deck will ever be exported, add the `@media print` override from [pdf-export.md](pdf-export.md) — it disables the mask in print and recreates the falloff with a gradient overlay that survives the print renderer.
+
 **When to use:** scene-setting pages only — title, opening vision, closing. 3–5 total across a 15–20 slide deck. More and it loses the "special moment" feel.
 
 ## Layer 3b: Character cameos (`.character`)

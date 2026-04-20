@@ -161,6 +161,10 @@ These are reusable components built for presentations. They're optional — use 
 
 When generating a presentation, scan the content outline and suggest which components would work well. Don't force components where simple bullet points or text would be clearer.
 
+## Utility: PDF Export
+
+When the user wants to export the deck to PDF (handout, archive, chat attachment), use the headless Chrome recipe in [references/pdf-export.md](references/pdf-export.md). Needs a one-time `@media print` block in the deck's CSS — it forces 1920×1080 landscape pages and works around Chrome's print-pipeline bug that renders the `.bg-art` layered mask as black rectangles.
+
 ## Utility: QR Code Generation
 
 For decks with "scan to download" CTAs:
@@ -184,3 +188,4 @@ qrencode -o assets/qr.png -s 20 -m 2 "https://example.com"
 | [references/reveal-system.md](references/reveal-system.md) | Step-controlled reveal + `data-toggle` + SVG sync patterns |
 | [references/chinese-guidelines.md](references/chinese-guidelines.md) | Chinese AI-slop avoidance + `/humanly` integration |
 | [references/components.md](references/components.md) | CSS / HTML for 13 reusable layout components |
+| [references/pdf-export.md](references/pdf-export.md) | Headless Chrome recipe + `@media print` block for landscape 16:9 PDF export (with `.bg-art` mask workaround) |
