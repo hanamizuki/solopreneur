@@ -65,13 +65,21 @@ Infer the tech stack from the codebase:
 |---|---|---|
 | `.xcodeproj` / `.swift` | iOS/SwiftUI | `ios-dev` |
 | `build.gradle` / `.kt` | Android/Kotlin | `android-dev` |
-| `package.json` / `.tsx` / `.jsx` | Web/React | `web-dev` |
-| Next.js config / API routes | Next.js | `nextjs-dev` |
+| `package.json` / `.tsx` / `.jsx` / Next.js config / API routes | Web / Next.js | `nextjs-dev` |
 | `pyproject.toml` / FastAPI | Python | `python-dev` |
 | LangGraph / agent workflow | LLM/AI Agent | `llm-dev` |
 
 Cross-platform todo (e.g., iOS + Android) → spawn **two experts** in parallel.
 If no platform detected → skip expert review.
+
+**Agent availability (post-v1.0.0 split):** each stack agent lives in its own
+sub-plugin (`solopreneur-ios`, `solopreneur-android`, `solopreneur-nextjs`,
+`solopreneur-python`, `solopreneur-llm`). If the matched sub-plugin is not
+installed (Agent dispatch fails with unknown subagent), do the review inline
+with generic expertise and prepend to the output:
+
+> ⚠️ `<agent>` not installed — review done with generic expertise. Install
+> `solopreneur-<stack>` for deeper, skill-index-backed review.
 
 ### Step 4: Best Practice Check (Expert Subagent)
 

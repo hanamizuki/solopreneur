@@ -14,11 +14,11 @@ Skill tool by name — Claude Code resolves paths and versions automatically
 across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin-bundled (solopreneur)
+### Plugin-bundled (solopreneur-ios)
 
 Always available — ships with this plugin.
 
-- `solopreneur:ios-patterns` — Team SwiftUI conventions: i18n (String Catalog),
+- `solopreneur-ios:ios-patterns` — Team SwiftUI conventions: i18n (String Catalog),
   date localization, ISO8601 date parsing, Previews, state management, sheet &
   navigation, list spacing, expandable animation, keyboard Done button
 

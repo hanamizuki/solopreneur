@@ -3,10 +3,10 @@ name: specialist-review
 description: |
   Tech-stack-aware expert code review using specialized subagents. Detects which
   tech stacks are in the diff, then dispatches the matching specialist agents
-  (ios-dev, android-dev, llm-dev, python-dev, nextjs-dev, web-dev) to review
-  against their skill-index best practices. Use when the user says "specialist
-  review", "expert review", "stack review", or wants a multi-perspective code
-  review with best practice verification. Also use after completing a significant
+  (ios-dev, android-dev, llm-dev, python-dev, nextjs-dev) to review against
+  their skill-index best practices. Use when the user says "specialist review",
+  "expert review", "stack review", or wants a multi-perspective code review
+  with best practice verification. Also use after completing a significant
   implementation when thorough review is needed.
 ---
 
@@ -43,7 +43,7 @@ Read the full diff and identify which tech stacks are involved based on file pat
 | `*.swift`, `*.xib`, `ios/`, SwiftUI/UIKit imports | iOS | `ios-dev` |
 | `*.kt`, `*.kts`, `android/`, Compose/Room imports | Android | `android-dev` |
 | `*.py`, FastAPI/Flask/Django imports | Python Backend | `python-dev` |
-| `*.ts`, `*.tsx`, `*.jsx`, React/Next.js imports | Web Frontend | `nextjs-dev` or `web-dev` |
+| `*.ts`, `*.tsx`, `*.jsx`, React/Next.js imports | Web Frontend | `nextjs-dev` |
 | LangChain/LangGraph/OpenAI/Anthropic imports | LLM/AI | `llm-dev` |
 | `*.sql`, migrations, Supabase | Database | `python-dev` |
 
@@ -53,6 +53,26 @@ is detected, dispatch one agent. If multiple, dispatch them **in parallel**.
 Also extract the key libraries/frameworks used in the diff (e.g., `jetpack compose`,
 `swiftui`, `langgraph`, `react`, `room`, `fastapi`). These will be passed to subagents
 for documentation lookup.
+
+## Step 2.25: Check Specialist Agent Availability
+
+Since the v1.0.0 split, each specialist agent ships as its own sub-plugin
+(`solopreneur-ios`, `solopreneur-android`, `solopreneur-nextjs`,
+`solopreneur-python`, `solopreneur-llm`). Users may have only installed
+`solopreneur-core`.
+
+For each agent you plan to dispatch in Step 3, check whether it is available
+(e.g., by trying to locate `<CONFIG>/plugins/cache/solopreneur/solopreneur-<stack>/`
+via Glob, or by attempting the Agent dispatch and handling an unknown-subagent
+error).
+
+- **Agent available**: dispatch as normal in Step 3.
+- **Agent not installed**: still perform the review for that stack, but do it
+  **inline** using generic expertise (no Agent dispatch). In the final report,
+  prefix that stack's section with:
+
+  > ⚠️ `<agent>` not installed — review done with generic expertise. Install
+  > `solopreneur-<stack>` for deeper, skill-index-backed review.
 
 ## Step 2.5: Check context7 Availability
 

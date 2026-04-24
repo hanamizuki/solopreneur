@@ -70,7 +70,7 @@ Based on the task content, propose a PR splitting strategy:
    - Short title
    - Files to create/modify (paths)
    - Dependencies on other PRs
-   - Required subagent type (python-dev / web-dev / ios-dev / android-dev / llm-dev / nextjs-dev)
+   - Required subagent type (python-dev / nextjs-dev / ios-dev / android-dev / llm-dev)
 
 3. **Validate the dependency graph**:
    - For PRs declared parallel: confirm file paths don't overlap

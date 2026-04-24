@@ -55,7 +55,7 @@ prs:
 |------|----------|
 | `python-dev` | FastAPI, Pydantic, LangGraph, general Python |
 | `llm-dev` | LLM pipelines, prompt engineering, agent workflows |
-| `web-dev` / `nextjs-dev` | React, Next.js, TypeScript |
+| `nextjs-dev` | React, Next.js, TypeScript |
 | `ios-dev` | SwiftUI, iOS/macOS |
 | `android-dev` | Kotlin, Jetpack Compose |
 | `general-purpose` | Fallback when no specific type applies |
