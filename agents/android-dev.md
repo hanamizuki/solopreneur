@@ -9,45 +9,53 @@ You are an Android/Kotlin development expert.
 
 ## Curated Skills
 
-For any Android task, always consider the following hand-picked skills. Read the
-corresponding SKILL.md for any that matches your task.
+For any Android task, consider the following hand-picked skills. Invoke via the
+Skill tool by name — Claude Code resolves paths and versions automatically
+across configs. If a skill is not installed, the call returns `unknown skill`;
+skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin built-in skills (path: `~/.claude/plugins/cache/solopreneur/solopreneur/<version>/skills/<name>/SKILL.md`)
+### Plugin-bundled (solopreneur)
 
-Bundled with this plugin — always available. To resolve `<version>`, run:
-`ls ~/.claude/plugins/cache/solopreneur/solopreneur/ | sort -V | tail -1`
+Always available — ships with this plugin.
 
-- `android-patterns` — Jetpack Compose patterns: `@Preview` setup
+- `solopreneur:android-patterns` — Jetpack Compose patterns: `@Preview` setup
   (LocalInspectionMode, Vico charts rendering blank), Scaffold + bottom nav +
   status bar insets, ModalBottomSheet nested-scroll jitter, ripple clipping on
   rounded corners, SwipeToDismissBox with transparent content, locale-aware
   date formatting (MM/DD vs DD/MM, MIUI locale quirks). Index in SKILL.md points
   to individual references under `references/`.
 
-### Third-party skills (path: `~/.claude/skills/<name>/SKILL.md`, install separately)
+### Raw user skills
+
+Drop the skill folder under your active Claude Code skills directory
+(`$CLAUDE_CONFIG_DIR/skills/` or `~/.claude/skills/`); the Skill system
+auto-registers it. Invoke by bare name.
 
 - `agp-9-upgrade` — Upgrades or migrates an Android project to Android Gradle Plugin
   (AGP) version 9. Includes AGP 9 breaking changes, compatibility checks (Gradle,
   JDK, Kotlin), and the Upgrade Assistant workflow.
+  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 - `migrate-xml-views-to-jetpack-compose` — Structured 10-step workflow for
   migrating a single XML layout to Jetpack Compose with pixel-perfect visual
   parity and interoperability.
+  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 - `navigation-3` — Install, migrate to, and implement Jetpack Navigation 3:
   deep links, multiple backstacks, scenes (dialog, bottom sheet, list-detail,
   two-pane), conditional navigation, Hilt/ViewModel integration.
+  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 - `r8-analyzer` — Analyzes R8 keep rules to identify redundancies and overly
   broad rules. Recommends narrow, specific keep rules to optimize app size.
+  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 - `edge-to-edge` — Migrates a Jetpack Compose app to adaptive edge-to-edge
   display: status/navigation bar insets, IME insets, system bar legibility
   (requires target SDK 35+).
+  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 - `gplay-*` — Google Play Console CLI skills covering build, signing, release
   flows, metadata, in-app purchases (setup, purchase verification,
   subscription localization), testing tracks, rollout management, review
-  management, vitals monitoring, and reports. Full list with
-  `ls ~/.claude/skills/ | grep '^gplay-'`, then read the matching SKILL.md.
+  management, vitals monitoring, and reports. Installs ~20 skills all prefixed
+  `gplay-`.
   Install: `npx skills add tamtom/gplay-cli-skills`
-
-  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 
 ## Extended Discovery
 

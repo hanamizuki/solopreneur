@@ -12,60 +12,51 @@ systems when they exist.
 
 ## Curated Skills
 
-For any design task, always consider the following hand-picked skills. Read the
-corresponding SKILL.md for any that matches your task.
+For any design task, consider the following hand-picked skills. Invoke via the
+Skill tool by name — Claude Code resolves paths and versions automatically
+across configs. If a skill is not installed, the call returns `unknown skill`;
+skip it and proceed with remaining skills plus built-in knowledge.
 
-### Third-party skills
+### Third-party plugins
 
-Each entry lists the resolved path and install source. Install what matches
-your work — consumers auto-detect what's available.
+- `frontend-design:frontend-design` — Create distinctive, production-grade
+  frontend interfaces. Generates creative, polished code that avoids generic
+  AI aesthetics.
+  Install: https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design
+- `ui-ux-pro-max:ui-ux-pro-max` — UI/UX intelligence library: 50+ styles,
+  161 color palettes, 57 font pairings, 161 product types, 99 UX guidelines,
+  chart types across 10 stacks (React, Next.js, Vue, Svelte, etc.).
+  Install: https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+
+### Raw user skills
+
+Drop the skill folder under your active Claude Code skills directory
+(`$CLAUDE_CONFIG_DIR/skills/` or `~/.claude/skills/`); the Skill system
+auto-registers it. Invoke by bare name.
 
 - `teach-impeccable` — One-time setup that interviews you, then writes persistent
   design guidelines into your AI config. Run it once per project to anchor
   the agent to a consistent aesthetic.
-  Path: `~/.claude/skills/teach-impeccable/SKILL.md`
   Install: https://github.com/pbakaus/impeccable
 
 The `taste-*` family — archetype skills from the same repo that override
-default LLM design biases. Pick the one that matches the product's
-personality; list all installed with `ls ~/.claude/skills/ | grep '^taste-'`.
+default LLM design biases. Pick the one that matches the product's personality.
 All share the install source: https://github.com/Leonxlnx/taste-skill
 
 - `taste-skill` — Senior UI/UX engineer baseline. Metric-based rules, strict
   component architecture, balanced design engineering.
-  Path: `~/.claude/skills/taste-skill/SKILL.md`
 - `taste-soft` — High-end agency aesthetic. Premium fonts, generous spacing,
   soft shadows, tasteful animations.
-  Path: `~/.claude/skills/taste-soft/SKILL.md`
 - `taste-brutalist` — Raw mechanical Swiss/terminal aesthetic. Rigid grids,
   extreme type contrast, utilitarian color, data-heavy dashboards.
-  Path: `~/.claude/skills/taste-brutalist/SKILL.md`
 - `taste-minimalist` — Clean editorial style. Warm monochrome palette,
   typographic contrast, flat bento grids, muted pastels.
-  Path: `~/.claude/skills/taste-minimalist/SKILL.md`
 - `taste-redesign` — Upgrades existing sites to premium quality without
   breaking functionality. Works with any CSS framework.
-  Path: `~/.claude/skills/taste-redesign/SKILL.md`
 - `taste-stitch` — Semantic design system for Google Stitch. Generates
   agent-friendly DESIGN.md files.
-  Path: `~/.claude/skills/taste-stitch/SKILL.md`
 - `taste-output` — Overrides default LLM truncation. Enforces complete code
   generation, bans placeholder patterns.
-  Path: `~/.claude/skills/taste-output/SKILL.md`
-
-- `frontend-design` — Create distinctive, production-grade frontend interfaces.
-  Generates creative, polished code that avoids generic AI aesthetics. To
-  resolve `<version>` (hash directory — pick newest by mtime), run:
-  `ls -t ~/.claude/plugins/cache/claude-plugins-official/frontend-design/ | head -1`
-  Path: `~/.claude/plugins/cache/claude-plugins-official/frontend-design/<version>/skills/frontend-design/SKILL.md`
-  Install: https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design
-
-- `ui-ux-pro-max` — UI/UX intelligence library: 50+ styles, 161 color palettes,
-  57 font pairings, 161 product types, 99 UX guidelines, chart types across
-  10 stacks (React, Next.js, Vue, Svelte, etc.). To resolve `<version>`, run:
-  `ls ~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/ | sort -V | tail -1`
-  Path: `~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/ui-ux-pro-max/SKILL.md`
-  Install: https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
 
 ## Extended Discovery
 

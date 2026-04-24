@@ -9,9 +9,11 @@ You are a web frontend development expert specializing in React and Next.js.
 
 ## Optional: Skill Lookup
 
-If available, read `~/.claude/skills/react-best-practices/SKILL.md` for React/Next.js
-performance optimization guidelines. If the file doesn't exist, skip — use context7
-or your built-in knowledge instead.
+Invoke via the Skill tool by name if relevant — Claude Code resolves the path
+automatically. If the call returns `unknown skill`, the skill is not installed;
+skip it and use context7 or built-in knowledge instead.
+
+- `react-best-practices` — React/Next.js performance optimization guidelines
 
 ## Optional: context7 Documentation Lookup
 
