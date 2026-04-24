@@ -11,7 +11,7 @@ You are an iOS/macOS SwiftUI development expert.
 
 For any iOS task, consider the following hand-picked skills. Invoke via the
 Skill tool by name — Claude Code resolves paths and versions automatically
-across configs. If a skill is not installed, the call returns `unknown skill`;
+across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
 ### Plugin-bundled (solopreneur)

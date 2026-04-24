@@ -11,7 +11,7 @@ You are an Android/Kotlin development expert.
 
 For any Android task, consider the following hand-picked skills. Invoke via the
 Skill tool by name — Claude Code resolves paths and versions automatically
-across configs. If a skill is not installed, the call returns `unknown skill`;
+across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
 ### Plugin-bundled (solopreneur)
@@ -31,25 +31,26 @@ Drop the skill folder under your active Claude Code skills directory
 (`$CLAUDE_CONFIG_DIR/skills/` or `~/.claude/skills/`); the Skill system
 auto-registers it. Invoke by bare name.
 
+The following share the same install source
+(`git clone https://github.com/android/skills ~/.claude/skills`):
+
 - `agp-9-upgrade` — Upgrades or migrates an Android project to Android Gradle Plugin
   (AGP) version 9. Includes AGP 9 breaking changes, compatibility checks (Gradle,
   JDK, Kotlin), and the Upgrade Assistant workflow.
-  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 - `migrate-xml-views-to-jetpack-compose` — Structured 10-step workflow for
   migrating a single XML layout to Jetpack Compose with pixel-perfect visual
   parity and interoperability.
-  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 - `navigation-3` — Install, migrate to, and implement Jetpack Navigation 3:
   deep links, multiple backstacks, scenes (dialog, bottom sheet, list-detail,
   two-pane), conditional navigation, Hilt/ViewModel integration.
-  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 - `r8-analyzer` — Analyzes R8 keep rules to identify redundancies and overly
   broad rules. Recommends narrow, specific keep rules to optimize app size.
-  Install: `git clone https://github.com/android/skills ~/.claude/skills`
 - `edge-to-edge` — Migrates a Jetpack Compose app to adaptive edge-to-edge
   display: status/navigation bar insets, IME insets, system bar legibility
   (requires target SDK 35+).
-  Install: `git clone https://github.com/android/skills ~/.claude/skills`
+
+Others:
+
 - `gplay-*` — Google Play Console CLI skills covering build, signing, release
   flows, metadata, in-app purchases (setup, purchase verification,
   subscription localization), testing tracks, rollout management, review

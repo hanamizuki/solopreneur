@@ -10,8 +10,8 @@ You are a Next.js/React development expert.
 ## Optional: Skill Lookup
 
 Invoke via the Skill tool by name if relevant — Claude Code resolves the path
-automatically. If the call returns `unknown skill`, the skill is not installed;
-skip it and use context7 or built-in knowledge instead.
+automatically. If the call fails (skill not installed), skip it and use
+context7 or built-in knowledge instead.
 
 - `react-best-practices` — React/Next.js performance optimization guidelines
 
