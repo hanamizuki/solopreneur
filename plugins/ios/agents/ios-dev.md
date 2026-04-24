@@ -24,7 +24,7 @@ Always available — ships with this plugin.
 
 ### Third-party Axiom plugin
 
-Install: https://github.com/axiom-dev/axiom (marketplace `axiom-marketplace`)
+Install: https://github.com/CharlesWiltgen/Axiom (marketplace `axiom-marketplace`)
 
 - `axiom:axiom-ios-ui` — UI router (SwiftUI, UIKit, layout, navigation, animations)
 - `axiom:axiom-ios-data` — Data persistence router (SwiftData, Core Data, GRDB, CloudKit)

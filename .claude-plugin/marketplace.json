@@ -16,31 +16,31 @@
     {
       "name": "solopreneur-ios",
       "source": "./plugins/ios",
-      "description": "iOS/macOS SwiftUI expertise — ios-dev agent and ios-patterns skill. Depends on solopreneur-core.",
+      "description": "iOS/macOS SwiftUI expertise — ios-dev agent and ios-patterns skill.",
       "license": "MIT"
     },
     {
       "name": "solopreneur-android",
       "source": "./plugins/android",
-      "description": "Android/Kotlin expertise — android-dev agent and android-patterns skill. Depends on solopreneur-core.",
+      "description": "Android/Kotlin expertise — android-dev agent and android-patterns skill.",
       "license": "MIT"
     },
     {
       "name": "solopreneur-nextjs",
       "source": "./plugins/nextjs",
-      "description": "Next.js/React/frontend expertise — nextjs-dev agent. Depends on solopreneur-core.",
+      "description": "Next.js/React/frontend expertise — nextjs-dev agent.",
       "license": "MIT"
     },
     {
       "name": "solopreneur-python",
       "source": "./plugins/python",
-      "description": "Python/FastAPI/LangGraph expertise — python-dev agent. Depends on solopreneur-core.",
+      "description": "Python/FastAPI/LangGraph expertise — python-dev agent.",
       "license": "MIT"
     },
     {
       "name": "solopreneur-llm",
       "source": "./plugins/llm",
-      "description": "LLM/LangGraph agent development expertise — llm-dev agent. Depends on solopreneur-core.",
+      "description": "LLM/LangGraph agent development expertise — llm-dev agent.",
       "license": "MIT"
     }
   ]

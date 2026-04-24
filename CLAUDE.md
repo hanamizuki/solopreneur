@@ -11,9 +11,6 @@ This repo ships **six sub-plugins** from a single marketplace:
 | `solopreneur-python` | `plugins/python/` | `solopreneur-core` |
 | `solopreneur-llm` | `plugins/llm/` | `solopreneur-core` |
 
-Each sub-plugin has its **own** `.claude-plugin/plugin.json` and its own
-version. `.claude-plugin/marketplace.json` at the repo root lists all six.
-
 ## Release rule
 
 Before pushing to `main`, for every sub-plugin whose files changed in the
@@ -38,11 +35,17 @@ current set of commits:
 
    The double-dash is required — Claude Code uses it to resolve plugin
    versions from git tags.
-3. **Push the commit and all new tags together**:
+3. **Push the commit and all new tags together** — this MUST be atomic, so
+   that the merge commit does not appear on `origin/main` before the
+   matching `<plugin>--v<version>` tags:
 
    ```bash
    git push --follow-tags
    ```
+
+   If you push the commit alone (`git push`) and then the tags later,
+   users installing in the gap will hit `no-matching-tag` errors from
+   Claude Code's dependency resolver.
 
 ### Quick scan for which plugins changed
 
@@ -53,6 +56,13 @@ git diff --name-only <base>..HEAD | awk -F/ '/^plugins\// { print $2 }' | sort -
 Bump + tag only those plugins. If several plugins change together, each
 still gets its own bump and its own `<name>--v<version>` tag on the same
 merge commit.
+
+### `marketplace.json` changes also bump
+
+If `.claude-plugin/marketplace.json` changed in a way that affects a plugin
+entry (name / source / description / license), that counts as a user-visible
+change for every affected sub-plugin — bump their versions too. The scan
+command above doesn't catch this; check `marketplace.json` separately.
 
 ### Exceptions
 

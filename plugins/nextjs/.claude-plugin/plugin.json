@@ -1,7 +1,7 @@
 {
   "name": "solopreneur-nextjs",
   "version": "1.0.0",
-  "description": "Next.js/React/frontend expertise — nextjs-dev agent. Requires solopreneur-core.",
+  "description": "Next.js/React/frontend expertise — nextjs-dev agent.",
   "license": "MIT",
   "dependencies": [
     { "name": "solopreneur-core", "version": ">=1.0.0" }

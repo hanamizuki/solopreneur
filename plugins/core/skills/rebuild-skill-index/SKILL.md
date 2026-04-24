@@ -17,9 +17,6 @@ config. Each file is the extended list of every platform-relevant skill
 installed on this machine that is not already in the curated list inside the
 matching agent's markdown file.
 
-Current platforms: **iOS** and **design**. (Others — android, web, python,
-llm — will be added when they need extended indexing.)
-
 Outputs are consumed by the matching subagents (`ios-dev`, `designer`, …) and
 any caller that dispatches them (`/specialist-review`, `/preflight`,
 `/todos-review`).
@@ -109,10 +106,12 @@ Agents to read (each lives in its own sub-plugin after the v1.0.0 split):
 - `ios-dev.md` (from `solopreneur-ios`) → iOS dedup list
 - `designer.md` (from `solopreneur-core`) → design dedup list
 
-To locate each agent file on disk, try:
-- `$BASE/plugins/cache/solopreneur/solopreneur-ios/<version>/agents/ios-dev.md`
-- `$BASE/plugins/cache/solopreneur/solopreneur-core/<version>/agents/designer.md`
-- Or use Glob: `$BASE/plugins/cache/solopreneur/solopreneur-*/*/agents/<name>.md`
+Locate each agent file via Glob (widens across any marketplace name the user
+chose at `claude plugin marketplace add --name`):
+
+    Glob: `$BASE/plugins/cache/*/solopreneur-*/*/agents/<name>.md`
+
+If multiple versions coexist, take the highest semver match.
 
 If you can't find an agent file, ask the user where that sub-plugin is
 installed and continue with an empty dedup list for that platform (the

@@ -1,7 +1,7 @@
 {
   "name": "solopreneur-python",
   "version": "1.0.0",
-  "description": "Python/FastAPI/LangGraph expertise — python-dev agent. Requires solopreneur-core.",
+  "description": "Python/FastAPI/LangGraph expertise — python-dev agent.",
   "license": "MIT",
   "dependencies": [
     { "name": "solopreneur-core", "version": ">=1.0.0" }

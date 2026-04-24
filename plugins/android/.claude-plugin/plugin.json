@@ -1,7 +1,7 @@
 {
   "name": "solopreneur-android",
   "version": "1.0.0",
-  "description": "Android/Kotlin expertise — android-dev agent and android-patterns skill. Requires solopreneur-core.",
+  "description": "Android/Kotlin expertise — android-dev agent and android-patterns skill.",
   "license": "MIT",
   "dependencies": [
     { "name": "solopreneur-core", "version": ">=1.0.0" }

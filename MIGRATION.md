@@ -10,7 +10,15 @@ and the marketplace ships six new plugin names instead.
 ```bash
 # 1. Uninstall the old monolithic plugin
 claude plugin uninstall solopreneur
+```
 
+> If you skip the uninstall step, the old monolithic plugin stays cached
+> alongside the new sub-plugins. Skills with the same name (`/preflight`,
+> `/greenlight`, `/specialist-review`, etc.) will exist in both — resolution
+> is undefined and you may see duplicated or inconsistent behavior until you
+> actually uninstall `solopreneur`.
+
+```bash
 # 2. Pull the updated marketplace (it now lists the new plugins)
 claude plugin marketplace update solopreneur
 
@@ -46,13 +54,10 @@ Requires Claude Code **≥ v2.1.110** (for `dependencies`-driven auto-install).
 
 ### 2. `web-dev` agent is removed
 
-The old `web-dev` and `nextjs-dev` agents were functionally redundant (the
-only difference was `model:` frontmatter — `opus` vs `sonnet`). In v1.0.0
-`nextjs-dev` absorbs the general React/frontend role.
-
-If your workflow referenced `web-dev` explicitly (custom prompts, scripts,
-notes), switch those references to `nextjs-dev`. Skills inside this plugin
-that dispatched `web-dev` (`/specialist-review`, `/autopilot`, `/preflight`,
+The `web-dev` agent is dropped; `nextjs-dev` now covers the general
+React/frontend role. If you have custom prompts or scripts that reference
+`web-dev`, switch them to `nextjs-dev`. Skills inside this repo that used
+to dispatch `web-dev` (`/specialist-review`, `/autopilot`, `/preflight`,
 `/todos-review`) have already been updated.
 
 ### 3. `ios-patterns` and `android-patterns` skills moved
@@ -93,6 +98,11 @@ skill-index-backed specialist. The report will prefix a warning like:
 > `solopreneur-ios` for deeper, skill-index-backed review.
 
 Install the referenced plugin to upgrade the review quality.
+
+`/preflight` behaves similarly but falls back to the `general-purpose`
+subagent **silently** (no warning blockquote). If your preflight feels
+lighter than usual after migrating, install the relevant stack plugin to
+restore skill-index-backed review.
 
 ## Verifying the migration
 

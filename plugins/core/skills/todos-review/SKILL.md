@@ -74,12 +74,16 @@ If no platform detected → skip expert review.
 
 **Agent availability (post-v1.0.0 split):** each stack agent lives in its own
 sub-plugin (`solopreneur-ios`, `solopreneur-android`, `solopreneur-nextjs`,
-`solopreneur-python`, `solopreneur-llm`). If the matched sub-plugin is not
-installed (Agent dispatch fails with unknown subagent), do the review inline
-with generic expertise and prepend to the output:
+`solopreneur-python`, `solopreneur-llm`). When dispatching in Step 4:
 
-> ⚠️ `<agent>` not installed — review done with generic expertise. Install
-> `solopreneur-<stack>` for deeper, skill-index-backed review.
+- **Success** → proceed as normal.
+- **Unknown-subagent-type error** → do the review inline with generic
+  expertise and prepend the stack's output with:
+
+  > ⚠️ `<agent>` not installed — review done with generic expertise. Install
+  > `solopreneur-<stack>` for deeper, skill-index-backed review.
+
+- **Any other Agent error** → surface to the user; do not silently fall back.
 
 ### Step 4: Best Practice Check (Expert Subagent)
 

@@ -61,18 +61,24 @@ Since the v1.0.0 split, each specialist agent ships as its own sub-plugin
 `solopreneur-python`, `solopreneur-llm`). Users may have only installed
 `solopreneur-core`.
 
-For each agent you plan to dispatch in Step 3, check whether it is available
-(e.g., by trying to locate `<CONFIG>/plugins/cache/solopreneur/solopreneur-<stack>/`
-via Glob, or by attempting the Agent dispatch and handling an unknown-subagent
-error).
+For each agent you plan to dispatch in Step 3, attempt the Agent dispatch
+directly. Handle the result:
 
-- **Agent available**: dispatch as normal in Step 3.
-- **Agent not installed**: still perform the review for that stack, but do it
-  **inline** using generic expertise (no Agent dispatch). In the final report,
-  prefix that stack's section with:
+- **Success** → proceed as normal.
+- **Unknown-subagent-type error** (i.e., Claude Code reports the subagent
+  type doesn't exist) → still perform the review for that stack, but do it
+  **inline** using generic expertise. Prefix that stack's section in the
+  final report with:
 
   > ⚠️ `<agent>` not installed — review done with generic expertise. Install
   > `solopreneur-<stack>` for deeper, skill-index-backed review.
+
+- **Any other Agent error** (crash, timeout, tool failure) → surface to the
+  user; do not silently fall back.
+
+Do **not** pre-check via Glob on the plugin cache path — the cache layout
+depends on the local marketplace name the user chose, and the dispatch
+error is the authoritative signal.
 
 ## Step 2.5: Check context7 Availability
 
