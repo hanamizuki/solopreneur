@@ -17,9 +17,10 @@ Before pushing to `main`, for every sub-plugin whose files changed in the
 current set of commits:
 
 1. **Bump the version** in `plugins/<name>/.claude-plugin/plugin.json`
-   - bug fix / docs / refactor → patch (`1.0.0` → `1.0.1`)
-   - new skill / agent / user-visible behavior → minor (`1.0.0` → `1.1.0`)
-   - breaking change → major (`1.x` → `2.0.0`)
+   - bug fix / docs / refactor → patch (`0.3.0` → `0.3.1`)
+   - new skill / agent / user-visible behavior → minor (`0.3.0` → `0.4.0`)
+   - pre-1.0, minor bumps may be breaking; 1.0 is reserved for the first
+     stable API cut
 2. **Tag the commit** for each bumped plugin with Claude Code's official
    double-dash tag format:
 
@@ -30,7 +31,7 @@ current set of commits:
    Example:
 
    ```bash
-   git tag -a solopreneur-ios--v1.1.0 -m "solopreneur-ios v1.1.0: add XYZ"
+   git tag -a solopreneur-ios--v0.4.0 -m "solopreneur-ios v0.4.0: add XYZ"
    ```
 
    The double-dash is required — Claude Code uses it to resolve plugin

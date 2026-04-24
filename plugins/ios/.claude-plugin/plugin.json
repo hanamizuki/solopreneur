@@ -1,9 +1,9 @@
 {
   "name": "solopreneur-ios",
-  "version": "1.0.0",
+  "version": "0.3.0",
   "description": "iOS/macOS SwiftUI expertise — ios-dev agent and ios-patterns skill.",
   "license": "MIT",
   "dependencies": [
-    { "name": "solopreneur-core", "version": ">=1.0.0" }
+    { "name": "solopreneur-core", "version": ">=0.3.0" }
   ]
 }

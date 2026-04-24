@@ -72,7 +72,7 @@ Infer the tech stack from the codebase:
 Cross-platform todo (e.g., iOS + Android) → spawn **two experts** in parallel.
 If no platform detected → skip expert review.
 
-**Agent availability (post-v1.0.0 split):** each stack agent lives in its own
+**Agent availability (post-v0.3.0 split):** each stack agent lives in its own
 sub-plugin (`solopreneur-ios`, `solopreneur-android`, `solopreneur-nextjs`,
 `solopreneur-python`, `solopreneur-llm`). When dispatching in Step 4:
 

@@ -102,7 +102,7 @@ bare (`asc-release-flow`) or namespaced (`solopreneur-ios:ios-patterns`,
 `axiom:axiom-ios-ui`) — strip any `<plugin>:` prefix before comparing
 against candidate skill names.
 
-Agents to read (each lives in its own sub-plugin after the v1.0.0 split):
+Agents to read (each lives in its own sub-plugin after the v0.3.0 split):
 - `ios-dev.md` (from `solopreneur-ios`) → iOS dedup list
 - `designer.md` (from `solopreneur-core`) → design dedup list
 

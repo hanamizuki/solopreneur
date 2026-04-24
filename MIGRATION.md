@@ -1,9 +1,11 @@
-# Migrating from v0.2.x to v1.0.0
+# Migrating from v0.2.x to v0.3.0
 
-v1.0.0 splits the monolithic `solopreneur` plugin into **six focused
+v0.3.0 splits the monolithic `solopreneur` plugin into **six focused
 sub-plugins** so you only pay the context cost of the stacks you actually
 build in. This is a breaking change — the old `solopreneur` plugin is gone
-and the marketplace ships six new plugin names instead.
+and the marketplace ships six new plugin names instead. (Per semver, 0.x
+minor bumps may be breaking; a proper 1.0.0 will come once the API
+stabilizes.)
 
 ## TL;DR — what to run
 
@@ -39,7 +41,7 @@ Requires Claude Code **≥ v2.1.110** (for `dependencies`-driven auto-install).
 
 ### 1. One plugin → six plugins
 
-| Before (v0.2.x) | After (v1.0.0) |
+| Before (v0.2.x) | After (v0.3.0) |
 |---|---|
 | `solopreneur` (22 skills + 7 agents in one bundle) | `solopreneur-core`, `solopreneur-ios`, `solopreneur-android`, `solopreneur-nextjs`, `solopreneur-python`, `solopreneur-llm` |
 
@@ -49,7 +51,7 @@ Requires Claude Code **≥ v2.1.110** (for `dependencies`-driven auto-install).
   Android, its associated patterns skill). Install only the stacks you
   actually build.
 - Stack plugins declare `dependencies: [{ name: "solopreneur-core",
-  version: ">=1.0.0" }]`, so `claude plugin install solopreneur-ios@solopreneur`
+  version: ">=0.3.0" }]`, so `claude plugin install solopreneur-ios@solopreneur`
   automatically installs `solopreneur-core` too.
 
 ### 2. `web-dev` agent is removed
@@ -83,7 +85,7 @@ Git tags for releases now use Claude Code's official double-dash format:
 <plugin-name>--v<version>
 ```
 
-Examples: `solopreneur-core--v1.0.0`, `solopreneur-ios--v1.0.0`. The old
+Examples: `solopreneur-core--v0.3.0`, `solopreneur-ios--v0.3.0`. The old
 single-`v`-prefix tags (`v0.2.1`) only applied to the monolithic plugin and
 aren't used anymore.
 

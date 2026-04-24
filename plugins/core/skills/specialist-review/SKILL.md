@@ -56,7 +56,7 @@ for documentation lookup.
 
 ## Step 2.25: Check Specialist Agent Availability
 
-Since the v1.0.0 split, each specialist agent ships as its own sub-plugin
+Since the v0.3.0 split, each specialist agent ships as its own sub-plugin
 (`solopreneur-ios`, `solopreneur-android`, `solopreneur-nextjs`,
 `solopreneur-python`, `solopreneur-llm`). Users may have only installed
 `solopreneur-core`.
