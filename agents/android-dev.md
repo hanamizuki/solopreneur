@@ -1,7 +1,7 @@
 ---
 name: android-dev
 description: Android/Kotlin development expert. Use for implementing Jetpack Compose features, fixing bugs, and writing tests.
-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: opus
 ---
 

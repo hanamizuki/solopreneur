@@ -1,7 +1,7 @@
 ---
 name: nextjs-dev
 description: Next.js/React development expert. Use for implementing web features, fixing bugs, and writing tests.
-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: sonnet
 ---
 

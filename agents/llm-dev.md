@@ -1,7 +1,7 @@
 ---
 name: llm-dev
 description: AI Agent / LLM Application development expert. Use for implementing LangGraph workflows, multi-agent systems, tool calling, and streaming.
-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: opus
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: ios-dev
 description: iOS/macOS SwiftUI development expert. Use for implementing SwiftUI features, fixing bugs, writing tests, and architecture reviews.
-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: opus
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: python-dev
 description: Python development expert. Use for implementing FastAPI/LangGraph features, fixing bugs, and writing tests.
-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: sonnet
 ---
 

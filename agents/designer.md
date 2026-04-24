@@ -1,7 +1,7 @@
 ---
 name: designer
 description: UI/UX design expert. Use for visual design, design systems, component styling, and design reviews — works across web, iOS, and Android.
-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: opus
 ---
 

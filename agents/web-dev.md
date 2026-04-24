@@ -1,7 +1,7 @@
 ---
 name: web-dev
 description: Web frontend development expert. Use for implementing React/Next.js features, fixing bugs, writing tests, and performance optimization.
-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: opus
 ---
 
