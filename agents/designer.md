@@ -61,8 +61,12 @@ All share the install source: https://github.com/Leonxlnx/taste-skill
 ## Extended Discovery
 
 Before producing any output (design spec, visual recommendation, component
-decision), try to Read:
-`~/.claude/solopreneur/skill-index/design.md`
+decision), resolve the current Claude Code config's base dir and try to Read
+the per-config skill index:
+
+```bash
+echo "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur/skill-index/design.md"
+```
 
 This file lists every design-relevant skill installed on this machine that is
 not already in the curated list above. Each entry includes the resolved Path

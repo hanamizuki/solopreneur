@@ -60,8 +60,13 @@ Others:
 
 ## Extended Discovery
 
-Before producing any output (code, review, recommendation), try to Read:
-`~/.claude/solopreneur/skill-index/android.md`
+Before producing any output (code, review, recommendation), resolve the
+current Claude Code config's base dir and try to Read the per-config skill
+index:
+
+```bash
+echo "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur/skill-index/android.md"
+```
 
 This file lists every Android-relevant skill installed on this machine that is
 not already in the curated list above. Each entry includes the resolved Path so
@@ -69,7 +74,8 @@ you can Read directly.
 
 If the file does not exist, proceed with the curated list above + context7
 + built-in knowledge — do not block. (The user can run `/rebuild-skill-index`
-to generate it.)
+to generate it. Note: `rebuild-skill-index` currently only emits `ios.md` and
+`design.md` — this path will be absent until Android extended indexing ships.)
 
 ## Optional: context7 Documentation Lookup
 

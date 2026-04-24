@@ -1,20 +1,21 @@
 ---
 name: rebuild-skill-index
 description: |
-  Rebuild the per-machine extended skill index used by platform subagents.
-  Scans installed Claude Code skills, classifies each by platform relevance
-  (iOS, design, …) using the frontmatter description, and writes one file per
-  platform under ~/.claude/solopreneur/skill-index/. Use when the user says
-  "rebuild skill index", "refresh skill index", or after installing / removing
-  platform-related skills.
+  Rebuild the per-machine, per-config extended skill index used by platform
+  subagents. Scans installed Claude Code skills, classifies each by platform
+  relevance (iOS, design, …) using the frontmatter description, and writes
+  one file per platform under `<base>/solopreneur/skill-index/` where `<base>`
+  is `$CLAUDE_CONFIG_DIR` or `~/.claude`. Use when the user says "rebuild skill
+  index", "refresh skill index", or after installing / removing platform-
+  related skills.
 ---
 
 # Rebuild Skill Index
 
-Generate one index file per platform under
-`~/.claude/solopreneur/skill-index/` — each one is the extended list of every
-platform-relevant skill installed on this machine that is not already in the
-curated list inside the matching agent's markdown file.
+Generate one index file per platform, specific to the current Claude Code
+config. Each file is the extended list of every platform-relevant skill
+installed on this machine that is not already in the curated list inside the
+matching agent's markdown file.
 
 Current platforms: **iOS** and **design**. (Others — android, web, python,
 llm — will be added when they need extended indexing.)
@@ -22,6 +23,20 @@ llm — will be added when they need extended indexing.)
 Outputs are consumed by the matching subagents (`ios-dev`, `designer`, …) and
 any caller that dispatches them (`/specialist-review`, `/preflight`,
 `/todos-review`).
+
+## Step 0: Resolve base directory
+
+Claude Code may be invoked with `CLAUDE_CONFIG_DIR` pointing at a non-default
+config. Resolve the current config's base directory first via Bash:
+
+```bash
+BASE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+echo "$BASE"
+```
+
+Use the resolved absolute value in all subsequent read and write paths and in
+`Path:` metadata written into output files — readers should not have to
+re-resolve.
 
 ## Step 1: Collect candidate skills
 
@@ -33,44 +48,44 @@ reasonable frontmatter).
 Shared sources (used by every platform's classifier):
 
 1. **User-level skills:**
-   `Glob pattern: ~/.claude/skills/*/SKILL.md`
+   `Glob pattern: $BASE/skills/*/SKILL.md`
 
 iOS-specific sources:
 
 2. **Axiom plugin skills** (optional):
    ```bash
-   ls ~/.claude/plugins/cache/axiom-marketplace/axiom/ | sort -V | tail -1
+   ls "$BASE/plugins/cache/axiom-marketplace/axiom/" | sort -V | tail -1
    ```
    - If the directory exists, use the highest semver version returned above
-     and glob: `~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/skills/*/SKILL.md`
+     and glob: `$BASE/plugins/cache/axiom-marketplace/axiom/<version>/skills/*/SKILL.md`
    - If it does not exist, record a "missing" warning for the iOS output file.
 
 Design-specific sources:
 
 3. **frontend-design plugin** (optional):
    ```bash
-   ls -t ~/.claude/plugins/cache/claude-plugins-official/frontend-design/ | head -1
+   ls -t "$BASE/plugins/cache/claude-plugins-official/frontend-design/" | head -1
    ```
    - This plugin uses hash directories, not semver; `ls -t | head -1` picks
      the newest by mtime — matches "the one currently installed" even when
      multiple hash dirs coexist.
-   - If present: `~/.claude/plugins/cache/claude-plugins-official/frontend-design/<hash>/skills/*/SKILL.md`
+   - If present: `$BASE/plugins/cache/claude-plugins-official/frontend-design/<hash>/skills/*/SKILL.md`
    - If absent, record a "missing" warning for the design output file.
 
 4. **ui-ux-pro-max-skill plugin** (optional):
    ```bash
-   ls ~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/ | sort -V | tail -1
+   ls "$BASE/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/" | sort -V | tail -1
    ```
-   - If present: `~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/*/SKILL.md`
+   - If present: `$BASE/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/*/SKILL.md`
    - If absent, record a "missing" warning for the design output file.
 
 5. **frontend-slides plugin** (optional):
    ```bash
-   ls ~/.claude/plugins/cache/frontend-slides/frontend-slides/ | sort -V | tail -1
+   ls "$BASE/plugins/cache/frontend-slides/frontend-slides/" | sort -V | tail -1
    ```
    - Slide-oriented skills — included in the design index because
      presentation design overlaps with product UI work.
-   - If present: `~/.claude/plugins/cache/frontend-slides/frontend-slides/<version>/skills/*/SKILL.md`
+   - If present: `$BASE/plugins/cache/frontend-slides/frontend-slides/<version>/skills/*/SKILL.md`
    - If absent, skip silently (no warning — this is bonus, not required).
 
 ## Step 2: Read curated dedup lists
@@ -83,17 +98,20 @@ looks like:
 - `<skill-name>` — <description>
 ```
 
-The section is subdivided by source (Plugin built-in / Third-party / …).
+The section is subdivided by source (Plugin-bundled / Third-party / …).
 Collect names from all subsections — they form the per-agent dedup blacklist
-and should not be re-included in that agent's extended index.
+and should not be re-included in that agent's extended index. Names may be
+bare (`asc-release-flow`) or namespaced (`solopreneur:ios-patterns`,
+`axiom:axiom-ios-ui`) — strip any `<plugin>:` prefix before comparing
+against candidate skill names.
 
 Agents to read:
 - `agents/ios-dev.md` → iOS dedup list
 - `agents/designer.md` → design dedup list
 
 To locate the plugin path on disk, try:
-- `~/.claude/plugins/cache/solopreneur/solopreneur/<version>/agents/<name>.md`
-- Or use Glob: `~/.claude/plugins/**/solopreneur/**/agents/<name>.md`
+- `$BASE/plugins/cache/solopreneur/solopreneur/<version>/agents/<name>.md`
+- Or use Glob: `$BASE/plugins/**/solopreneur/**/agents/<name>.md`
 
 If you can't find an agent file, ask the user where the solopreneur plugin is
 installed and continue with an empty dedup list for that platform (the
@@ -136,26 +154,29 @@ Be inclusive but not sloppy.
 ## Step 4: Write output files
 
 ```bash
-mkdir -p ~/.claude/solopreneur/skill-index
+mkdir -p "$BASE/solopreneur/skill-index"
 ```
 
-Write one file per platform.
+Write one file per platform. **Expand `$BASE` to its absolute resolved value
+in all `Path:` lines** so that consumers (agents that Read this file) can
+open each path directly without re-resolving the env var.
 
-### `~/.claude/solopreneur/skill-index/ios.md`
+### `$BASE/solopreneur/skill-index/ios.md`
 
 ```markdown
 # iOS Skills Index — Extended
 Generated: <ISO 8601 timestamp with timezone>
+Config: <resolved absolute $BASE>
 Classified by: <model name running this skill>
 
 ## Auto-classified user skills
 - `<name>` — <one-line description trimmed to ~120 chars>
-  Path: ~/.claude/skills/<name>/SKILL.md
+  Path: <$BASE resolved>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Auto-classified Axiom plugin skills (axiom-marketplace v<version>)
 - `<name>` — <description>
-  Path: ~/.claude/plugins/cache/axiom-marketplace/axiom/<version>/skills/<name>/SKILL.md
+  Path: <$BASE resolved>/plugins/cache/axiom-marketplace/axiom/<version>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Missing
@@ -164,31 +185,32 @@ Classified by: <model name running this skill>
   (https://github.com/CharlesWiltgen/Axiom)
 ```
 
-### `~/.claude/solopreneur/skill-index/design.md`
+### `$BASE/solopreneur/skill-index/design.md`
 
 ```markdown
 # Design Skills Index — Extended
 Generated: <ISO 8601 timestamp with timezone>
+Config: <resolved absolute $BASE>
 Classified by: <model name running this skill>
 
 ## Auto-classified user skills
 - `<name>` — <one-line description trimmed to ~120 chars>
-  Path: ~/.claude/skills/<name>/SKILL.md
+  Path: <$BASE resolved>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Auto-classified frontend-design plugin skills (v<hash>)
 - `<name>` — <one-line description trimmed to ~120 chars>
-  Path: ~/.claude/plugins/cache/claude-plugins-official/frontend-design/<hash>/skills/<name>/SKILL.md
+  Path: <$BASE resolved>/plugins/cache/claude-plugins-official/frontend-design/<hash>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Auto-classified ui-ux-pro-max plugin skills (v<version>)
 - `<name>` — <one-line description trimmed to ~120 chars>
-  Path: ~/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/<name>/SKILL.md
+  Path: <$BASE resolved>/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Auto-classified frontend-slides plugin skills (v<version>)
 - `<name>` — <one-line description trimmed to ~120 chars>
-  Path: ~/.claude/plugins/cache/frontend-slides/frontend-slides/<version>/skills/<name>/SKILL.md
+  Path: <$BASE resolved>/plugins/cache/frontend-slides/frontend-slides/<version>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
 ## Missing
@@ -204,8 +226,8 @@ Print a short summary (one `Wrote` line per file actually written — skip
 platforms that had no sources available):
 
 ```
-Wrote ~/.claude/solopreneur/skill-index/ios.md
-Wrote ~/.claude/solopreneur/skill-index/design.md
+Wrote <$BASE resolved>/solopreneur/skill-index/ios.md
+Wrote <$BASE resolved>/solopreneur/skill-index/design.md
 
 iOS:
 - N user skills classified as iOS-relevant
@@ -226,8 +248,11 @@ Design:
 
 - This skill is **manual**. There is no auto-rebuild on subagent invocation
   or on plugin update.
-- Output is **per-machine**. The plugin git repo only ships the curated lists
-  inside each `agents/<name>.md`.
+- Output is **per-machine and per-config**. Each Claude Code config
+  (`CLAUDE_CONFIG_DIR`) gets its own index because each config has its own
+  set of installed plugins and user skills.
+- The plugin git repo only ships the curated lists inside each
+  `agents/<name>.md`.
 - A single candidate skill can land in multiple platform indexes (design +
   iOS overlap is common for SwiftUI-focused visual skills).
 - Classification is LLM judgment, not regex. Output may shift slightly

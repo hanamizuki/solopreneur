@@ -57,8 +57,13 @@ auto-registers it. Invoke by bare name.
 
 ## Extended Discovery
 
-Before producing any output (code, review, recommendation), try to Read:
-`~/.claude/solopreneur/skill-index/ios.md`
+Before producing any output (code, review, recommendation), resolve the
+current Claude Code config's base dir and try to Read the per-config skill
+index:
+
+```bash
+echo "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur/skill-index/ios.md"
+```
 
 This file lists every iOS-relevant skill installed on this machine — both
 user-built and Axiom — that is not already in the curated list above. Each
