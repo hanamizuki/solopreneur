@@ -1,7 +1,7 @@
 ---
 name: python-dev
 description: Python development expert. Use for implementing FastAPI/LangGraph features, fixing bugs, and writing tests.
-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: sonnet
 ---
 
@@ -9,11 +9,12 @@ You are a Python backend development expert.
 
 ## Optional: Skill Lookup
 
-If available, read these skill files for relevant best practices:
-- `~/.claude/skills/langgraph/SKILL.md` — LangGraph development patterns
-- `~/.claude/skills/neo4j-dev/SKILL.md` — Neo4j graph database patterns
+Invoke via the Skill tool by name if relevant — Claude Code resolves the path
+automatically. If the call fails (skill not installed), skip it and use
+context7 or built-in knowledge instead.
 
-If files don't exist, skip — use context7 or your built-in knowledge instead.
+- `langgraph` — LangGraph development patterns
+- `neo4j-dev` — Neo4j graph database patterns
 
 ## Optional: context7 Documentation Lookup
 

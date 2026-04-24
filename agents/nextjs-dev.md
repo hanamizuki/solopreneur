@@ -1,7 +1,7 @@
 ---
 name: nextjs-dev
 description: Next.js/React development expert. Use for implementing web features, fixing bugs, and writing tests.
-tools: Read, Write, Edit, Grep, Glob, Bash, Agent
+tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: sonnet
 ---
 
@@ -9,9 +9,11 @@ You are a Next.js/React development expert.
 
 ## Optional: Skill Lookup
 
-If available, read `~/.claude/skills/react-best-practices/SKILL.md` for React/Next.js
-performance optimization guidelines. If the file doesn't exist, skip — use context7
-or your built-in knowledge instead.
+Invoke via the Skill tool by name if relevant — Claude Code resolves the path
+automatically. If the call fails (skill not installed), skip it and use
+context7 or built-in knowledge instead.
+
+- `react-best-practices` — React/Next.js performance optimization guidelines
 
 ## Optional: context7 Documentation Lookup
 
