@@ -4,13 +4,43 @@
     "name": "Hana Chang"
   },
   "metadata": {
-    "description": "A virtual engineering team for solo founders — plan review, code review, automated PR cycles, and multi-platform expertise in one plugin."
+    "description": "A virtual engineering team for solo founders — core skills (plan review, code review, automation pipelines, GTM, writing) plus modular stack experts (iOS, Android, Next.js, Python, LLM). Install what you need."
   },
   "plugins": [
     {
-      "name": "solopreneur",
-      "source": "./",
-      "description": "Skills and agents for solopreneurs — ship, review, debug, and think through problems with AI.",
+      "name": "solopreneur-core",
+      "source": "./plugins/core",
+      "description": "Core skills and the designer agent — plan review, code review loops, backlog management, GTM, writing, and thinking partners.",
+      "license": "MIT"
+    },
+    {
+      "name": "solopreneur-ios",
+      "source": "./plugins/ios",
+      "description": "iOS/macOS SwiftUI expertise — ios-dev agent and ios-patterns skill.",
+      "license": "MIT"
+    },
+    {
+      "name": "solopreneur-android",
+      "source": "./plugins/android",
+      "description": "Android/Kotlin expertise — android-dev agent and android-patterns skill.",
+      "license": "MIT"
+    },
+    {
+      "name": "solopreneur-nextjs",
+      "source": "./plugins/nextjs",
+      "description": "Next.js/React/frontend expertise — nextjs-dev agent.",
+      "license": "MIT"
+    },
+    {
+      "name": "solopreneur-python",
+      "source": "./plugins/python",
+      "description": "Python/FastAPI/LangGraph expertise — python-dev agent.",
+      "license": "MIT"
+    },
+    {
+      "name": "solopreneur-llm",
+      "source": "./plugins/llm",
+      "description": "LLM/LangGraph agent development expertise — llm-dev agent.",
       "license": "MIT"
     }
   ]

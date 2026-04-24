@@ -17,9 +17,6 @@ config. Each file is the extended list of every platform-relevant skill
 installed on this machine that is not already in the curated list inside the
 matching agent's markdown file.
 
-Current platforms: **iOS** and **design**. (Others — android, web, python,
-llm — will be added when they need extended indexing.)
-
 Outputs are consumed by the matching subagents (`ios-dev`, `designer`, …) and
 any caller that dispatches them (`/specialist-review`, `/preflight`,
 `/todos-review`).
@@ -101,19 +98,22 @@ looks like:
 The section is subdivided by source (Plugin-bundled / Third-party / …).
 Collect names from all subsections — they form the per-agent dedup blacklist
 and should not be re-included in that agent's extended index. Names may be
-bare (`asc-release-flow`) or namespaced (`solopreneur:ios-patterns`,
+bare (`asc-release-flow`) or namespaced (`solopreneur-ios:ios-patterns`,
 `axiom:axiom-ios-ui`) — strip any `<plugin>:` prefix before comparing
 against candidate skill names.
 
-Agents to read:
-- `agents/ios-dev.md` → iOS dedup list
-- `agents/designer.md` → design dedup list
+Agents to read (each lives in its own sub-plugin after the v0.3.0 split):
+- `ios-dev.md` (from `solopreneur-ios`) → iOS dedup list
+- `designer.md` (from `solopreneur-core`) → design dedup list
 
-To locate the plugin path on disk, try:
-- `$BASE/plugins/cache/solopreneur/solopreneur/<version>/agents/<name>.md`
-- Or use Glob: `$BASE/plugins/**/solopreneur/**/agents/<name>.md`
+Locate each agent file via Glob (widens across any marketplace name the user
+chose at `claude plugin marketplace add --name`):
 
-If you can't find an agent file, ask the user where the solopreneur plugin is
+    Glob: `$BASE/plugins/cache/*/solopreneur-*/*/agents/<name>.md`
+
+If multiple versions coexist, take the highest semver match.
+
+If you can't find an agent file, ask the user where that sub-plugin is
 installed and continue with an empty dedup list for that platform (the
 extended file will have duplicates with curated, which is fine — costs one
 extra entry per dup).

@@ -30,7 +30,7 @@ Identify keywords in the plan and map to subagents and context7 query targets:
 |----------|----------|----------|----------------------|
 | Swift, SwiftUI, @Observable, SwiftData, iOS | iOS | `ios-dev` | SwiftUI, Swift concurrency, relevant Apple frameworks |
 | Kotlin, Compose, Room, ViewModel, Android | Android | `android-dev` | Jetpack Compose, Kotlin Coroutines, relevant Jetpack libraries |
-| React, Next.js, TypeScript, TSX | Web | `nextjs-dev` / `web-dev` | React, Next.js |
+| React, Next.js, TypeScript, TSX | Web | `nextjs-dev` | React, Next.js |
 | FastAPI, Python, Pydantic, CRUD, REST API | Backend (general) | `python-dev` | FastAPI, Pydantic |
 | LangGraph, prompt, agent, tool calling, streaming, RAG, embedding, chain, node, state graph, LLM | Backend (LLM) | `llm-dev` | LangGraph, LangChain |
 

@@ -1,0 +1,9 @@
+{
+  "name": "solopreneur-llm",
+  "version": "0.3.0",
+  "description": "LLM/LangGraph agent development expertise — llm-dev agent.",
+  "license": "MIT",
+  "dependencies": [
+    { "name": "solopreneur-core", "version": ">=0.3.0" }
+  ]
+}

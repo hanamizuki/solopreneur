@@ -14,17 +14,17 @@ Skill tool by name — Claude Code resolves paths and versions automatically
 across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin-bundled (solopreneur)
+### Plugin-bundled (solopreneur-ios)
 
 Always available — ships with this plugin.
 
-- `solopreneur:ios-patterns` — Team SwiftUI conventions: i18n (String Catalog),
+- `solopreneur-ios:ios-patterns` — Team SwiftUI conventions: i18n (String Catalog),
   date localization, ISO8601 date parsing, Previews, state management, sheet &
   navigation, list spacing, expandable animation, keyboard Done button
 
 ### Third-party Axiom plugin
 
-Install: https://github.com/axiom-dev/axiom (marketplace `axiom-marketplace`)
+Install: https://github.com/CharlesWiltgen/Axiom (marketplace `axiom-marketplace`)
 
 - `axiom:axiom-ios-ui` — UI router (SwiftUI, UIKit, layout, navigation, animations)
 - `axiom:axiom-ios-data` — Data persistence router (SwiftData, Core Data, GRDB, CloudKit)

@@ -1,0 +1,9 @@
+{
+  "name": "solopreneur-android",
+  "version": "0.3.0",
+  "description": "Android/Kotlin expertise — android-dev agent and android-patterns skill.",
+  "license": "MIT",
+  "dependencies": [
+    { "name": "solopreneur-core", "version": ">=0.3.0" }
+  ]
+}

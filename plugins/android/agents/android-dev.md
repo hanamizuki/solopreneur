@@ -14,11 +14,11 @@ Skill tool by name — Claude Code resolves paths and versions automatically
 across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin-bundled (solopreneur)
+### Plugin-bundled (solopreneur-android)
 
 Always available — ships with this plugin.
 
-- `solopreneur:android-patterns` — Jetpack Compose patterns: `@Preview` setup
+- `solopreneur-android:android-patterns` — Jetpack Compose patterns: `@Preview` setup
   (LocalInspectionMode, Vico charts rendering blank), Scaffold + bottom nav +
   status bar insets, ModalBottomSheet nested-scroll jitter, ripple clipping on
   rounded corners, SwipeToDismissBox with transparent content, locale-aware

@@ -32,16 +32,20 @@ Step 5: Schedule (CronCreate)
 
 ## Step 0: Verify Dependency Skills
 
-Before proceeding, confirm that Phase 2 skills are available and invocable.
+Before proceeding, confirm that the execution-phase skills are available.
 
-**Required skills** (all must be present):
+**Co-packaged in `solopreneur-core`** (always present alongside this skill —
+no runtime check needed):
 - `/greenlight` — Automated PR review loop
-- `/merge-pr` — PR merge workflow
-- `/preflight` — Pre-implementation best practice review (called by PR subagent after planning)
+- `/preflight` — Pre-implementation best practice review (called by PR
+  subagent after planning)
 
-Verification: check if each skill appears in the current available skills list
-(system-reminder). If any required skill is missing, stop and tell the user
-what needs to be installed.
+**External dependency** (must be verified at runtime):
+- `/merge-pr` — PR merge workflow
+
+Verification: check if `/merge-pr` appears in the current available skills
+list (system-reminder). If it's missing, stop and tell the user what needs
+to be installed.
 
 ## Step 1: Understand the Task
 
@@ -70,7 +74,7 @@ Based on the task content, propose a PR splitting strategy:
    - Short title
    - Files to create/modify (paths)
    - Dependencies on other PRs
-   - Required subagent type (python-dev / web-dev / ios-dev / android-dev / llm-dev / nextjs-dev)
+   - Required subagent type (python-dev / nextjs-dev / ios-dev / android-dev / llm-dev)
 
 3. **Validate the dependency graph**:
    - For PRs declared parallel: confirm file paths don't overlap

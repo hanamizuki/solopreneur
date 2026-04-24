@@ -1,27 +1,66 @@
 # solopreneur
 
-Building alone doesn't mean building without a team. This Claude Code plugin gives solo founders the workflows of a full engineering org — plan review, code review, automated PR cycles, multi-platform expertise, and even a thinking partner — in one install.
+Building alone doesn't mean building without a team. **solopreneur** gives solo
+founders the workflows of a full engineering org — plan review, code review
+loops, automated PR cycles, GTM, writing, and platform-specific experts — as a
+family of Claude Code plugins you install à la carte.
+
+## The six plugins
+
+| Plugin | What you get | Depends on |
+|---|---|---|
+| [`solopreneur-core`](./plugins/core) | 20 skills (review, pipelines, GTM, writing, thinking) + `designer` agent | — |
+| [`solopreneur-ios`](./plugins/ios) | `ios-dev` agent + `ios-patterns` skill | `solopreneur-core` |
+| [`solopreneur-android`](./plugins/android) | `android-dev` agent + `android-patterns` skill | `solopreneur-core` |
+| [`solopreneur-nextjs`](./plugins/nextjs) | `nextjs-dev` agent (covers React/Next.js/frontend broadly) | `solopreneur-core` |
+| [`solopreneur-python`](./plugins/python) | `python-dev` agent (FastAPI, Pydantic, LangGraph) | `solopreneur-core` |
+| [`solopreneur-llm`](./plugins/llm) | `llm-dev` agent (LangGraph, agent workflows, tool calling) | `solopreneur-core` |
+
+Installing any stack plugin auto-pulls `solopreneur-core`. Requires Claude Code
+**≥ v2.1.110** for plugin dependency resolution.
+
+> **Migrating from v0.2.x?** See [MIGRATION.md](./MIGRATION.md) — the monolithic
+> `solopreneur` plugin is gone; you now install one core plugin plus whichever
+> stacks you use.
 
 ## Install
 
-Install from GitHub:
+Add this repo as a marketplace source once, then install the pieces you need:
 
 ```bash
-# Add this repo as a marketplace source
+# Add the marketplace
 claude plugin marketplace add hanamizuki/solopreneur
 
-# Install the plugin
-claude plugin install solopreneur
+# Everyone: install core
+claude plugin install solopreneur-core@solopreneur
+
+# Then install whichever stacks apply
+claude plugin install solopreneur-ios@solopreneur      # auto-pulls core
+claude plugin install solopreneur-android@solopreneur
+claude plugin install solopreneur-nextjs@solopreneur
+claude plugin install solopreneur-python@solopreneur
+claude plugin install solopreneur-llm@solopreneur
 ```
 
 To update later:
 
 ```bash
 claude plugin marketplace update solopreneur
-claude plugin update solopreneur
+claude plugin update solopreneur-core        # and any other installed plugins
 ```
 
-## Skills
+### Quick-start by stack
+
+| If you build… | Install |
+|---|---|
+| iOS / macOS SwiftUI apps | `solopreneur-core` + `solopreneur-ios` |
+| Android / Kotlin apps | `solopreneur-core` + `solopreneur-android` |
+| Next.js / React web apps | `solopreneur-core` + `solopreneur-nextjs` |
+| FastAPI / Python services | `solopreneur-core` + `solopreneur-python` |
+| LangGraph / AI agents | `solopreneur-core` + `solopreneur-llm` |
+| Nothing but want the GTM / writing / review loops | `solopreneur-core` alone |
+
+## What's in `solopreneur-core`
 
 ### Your Virtual Product Team
 
@@ -33,7 +72,7 @@ claude plugin update solopreneur
 | `/specialist-review` | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
 | `/post-mortem` | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
 | `/session-retro` | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
-| `/perspective` | **Thinking Partner.** Switch between 6 thinker perspectives (Musk, Feynman, Munger, Naval, Jobs, Taleb) to analyze problems from a different angle |
+| `/perspective` | **Thinking Partner.** Switch between thinker perspectives (Musk, Feynman, Munger, Naval, Jobs, Taleb, …) to analyze problems from a different angle |
 
 ### Your Virtual GTM Team
 
@@ -45,7 +84,7 @@ claude plugin update solopreneur
 | `/x-writing` | **Writing Coach.** X/Twitter writing coach — helps with single tweets, threads, and long-form posts. Generates hooks, suggests topics, reviews drafts, and explains craft principles grounded in Aesthetic Writing, RARE hooks, and the algorithmic reality of X |
 | `/x-growth` | **X Growth Consultant.** Diagnoses X/Twitter profiles, co-creates personalized 12-week growth plans — covers algorithm mechanics, content strategy, engagement tactics, monetization, and Dream 100 outreach. Integrates with GTM docs |
 | `/linkedin-growth` | **LinkedIn Growth Consultant.** Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans — covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
-| `/slide-design` | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase — bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, 13 reusable layout components, and AI-slop review via `/humanly` (English + Chinese, with Chinese-specific prewrite guidelines) |
+| `/slide-design` | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase — bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, 13 reusable layout components, and AI-slop review via `/humanly` (English + Chinese) |
 
 ### Backlog Management
 
@@ -64,7 +103,13 @@ Start them and walk away — they loop until the job is done.
 | `/greenlight` | **Code Review Loop.** Triggers external reviewers (Codex, Gemini, CodeRabbit), fixes issues, re-triggers — loops until the PR is clean |
 | `/todos-babysit` | **Backlog Monitor.** Scans backlog and in-progress todos, cross-references PR status, reviews new items, and maintains worktrees. **Interactive mode**: presents a confirmation checkpoint before acting. **Loop mode** (`/loop 24h /todos-babysit`): auto-executes safe operations and auto-implements bug fixes that pass the readiness gate — notifies only for items that need human judgment |
 
-### How Skills Work Together
+### Skill-index plumbing
+
+| Skill | What it does |
+|-------|--------------|
+| `/rebuild-skill-index` | Generates per-platform extended indexes of every relevant skill installed on this machine. Feeds `ios-dev` and `designer` extended discovery. Run after installing/removing platform skills. |
+
+### How core skills work together
 
 ```
 Idea
@@ -87,21 +132,45 @@ Idea
      └─ /todos-babysit ─── Periodic loop: review → notify → implement on approval
 ```
 
-## Agents
+## Stack plugins — the platform experts
 
-Platform-specific development experts used by `/preflight`, `/specialist-review`, and `/todos-review`. Each agent's system prompt embeds a hand-curated skill list plus instructions to consult an auto-generated extended index of every skill installed on the machine.
+Each stack plugin is a focused subagent that `/preflight`, `/specialist-review`,
+and `/todos-review` dispatch when they detect that stack in your diff. Each
+agent's system prompt embeds a hand-curated skill list plus instructions to
+consult an auto-generated extended index of every platform-relevant skill
+installed on the machine.
 
-- **`ios-dev`** — iOS/macOS SwiftUI. Uses Axiom (200+ skills) and a curated list of iOS-specific skills. Extended index at `~/.claude/solopreneur/skill-index/ios.md`, rebuild with `/rebuild-skill-index`.
-- **`android-dev`** — Android/Kotlin. Curated list drawn from `android/skills` and `gplay-cli-skills`.
-- **`web-dev`** — React/frontend. Curated list for general web development patterns.
-- **`nextjs-dev`** — Next.js/React. Same as web-dev, specialized for Next.js projects.
-- **`python-dev`** — Python/FastAPI. Curated list for Python backend development.
-- **`llm-dev`** — LLM/LangGraph. Curated list for LLM application development.
-- **`designer`** — UI/UX design (cross-platform). Curated list of third-party design skills. Extended index at `~/.claude/solopreneur/skill-index/design.md`, rebuild with `/rebuild-skill-index`.
+- **`solopreneur-ios`** → `ios-dev` agent. Uses Axiom (200+ skills) plus a
+  curated list of iOS-specific skills. Ships with the `ios-patterns` skill
+  (SwiftUI conventions: i18n, date parsing, Previews, state management, sheet
+  & navigation, list spacing, expandable animation, keyboard Done button).
+  Extended index at `<config>/solopreneur/skill-index/ios.md`, rebuild with
+  `/rebuild-skill-index`.
+
+- **`solopreneur-android`** → `android-dev` agent. Curated list drawn from
+  `android/skills` and `gplay-cli-skills`. Ships with the `android-patterns`
+  skill (Jetpack Compose patterns: `@Preview` setup, Scaffold + bottom nav,
+  ModalBottomSheet nested scroll, ripple clipping, SwipeToDismissBox
+  transparency, locale-aware date formatting including MIUI quirks).
+
+- **`solopreneur-nextjs`** → `nextjs-dev` agent. Covers React, Next.js App
+  Router, TypeScript, and general frontend patterns (single agent absorbs the
+  previous `web-dev` role — see MIGRATION.md if you're coming from v0.2.x).
+
+- **`solopreneur-python`** → `python-dev` agent. FastAPI + Pydantic, LangGraph,
+  Neo4j, async/await, pytest.
+
+- **`solopreneur-llm`** → `llm-dev` agent. LangGraph (StateGraph, prebuilt
+  agents, Supervisor/Swarm), LangChain, streaming patterns, tool calling.
+
+The `designer` agent ships in `solopreneur-core` because design work spans
+web, iOS, and Android.
 
 ## Auto-Integrations
 
-Solopreneur's agents and skills auto-discover tools from other installed plugins and skill libraries. Install what matches your work — no config, `/preflight`, `/specialist-review`, and `/greenlight` will pick them up.
+Solopreneur's agents and skills auto-discover tools from other installed plugins
+and skill libraries. Install what matches your work — no config, `/preflight`,
+`/specialist-review`, and `/greenlight` will pick them up.
 
 ### Any Stack
 
@@ -130,7 +199,8 @@ Solopreneur's agents and skills auto-discover tools from other installed plugins
 | [app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills) | Skills | `ios-dev` agent | App Store Connect CLI — TestFlight, releases, metadata |
 | [iphone-apps](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps) | Skill | `ios-dev` agent | Full iPhone app workflow (build, debug, test, ship — CLI-only) |
 
-User-level skills in `~/.claude/skills/` are auto-classified into the iOS extended index by `/rebuild-skill-index` (other platforms TBD).
+User-level skills in `<config>/skills/` are auto-classified into the iOS
+extended index by `/rebuild-skill-index`.
 
 ### Design / UI
 
@@ -141,8 +211,8 @@ User-level skills in `~/.claude/skills/` are auto-classified into the iOS extend
 | [frontend-design](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design) | Plugin | `designer` agent | Creative, polished frontend code generation that avoids generic AI aesthetics |
 | [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | Plugin | `designer` agent | UI/UX intelligence library — styles, palettes, font pairings, product types, UX guidelines, chart types across 10 stacks |
 
-User-level skills in `~/.claude/skills/` and the above plugins are
-auto-classified into the design extended index by `/rebuild-skill-index`.
+User-level skills and the above plugins are auto-classified into the design
+extended index by `/rebuild-skill-index`.
 
 ### Presentations
 
