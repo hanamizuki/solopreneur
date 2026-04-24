@@ -78,10 +78,14 @@ sub-plugin (`solopreneur-ios`, `solopreneur-android`, `solopreneur-nextjs`,
 
 - **Success** → proceed as normal.
 - **Unknown-subagent-type error** → do the review inline with generic
-  expertise and prepend the stack's output with:
+  expertise and prepend the stack's output with the template below,
+  substituting `<agent>` with the specific agent name (e.g. `ios-dev`) and
+  `<plugin-suffix>` with the plugin slug (`ios`, `android`, `nextjs`,
+  `python`, or `llm` — NOT the "Platform" column value; always strip
+  `-dev` from the agent name):
 
   > ⚠️ `<agent>` not installed — review done with generic expertise. Install
-  > `solopreneur-<stack>` for deeper, skill-index-backed review.
+  > `solopreneur-<plugin-suffix>` for deeper, skill-index-backed review.
 
 - **Any other Agent error** → surface to the user; do not silently fall back.
 

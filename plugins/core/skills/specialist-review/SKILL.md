@@ -68,10 +68,13 @@ directly. Handle the result:
 - **Unknown-subagent-type error** (i.e., Claude Code reports the subagent
   type doesn't exist) → still perform the review for that stack, but do it
   **inline** using generic expertise. Prefix that stack's section in the
-  final report with:
+  final report with the template below, substituting `<agent>` with the
+  specific agent name (e.g. `ios-dev`) and `<plugin-suffix>` with the plugin
+  slug (`ios`, `android`, `nextjs`, `python`, or `llm` — NOT the "Tech Stack"
+  column value; always strip `-dev` from the agent name):
 
   > ⚠️ `<agent>` not installed — review done with generic expertise. Install
-  > `solopreneur-<stack>` for deeper, skill-index-backed review.
+  > `solopreneur-<plugin-suffix>` for deeper, skill-index-backed review.
 
 - **Any other Agent error** (crash, timeout, tool failure) → surface to the
   user; do not silently fall back.

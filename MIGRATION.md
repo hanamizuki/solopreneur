@@ -79,7 +79,7 @@ namespaced name, update the prefix.
 
 Git tags for releases now use Claude Code's official double-dash format:
 
-```
+```text
 <plugin-name>--v<version>
 ```
 
