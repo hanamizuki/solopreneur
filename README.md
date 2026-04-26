@@ -1,9 +1,9 @@
 # solopreneur
 
-Building alone doesn't mean building without a team. **solopreneur** gives solo
-founders the workflows of a full engineering org — plan review, code review
-loops, automated PR cycles, marketing, design, and platform-specific experts —
-as a family of Claude Code plugins you install à la carte.
+**solopreneur** gives solo founders the workflows of a full engineering org —
+plan review, code review loops, automated PR cycles, marketing, design, and
+platform-specific experts — as a family of Claude Code plugins you install à
+la carte.
 
 ## What's in the box
 
@@ -123,8 +123,8 @@ Idea
  │   ├─ /specialist-review ── Expert code review per PR
  │   └─ /greenlight ────────── External review loop per PR
  │
- ├─ /post-mortem ───── Something broke? Trace the root cause
- ├─ /session-retro ─── What did we learn?
+ ├─ /post-mortem ───── Trace the root cause when something breaks
+ ├─ /session-retro ─── Capture lessons from this session
  │
  └─ Backlog
      ├─ /todos-review ──── Review a single todo before implementing
@@ -142,7 +142,7 @@ Idea
 | [Codex CLI](https://github.com/openai/codex) | CLI | **Required for `/greenlight` uncommitted mode** | Also: `/second-opinion` (primary review path), `/greenlight` PR mode (one of the reviewer options), `/naming` (multi-model candidate generation) |
 | [superpowers](https://github.com/obra/superpowers) | Plugin | Strongly recommended | `/greenlight`, `/specialist-review` use `superpowers:requesting-code-review` and `receiving-code-review` for review framework. Graceful fallback if absent |
 | [context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7) | MCP | Strongly recommended | `/preflight`, `/specialist-review`, **and every stack agent** (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) call context7 for current official docs. Graceful skip if absent |
-| [gstack](https://github.com/garrytan/gstack) `/review` | User skill | Recommended | `/greenlight` internal review phase — SQL safety, trust boundaries, structural issues |
+| [`gstack /review`](https://github.com/garrytan/gstack/tree/main/review) | User skill | Recommended | `/greenlight` internal review phase — SQL safety, trust boundaries, structural issues |
 | [Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector) | GitHub App | Recommended | `/greenlight` PR mode default reviewer (`@codex review`) |
 | [Gemini Code Assist](https://github.com/apps/gemini-code-assist) | GitHub App | Optional | `/greenlight` PR mode alternative reviewer (`/gemini review`) |
 | [CodeRabbit](https://coderabbit.ai) | GitHub App | Optional | `/greenlight` passive reviewer (auto-triggered on push) |
