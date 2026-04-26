@@ -14,9 +14,9 @@ For any AI-engineering task, consider the following hand-picked skills.
 Invoke via the Skill tool by name. If a skill is not installed, the call
 fails — skip it and proceed with context7 + built-in knowledge.
 
-### Plugin-bundled (solo-ai-engineer)
+### Plugin-bundled (ai-engineer)
 
-Always available — ships with this plugin. Invoke with `solo-ai-engineer:<name>`.
+Always available — ships with this plugin. Invoke with `ai-engineer:<name>`.
 
 All four skills below are auto-discoverable (no `disable-model-invocation`
 flag), so the model can also fire them on description match. Each entry's
@@ -25,7 +25,7 @@ follow it when invoking explicitly via the Skill tool.
 
 In-house:
 
-- `solo-ai-engineer:langgraph` — Deployment-first LangGraph v1.0 patterns:
+- `ai-engineer:langgraph` — Deployment-first LangGraph v1.0 patterns:
   `agent.py` with compiled graph exported as `app`, `langgraph.json` config,
   `TypedDict` / Pydantic state, prefer `create_react_agent` over hand-built
   StateGraph, Supervisor / Swarm multi-agent patterns, streaming.
@@ -36,7 +36,7 @@ In-house:
 Vendored from third-party sources (see `skills/_vendored/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
-- `solo-ai-engineer:ai-engineering` — Production AI-system fundamentals:
+- `ai-engineer:ai-engineering` — Production AI-system fundamentals:
   LLM provider trade-offs (OpenAI / Anthropic / Ollama / LiteLLM), vector
   DB selection (Chroma / Pinecone / Qdrant / pgvector), RAG vs fine-tuning
   decision framework, full RAG pipeline (chunk / embed / retrieve / re-rank),
@@ -45,7 +45,7 @@ upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
   especially when picking providers / vector DBs / chunking strategy, or
   when the user asks "should we use RAG or fine-tune?".
 
-- `solo-ai-engineer:senior-prompt-engineer` — Advanced prompt-engineering
+- `ai-engineer:senior-prompt-engineer` — Advanced prompt-engineering
   patterns + LLM evaluation frameworks + agentic system design. Includes
   helper scripts: prompt optimizer (token + clarity audit), RAG evaluator,
   agent orchestrator (workflow visualization).
@@ -53,7 +53,7 @@ upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
   for cost/latency, or building structured eval harnesses for an LLM
   pipeline.
 
-- `solo-ai-engineer:prompt-architect` — Single-prompt design discipline:
+- `ai-engineer:prompt-architect` — Single-prompt design discipline:
   ingest → clarify (5–10 questions) → structure → ship. Forces a clarifying
   loop before generating, then outputs an optimized prompt in a code block.
   **Read when** the user asks "write me a prompt for X", "improve this

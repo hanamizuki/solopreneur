@@ -76,18 +76,18 @@ Cross-platform todo (e.g., iOS + Android) → spawn **two experts** in parallel.
 If no platform detected → skip expert review.
 
 **Agent availability:** each stack agent lives in its own sub-plugin
-(`solo-ios-dev`, `solo-android-dev`, `solo-ai-engineer`, `solo-neo4j-dev`).
+(`ios-dev`, `android-dev`, `ai-engineer`, `neo4j-dev`).
 When dispatching in Step 4:
 
 - **Success** → proceed as normal.
 - **Unknown-subagent-type error** → do the review inline with generic
   expertise and prepend the stack's output with the template below,
-  substituting `<agent>` with the specific agent name (e.g. `ios-dev`) and
-  `<plugin>` with the matching marketplace plugin name (`solo-ios-dev`,
-  `solo-android-dev`, `solo-ai-engineer`, `solo-neo4j-dev`):
+  substituting `<plugin>` with the agent / plugin name for that stack
+  (`ios-dev`, `android-dev`, `ai-engineer`, or `neo4j-dev`; the agent and
+  plugin share the same name):
 
-  > ⚠️ `<agent>` not installed — review done with generic expertise. Install
-  > `<plugin>` for deeper, skill-index-backed review.
+  > ⚠️ Plugin `<plugin>` not installed. Review done with generic expertise.
+  > Install it for deeper, skill-index-backed review.
 
 - **Any other Agent error** → surface to the user; do not silently fall back.
 

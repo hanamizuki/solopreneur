@@ -16,41 +16,41 @@ Invoke via the Skill tool by name — Claude Code resolves paths and versions
 automatically across configs. If a skill is not installed, the Skill tool call
 will fail; skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin-bundled (solo-marketer)
+### Plugin-bundled (marketer)
 
-Always available — ships with this plugin. Invoke with `solo-marketer:<name>`.
+Always available — ships with this plugin. Invoke with `marketer:<name>`.
 
 Strategy & brand:
 
-- `solo-marketer:gtm` — Generate a complete Go-To-Market strategy by analyzing
+- `marketer:gtm` — Generate a complete Go-To-Market strategy by analyzing
   the codebase and interviewing the user. Produces 4 strategy documents
   (brand, market landscape, messaging, channel playbook). Initial deep
   research and weekly incremental updates.
-- `solo-marketer:naming` — Generate a product or company name through
+- `marketer:naming` — Generate a product or company name through
   structured brief, multi-model candidate generation, and two-layer
   evaluation. Greenfield and rebrand modes. Grounded in Lexicon / Interbrand /
   Siegel+Gale methodology plus processing-fluency / sound-symbolism research.
 
 Writing & content:
 
-- `solo-marketer:humanly` — Remove AI writing patterns from text. Three modes:
+- `marketer:humanly` — Remove AI writing patterns from text. Three modes:
   pre-write (internalize anti-slop rules), review (post-writing audit with
   severity tiers and two-pass rewrite), detect (flag-only audit). Use as a
   pre-write reference before composing any public-facing text.
-- `solo-marketer:x-writing` — X/Twitter writing coach for tweets, threads, and
+- `marketer:x-writing` — X/Twitter writing coach for tweets, threads, and
   long-form. Generates hooks, suggests topics, reviews drafts. Grounded in
   Aesthetic Writing, RARE hooks, and the algorithmic reality of X.
-- `solo-marketer:slide-design` — Create brand-aware presentations using
+- `marketer:slide-design` — Create brand-aware presentations using
   frontend-slides or reveal.js. Adds a brand setup step that saves time on
   color/asset iteration.
 
 Growth consulting:
 
-- `solo-marketer:x-growth` — X/Twitter growth consultant. Diagnoses profiles,
+- `marketer:x-growth` — X/Twitter growth consultant. Diagnoses profiles,
   discusses goals, co-creates a personalized growth plan. Covers algorithm
   mechanics, content strategy, engagement, monetization. Integrates with GTM
   strategy docs when available.
-- `solo-marketer:linkedin-growth` — LinkedIn organic growth consultant.
+- `marketer:linkedin-growth` — LinkedIn organic growth consultant.
   Diagnoses profiles and co-creates a 90-day growth plan covering algorithm
   mechanics, content strategy, engagement tactics, and real case studies.
 

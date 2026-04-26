@@ -17,14 +17,14 @@ Skill tool by name — Claude Code resolves paths and versions automatically
 across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin-bundled (solo-designer)
+### Plugin-bundled (designer)
 
-Always available — ships with this plugin. Invoke with `solo-designer:<name>`.
+Always available — ships with this plugin. Invoke with `designer:<name>`.
 
 Vendored from third-party sources (see `skills/_vendored/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
-- `solo-designer:impeccable` — Design / redesign / critique / audit /
+- `designer:impeccable` — Design / redesign / critique / audit /
   polish / animate / colorize a frontend interface. Covers websites, landing
   pages, dashboards, product UI, app shells, components, forms, settings,
   onboarding, empty states. Includes UX review, visual hierarchy, IA, cognitive
@@ -35,27 +35,27 @@ upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 The `taste-*` archetype family — pick the one that matches the product's
 personality (override default LLM design biases):
 
-- `solo-designer:taste-skill` — Senior UI/UX engineer baseline:
+- `designer:taste-skill` — Senior UI/UX engineer baseline:
   metric-based rules, strict component architecture, CSS hardware acceleration,
   balanced design engineering.
-- `solo-designer:taste-soft` — High-end agency aesthetic: premium fonts,
+- `designer:taste-soft` — High-end agency aesthetic: premium fonts,
   generous spacing, soft shadows, tasteful animations.
-- `solo-designer:taste-brutalist` — Swiss / military terminal aesthetic:
+- `designer:taste-brutalist` — Swiss / military terminal aesthetic:
   rigid grids, extreme type-scale contrast, utilitarian color, analog
   degradation effects. Data-heavy dashboards.
-- `solo-designer:taste-minimalist` — Clean editorial: warm monochrome
+- `designer:taste-minimalist` — Clean editorial: warm monochrome
   palette, typographic contrast, flat bento grids, muted pastels. No gradients,
   no heavy shadows.
-- `solo-designer:taste-redesign` — Upgrades existing sites to premium
+- `designer:taste-redesign` — Upgrades existing sites to premium
   quality without breaking functionality. Works with any CSS framework.
-- `solo-designer:taste-stitch` — Semantic design system for Google
+- `designer:taste-stitch` — Semantic design system for Google
   Stitch. Generates agent-friendly `DESIGN.md` files.
-- `solo-designer:taste-output` — Overrides default LLM truncation:
+- `designer:taste-output` — Overrides default LLM truncation:
   enforces complete code generation, bans placeholder patterns.
-- `solo-designer:taste-gpt` — Elite UX/UI + advanced GSAP motion:
+- `designer:taste-gpt` — Elite UX/UI + advanced GSAP motion:
   Python-driven layout randomization, strict AIDA structure, wide editorial
   typography (bans 6-line wraps), gapless scroll.
-- `solo-designer:taste-image-to-code` — Image-to-code workflow for
+- `designer:taste-image-to-code` — Image-to-code workflow for
   Codex: generate the design image first, deeply analyze, then implement.
 
 ### Optional: third-party plugins

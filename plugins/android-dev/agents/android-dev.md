@@ -14,13 +14,13 @@ Skill tool by name — Claude Code resolves paths and versions automatically
 across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin-bundled (solo-android-dev)
+### Plugin-bundled (android-dev)
 
-Always available — ships with this plugin. Invoke with `solo-android-dev:<name>`.
+Always available — ships with this plugin. Invoke with `android-dev:<name>`.
 
 In-house:
 
-- `solo-android-dev:android-patterns` — Jetpack Compose patterns: `@Preview` setup
+- `android-dev:android-patterns` — Jetpack Compose patterns: `@Preview` setup
   (LocalInspectionMode, Vico charts rendering blank), Scaffold + bottom nav +
   status bar insets, ModalBottomSheet nested-scroll jitter, ripple clipping on
   rounded corners, SwipeToDismissBox with transparent content, locale-aware
@@ -30,103 +30,103 @@ In-house:
 Vendored from third-party sources (see `skills/_vendored/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
-- `solo-android-dev:accessibility` — Audit/fix Android accessibility issues
+- `android-dev:accessibility` — Audit/fix Android accessibility issues
   (content descriptions, touch targets, contrast, focus & semantics), especially
   in Jetpack Compose.
-- `solo-android-dev:architecture` — Modern Android Clean Architecture + Hilt:
+- `android-dev:architecture` — Modern Android Clean Architecture + Hilt:
   UI/Domain/Data layers, dependency injection, module setup, project structure.
-- `solo-android-dev:compose-navigation` — Type-safe Navigation Compose: NavHost,
+- `android-dev:compose-navigation` — Type-safe Navigation Compose: NavHost,
   argument passing, deep links, nested graphs, adaptive navigation, testing.
-- `solo-android-dev:compose-performance-audit` — Diagnose & fix Compose runtime
+- `android-dev:compose-performance-audit` — Diagnose & fix Compose runtime
   perf: recomposition storms, unstable keys in Lazy lists, heavy work in
   composition; guides Layout Inspector / Perfetto when needed.
-- `solo-android-dev:compose-ui` — Compose best practices: state hoisting,
+- `android-dev:compose-ui` — Compose best practices: state hoisting,
   modifier discipline, performance, theming.
-- `solo-android-dev:coroutines` — Production Kotlin Coroutines on Android:
+- `android-dev:coroutines` — Production Kotlin Coroutines on Android:
   structured concurrency, lifecycle scopes, Flow/StateFlow/SharedFlow,
   cancellability, testing.
-- `solo-android-dev:data-layer` — Repository pattern + Room + Retrofit with
+- `android-dev:data-layer` — Repository pattern + Room + Retrofit with
   offline-first sync; SSOT semantics.
-- `solo-android-dev:gradle-build-performance` — Slow build diagnosis: Build
+- `android-dev:gradle-build-performance` — Slow build diagnosis: Build
   Scans, configuration vs execution, configuration cache, kapt/KSP bottlenecks,
   CI optimization.
-- `solo-android-dev:gradle-logic` — Scalable build logic with Convention
+- `android-dev:gradle-logic` — Scalable build logic with Convention
   Plugins + Version Catalogs (Now in Android pattern).
-- `solo-android-dev:jetpack-compose` — Declarative UI patterns: remember,
+- `android-dev:jetpack-compose` — Declarative UI patterns: remember,
   mutableStateOf, derivedStateOf, recomposition basics.
-- `solo-android-dev:kotlin-concurrency-expert` — Coroutine review &
+- `android-dev:kotlin-concurrency-expert` — Coroutine review &
   remediation: ANR fixes, leak repair, GlobalScope removal, Dispatcher correctness,
   minimal-change patches.
-- `solo-android-dev:mobile-android-design` — Material Design 3 + Compose
+- `android-dev:mobile-android-design` — Material Design 3 + Compose
   patterns: Material You dynamic color, adaptive layouts (phone/tablet/foldable),
   Navigation Compose conventions, accessibility.
-- `solo-android-dev:testing` — Unit + Hilt integration + Roborazzi screenshot
+- `android-dev:testing` — Unit + Hilt integration + Roborazzi screenshot
   testing strategy with libs.versions.toml setup.
-- `solo-android-dev:viewmodel` — `StateFlow` for UI state, `SharedFlow` for
+- `android-dev:viewmodel` — `StateFlow` for UI state, `SharedFlow` for
   one-off events (Toast/Snackbar/Navigate); update-with-reducer thread safety.
-- `solo-android-dev:xml-to-compose-migration` — XML layout → Compose: layout
+- `android-dev:xml-to-compose-migration` — XML layout → Compose: layout
   mapping, state migration, incremental adoption with `ComposeView`/`AndroidView`.
 
 Google Play Console CLI (`gplay`) workflow — 18 skills, all `gplay-*`:
 
-- `solo-android-dev:gplay-cli-usage` — `gplay` CLI flags, output formats,
+- `android-dev:gplay-cli-usage` — `gplay` CLI flags, output formats,
   pagination, auth, discovery — read this when designing or running gplay
   commands.
-- `solo-android-dev:gplay-signing-setup` — App signing, keystores, Play App
+- `android-dev:gplay-signing-setup` — App signing, keystores, Play App
   Signing setup / migration.
-- `solo-android-dev:gplay-gradle-build` — Gradle build, sign, package APK /
+- `android-dev:gplay-gradle-build` — Gradle build, sign, package APK /
   AAB before upload.
-- `solo-android-dev:gplay-release-flow` — End-to-end release across tracks
+- `android-dev:gplay-release-flow` — End-to-end release across tracks
   (internal / beta / production) with `gplay release`, promote, rollout.
-- `solo-android-dev:gplay-rollout-management` — Staged rollout orchestration
+- `android-dev:gplay-rollout-management` — Staged rollout orchestration
   and monitoring.
-- `solo-android-dev:gplay-submission-checks` — Pre-submission validation
+- `android-dev:gplay-submission-checks` — Pre-submission validation
   (metadata, screenshots, bundle integrity, data safety, policy) to avoid
   rejections.
-- `solo-android-dev:gplay-testers-orchestration` — Closed testing groups,
+- `android-dev:gplay-testers-orchestration` — Closed testing groups,
   beta tester management.
-- `solo-android-dev:gplay-metadata-sync` — Metadata + localization sync
+- `android-dev:gplay-metadata-sync` — Metadata + localization sync
   (Fastlane format included).
-- `solo-android-dev:gplay-migrate-fastlane` — Migrate Fastlane supply →
+- `android-dev:gplay-migrate-fastlane` — Migrate Fastlane supply →
   `gplay`; import existing Fastlane metadata directories.
-- `solo-android-dev:gplay-screenshot-automation` — Android screenshot
+- `android-dev:gplay-screenshot-automation` — Android screenshot
   pipelines: adb + Espresso / UI Automator + device framing + upload.
-- `solo-android-dev:gplay-iap-setup` — In-app products, subscriptions, base
+- `android-dev:gplay-iap-setup` — In-app products, subscriptions, base
   plans, offers.
-- `solo-android-dev:gplay-purchase-verification` — Server-side receipt
+- `android-dev:gplay-purchase-verification` — Server-side receipt
   validation via Google Play Developer API.
-- `solo-android-dev:gplay-subscription-localization` — Bulk-localize
+- `android-dev:gplay-subscription-localization` — Bulk-localize
   subscription display names / descriptions / offer tags across all locales.
-- `solo-android-dev:gplay-ppp-pricing` — Region-specific PPP pricing for
+- `android-dev:gplay-ppp-pricing` — Region-specific PPP pricing for
   subscriptions and IAP.
-- `solo-android-dev:gplay-review-management` — Review monitoring, filtering,
+- `android-dev:gplay-review-management` — Review monitoring, filtering,
   automated responses.
-- `solo-android-dev:gplay-vitals-monitoring` — App vitals: crash rate, ANR,
+- `android-dev:gplay-vitals-monitoring` — App vitals: crash rate, ANR,
   performance metrics.
-- `solo-android-dev:gplay-reports-download` — Financial / statistics report
+- `android-dev:gplay-reports-download` — Financial / statistics report
   listing + download via GCS.
-- `solo-android-dev:gplay-user-management` — Users + grants on the developer
+- `android-dev:gplay-user-management` — Users + grants on the developer
   account (`gplay users`, `gplay grants`).
 
 Official Android team skills (Apache-2.0, from `github.com/android/skills`):
 
-- `solo-android-dev:agp-9-upgrade` — Upgrades or migrates an Android project
+- `android-dev:agp-9-upgrade` — Upgrades or migrates an Android project
   to Android Gradle Plugin 9: breaking changes, compatibility checks (Gradle,
   JDK, Kotlin), Upgrade Assistant workflow.
-- `solo-android-dev:migrate-xml-views-to-jetpack-compose` — Structured
+- `android-dev:migrate-xml-views-to-jetpack-compose` — Structured
   10-step workflow for migrating a single XML layout to Jetpack Compose with
   pixel-perfect visual parity and interoperability.
-- `solo-android-dev:navigation-3` — Install, migrate to, and implement
+- `android-dev:navigation-3` — Install, migrate to, and implement
   Jetpack Navigation 3: deep links, multiple backstacks, scenes (dialog,
   bottom sheet, list-detail, two-pane), conditional navigation, Hilt /
   ViewModel integration.
-- `solo-android-dev:r8-analyzer` — Analyzes R8 keep rules to identify
+- `android-dev:r8-analyzer` — Analyzes R8 keep rules to identify
   redundancies and overly broad rules; recommends narrow, specific keep rules
   to optimize app size.
-- `solo-android-dev:edge-to-edge` — Migrates a Jetpack Compose app to
+- `android-dev:edge-to-edge` — Migrates a Jetpack Compose app to
   adaptive edge-to-edge display: status / navigation bar insets, IME insets,
   system bar legibility (requires target SDK 35+).
-- `solo-android-dev:play-billing-library-version-upgrade` — Upgrade /
+- `android-dev:play-billing-library-version-upgrade` — Upgrade /
   migrate an Android project from any older Play Billing Library version to
   the current major version.
 

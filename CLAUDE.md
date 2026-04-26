@@ -5,12 +5,12 @@ This repo ships **seven sub-plugins** from a single marketplace:
 | Plugin | Path | Depends on |
 |---|---|---|
 | `solopreneur` | `plugins/solopreneur/` | — |
-| `solo-designer` | `plugins/solo-designer/` | `solopreneur` |
-| `solo-marketer` | `plugins/solo-marketer/` | `solopreneur` |
-| `solo-ios-dev` | `plugins/solo-ios-dev/` | `solopreneur` |
-| `solo-android-dev` | `plugins/solo-android-dev/` | `solopreneur` |
-| `solo-ai-engineer` | `plugins/solo-ai-engineer/` | `solopreneur` |
-| `solo-neo4j-dev` | `plugins/solo-neo4j-dev/` | `solopreneur` |
+| `designer` | `plugins/designer/` | `solopreneur` |
+| `marketer` | `plugins/marketer/` | `solopreneur` |
+| `ios-dev` | `plugins/ios-dev/` | `solopreneur` |
+| `android-dev` | `plugins/android-dev/` | `solopreneur` |
+| `ai-engineer` | `plugins/ai-engineer/` | `solopreneur` |
+| `neo4j-dev` | `plugins/neo4j-dev/` | `solopreneur` |
 
 Each plugin's directory name matches its marketplace `name` 1:1. The
 `Depends on` column shows the marketplace `name` declared in
@@ -40,7 +40,7 @@ current set of commits:
    Example:
 
    ```bash
-   git tag -a solo-android-dev--v0.4.4 -m "solo-android-dev v0.4.4: add XYZ"
+   git tag -a android-dev--v0.4.4 -m "android-dev v0.4.4: add XYZ"
    ```
 
    The double-dash is required — Claude Code uses it to resolve plugin
@@ -66,7 +66,7 @@ git diff --name-only <base>..HEAD | awk -F/ '/^plugins\// { print $2 }' | sort -
 ```
 
 This prints directory names which now match the marketplace `name` 1:1
-(e.g. `solopreneur`, `solo-android-dev`). Bump + tag only the plugins that
+(e.g. `solopreneur`, `android-dev`). Bump + tag only the plugins that
 changed. If several plugins change together, each still gets its own bump
 and its own `<name>--v<version>` tag on the same merge commit.
 

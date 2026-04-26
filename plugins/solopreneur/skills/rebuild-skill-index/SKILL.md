@@ -50,7 +50,7 @@ Shared sources (used by every platform's classifier):
 Android-specific sources:
 
 - None beyond the shared user-level glob. All curated Android skills are
-  vendored inside `solo-android-dev` itself (under `<plugin>/skills/`) and
+  vendored inside `android-dev` itself (under `<plugin>/skills/`) and
   excluded via the dedup list in Step 2.
 
 iOS-specific sources:
@@ -106,7 +106,7 @@ Marketer-specific sources:
 Neo4j-specific sources:
 
 - None beyond the shared user-level glob. All curated Neo4j skills are
-  vendored inside `solo-neo4j-dev` itself.
+  vendored inside `neo4j-dev` itself.
 
 ## Step 2: Read curated dedup lists
 
@@ -121,17 +121,17 @@ that looks like:
 The section is subdivided by source (Plugin-bundled / Third-party / …).
 Collect names from all subsections — they form the per-agent dedup blacklist
 and should not be re-included in that agent's extended index. Names may be
-bare (`asc-release-flow`) or namespaced (`solo-ios-dev:ios-patterns`,
+bare (`asc-release-flow`) or namespaced (`ios-dev:ios-patterns`,
 `axiom:axiom-ios-ui`) — strip any `<plugin>:` prefix before comparing
 against candidate skill names.
 
 Agents to read (each lives in its own sub-plugin):
 
-- `ios-dev.md` (from `solo-ios-dev`) → iOS dedup list
-- `android-dev.md` (from `solo-android-dev`) → Android dedup list
-- `designer.md` (from `solo-designer`) → design dedup list
-- `marketer.md` (from `solo-marketer`) → marketer dedup list
-- `neo4j-dev.md` (from `solo-neo4j-dev`) → neo4j-dev dedup list
+- `ios-dev.md` (from `ios-dev`) → iOS dedup list
+- `android-dev.md` (from `android-dev`) → Android dedup list
+- `designer.md` (from `designer`) → design dedup list
+- `marketer.md` (from `marketer`) → marketer dedup list
+- `neo4j-dev.md` (from `neo4j-dev`) → neo4j-dev dedup list
 
 Locate each agent file via Glob (widens across any marketplace name the user
 chose at `claude plugin marketplace add --name`):

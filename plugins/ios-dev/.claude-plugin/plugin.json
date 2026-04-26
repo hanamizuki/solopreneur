@@ -1,0 +1,12 @@
+{
+  "name": "ios-dev",
+  "version": "0.4.3",
+  "description": "iOS/macOS SwiftUI expertise. Ships the ios-dev agent, ios-patterns, and 23 vendored third-party skills (iphone-apps + asc-* App Store Connect CLI).",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "solopreneur",
+      "version": ">=0.5.1"
+    }
+  ]
+}
