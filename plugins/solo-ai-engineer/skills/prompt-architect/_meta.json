@@ -1,0 +1,11 @@
+{
+  "owner": "abdullah4ai",
+  "slug": "prompt-architect",
+  "displayName": "Prompt Architect",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771221898806,
+    "commit": "https://github.com/openclaw/skills/commit/bffc77fadeda9949cebcdd4a6400da703784badf"
+  },
+  "history": []
+}

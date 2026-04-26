@@ -14,7 +14,7 @@ as a family of Claude Code plugins you install à la carte.
 | [`solo-marketer`](./plugins/solo-marketer) | `marketer` agent + 7 skills (GTM, naming, writing, X/LinkedIn growth, slide design) | `solopreneur` |
 | [`solo-ios-dev`](./plugins/solo-ios-dev) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`iphone-apps` + `asc-*`) | `solopreneur` |
 | [`solo-android-dev`](./plugins/solo-android-dev) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + official) | `solopreneur` |
-| [`solo-ai-engineer`](./plugins/solo-ai-engineer) | `ai-engineer` agent + `langgraph` skill (LangGraph v1.0 deployment-first patterns; loaded only when LangGraph is detected) | `solopreneur` |
+| [`solo-ai-engineer`](./plugins/solo-ai-engineer) | `ai-engineer` agent + 1 in-house skill (`langgraph`) + 3 vendored skills (`ai-engineering`, `senior-prompt-engineer`, `prompt-architect`) | `solopreneur` |
 | [`solo-neo4j-dev`](./plugins/solo-neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills (cypher, cypher-guide, migration, cli-tools) | `solopreneur` |
 
 Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
@@ -160,12 +160,20 @@ installed on the machine.
 
 - **`solo-ai-engineer`** → `ai-engineer` agent. LangGraph (StateGraph,
   prebuilt agents, Supervisor/Swarm), LangChain, streaming patterns, tool
-  calling, structured output. Ships the `langgraph` skill —
-  deployment-first v1.0 patterns (`agent.py` with `app = ...compile()`,
-  `langgraph.json` config, prefer `create_react_agent`, Supervisor / Swarm
-  multi-agent shapes). Skill has `disable-model-invocation: true` so it
-  only loads when this agent invokes it on a project that actually uses
-  LangGraph.
+  calling, structured output. Ships 4 skills, all with
+  `disable-model-invocation: true` so they only load when the agent (or
+  any explicit caller) invokes them — no auto-trigger cost on unrelated
+  projects:
+  - `langgraph` (in-house) — deployment-first v1.0 patterns (`agent.py`
+    with `app = ...compile()`, `langgraph.json` config, prefer
+    `create_react_agent`).
+  - `ai-engineering` (vendored) — production AI fundamentals: LLM
+    provider selection, vector DB selection, full RAG pipeline, evals,
+    drift detection.
+  - `senior-prompt-engineer` (vendored) — advanced prompt patterns + LLM
+    eval frameworks + agent orchestration.
+  - `prompt-architect` (vendored) — single-prompt design discipline:
+    ingest → clarify → structure → ship.
 
 - **`solo-neo4j-dev`** → `neo4j-dev` agent. Modern Cypher (QPP, CALL
   subqueries), graph data modelling, schema design, Neo4j drivers, query
@@ -246,6 +254,12 @@ extended index by `/rebuild-skill-index`.
 |--------|------|--------|---------|---------|
 | [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills) | Skills | **Vendored** in `solo-neo4j-dev` (3 skills) | `neo4j-dev` agent | `neo4j-cypher` (4.x/5.x → 2025.x), `neo4j-migration` (driver upgrade), `neo4j-cli-tools` |
 | [tomasonjo/blogs](https://github.com/tomasonjo/blogs/tree/master/claude-skills/neo4j-cypher-guide) | Skill | **Vendored** in `solo-neo4j-dev` (1 skill) | `neo4j-dev` agent | `neo4j-cypher-guide` — modern Cypher read patterns (QPP, CALL subqueries, sorting) |
+
+### AI Engineering / Prompt Design
+
+| Source | Type | Status | Used by | Purpose |
+|--------|------|--------|---------|---------|
+| [openclaw/skills](https://github.com/openclaw/skills) | Skills | **Vendored** in `solo-ai-engineer` (3 skills) | `ai-engineer` agent | `ai-engineering` — production LLM systems, RAG, vector DBs, evals; `senior-prompt-engineer` — advanced prompt patterns + eval frameworks; `prompt-architect` — single-prompt design discipline |
 
 ## CLI Tools
 

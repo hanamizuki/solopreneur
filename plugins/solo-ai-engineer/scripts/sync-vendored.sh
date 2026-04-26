@@ -1,0 +1,1 @@
+../../solopreneur/scripts/sync-vendored.sh

@@ -34,7 +34,7 @@
     {
       "name": "solo-ai-engineer",
       "source": "./plugins/solo-ai-engineer",
-      "description": "AI / LLM application engineering expertise — ai-engineer agent plus the langgraph skill (deployment-first v1.0 patterns) for LangGraph workflows, multi-agent systems, tool calling, and streaming.",
+      "description": "AI / LLM application engineering expertise — ai-engineer agent plus 1 in-house skill (langgraph) and 3 vendored skills (ai-engineering, senior-prompt-engineer, prompt-architect) for production LLM systems, RAG, agents, and prompt design.",
       "license": "MIT"
     },
     {

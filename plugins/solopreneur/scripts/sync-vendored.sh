@@ -14,6 +14,9 @@
 #   ./scripts/sync-vendored.sh           # sync to latest commit on each source's branch
 #   ./scripts/sync-vendored.sh --pinned  # re-sync to revs already pinned in manifest (reproducible)
 #
+# Optional manifest fields per source:
+#   disable_model_invocation: true  # inject `disable-model-invocation: true` into each synced SKILL.md
+#
 # Requires: git, jq
 
 set -euo pipefail
@@ -146,6 +149,30 @@ for i in $(seq 0 $((source_count - 1))); do
         { print }
       ' "$dst_path/SKILL.md" > "$dst_path/SKILL.md.tmp" && \
         mv "$dst_path/SKILL.md.tmp" "$dst_path/SKILL.md"
+    fi
+
+    # Inject disable-model-invocation: true if the source has the flag enabled.
+    # Idempotent — only inserts if not already present.
+    disable_mi=$(echo "$src" | jq -r '.disable_model_invocation // false')
+    if [[ "$disable_mi" == "true" && -f "$dst_path/SKILL.md" ]]; then
+      if ! grep -q "^disable-model-invocation:" "$dst_path/SKILL.md"; then
+        # Insert after the `name:` line inside the frontmatter.
+        awk '
+          BEGIN { in_fm = 0; fm_done = 0; injected = 0 }
+          /^---$/ {
+            if (!in_fm && !fm_done) { in_fm = 1; print; next }
+            if (in_fm) { in_fm = 0; fm_done = 1; print; next }
+          }
+          in_fm && /^name:[[:space:]]/ && !injected {
+            print
+            print "disable-model-invocation: true"
+            injected = 1
+            next
+          }
+          { print }
+        ' "$dst_path/SKILL.md" > "$dst_path/SKILL.md.tmp" && \
+          mv "$dst_path/SKILL.md.tmp" "$dst_path/SKILL.md"
+      fi
     fi
 
     # Drop a small _VENDOR.md sidecar so the source is traceable from the skill folder.
