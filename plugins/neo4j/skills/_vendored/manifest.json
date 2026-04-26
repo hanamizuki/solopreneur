@@ -1,0 +1,45 @@
+{
+  "$schema_note": "Maintained by scripts/sync-vendored.sh. Do not edit `rev` or `synced_at` by hand — re-run sync to update.",
+  "sources": [
+    {
+      "name": "neo4j-skills",
+      "repo": "https://github.com/neo4j-contrib/neo4j-skills",
+      "branch": "main",
+      "rev": "ecfc1394e44534a8436f5eeea9e40747c8004aa0",
+      "synced_at": "2026-04-26T12:09:11Z",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "license_file": "LICENSES/neo4j-skills-LICENSE",
+      "skills": [
+        {
+          "from": "neo4j-cli-tools-skill",
+          "to": "neo4j-cli-tools"
+        },
+        {
+          "from": "neo4j-cypher-skill",
+          "to": "neo4j-cypher"
+        },
+        {
+          "from": "neo4j-migration-skill",
+          "to": "neo4j-migration"
+        }
+      ]
+    },
+    {
+      "name": "tomasonjo-blogs",
+      "repo": "https://github.com/tomasonjo/blogs",
+      "branch": "master",
+      "rev": "11fd30bdf48c3d7d1f008276d2592a1a007e1c4f",
+      "synced_at": "2026-04-26T12:09:13Z",
+      "license": "Unspecified (no LICENSE file in upstream as of 2026-04-26)",
+      "license_path": null,
+      "license_file": null,
+      "skills": [
+        {
+          "from": "claude-skills/neo4j-cypher-guide/neo4j-cypher-guide",
+          "to": "neo4j-cypher-guide"
+        }
+      ]
+    }
+  ]
+}
