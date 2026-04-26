@@ -18,8 +18,10 @@ fails — skip it and proceed with context7 + built-in knowledge.
 
 Always available — ships with this plugin. Invoke with `solo-ai-engineer:<name>`.
 
-All four skills below have `disable-model-invocation: true` — they don't
-auto-trigger. Read them only when the trigger condition matches.
+All four skills below are auto-discoverable (no `disable-model-invocation`
+flag), so the model can also fire them on description match. Each entry's
+**Read when** line is the deliberate trigger from this agent's perspective —
+follow it when invoking explicitly via the Skill tool.
 
 In-house:
 
