@@ -186,7 +186,7 @@ The `designer` agent for UI/UX work that spans web, iOS, and Android. Ships
 
 - **[frontend-design](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design)** plugin — creative, polished frontend code generation that avoids generic AI aesthetics. Auto-classified into the design extended index by `/rebuild-skill-index`.
 - **[ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)** plugin — UI/UX intelligence library: 50+ styles, 161 color palettes, font pairings, product types, UX guidelines, chart types across 10 stacks. Auto-classified.
-- **Pencil MCP** — optional. If `mcp__pencil__*` tools are available, the `designer` agent prefers them for `.pen` design file access (layout, variables, guidelines, export).
+- **[Pencil MCP](https://www.pencil.dev/downloads)** — optional. If `mcp__pencil__*` tools are available, the `designer` agent prefers them for `.pen` design file access (layout, variables, guidelines, export).
 
 ---
 
