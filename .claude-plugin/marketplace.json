@@ -9,43 +9,43 @@
   "plugins": [
     {
       "name": "solopreneur",
-      "source": "./plugins/core",
+      "source": "./plugins/solopreneur",
       "description": "Core skills — plan review, code review loops, backlog management, and thinking partners.",
       "license": "MIT"
     },
     {
       "name": "solo-designer",
-      "source": "./plugins/designer",
+      "source": "./plugins/solo-designer",
       "description": "UI/UX design expertise — designer agent and 10 vendored third-party design skills (taste-* archetype family + impeccable).",
       "license": "MIT"
     },
     {
       "name": "solo-ios-dev",
-      "source": "./plugins/ios",
+      "source": "./plugins/solo-ios-dev",
       "description": "iOS/macOS SwiftUI expertise — ios-dev agent, ios-patterns, and 23 vendored third-party skills (iphone-apps + asc-* App Store Connect CLI).",
       "license": "MIT"
     },
     {
       "name": "solo-android-dev",
-      "source": "./plugins/android",
+      "source": "./plugins/solo-android-dev",
       "description": "Android/Kotlin expertise — android-dev agent, android-patterns, and 39 vendored third-party skills (Compose / architecture / Gradle + 18 gplay-* Google Play Console CLI + 6 official Android team skills).",
       "license": "MIT"
     },
     {
       "name": "solo-ai-engineer",
-      "source": "./plugins/llm",
+      "source": "./plugins/solo-ai-engineer",
       "description": "AI / LLM application engineering expertise — ai-engineer agent for LangGraph workflows, multi-agent systems, tool calling, and streaming.",
       "license": "MIT"
     },
     {
       "name": "solo-marketer",
-      "source": "./plugins/marketer",
+      "source": "./plugins/solo-marketer",
       "description": "Marketing / brand / writing expertise — marketer agent plus GTM strategy, naming, X/Twitter & LinkedIn growth, AI-pattern removal, and brand-aware slide design.",
       "license": "MIT"
     },
     {
       "name": "solo-neo4j-dev",
-      "source": "./plugins/neo4j",
+      "source": "./plugins/solo-neo4j-dev",
       "description": "Neo4j graph database expertise — neo4j-dev agent and 4 vendored third-party skills (cypher / cypher-guide / migration / cli-tools).",
       "license": "MIT"
     }
