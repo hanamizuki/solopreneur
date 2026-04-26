@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Maintainer script for vendoring third-party android skills.
+# Maintainer script for vendoring third-party skills into this plugin.
+# (Same script is shipped verbatim in plugins/{android,ios,designer}/scripts/.)
 #
 # Reads skills/_vendored/manifest.json, sparse-clones each source repo at the
 # pinned (or latest) revision, copies each `from` skill folder to skills/<to>/,
@@ -17,7 +18,7 @@ PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MANIFEST="$PLUGIN_DIR/skills/_vendored/manifest.json"
 LICENSES_DIR="$PLUGIN_DIR/skills/_vendored/LICENSES"
 SKILLS_DIR="$PLUGIN_DIR/skills"
-TMP_ROOT="$(mktemp -d -t solopreneur-android-sync.XXXXXX)"
+TMP_ROOT="$(mktemp -d -t solopreneur-vendor-sync.XXXXXX)"
 
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -47,8 +48,8 @@ for i in $(seq 0 $((source_count - 1))); do
   repo=$(echo "$src" | jq -r '.repo')
   branch=$(echo "$src" | jq -r '.branch')
   pinned_rev=$(echo "$src" | jq -r '.rev // empty')
-  license_path=$(echo "$src" | jq -r '.license_path')
-  license_file=$(echo "$src" | jq -r '.license_file')
+  license_path=$(echo "$src" | jq -r '.license_path // empty')
+  license_file=$(echo "$src" | jq -r '.license_file // empty')
   skills_count=$(echo "$src" | jq '.skills | length')
 
   echo "==> [$name] $repo"
@@ -60,10 +61,12 @@ for i in $(seq 0 $((source_count - 1))); do
     cd "$clone_dir"
     git sparse-checkout init --cone >/dev/null
 
-    # Collect all `from` paths to sparse-checkout, plus license path
+    # Collect all `from` paths to sparse-checkout, plus license path if set
     sparse_paths=()
     while IFS= read -r p; do sparse_paths+=("$p"); done < <(echo "$src" | jq -r '.skills[].from')
-    sparse_paths+=("$license_path")
+    if [[ -n "$license_path" ]]; then
+      sparse_paths+=("$license_path")
+    fi
     git sparse-checkout set "${sparse_paths[@]}" >/dev/null
 
     if [[ "$PINNED" -eq 1 && -n "$pinned_rev" ]]; then
@@ -78,8 +81,10 @@ for i in $(seq 0 $((source_count - 1))); do
   rev=$(git -C "$clone_dir" rev-parse HEAD)
   echo "    rev: $rev"
 
-  # Copy LICENSE
-  if [[ -f "$clone_dir/$license_path" ]]; then
+  # Copy LICENSE if specified in manifest
+  if [[ -z "$license_path" ]]; then
+    echo "    license: (none specified in manifest — upstream has no LICENSE file)"
+  elif [[ -f "$clone_dir/$license_path" ]]; then
     cp "$clone_dir/$license_path" "$LICENSES_DIR/$(basename "$license_file")"
     echo "    license: $license_file"
   else
@@ -129,6 +134,11 @@ for i in $(seq 0 $((source_count - 1))); do
     fi
 
     # Drop a small _VENDOR.md sidecar so the source is traceable from the skill folder.
+    if [[ -n "$license_file" ]]; then
+      license_line="see \`../_vendored/LICENSES/$(basename "$license_file")\`"
+    else
+      license_line="(none — upstream has no LICENSE file as of sync)"
+    fi
     cat > "$dst_path/_VENDOR.md" <<EOF
 # Vendored Skill
 
@@ -139,10 +149,10 @@ edits will be overwritten on the next \`scripts/sync-vendored.sh\` run.
 - **Source path**: \`$from\`
 - **Pinned commit**: $rev
 - **Synced at**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-- **License**: see \`../_vendored/LICENSES/$(basename "$license_file")\`
+- **License**: $license_line
 
-To update: edit \`skills/_vendored/manifest.json\` if needed, then run
-\`./scripts/sync-vendored.sh\` from \`plugins/android/\`.
+To update: edit \`skills/_vendored/manifest.json\` if needed, then re-run this
+plugin's \`./scripts/sync-vendored.sh\`.
 EOF
 
     echo "    skill: $from -> skills/$to/"

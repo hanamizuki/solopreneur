@@ -111,7 +111,7 @@ against candidate skill names.
 Agents to read (each lives in its own sub-plugin after the v0.3.0 split):
 - `ios-dev.md` (from `solopreneur-ios`) → iOS dedup list
 - `android-dev.md` (from `solopreneur-android`) → Android dedup list
-- `designer.md` (from `solopreneur-core`) → design dedup list
+- `designer.md` (from `solopreneur-designer`) → design dedup list
 
 Locate each agent file via Glob (widens across any marketplace name the user
 chose at `claude plugin marketplace add --name`):

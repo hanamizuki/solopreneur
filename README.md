@@ -5,13 +5,14 @@ founders the workflows of a full engineering org — plan review, code review
 loops, automated PR cycles, GTM, writing, and platform-specific experts — as a
 family of Claude Code plugins you install à la carte.
 
-## The six plugins
+## The seven plugins
 
 | Plugin | What you get | Depends on |
 |---|---|---|
-| [`solopreneur-core`](./plugins/core) | 20 skills (review, pipelines, GTM, writing, thinking) + `designer` agent | — |
-| [`solopreneur-ios`](./plugins/ios) | `ios-dev` agent + `ios-patterns` skill | `solopreneur-core` |
-| [`solopreneur-android`](./plugins/android) | `android-dev` agent + `android-patterns` skill | `solopreneur-core` |
+| [`solopreneur-core`](./plugins/core) | 20 skills (review, pipelines, GTM, writing, thinking) | — |
+| [`solopreneur-designer`](./plugins/designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) | `solopreneur-core` |
+| [`solopreneur-ios`](./plugins/ios) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`iphone-apps` + `asc-*`) | `solopreneur-core` |
+| [`solopreneur-android`](./plugins/android) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + official) | `solopreneur-core` |
 | [`solopreneur-nextjs`](./plugins/nextjs) | `nextjs-dev` agent (covers React/Next.js/frontend broadly) | `solopreneur-core` |
 | [`solopreneur-python`](./plugins/python) | `python-dev` agent (FastAPI, Pydantic, LangGraph) | `solopreneur-core` |
 | [`solopreneur-llm`](./plugins/llm) | `llm-dev` agent (LangGraph, agent workflows, tool calling) | `solopreneur-core` |
@@ -37,6 +38,7 @@ claude plugin install solopreneur-core@solopreneur
 # Then install whichever stacks apply
 claude plugin install solopreneur-ios@solopreneur      # auto-pulls core
 claude plugin install solopreneur-android@solopreneur
+claude plugin install solopreneur-designer@solopreneur
 claude plugin install solopreneur-nextjs@solopreneur
 claude plugin install solopreneur-python@solopreneur
 claude plugin install solopreneur-llm@solopreneur
@@ -58,6 +60,7 @@ claude plugin update solopreneur-core        # and any other installed plugins
 | Next.js / React web apps | `solopreneur-core` + `solopreneur-nextjs` |
 | FastAPI / Python services | `solopreneur-core` + `solopreneur-python` |
 | LangGraph / AI agents | `solopreneur-core` + `solopreneur-llm` |
+| Pure design / UI / UX work | `solopreneur-core` + `solopreneur-designer` |
 | Nothing but want the GTM / writing / review loops | `solopreneur-core` alone |
 
 ## What's in `solopreneur-core`
@@ -164,8 +167,9 @@ installed on the machine.
 - **`solopreneur-llm`** → `llm-dev` agent. LangGraph (StateGraph, prebuilt
   agents, Supervisor/Swarm), LangChain, streaming patterns, tool calling.
 
-The `designer` agent ships in `solopreneur-core` because design work spans
-web, iOS, and Android.
+- **`solopreneur-designer`** → `designer` agent. UI/UX design work that spans
+  web, iOS, and Android. Ships with 10 vendored design skills (the `taste-*`
+  archetype family + `impeccable`).
 
 ## Auto-Integrations
 
@@ -205,12 +209,12 @@ extended index by `/rebuild-skill-index`.
 
 ### Design / UI
 
-| Source | Type | Used by | Purpose |
-|--------|------|---------|---------|
-| [impeccable](https://github.com/pbakaus/impeccable) | Skill | `designer` agent | `teach-impeccable` — one-time interview that writes persistent project design guidelines |
-| [taste-skill](https://github.com/Leonxlnx/taste-skill) | Skills | `designer` agent | `taste-*` archetype family (soft / brutalist / minimalist / redesign / stitch / output) — overrides default LLM design biases |
-| [frontend-design](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design) | Plugin | `designer` agent | Creative, polished frontend code generation that avoids generic AI aesthetics |
-| [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | Plugin | `designer` agent | UI/UX intelligence library — styles, palettes, font pairings, product types, UX guidelines, chart types across 10 stacks |
+| Source | Type | Status | Used by | Purpose |
+|--------|------|--------|---------|---------|
+| [impeccable](https://github.com/pbakaus/impeccable) | Skill | **Vendored** in `solopreneur-designer` | `designer` agent | Polish / critique / redesign frontend interfaces |
+| [taste-skill](https://github.com/Leonxlnx/taste-skill) | Skills | **Vendored** in `solopreneur-designer` (9 skills) | `designer` agent | `taste-*` archetype family (soft / brutalist / minimalist / redesign / stitch / output / gpt / image-to-code) — overrides default LLM design biases |
+| frontend-design | Plugin | Recommended install | `designer` agent | Creative, polished frontend code generation that avoids generic AI aesthetics. Ships in Anthropic's `claude-plugins-official` marketplace |
+| [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | Plugin | Recommended install | `designer` agent | UI/UX intelligence library — styles, palettes, font pairings, product types, UX guidelines, chart types across 10 stacks |
 
 User-level skills and the above plugins are auto-classified into the design
 extended index by `/rebuild-skill-index`.
@@ -219,8 +223,8 @@ extended index by `/rebuild-skill-index`.
 
 | Source | Type | Used by | Purpose |
 |--------|------|---------|---------|
-| [frontend-slides](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-slides) | Plugin | `/slide-design` | Single-HTML, animation-rich slide engine (recommended) |
-| [revealjs](https://github.com/anthropics/claude-code/tree/main/plugins/revealjs) | Plugin | `/slide-design` | Reveal.js-based slides — fragments, vertical stacks, speaker notes, Chart.js |
+| [frontend-slides](https://github.com/zarazhangrui/frontend-slides) | Plugin | `/slide-design` | Single-HTML, animation-rich slide engine (recommended) |
+| [reveal.js](https://github.com/hakimel/reveal.js) | Library | `/slide-design` | Reveal.js — fragments, vertical stacks, speaker notes, Chart.js |
 
 ## CLI Tools
 

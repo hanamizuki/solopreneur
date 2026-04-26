@@ -17,46 +17,64 @@ Skill tool by name — Claude Code resolves paths and versions automatically
 across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
-### Third-party plugins
+### Plugin-bundled (solopreneur-designer)
 
-- `frontend-design:frontend-design` — Create distinctive, production-grade
-  frontend interfaces. Generates creative, polished code that avoids generic
-  AI aesthetics.
-  Install: https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design
-- `ui-ux-pro-max:ui-ux-pro-max` — UI/UX intelligence library: 50+ styles,
-  161 color palettes, 57 font pairings, 161 product types, 99 UX guidelines,
-  chart types across 10 stacks (React, Next.js, Vue, Svelte, etc.).
-  Install: https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+Always available — ships with this plugin. Invoke with `solopreneur-designer:<name>`.
 
-### Raw user skills
+Vendored from third-party sources (see `skills/_vendored/manifest.json` for
+upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
-Drop the skill folder under your active Claude Code skills directory
-(`$CLAUDE_CONFIG_DIR/skills/` or `~/.claude/skills/`); the Skill system
-auto-registers it. Invoke by bare name.
+- `solopreneur-designer:impeccable` — Design / redesign / critique / audit /
+  polish / animate / colorize a frontend interface. Covers websites, landing
+  pages, dashboards, product UI, app shells, components, forms, settings,
+  onboarding, empty states. Includes UX review, visual hierarchy, IA, cognitive
+  load, accessibility, performance, responsive behavior, theming, anti-patterns,
+  typography, spacing, layout, color, motion, micro-interactions, UX copy,
+  error states, edge cases, i18n, design systems, tokens.
 
-- `teach-impeccable` — One-time setup that interviews you, then writes persistent
-  design guidelines into your AI config. Run it once per project to anchor
-  the agent to a consistent aesthetic.
-  Install: https://github.com/pbakaus/impeccable
+The `taste-*` archetype family — pick the one that matches the product's
+personality (override default LLM design biases):
 
-The `taste-*` family — archetype skills from the same repo that override
-default LLM design biases. Pick the one that matches the product's personality.
-All share the install source: https://github.com/Leonxlnx/taste-skill
+- `solopreneur-designer:taste-skill` — Senior UI/UX engineer baseline:
+  metric-based rules, strict component architecture, CSS hardware acceleration,
+  balanced design engineering.
+- `solopreneur-designer:taste-soft` — High-end agency aesthetic: premium fonts,
+  generous spacing, soft shadows, tasteful animations.
+- `solopreneur-designer:taste-brutalist` — Swiss / military terminal aesthetic:
+  rigid grids, extreme type-scale contrast, utilitarian color, analog
+  degradation effects. Data-heavy dashboards.
+- `solopreneur-designer:taste-minimalist` — Clean editorial: warm monochrome
+  palette, typographic contrast, flat bento grids, muted pastels. No gradients,
+  no heavy shadows.
+- `solopreneur-designer:taste-redesign` — Upgrades existing sites to premium
+  quality without breaking functionality. Works with any CSS framework.
+- `solopreneur-designer:taste-stitch` — Semantic design system for Google
+  Stitch. Generates agent-friendly `DESIGN.md` files.
+- `solopreneur-designer:taste-output` — Overrides default LLM truncation:
+  enforces complete code generation, bans placeholder patterns.
+- `solopreneur-designer:taste-gpt` — Elite UX/UI + advanced GSAP motion:
+  Python-driven layout randomization, strict AIDA structure, wide editorial
+  typography (bans 6-line wraps), gapless scroll.
+- `solopreneur-designer:taste-image-to-code` — Image-to-code workflow for
+  Codex: generate the design image first, deeply analyze, then implement.
 
-- `taste-skill` — Senior UI/UX engineer baseline. Metric-based rules, strict
-  component architecture, balanced design engineering.
-- `taste-soft` — High-end agency aesthetic. Premium fonts, generous spacing,
-  soft shadows, tasteful animations.
-- `taste-brutalist` — Raw mechanical Swiss/terminal aesthetic. Rigid grids,
-  extreme type contrast, utilitarian color, data-heavy dashboards.
-- `taste-minimalist` — Clean editorial style. Warm monochrome palette,
-  typographic contrast, flat bento grids, muted pastels.
-- `taste-redesign` — Upgrades existing sites to premium quality without
-  breaking functionality. Works with any CSS framework.
-- `taste-stitch` — Semantic design system for Google Stitch. Generates
-  agent-friendly DESIGN.md files.
-- `taste-output` — Overrides default LLM truncation. Enforces complete code
-  generation, bans placeholder patterns.
+### Optional: third-party plugins
+
+These ship as Claude Code plugins (not vendored here). After installing them,
+run `/rebuild-skill-index` once and their skills will appear in
+`$BASE/solopreneur/skill-index/design.md` (Extended Discovery, below) — no
+manual editing of this file needed.
+
+- **frontend-design** — Create distinctive, production-grade frontend
+  interfaces; generates creative, polished code that avoids generic AI
+  aesthetics. Install: see Anthropic's `claude-plugins-official` marketplace
+  (plugin: `frontend-design`).
+- **ui-ux-pro-max** — UI/UX intelligence library: 50+ styles, 161 color
+  palettes, 57 font pairings, 161 product types, 99 UX guidelines, chart types
+  across 10 stacks (React, Next.js, Vue, Svelte, etc.). Skills include
+  `ui-ux-pro-max`, `design`, `design-system`, `brand`, `ui-styling`, `slides`,
+  `banner-design`. Install via marketplace: `nextlevelbuilder/ui-ux-pro-max-skill`
+  (https://github.com/nextlevelbuilder/ui-ux-pro-max-skill).
 
 ## Extended Discovery
 

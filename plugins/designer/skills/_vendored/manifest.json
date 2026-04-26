@@ -1,0 +1,69 @@
+{
+  "$schema_note": "Maintained by scripts/sync-vendored.sh. Do not edit `rev` or `synced_at` by hand — re-run sync to update.",
+  "sources": [
+    {
+      "name": "taste-skill",
+      "repo": "https://github.com/Leonxlnx/taste-skill",
+      "branch": "main",
+      "rev": "840b46bb698104b3dd06a8ba0c0ecc0163d54d17",
+      "synced_at": "2026-04-26T11:21:29Z",
+      "license": "Unspecified (no LICENSE file in upstream as of 2026-04-26)",
+      "license_path": null,
+      "license_file": null,
+      "skills": [
+        {
+          "from": "skills/taste-skill",
+          "to": "taste-skill"
+        },
+        {
+          "from": "skills/soft-skill",
+          "to": "taste-soft"
+        },
+        {
+          "from": "skills/brutalist-skill",
+          "to": "taste-brutalist"
+        },
+        {
+          "from": "skills/minimalist-skill",
+          "to": "taste-minimalist"
+        },
+        {
+          "from": "skills/redesign-skill",
+          "to": "taste-redesign"
+        },
+        {
+          "from": "skills/stitch-skill",
+          "to": "taste-stitch"
+        },
+        {
+          "from": "skills/output-skill",
+          "to": "taste-output"
+        },
+        {
+          "from": "skills/gpt-tasteskill",
+          "to": "taste-gpt"
+        },
+        {
+          "from": "skills/image-to-code-skill",
+          "to": "taste-image-to-code"
+        }
+      ]
+    },
+    {
+      "name": "impeccable",
+      "repo": "https://github.com/pbakaus/impeccable",
+      "branch": "main",
+      "rev": "25e6c820aab580526f8e9ffb3866b5a5b39c16c9",
+      "synced_at": "2026-04-26T11:21:30Z",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "license_file": "LICENSES/impeccable-LICENSE",
+      "skills": [
+        {
+          "from": ".claude/skills/impeccable",
+          "to": "impeccable"
+        }
+      ]
+    }
+  ]
+}

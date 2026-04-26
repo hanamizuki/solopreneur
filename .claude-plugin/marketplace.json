@@ -4,13 +4,19 @@
     "name": "Hana Chang"
   },
   "metadata": {
-    "description": "A virtual engineering team for solo founders — core skills (plan review, code review, automation pipelines, GTM, writing) plus modular stack experts (iOS, Android, Next.js, Python, LLM). Install what you need."
+    "description": "A virtual engineering team for solo founders — core skills (plan review, code review, automation pipelines, GTM, writing) plus modular stack experts (iOS, Android, Next.js, Python, LLM, Designer). Install what you need."
   },
   "plugins": [
     {
       "name": "solopreneur-core",
       "source": "./plugins/core",
-      "description": "Core skills and the designer agent — plan review, code review loops, backlog management, GTM, writing, and thinking partners.",
+      "description": "Core skills — plan review, code review loops, backlog management, GTM, writing, and thinking partners.",
+      "license": "MIT"
+    },
+    {
+      "name": "solopreneur-designer",
+      "source": "./plugins/designer",
+      "description": "UI/UX design expertise — designer agent and 10 vendored third-party design skills (taste-* archetype family + impeccable).",
       "license": "MIT"
     },
     {
