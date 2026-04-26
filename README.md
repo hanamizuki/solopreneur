@@ -64,9 +64,9 @@ claude plugin update solopreneur        # and any other installed plugins
 ## Plugins
 
 Each plugin section below describes the bundled skills (in-house and vendored)
-plus the **Recommended companions** — external CLIs, plugins, MCPs, or GitHub
-apps that the plugin's skills and agent integrate with. Required companions
-are called out explicitly; everything else degrades gracefully if absent.
+plus its **Requirements** — external CLIs, plugins, MCPs, or GitHub apps the
+plugin's skills and agent integrate with. Hard requirements are called out
+explicitly; everything else is recommended and degrades gracefully if absent.
 
 ### `solopreneur` (core)
 
@@ -132,7 +132,7 @@ Idea
      └─ /todos-babysit ─── Periodic loop: review → notify → implement on approval
 ```
 
-#### Recommended companions
+#### Requirements
 
 | Component | Type | Required? | Used by |
 |---|---|---|---|
@@ -164,7 +164,7 @@ in-house skills.
 | `/linkedin-growth` | **LinkedIn Growth Consultant.** Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans — covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
 | `/slide-design` | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase — bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, 13 reusable layout components, and AI-slop review via `/humanly` (English + Chinese) |
 
-#### Recommended companions
+#### Requirements
 
 - **[frontend-slides](https://github.com/zarazhangrui/frontend-slides)** plugin — single-HTML, animation-rich slide engine. Used by `/slide-design` (recommended).
 - **[revealjs-skill](https://github.com/ryanbbrown/revealjs-skill)** plugin — reveal.js scaffolding (fragments, vertical stacks, speaker notes, Chart.js). Alternative engine for `/slide-design`. Wraps the underlying [reveal.js](https://github.com/hakimel/reveal.js) library.
@@ -182,7 +182,7 @@ The `designer` agent for UI/UX work that spans web, iOS, and Android. Ships
 - **`impeccable`** — vendored from [pbakaus/impeccable](https://github.com/pbakaus/impeccable). Polish / critique / redesign frontend interfaces.
 - **`taste-skill` + 8 archetype skills** (`taste-soft`, `taste-brutalist`, `taste-minimalist`, `taste-redesign`, `taste-stitch`, `taste-output`, `taste-gpt`, `taste-image-to-code`) — vendored from [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill). The `taste-*` archetype family overrides default LLM design biases.
 
-#### Recommended companions
+#### Requirements
 
 - **[frontend-design](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design)** plugin — creative, polished frontend code generation that avoids generic AI aesthetics. Auto-classified into the design extended index by `/rebuild-skill-index`.
 - **[ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)** plugin — UI/UX intelligence library: 50+ styles, 161 color palettes, font pairings, product types, UX guidelines, chart types across 10 stacks. Auto-classified.
@@ -200,9 +200,9 @@ Store Connect CLI workflows and full iPhone app build/debug/ship.
 
 - **`ios-patterns`** (in-house) — SwiftUI conventions: i18n, date parsing, Previews, state management, sheet & navigation, list spacing, expandable animation, keyboard Done button.
 - **`asc-cli` skills** (22) — vendored from [rudrankriyam/app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills). End-to-end App Store Connect workflows: TestFlight, releases, metadata, IAP, signing, screenshots, crash triage, ASO audit, RevenueCat catalog sync, notarization, submission health, …
-- **`iphone-apps`** — vendored from [glittercowboy/taches-cc-resources](https://github.com/glittercowboy/taches-cc-resources). CLI-only iPhone app workflow (build, debug, test, ship).
+- **`iphone-apps`** — vendored from [glittercowboy/taches-cc-resources](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps). CLI-only iPhone app workflow (build, debug, test, ship).
 
-#### Recommended companions
+#### Requirements
 
 - **`asc` CLI** — **required** by every `asc-*` skill. Without it, those 22 skills won't run. Install from [rorkai/App-Store-Connect-CLI](https://github.com/rorkai/App-Store-Connect-CLI).
 - **[Axiom](https://github.com/CharlesWiltgen/Axiom)** plugin — 200+ skills covering SwiftUI, SwiftData, concurrency, testing, App Store, camera, AI, graphics. After install, run `/rebuild-skill-index` once and the iOS-relevant skills appear in the `ios-dev` agent's extended index. Install: `claude plugin marketplace add CharlesWiltgen/Axiom` then `claude plugin install axiom@axiom-marketplace`.
@@ -218,13 +218,13 @@ from 5 different upstream repos.
 #### Bundled skills
 
 - **`android-patterns`** (in-house) — Jetpack Compose patterns: `@Preview` setup (LocalInspectionMode, Vico charts), Scaffold + bottom nav + status bar insets, ModalBottomSheet nested-scroll jitter, ripple clipping on rounded corners, SwipeToDismissBox transparency, locale-aware date formatting (MIUI quirks).
-- **18× `gplay-*`** — vendored from [tamtom/gplay-cli-skills](https://github.com/tamtom/gplay-cli-skills). Google Play Console CLI workflows: build, signing, release flows, metadata, IAP, testing tracks, rollout, reviews, vitals.
+- **`gplay` skills** (18) — vendored from [tamtom/gplay-cli-skills](https://github.com/tamtom/gplay-cli-skills). Google Play Console CLI workflows: build, signing, release flows, metadata, IAP, testing tracks, rollout, reviews, vitals.
 - **13 Compose / architecture skills** (`compose-ui`, `compose-navigation`, `compose-performance-audit`, `architecture`, `viewmodel`, `data-layer`, `coroutines`, `kotlin-concurrency-expert`, `gradle-build-performance`, `gradle-logic`, `accessibility`, `testing`, `xml-to-compose-migration`) — vendored from [new-silvermoon/awesome-android-agent-skills](https://github.com/new-silvermoon/awesome-android-agent-skills).
-- **`jetpack-compose`** — vendored from [TheBushidoCollective/han](https://github.com/TheBushidoCollective/han).
-- **`mobile-android-design`** — vendored from [wshobson/agents](https://github.com/wshobson/agents).
+- **`jetpack-compose`** — vendored from [TheBushidoCollective/han](https://github.com/TheBushidoCollective/han/tree/main/plugins/specialized/android/skills/jetpack-compose).
+- **`mobile-android-design`** — vendored from [wshobson/agents](https://github.com/wshobson/agents/tree/main/plugins/ui-design/skills/mobile-android-design).
 - **6 official Android skills** (`agp-9-upgrade`, `migrate-xml-views-to-jetpack-compose`, `navigation-3`, `r8-analyzer`, `play-billing-library-version-upgrade`, `edge-to-edge`) — vendored from [android/skills](https://github.com/android/skills) (Apache-2.0).
 
-#### Recommended companions
+#### Requirements
 
 - **`gplay` CLI** — **required** by every `gplay-*` skill. Without it, those 18 skills won't run. Install from [tamtom/play-console-cli](https://github.com/tamtom/play-console-cli).
 
@@ -238,16 +238,16 @@ structured output, plus the in-house `langgraph` skill and 3 vendored skills.
 #### Bundled skills
 
 - **`langgraph`** (in-house) — deployment-first v1.0 patterns (`agent.py` with `app = ...compile()`, `langgraph.json` config, prefer `create_react_agent`).
-- **`ai-engineering`** — vendored from [openclaw/skills](https://github.com/openclaw/skills) (originally authored by `bullkis1`, namespaced as `ai-engineer` in the source repo). Production AI fundamentals: LLM provider selection, vector DB selection, full RAG pipeline, evals, drift detection.
-- **`senior-prompt-engineer`** — vendored from [openclaw/skills](https://github.com/openclaw/skills) (originally authored by `alirezarezvani`). Advanced prompt patterns + LLM eval frameworks + agent orchestration.
-- **`prompt-architect`** — vendored from [openclaw/skills](https://github.com/openclaw/skills) (originally authored by `abdullah4ai`). Single-prompt design discipline: ingest → clarify → structure → ship.
+- **`ai-engineering`** — vendored from [openclaw/skills](https://github.com/openclaw/skills/tree/main/skills/bullkis1/ai-engineer) (originally authored by `bullkis1`, namespaced as `ai-engineer` in the source repo). Production AI fundamentals: LLM provider selection, vector DB selection, full RAG pipeline, evals, drift detection.
+- **`senior-prompt-engineer`** — vendored from [openclaw/skills](https://github.com/openclaw/skills/tree/main/skills/alirezarezvani/senior-prompt-engineer) (originally authored by `alirezarezvani`). Advanced prompt patterns + LLM eval frameworks + agent orchestration.
+- **`prompt-architect`** — vendored from [openclaw/skills](https://github.com/openclaw/skills/tree/main/skills/abdullah4ai/prompt-architect) (originally authored by `abdullah4ai`). Single-prompt design discipline: ingest → clarify → structure → ship.
 
 > Note: [openclaw/skills](https://github.com/openclaw/skills) is a community
 > aggregator hosting skills from many authors. The three skills above each
 > ship from a different upstream contributor, vendored together via that
 > aggregator with each one's source path preserved in `_VENDOR.md`.
 
-(No external companions required.)
+(No external requirements.)
 
 ---
 
@@ -264,7 +264,7 @@ skills.
 - **`neo4j-migration`** — vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). Driver upgrade across .NET / Go / Java / JS / Python.
 - **`neo4j-cli-tools`** — vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). `neo4j-admin`, `cypher-shell`, `aura-cli`, MCP server setup.
 
-#### Recommended companions
+#### Requirements
 
 - **`neo4j-admin`**, **`cypher-shell`**, **`aura-cli`** — Neo4j first-party CLIs. Install per the `neo4j-cli-tools` skill's guidance, depending on which workflow (admin / query / cloud) applies.
 
