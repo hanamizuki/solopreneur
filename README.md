@@ -54,7 +54,7 @@ claude plugin update solopreneur        # and any other installed plugins
 | If you build / do… | Install |
 |---|---|
 | Nothing but want the review and automation loops | `solopreneur` alone |
-| GTM / brand / writing / launch | `solopreneur` + `solo-marketer` |
+| GTM / brand / writing / slides | `solopreneur` + `solo-marketer` |
 | Pure design / UI / UX work | `solopreneur` + `solo-designer` |
 | iOS / macOS SwiftUI apps | `solopreneur` + `solo-ios-dev` |
 | Android / Kotlin apps | `solopreneur` + `solo-android-dev` |
