@@ -1,9 +1,9 @@
 {
   "name": "solopreneur-ios",
-  "version": "0.3.0",
-  "description": "iOS/macOS SwiftUI expertise — ios-dev agent and ios-patterns skill.",
+  "version": "0.4.0",
+  "description": "iOS/macOS SwiftUI expertise — ios-dev agent, ios-patterns, and 23 vendored third-party skills (iphone-apps + asc-* App Store Connect CLI).",
   "license": "MIT",
   "dependencies": [
-    { "name": "solopreneur-core", "version": ">=0.3.0" }
+    { "name": "solopreneur-core", "version": ">=0.4.0" }
   ]
 }

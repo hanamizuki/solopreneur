@@ -16,44 +16,82 @@ skip it and proceed with remaining skills plus built-in knowledge.
 
 ### Plugin-bundled (solopreneur-ios)
 
-Always available — ships with this plugin.
+Always available — ships with this plugin. Invoke with `solopreneur-ios:<name>`.
+
+In-house:
 
 - `solopreneur-ios:ios-patterns` — Team SwiftUI conventions: i18n (String Catalog),
   date localization, ISO8601 date parsing, Previews, state management, sheet &
-  navigation, list spacing, expandable animation, keyboard Done button
+  navigation, list spacing, expandable animation, keyboard Done button.
 
-### Third-party Axiom plugin
+Vendored from third-party sources (see `skills/_vendored/manifest.json` for
+upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
-Install: https://github.com/CharlesWiltgen/Axiom (marketplace `axiom-marketplace`)
+- `solopreneur-ios:iphone-apps` — Full iPhone app workflow in Swift (SwiftUI +
+  UIKit) with build, debug, test, ship — CLI-only, no Xcode. Targets iOS 26
+  with iOS 18 compatibility.
 
-- `axiom:axiom-ios-ui` — UI router (SwiftUI, UIKit, layout, navigation, animations)
-- `axiom:axiom-ios-data` — Data persistence router (SwiftData, Core Data, GRDB, CloudKit)
-- `axiom:axiom-ios-concurrency` — Concurrency router (async/await, actors, Sendable)
-- `axiom:axiom-ios-build` — Build failures, compilation errors, simulator issues
-- `axiom:axiom-ios-performance` — Performance, memory leaks, Instruments, retain cycles
-- `axiom:axiom-ios-testing` — Testing router (Swift Testing, XCTest, async tests)
-- `axiom:axiom-swiftui-architecture` — MVVM, logic separation, testability
-- `axiom:axiom-swiftui-performance` — SwiftUI performance (view updates, scrolling)
-- `axiom:axiom-swiftui-nav` — Navigation patterns (NavigationStack, deep links)
-- `axiom:axiom-swift-concurrency` — Swift 6 strict concurrency, actor isolation
-- `axiom:axiom-xcode-debugging` — BUILD FAILED, simulator hangs, stale builds
-- `axiom:axiom-swift-testing` — Swift Testing framework (@Test, @Suite, #expect)
-- `axiom:axiom-storage` — Storage solution selection (SwiftData vs files, Documents vs Caches)
-- `axiom:axiom-shipping` — Submission workflow (metadata, privacy, export compliance)
-- `axiom:axiom-hig` — Apple HIG design decisions (colors, typography, Dark Mode)
+App Store Connect CLI (`asc`) workflow — 22 skills, all `asc-*`:
 
-### Raw user skills
+- `solopreneur-ios:asc-cli-usage` — `asc` CLI flags, output formats, pagination,
+  auth, discovery — read this when designing or running asc commands.
+- `solopreneur-ios:asc-id-resolver` — Resolve ASC IDs (apps, builds, versions,
+  groups, testers) from human-friendly names. Use when commands require IDs.
+- `solopreneur-ios:asc-app-create-ui` — Browser-automate the New App form
+  (no public API for app creation).
+- `solopreneur-ios:asc-signing-setup` — Bundle IDs, capabilities, certificates,
+  provisioning profiles, encrypted signing sync.
+- `solopreneur-ios:asc-xcode-build` — Build, archive, export, version/build
+  number management with `asc` + `xcodebuild`.
+- `solopreneur-ios:asc-build-lifecycle` — Track build processing, find latest
+  builds, clean up old builds.
+- `solopreneur-ios:asc-notarization` — macOS Developer ID signing + Apple
+  notarization for non-App-Store distribution.
+- `solopreneur-ios:asc-testflight-orchestration` — TestFlight distribution,
+  groups, testers, What to Test notes.
+- `solopreneur-ios:asc-crash-triage` — TestFlight crashes, beta feedback, hangs,
+  launch diagnostics.
+- `solopreneur-ios:asc-submission-health` — Preflight, submit, monitor review
+  status.
+- `solopreneur-ios:asc-release-flow` — End-to-end release flow with first-time
+  submission fixes (availability, IAP, subscriptions, Game Center, App Privacy).
+- `solopreneur-ios:asc-wall-submit` — Submit/update a Wall of Apps entry.
+- `solopreneur-ios:asc-metadata-sync` — Sync + validate App Store metadata and
+  localizations; handles legacy metadata format migration.
+- `solopreneur-ios:asc-localize-metadata` — LLM-translated metadata
+  (description / keywords / what's new / subtitle) across multiple languages.
+- `solopreneur-ios:asc-subscription-localization` — Bulk-localize subscription /
+  IAP display names across all locales.
+- `solopreneur-ios:asc-whats-new-writer` — Generate localized release notes from
+  git log, bullets, or free text.
+- `solopreneur-ios:asc-aso-audit` — Offline ASO audit on canonical metadata,
+  surface keyword gaps via Astro MCP.
+- `solopreneur-ios:asc-screenshot-resize` — Resize/validate screenshots for all
+  device classes via macOS `sips`.
+- `solopreneur-ios:asc-shots-pipeline` — Screenshot automation: xcodebuild +
+  simctl + AXe + Koubou framing + upload.
+- `solopreneur-ios:asc-ppp-pricing` — Territory-specific subscription/IAP
+  pricing (PPP strategies).
+- `solopreneur-ios:asc-revenuecat-catalog-sync` — Reconcile ASC subscriptions /
+  IAP with RevenueCat products / entitlements / offerings.
+- `solopreneur-ios:asc-workflow` — Define, validate, run repo-local multi-step
+  automations with `asc workflow` and `.asc/workflow.json`.
 
-Drop the skill folder under your active Claude Code skills directory
-(`$CLAUDE_CONFIG_DIR/skills/` or `~/.claude/skills/`); the Skill system
-auto-registers it. Invoke by bare name.
+### Optional: third-party Axiom plugin
 
-- `asc-*` — App Store Connect CLI workflow skills (TestFlight, releases,
-  metadata, ASO, crash triage, signing, etc.). ~20 skills all prefixed `asc-`
-  (e.g. `asc-release-flow`, `asc-testflight-orchestration`, `asc-whats-new-writer`).
-  Install: https://github.com/rudrankriyam/app-store-connect-cli-skills
-- `iphone-apps` — Full iPhone app workflow (build, debug, test, ship — CLI-only).
-  Install: https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps
+Axiom is shipped as a Claude Code plugin (not vendored here). After installing
+it, run `/rebuild-skill-index` once and the 15 Axiom skills will appear in
+`$BASE/solopreneur/skill-index/ios.md` (Extended Discovery, below) — no manual
+editing of this file needed.
+
+Install: `claude plugin marketplace add CharlesWiltgen/Axiom` then
+`claude plugin install axiom@axiom-marketplace`
+(repo: https://github.com/CharlesWiltgen/Axiom).
+
+Axiom's 15 iOS skills include UI / data / concurrency / build / performance /
+testing routers, SwiftUI architecture and performance helpers,
+NavigationStack patterns, Swift 6 strict concurrency, Xcode debugging, Swift
+Testing framework, storage selection, shipping, and HIG design.
 
 ## Extended Discovery
 

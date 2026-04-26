@@ -1,0 +1,121 @@
+{
+  "$schema_note": "Maintained by scripts/sync-vendored.sh. Do not edit `rev` or `synced_at` by hand — re-run sync to update.",
+  "sources": [
+    {
+      "name": "app-store-connect-cli-skills",
+      "repo": "https://github.com/rudrankriyam/app-store-connect-cli-skills",
+      "branch": "main",
+      "rev": "c45a9fa1f63dc2d2152010905260c2d8586dc51f",
+      "synced_at": "2026-04-26T10:55:03Z",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "license_file": "LICENSES/app-store-connect-cli-skills-LICENSE",
+      "skills": [
+        {
+          "from": "skills/asc-app-create-ui",
+          "to": "asc-app-create-ui"
+        },
+        {
+          "from": "skills/asc-aso-audit",
+          "to": "asc-aso-audit"
+        },
+        {
+          "from": "skills/asc-build-lifecycle",
+          "to": "asc-build-lifecycle"
+        },
+        {
+          "from": "skills/asc-cli-usage",
+          "to": "asc-cli-usage"
+        },
+        {
+          "from": "skills/asc-crash-triage",
+          "to": "asc-crash-triage"
+        },
+        {
+          "from": "skills/asc-id-resolver",
+          "to": "asc-id-resolver"
+        },
+        {
+          "from": "skills/asc-localize-metadata",
+          "to": "asc-localize-metadata"
+        },
+        {
+          "from": "skills/asc-metadata-sync",
+          "to": "asc-metadata-sync"
+        },
+        {
+          "from": "skills/asc-notarization",
+          "to": "asc-notarization"
+        },
+        {
+          "from": "skills/asc-ppp-pricing",
+          "to": "asc-ppp-pricing"
+        },
+        {
+          "from": "skills/asc-release-flow",
+          "to": "asc-release-flow"
+        },
+        {
+          "from": "skills/asc-revenuecat-catalog-sync",
+          "to": "asc-revenuecat-catalog-sync"
+        },
+        {
+          "from": "skills/asc-screenshot-resize",
+          "to": "asc-screenshot-resize"
+        },
+        {
+          "from": "skills/asc-shots-pipeline",
+          "to": "asc-shots-pipeline"
+        },
+        {
+          "from": "skills/asc-signing-setup",
+          "to": "asc-signing-setup"
+        },
+        {
+          "from": "skills/asc-submission-health",
+          "to": "asc-submission-health"
+        },
+        {
+          "from": "skills/asc-subscription-localization",
+          "to": "asc-subscription-localization"
+        },
+        {
+          "from": "skills/asc-testflight-orchestration",
+          "to": "asc-testflight-orchestration"
+        },
+        {
+          "from": "skills/asc-wall-submit",
+          "to": "asc-wall-submit"
+        },
+        {
+          "from": "skills/asc-whats-new-writer",
+          "to": "asc-whats-new-writer"
+        },
+        {
+          "from": "skills/asc-workflow",
+          "to": "asc-workflow"
+        },
+        {
+          "from": "skills/asc-xcode-build",
+          "to": "asc-xcode-build"
+        }
+      ]
+    },
+    {
+      "name": "taches-cc-resources",
+      "repo": "https://github.com/glittercowboy/taches-cc-resources",
+      "branch": "main",
+      "rev": "1757615b99ab789a72ff2d02e9f6112af2a15c04",
+      "synced_at": "2026-04-26T10:55:04Z",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "license_file": "LICENSES/taches-cc-resources-LICENSE",
+      "skills": [
+        {
+          "from": "skills/expertise/iphone-apps",
+          "to": "iphone-apps"
+        }
+      ]
+    }
+  ]
+}
