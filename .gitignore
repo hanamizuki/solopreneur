@@ -68,4 +68,7 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
+
+# Git worktrees
+.worktrees/
 ```

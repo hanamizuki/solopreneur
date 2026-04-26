@@ -30,9 +30,12 @@ Identify keywords in the plan and map to subagents and context7 query targets:
 |----------|----------|----------|----------------------|
 | Swift, SwiftUI, @Observable, SwiftData, iOS | iOS | `ios-dev` | SwiftUI, Swift concurrency, relevant Apple frameworks |
 | Kotlin, Compose, Room, ViewModel, Android | Android | `android-dev` | Jetpack Compose, Kotlin Coroutines, relevant Jetpack libraries |
-| React, Next.js, TypeScript, TSX | Web | `nextjs-dev` | React, Next.js |
-| FastAPI, Python, Pydantic, CRUD, REST API | Backend (general) | `python-dev` | FastAPI, Pydantic |
-| LangGraph, prompt, agent, tool calling, streaming, RAG, embedding, chain, node, state graph, LLM | Backend (LLM) | `llm-dev` | LangGraph, LangChain |
+| LangGraph, prompt, agent, tool calling, streaming, RAG, embedding, chain, node, state graph, LLM | Backend (LLM) | `ai-engineer` | LangGraph, LangChain |
+| Cypher, Neo4j, graph schema, neo4j driver | Graph DB | `neo4j-dev` | Neo4j, Cypher |
+| React, Next.js, TypeScript, TSX | Web | `general-purpose` | React, Next.js |
+| FastAPI, Python, Pydantic, CRUD, REST API | Backend (general) | `general-purpose` | FastAPI, Pydantic |
+| GTM, naming, brand, copywriting, social growth, X/LinkedIn | Marketing | `marketer` | brand voice, GTM strategy |
+| UI, UX, design system, CSS, Figma, design tokens | Design | `designer` | design systems, accessibility |
 
 If multiple platforms are involved → run Step 3 + Step 4 for each.
 
@@ -55,7 +58,7 @@ Based on **specific APIs or frameworks mentioned** in the plan, query official d
 Based on detected platforms, dispatch corresponding subagents **in parallel**.
 
 **Subagent selection with fallback:**
-Use the platform-specific subagent type from the table above (e.g., `ios-dev`, `python-dev`).
+Use the platform-specific subagent type from the table above (e.g., `ios-dev`, `ai-engineer`).
 If the preferred subagent type is not available in the current environment, fall back to
 `general-purpose` with the same prompt — the review will be less specialized but still useful.
 

@@ -1,9 +1,9 @@
 {
-  "name": "solopreneur-android",
-  "version": "0.4.2",
+  "name": "solo-android-dev",
+  "version": "0.4.3",
   "description": "Android/Kotlin expertise — android-dev agent, android-patterns, and 39 vendored third-party skills (Compose / architecture / Gradle + 18 gplay-* Google Play Console CLI + 6 official Android team skills).",
   "license": "MIT",
   "dependencies": [
-    { "name": "solopreneur-core", "version": ">=0.4.0" }
+    { "name": "solopreneur", "version": ">=0.5.1" }
   ]
 }

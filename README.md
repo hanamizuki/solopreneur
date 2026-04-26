@@ -2,27 +2,28 @@
 
 Building alone doesn't mean building without a team. **solopreneur** gives solo
 founders the workflows of a full engineering org — plan review, code review
-loops, automated PR cycles, GTM, writing, and platform-specific experts — as a
-family of Claude Code plugins you install à la carte.
+loops, automated PR cycles, marketing, design, and platform-specific experts —
+as a family of Claude Code plugins you install à la carte.
 
 ## The seven plugins
 
 | Plugin | What you get | Depends on |
 |---|---|---|
-| [`solopreneur-core`](./plugins/core) | 20 skills (review, pipelines, GTM, writing, thinking) | — |
-| [`solopreneur-designer`](./plugins/designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) | `solopreneur-core` |
-| [`solopreneur-ios`](./plugins/ios) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`iphone-apps` + `asc-*`) | `solopreneur-core` |
-| [`solopreneur-android`](./plugins/android) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + official) | `solopreneur-core` |
-| [`solopreneur-nextjs`](./plugins/nextjs) | `nextjs-dev` agent (covers React/Next.js/frontend broadly) | `solopreneur-core` |
-| [`solopreneur-python`](./plugins/python) | `python-dev` agent (FastAPI, Pydantic, LangGraph) | `solopreneur-core` |
-| [`solopreneur-llm`](./plugins/llm) | `llm-dev` agent (LangGraph, agent workflows, tool calling) | `solopreneur-core` |
+| [`solopreneur`](./plugins/core) | 14 skills (review, pipelines, thinking partners, automation) | — |
+| [`solo-designer`](./plugins/designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) | `solopreneur` |
+| [`solo-marketer`](./plugins/marketer) | `marketer` agent + 7 skills (GTM, naming, writing, X/LinkedIn growth, slide design) | `solopreneur` |
+| [`solo-ios-dev`](./plugins/ios) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`iphone-apps` + `asc-*`) | `solopreneur` |
+| [`solo-android-dev`](./plugins/android) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + official) | `solopreneur` |
+| [`solo-ai-engineer`](./plugins/llm) | `ai-engineer` agent (LangGraph, agent workflows, tool calling, streaming) | `solopreneur` |
+| [`solo-neo4j-dev`](./plugins/neo4j) | `neo4j-dev` agent + 4 vendored Neo4j skills (cypher, cypher-guide, migration, cli-tools) | `solopreneur` |
 
-Installing any stack plugin auto-pulls `solopreneur-core`. Requires Claude Code
+Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
 **≥ v2.1.110** for plugin dependency resolution.
 
-> **Migrating from v0.2.x?** See [MIGRATION.md](./MIGRATION.md) — the monolithic
-> `solopreneur` plugin is gone; you now install one core plugin plus whichever
-> stacks you use.
+> **Migrating from a previous version?** See [MIGRATION.md](./MIGRATION.md) —
+> the `solopreneur-*` plugin family was renamed to `solopreneur` /  `solo-*` in
+> v0.5.1; the `solopreneur-nextjs` and `solopreneur-python` plugins were
+> removed; `solo-marketer` and `solo-neo4j-dev` were added.
 
 ## Install
 
@@ -32,38 +33,38 @@ Add this repo as a marketplace source once, then install the pieces you need:
 # Add the marketplace
 claude plugin marketplace add hanamizuki/solopreneur
 
-# Everyone: install core
-claude plugin install solopreneur-core@solopreneur
+# Everyone: install the core plugin
+claude plugin install solopreneur@solopreneur
 
-# Then install whichever stacks apply
-claude plugin install solopreneur-ios@solopreneur      # auto-pulls core
-claude plugin install solopreneur-android@solopreneur
-claude plugin install solopreneur-designer@solopreneur
-claude plugin install solopreneur-nextjs@solopreneur
-claude plugin install solopreneur-python@solopreneur
-claude plugin install solopreneur-llm@solopreneur
+# Then install whichever roles apply
+claude plugin install solo-marketer@solopreneur        # GTM / naming / writing / slides
+claude plugin install solo-designer@solopreneur        # auto-pulls solopreneur
+claude plugin install solo-ios-dev@solopreneur         # auto-pulls solopreneur
+claude plugin install solo-android-dev@solopreneur     # auto-pulls solopreneur
+claude plugin install solo-ai-engineer@solopreneur     # auto-pulls solopreneur
+claude plugin install solo-neo4j-dev@solopreneur       # auto-pulls solopreneur
 ```
 
 To update later:
 
 ```bash
 claude plugin marketplace update solopreneur
-claude plugin update solopreneur-core        # and any other installed plugins
+claude plugin update solopreneur        # and any other installed plugins
 ```
 
-### Quick-start by stack
+### Quick-start by role
 
-| If you build… | Install |
+| If you build / do… | Install |
 |---|---|
-| iOS / macOS SwiftUI apps | `solopreneur-core` + `solopreneur-ios` |
-| Android / Kotlin apps | `solopreneur-core` + `solopreneur-android` |
-| Next.js / React web apps | `solopreneur-core` + `solopreneur-nextjs` |
-| FastAPI / Python services | `solopreneur-core` + `solopreneur-python` |
-| LangGraph / AI agents | `solopreneur-core` + `solopreneur-llm` |
-| Pure design / UI / UX work | `solopreneur-core` + `solopreneur-designer` |
-| Nothing but want the GTM / writing / review loops | `solopreneur-core` alone |
+| iOS / macOS SwiftUI apps | `solopreneur` + `solo-ios-dev` |
+| Android / Kotlin apps | `solopreneur` + `solo-android-dev` |
+| LangGraph / AI agents / LLM apps | `solopreneur` + `solo-ai-engineer` |
+| Neo4j / graph database work | `solopreneur` + `solo-neo4j-dev` |
+| Pure design / UI / UX work | `solopreneur` + `solo-designer` |
+| GTM / brand / writing / launch | `solopreneur` + `solo-marketer` |
+| Nothing but want the review and automation loops | `solopreneur` alone |
 
-## What's in `solopreneur-core`
+## What's in `solopreneur` (core)
 
 ### Your Virtual Product Team
 
@@ -77,18 +78,6 @@ claude plugin update solopreneur-core        # and any other installed plugins
 | `/post-mortem` | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
 | `/session-retro` | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
 | `/perspective` | **Thinking Partner.** Switch between thinker perspectives (Musk, Feynman, Munger, Naval, Jobs, Taleb, …) to analyze problems from a different angle |
-
-### Your Virtual GTM Team
-
-| Skill | What it does |
-|-------|--------------|
-| `/gtm` | **Strategist.** Generates a complete Go-To-Market strategy — analyzes the codebase, interviews you across multiple sessions, and produces 4 strategy docs (brand, market landscape, messaging, channel playbook). Supports weekly incremental updates |
-| `/naming` | **Brand Namer.** Generates product or company names through structured brief, multi-model candidate generation, and two-layer evaluation — supports greenfield and rebrand modes. Grounded in Lexicon / Interbrand / Siegel+Gale methodology plus processing fluency, sound symbolism, and iconicity research. Auto-reuses `docs/gtm/` if present |
-| `/humanly` | **Editor.** Removes AI writing patterns from text — 36 pattern categories, 3-tier word tables, severity-based audit (P0/P1/P2), with English and Traditional Chinese support |
-| `/x-writing` | **Writing Coach.** X/Twitter writing coach — helps with single tweets, threads, and long-form posts. Generates hooks, suggests topics, reviews drafts, and explains craft principles grounded in Aesthetic Writing, RARE hooks, and the algorithmic reality of X |
-| `/x-growth` | **X Growth Consultant.** Diagnoses X/Twitter profiles, co-creates personalized 12-week growth plans — covers algorithm mechanics, content strategy, engagement tactics, monetization, and Dream 100 outreach. Integrates with GTM docs |
-| `/linkedin-growth` | **LinkedIn Growth Consultant.** Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans — covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
-| `/slide-design` | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase — bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, 13 reusable layout components, and AI-slop review via `/humanly` (English + Chinese) |
 
 ### Backlog Management
 
@@ -111,7 +100,7 @@ Start them and walk away — they loop until the job is done.
 
 | Skill | What it does |
 |-------|--------------|
-| `/rebuild-skill-index` | Generates per-platform extended indexes of every relevant skill installed on this machine. Feeds `ios-dev` and `designer` extended discovery. Run after installing/removing platform skills. |
+| `/rebuild-skill-index` | Generates per-platform extended indexes of every relevant skill installed on this machine. Feeds the `ios-dev`, `android-dev`, `designer`, `marketer`, and `neo4j-dev` agents' extended discovery. Run after installing/removing platform skills. |
 
 ### How core skills work together
 
@@ -136,6 +125,18 @@ Idea
      └─ /todos-babysit ─── Periodic loop: review → notify → implement on approval
 ```
 
+## What's in `solo-marketer`
+
+| Skill | What it does |
+|-------|--------------|
+| `/gtm` | **Strategist.** Generates a complete Go-To-Market strategy — analyzes the codebase, interviews you across multiple sessions, and produces 4 strategy docs (brand, market landscape, messaging, channel playbook). Supports weekly incremental updates |
+| `/naming` | **Brand Namer.** Generates product or company names through structured brief, multi-model candidate generation, and two-layer evaluation — supports greenfield and rebrand modes. Grounded in Lexicon / Interbrand / Siegel+Gale methodology plus processing fluency, sound symbolism, and iconicity research. Auto-reuses `docs/gtm/` if present |
+| `/humanly` | **Editor.** Removes AI writing patterns from text — 36 pattern categories, 3-tier word tables, severity-based audit (P0/P1/P2), with English and Traditional Chinese support |
+| `/x-writing` | **Writing Coach.** X/Twitter writing coach — helps with single tweets, threads, and long-form posts. Generates hooks, suggests topics, reviews drafts, and explains craft principles grounded in Aesthetic Writing, RARE hooks, and the algorithmic reality of X |
+| `/x-growth` | **X Growth Consultant.** Diagnoses X/Twitter profiles, co-creates personalized 12-week growth plans — covers algorithm mechanics, content strategy, engagement tactics, monetization, and Dream 100 outreach. Integrates with GTM docs |
+| `/linkedin-growth` | **LinkedIn Growth Consultant.** Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans — covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
+| `/slide-design` | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase — bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, 13 reusable layout components, and AI-slop review via `/humanly` (English + Chinese) |
+
 ## Stack plugins — the platform experts
 
 Each stack plugin is a focused subagent that `/preflight`, `/specialist-review`,
@@ -144,32 +145,37 @@ agent's system prompt embeds a hand-curated skill list plus instructions to
 consult an auto-generated extended index of every platform-relevant skill
 installed on the machine.
 
-- **`solopreneur-ios`** → `ios-dev` agent. Uses Axiom (200+ skills) plus a
+- **`solo-ios-dev`** → `ios-dev` agent. Uses Axiom (200+ skills) plus a
   curated list of iOS-specific skills. Ships with the `ios-patterns` skill
   (SwiftUI conventions: i18n, date parsing, Previews, state management, sheet
   & navigation, list spacing, expandable animation, keyboard Done button).
   Extended index at `<config>/solopreneur/skill-index/ios.md`, rebuild with
   `/rebuild-skill-index`.
 
-- **`solopreneur-android`** → `android-dev` agent. Curated list drawn from
+- **`solo-android-dev`** → `android-dev` agent. Curated list drawn from
   `android/skills` and `gplay-cli-skills`. Ships with the `android-patterns`
   skill (Jetpack Compose patterns: `@Preview` setup, Scaffold + bottom nav,
   ModalBottomSheet nested scroll, ripple clipping, SwipeToDismissBox
   transparency, locale-aware date formatting including MIUI quirks).
 
-- **`solopreneur-nextjs`** → `nextjs-dev` agent. Covers React, Next.js App
-  Router, TypeScript, and general frontend patterns (single agent absorbs the
-  previous `web-dev` role — see MIGRATION.md if you're coming from v0.2.x).
+- **`solo-ai-engineer`** → `ai-engineer` agent. LangGraph (StateGraph,
+  prebuilt agents, Supervisor/Swarm), LangChain, streaming patterns, tool
+  calling, structured output. (Renamed from `llm-dev` in v0.5.1.)
 
-- **`solopreneur-python`** → `python-dev` agent. FastAPI + Pydantic, LangGraph,
-  Neo4j, async/await, pytest.
+- **`solo-neo4j-dev`** → `neo4j-dev` agent. Modern Cypher (QPP, CALL
+  subqueries), graph data modelling, schema design, Neo4j drivers, query
+  plan tuning. Ships 4 vendored skills: `neo4j-cypher` (4.x/5.x → 2025.x
+  upgrade), `neo4j-cypher-guide` (modern read query patterns),
+  `neo4j-migration` (driver upgrades across .NET / Go / Java / JS / Python),
+  `neo4j-cli-tools` (`neo4j-admin`, `cypher-shell`, `aura-cli`, MCP server
+  setup).
 
-- **`solopreneur-llm`** → `llm-dev` agent. LangGraph (StateGraph, prebuilt
-  agents, Supervisor/Swarm), LangChain, streaming patterns, tool calling.
-
-- **`solopreneur-designer`** → `designer` agent. UI/UX design work that spans
+- **`solo-designer`** → `designer` agent. UI/UX design work that spans
   web, iOS, and Android. Ships with 10 vendored design skills (the `taste-*`
   archetype family + `impeccable`).
+
+- **`solo-marketer`** → `marketer` agent. Brand, GTM, content, and writing
+  work. Ships 7 in-house skills (see "What's in `solo-marketer`" above).
 
 ## Auto-Integrations
 
@@ -211,20 +217,30 @@ extended index by `/rebuild-skill-index`.
 
 | Source | Type | Status | Used by | Purpose |
 |--------|------|--------|---------|---------|
-| [impeccable](https://github.com/pbakaus/impeccable) | Skill | **Vendored** in `solopreneur-designer` | `designer` agent | Polish / critique / redesign frontend interfaces |
-| [taste-skill](https://github.com/Leonxlnx/taste-skill) | Skills | **Vendored** in `solopreneur-designer` (9 skills) | `designer` agent | `taste-*` archetype family (soft / brutalist / minimalist / redesign / stitch / output / gpt / image-to-code) — overrides default LLM design biases |
+| [impeccable](https://github.com/pbakaus/impeccable) | Skill | **Vendored** in `solo-designer` | `designer` agent | Polish / critique / redesign frontend interfaces |
+| [taste-skill](https://github.com/Leonxlnx/taste-skill) | Skills | **Vendored** in `solo-designer` (9 skills) | `designer` agent | `taste-*` archetype family (soft / brutalist / minimalist / redesign / stitch / output / gpt / image-to-code) — overrides default LLM design biases |
 | [frontend-design](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design) | Plugin | Recommended install | `designer` agent | Creative, polished frontend code generation that avoids generic AI aesthetics |
 | [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | Plugin | Recommended install | `designer` agent | UI/UX intelligence library — styles, palettes, font pairings, product types, UX guidelines, chart types across 10 stacks |
 
 User-level skills and the above plugins are auto-classified into the design
 extended index by `/rebuild-skill-index`.
 
-### Presentations
+### Marketer / Presentations
 
 | Source | Type | Used by | Purpose |
 |--------|------|---------|---------|
-| [frontend-slides](https://github.com/zarazhangrui/frontend-slides) | Plugin | `/slide-design` | Single-HTML, animation-rich slide engine (recommended) |
-| [reveal.js](https://github.com/hakimel/reveal.js) | Library | `/slide-design` | Reveal.js — fragments, vertical stacks, speaker notes, Chart.js |
+| [frontend-slides](https://github.com/zarazhangrui/frontend-slides) | Plugin | `marketer` agent, `/slide-design` | Single-HTML, animation-rich slide engine (recommended) |
+| [revealjs-skill](https://github.com/ryanbbrown/revealjs-skill) | Plugin | `marketer` agent, `/slide-design` | Reveal.js scaffolding — fragments, vertical stacks, speaker notes, Chart.js (wraps [reveal.js](https://github.com/hakimel/reveal.js)) |
+
+User-level skills and the above plugins are auto-classified into the marketer
+extended index by `/rebuild-skill-index`.
+
+### Neo4j
+
+| Source | Type | Status | Used by | Purpose |
+|--------|------|--------|---------|---------|
+| [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills) | Skills | **Vendored** in `solo-neo4j-dev` (3 skills) | `neo4j-dev` agent | `neo4j-cypher` (4.x/5.x → 2025.x), `neo4j-migration` (driver upgrade), `neo4j-cli-tools` |
+| [tomasonjo/blogs](https://github.com/tomasonjo/blogs/tree/master/claude-skills/neo4j-cypher-guide) | Skill | **Vendored** in `solo-neo4j-dev` (1 skill) | `neo4j-dev` agent | `neo4j-cypher-guide` — modern Cypher read patterns (QPP, CALL subqueries, sorting) |
 
 ## CLI Tools
 
@@ -232,7 +248,7 @@ extended index by `/rebuild-skill-index`.
 |------|-----------|---------|
 | `git` | Required | All skills |
 | `gh` (GitHub CLI) | Required | `/greenlight`, `/autopilot`, `/post-mortem` |
-| `jq` | Required | `/greenlight` |
+| `jq` | Required | `/greenlight`, `scripts/sync-vendored.sh` |
 | `codex` (Codex CLI) | Optional | `/greenlight`, `/second-opinion` |
 
 ## License

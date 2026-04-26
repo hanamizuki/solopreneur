@@ -126,10 +126,10 @@ for i in $(seq 0 $((source_count - 1))); do
     cp -R "$src_path" "$dst_path"
 
     # Normalize frontmatter `name:` to match the folder name `to`. Upstream
-    # often pre-prefixes with `android-`, but inside the solopreneur-android
+    # often pre-prefixes with `android-` (or `neo4j-` etc.), but inside a
     # plugin namespace that's redundant — callers invoke as
-    # `solopreneur-android:<to>`. Folder name and frontmatter name must match
-    # for Claude Code to resolve the skill.
+    # `solo-android-dev:<to>` / `solo-neo4j-dev:<to>`. Folder name and
+    # frontmatter name must match for Claude Code to resolve the skill.
     if [[ -f "$dst_path/SKILL.md" ]]; then
       # macOS sed needs `-i ''`; use a portable temp-file approach instead.
       awk -v target="$to" '

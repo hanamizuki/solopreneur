@@ -13,7 +13,7 @@ prs:
     branch: feature/mining-pr1        # Git branch name
     title: "feat(core): models"       # PR title (for gh pr create)
     type: code                        # code | docs (affects review depth)
-    subagent: python-dev              # Implementation subagent type
+    subagent: ai-engineer              # Implementation subagent type
     depends_on: []                    # List of dependent PR ids (empty = no dependencies)
     spec: pr1-models.md              # Spec filename (in same directory)
 
@@ -21,7 +21,7 @@ prs:
     branch: feature/mining-pr2
     title: "feat(core): router"
     type: code
-    subagent: python-dev
+    subagent: ai-engineer
     depends_on: [pr1]                 # Depends on pr1; must wait for pr1 to merge first
     spec: pr2-router.md
 
@@ -29,7 +29,7 @@ prs:
     branch: feature/mining-pr3
     title: "docs: update spec"
     type: docs                        # docs-type PRs get lighter review
-    subagent: python-dev
+    subagent: ai-engineer
     depends_on: [pr1, pr2]            # Depends on all
     spec: pr3-docs.md
 ```
@@ -53,11 +53,12 @@ prs:
 
 | Type | Use Case |
 |------|----------|
-| `python-dev` | FastAPI, Pydantic, LangGraph, general Python |
-| `llm-dev` | LLM pipelines, prompt engineering, agent workflows |
-| `nextjs-dev` | React, Next.js, TypeScript |
+| `ai-engineer` | LLM pipelines, prompt engineering, agent workflows, LangGraph |
 | `ios-dev` | SwiftUI, iOS/macOS |
 | `android-dev` | Kotlin, Jetpack Compose |
+| `neo4j-dev` | Neo4j schema, Cypher queries, graph DB driver work |
+| `marketer` | GTM strategy, naming, content writing, social growth |
+| `designer` | UI/UX design, design systems, visual review |
 | `general-purpose` | Fallback when no specific type applies |
 
 ---

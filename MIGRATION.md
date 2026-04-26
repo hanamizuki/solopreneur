@@ -1,7 +1,130 @@
 # Migration guide
 
+- [v0.5.0 → v0.5.1](#v050--v051) — marketplace rename (`solopreneur-*` → `solopreneur` / `solo-*`), `solo-marketer` and `solo-neo4j-dev` added, `solopreneur-nextjs` and `solopreneur-python` removed, `llm-dev` agent renamed to `ai-engineer`
 - [v0.4.x → v0.5.0](#v04x--v050) — designer agent split out of `solopreneur-core`
 - [v0.2.x → v0.3.0](#v02x--v030) — monolithic plugin split into six sub-plugins
+
+---
+
+## v0.5.0 → v0.5.1
+
+This release reorganises the marketplace. The changes are entirely about
+naming, scope, and packaging — no in-house skill content is removed. Pre-1.0
+versioning is conservative (patch bumps), but the plugin renames make this a
+**hard breaking change** at the Claude Code dependency-resolver level: the
+old plugin names disappear, so existing installs must be uninstalled and
+re-installed under their new names.
+
+### What changed
+
+**Plugin renames** (the path stays the same; only the marketplace `name` is
+new):
+
+| Before | After |
+|---|---|
+| `solopreneur-core` | `solopreneur` |
+| `solopreneur-designer` | `solo-designer` |
+| `solopreneur-ios` | `solo-ios-dev` |
+| `solopreneur-android` | `solo-android-dev` |
+| `solopreneur-llm` | `solo-ai-engineer` |
+
+**Plugins removed**: `solopreneur-nextjs`, `solopreneur-python`. Both shipped
+only an agent and no curated skills; the `nextjs-dev` and `python-dev`
+specialist subagents are no longer dispatchable from `/specialist-review`,
+`/preflight`, `/todos-review`, or `/autopilot`. Use the `general-purpose`
+subagent for those stacks until / unless we ship replacement plugins.
+
+**Plugins added**:
+
+- **`solo-marketer`** — bundles the marketing / brand / writing skills that
+  used to live in `solopreneur-core`: `gtm`, `naming`, `humanly`, `x-writing`,
+  `x-growth`, `linkedin-growth`, `slide-design`. Adds a new `marketer` agent.
+- **`solo-neo4j-dev`** — bundles the `neo4j-dev` agent and four vendored
+  Neo4j skills (`neo4j-cypher`, `neo4j-cypher-guide`, `neo4j-migration`,
+  `neo4j-cli-tools`).
+
+**Agent rename inside `solo-ai-engineer`**: `llm-dev` → `ai-engineer`. If
+you dispatch this subagent from custom scripts, update the `subagent_type`.
+
+**Skill prefix renames**. Plugin-bundled skills are now invoked under the
+new plugin namespace:
+
+| Before | After |
+|---|---|
+| `solopreneur-core:slide-design` | `solo-marketer:slide-design` |
+| `solopreneur-core:gtm` | `solo-marketer:gtm` |
+| `solopreneur-core:naming` | `solo-marketer:naming` |
+| `solopreneur-core:humanly` | `solo-marketer:humanly` |
+| `solopreneur-core:x-writing` | `solo-marketer:x-writing` |
+| `solopreneur-core:x-growth` | `solo-marketer:x-growth` |
+| `solopreneur-core:linkedin-growth` | `solo-marketer:linkedin-growth` |
+| `solopreneur-core:<other>` | `solopreneur:<other>` |
+| `solopreneur-designer:<name>` | `solo-designer:<name>` |
+| `solopreneur-ios:<name>` | `solo-ios-dev:<name>` |
+| `solopreneur-android:<name>` | `solo-android-dev:<name>` |
+| `solopreneur-llm:<name>` | `solo-ai-engineer:<name>` |
+
+The bare skill names (e.g. `slide-design`, `taste-soft`, `compose-ui`) are
+unchanged — only the plugin prefix changed.
+
+### TL;DR — what to run
+
+```bash
+# 1. Uninstall every old solopreneur-* plugin you have
+claude plugin uninstall solopreneur-core
+claude plugin uninstall solopreneur-designer
+claude plugin uninstall solopreneur-ios
+claude plugin uninstall solopreneur-android
+claude plugin uninstall solopreneur-llm
+claude plugin uninstall solopreneur-nextjs   # if installed
+claude plugin uninstall solopreneur-python   # if installed
+
+# 2. Pull the updated marketplace
+claude plugin marketplace update solopreneur
+
+# 3. Install the renamed core plugin (required by every other plugin)
+claude plugin install solopreneur@solopreneur
+
+# 4. Install the new and renamed sub-plugins you need
+claude plugin install solo-marketer@solopreneur        # auto-pulls solopreneur
+claude plugin install solo-designer@solopreneur        # auto-pulls solopreneur
+claude plugin install solo-ios-dev@solopreneur         # auto-pulls solopreneur
+claude plugin install solo-android-dev@solopreneur     # auto-pulls solopreneur
+claude plugin install solo-ai-engineer@solopreneur     # auto-pulls solopreneur
+claude plugin install solo-neo4j-dev@solopreneur       # auto-pulls solopreneur
+```
+
+If you skip the uninstall step, the old `solopreneur-*` plugins stay cached
+alongside the new ones. Skills like `/preflight` will still resolve, but
+plugin-namespaced invocations (`solopreneur-core:slide-design`) silently
+keep working against the old cache, masking the move and producing
+inconsistent behaviour. Uninstall first.
+
+### Stand-alone `neo4j-dev.md` agent file
+
+If you previously dropped a hand-rolled `neo4j-dev.md` into
+`$CLAUDE_CONFIG_DIR/agents/`, delete it after installing
+`solo-neo4j-dev` — otherwise both definitions will exist and Claude Code's
+agent resolution between two same-named agents is undefined. The
+plugin-bundled version is now the canonical one.
+
+```bash
+rm "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/agents/neo4j-dev.md"
+```
+
+The same applies to any local `~/Agents/...` checkout that contained a
+prior copy of `neo4j-dev.md`.
+
+### `/rebuild-skill-index`
+
+After installing the new plugins, run `/rebuild-skill-index` once. The skill
+now writes two new platform indexes:
+
+- `$BASE/solopreneur/skill-index/marketer.md`
+- `$BASE/solopreneur/skill-index/neo4j-dev.md`
+
+…and `frontend-slides` / `revealjs` skills are now classified into the
+**marketer** index instead of design.
 
 ---
 
