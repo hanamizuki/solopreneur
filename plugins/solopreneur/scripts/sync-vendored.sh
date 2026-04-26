@@ -45,8 +45,8 @@ if [[ ! -f "$MANIFEST" ]]; then
   echo "error: manifest not found at $MANIFEST" >&2
   echo "       This script needs a manifest at <plugin>/skills/_vendored/manifest.json." >&2
   echo "       If you ran it from plugins/solopreneur/scripts/ directly, switch to a sub-plugin" >&2
-  echo "       (e.g. plugins/solo-android-dev, plugins/solo-ios-dev, plugins/solo-designer) and run from there:" >&2
-  echo "         cd plugins/solo-android-dev && ./scripts/sync-vendored.sh" >&2
+  echo "       (e.g. plugins/android-dev, plugins/ios-dev, plugins/designer) and run from there:" >&2
+  echo "         cd plugins/android-dev && ./scripts/sync-vendored.sh" >&2
   exit 1
 fi
 
@@ -131,7 +131,7 @@ for i in $(seq 0 $((source_count - 1))); do
     # Normalize frontmatter `name:` to match the folder name `to`. Upstream
     # often pre-prefixes with `android-` (or `neo4j-` etc.), but inside a
     # plugin namespace that's redundant — callers invoke as
-    # `solo-android-dev:<to>` / `solo-neo4j-dev:<to>`. Folder name and
+    # `android-dev:<to>` / `neo4j-dev:<to>`. Folder name and
     # frontmatter name must match for Claude Code to resolve the skill.
     if [[ -f "$dst_path/SKILL.md" ]]; then
       # macOS sed needs `-i ''`; use a portable temp-file approach instead.

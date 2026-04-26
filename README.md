@@ -10,12 +10,12 @@ automated PR cycles, marketing, design, and platform-specific experts. Install
 | Plugin | What you get |
 |---|---|
 | [`solopreneur`](./plugins/solopreneur) | 14 in-house skills (review, pipelines, thinking partners, automation) |
-| [`solo-marketer`](./plugins/solo-marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) |
-| [`solo-designer`](./plugins/solo-designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
-| [`solo-ios-dev`](./plugins/solo-ios-dev) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`asc-*` + `iphone-apps`) |
-| [`solo-android-dev`](./plugins/solo-android-dev) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + Android official) |
-| [`solo-ai-engineer`](./plugins/solo-ai-engineer) | `ai-engineer` agent + `langgraph` + 3 vendored skills (LLM / prompt engineering) |
-| [`solo-neo4j-dev`](./plugins/solo-neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills |
+| [`marketer`](./plugins/marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) |
+| [`designer`](./plugins/designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
+| [`ios-dev`](./plugins/ios-dev) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`asc-*` + `iphone-apps`) |
+| [`android-dev`](./plugins/android-dev) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + Android official) |
+| [`ai-engineer`](./plugins/ai-engineer) | `ai-engineer` agent + `langgraph` + 3 vendored skills (LLM / prompt engineering) |
+| [`neo4j-dev`](./plugins/neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills |
 
 Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
 **≥ v2.1.110** for plugin dependency resolution.
@@ -34,12 +34,12 @@ claude plugin marketplace add hanamizuki/solopreneur
 claude plugin install solopreneur@solopreneur
 
 # Then install whichever roles apply
-claude plugin install solo-marketer@solopreneur
-claude plugin install solo-designer@solopreneur
-claude plugin install solo-ios-dev@solopreneur
-claude plugin install solo-android-dev@solopreneur
-claude plugin install solo-ai-engineer@solopreneur
-claude plugin install solo-neo4j-dev@solopreneur
+claude plugin install marketer@solopreneur
+claude plugin install designer@solopreneur
+claude plugin install ios-dev@solopreneur
+claude plugin install android-dev@solopreneur
+claude plugin install ai-engineer@solopreneur
+claude plugin install neo4j-dev@solopreneur
 ```
 
 To update later:
@@ -54,12 +54,12 @@ claude plugin update solopreneur        # and any other installed plugins
 | If you build / do… | Install |
 |---|---|
 | Run a one-person engineering org on auto-pilot | `solopreneur` alone |
-| GTM / brand / writing / slides | `solopreneur` + `solo-marketer` |
-| Pure design / UI / UX work | `solopreneur` + `solo-designer` |
-| iOS / macOS SwiftUI apps | `solopreneur` + `solo-ios-dev` |
-| Android / Kotlin apps | `solopreneur` + `solo-android-dev` |
-| LangGraph / AI agents / LLM apps | `solopreneur` + `solo-ai-engineer` |
-| Neo4j / graph database work | `solopreneur` + `solo-neo4j-dev` |
+| GTM / brand / writing / slides | `solopreneur` + `marketer` |
+| Pure design / UI / UX work | `solopreneur` + `designer` |
+| iOS / macOS SwiftUI apps | `solopreneur` + `ios-dev` |
+| Android / Kotlin apps | `solopreneur` + `android-dev` |
+| LangGraph / AI agents / LLM apps | `solopreneur` + `ai-engineer` |
+| Neo4j / graph database work | `solopreneur` + `neo4j-dev` |
 
 ## Plugins
 
@@ -145,7 +145,7 @@ Idea
 
 ---
 
-### `solo-marketer`
+### `marketer`
 
 Brand, GTM, content, and writing work. Ships the `marketer` agent plus 7
 in-house skills.
@@ -168,7 +168,7 @@ in-house skills.
 
 ---
 
-### `solo-designer`
+### `designer`
 
 The `designer` agent for UI/UX work that spans web, iOS, and Android. Ships
 10 vendored design skills.
@@ -186,7 +186,7 @@ The `designer` agent for UI/UX work that spans web, iOS, and Android. Ships
 
 ---
 
-### `solo-ios-dev`
+### `ios-dev`
 
 The `ios-dev` agent (SwiftUI / SwiftData / concurrency / testing / App Store)
 plus the in-house `ios-patterns` skill and 23 vendored skills covering App
@@ -205,7 +205,7 @@ Store Connect CLI workflows and full iPhone app build/debug/ship.
 
 ---
 
-### `solo-android-dev`
+### `android-dev`
 
 The `android-dev` agent (Jetpack Compose / Kotlin / Play Console / build /
 performance) plus the in-house `android-patterns` skill and 39 vendored skills
@@ -226,7 +226,7 @@ from 5 different upstream repos.
 
 ---
 
-### `solo-ai-engineer`
+### `ai-engineer`
 
 The `ai-engineer` agent for LangGraph / LangChain / streaming / tool calling /
 structured output, plus the in-house `langgraph` skill and 3 vendored skills.
@@ -247,7 +247,7 @@ structured output, plus the in-house `langgraph` skill and 3 vendored skills.
 
 ---
 
-### `solo-neo4j-dev`
+### `neo4j-dev`
 
 The `neo4j-dev` agent for modern Cypher (QPP, CALL subqueries), graph data
 modelling, schema design, drivers, and query plan tuning. Ships 4 vendored

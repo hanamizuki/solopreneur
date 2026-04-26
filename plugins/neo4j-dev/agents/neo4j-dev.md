@@ -16,25 +16,25 @@ Skill tool by name — Claude Code resolves paths and versions automatically
 across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin-bundled (solo-neo4j-dev)
+### Plugin-bundled (neo4j-dev)
 
-Always available — ships with this plugin. Invoke with `solo-neo4j-dev:<name>`.
+Always available — ships with this plugin. Invoke with `neo4j-dev:<name>`.
 
 Vendored from third-party sources (see `skills/_vendored/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
-- `solo-neo4j-dev:neo4j-cypher-guide` — Comprehensive guide for writing modern
+- `neo4j-dev:neo4j-cypher-guide` — Comprehensive guide for writing modern
   Neo4j Cypher read queries. Essential when generating Cypher for text2cypher
   MCP tools or LLM use. Covers removed/deprecated syntax, modern replacements,
   CALL subqueries for reads, COLLECT patterns, sorting best practices, and
   Quantified Path Patterns (QPP) for efficient graph traversal.
-- `solo-neo4j-dev:neo4j-cypher` — Upgrade Neo4j 4.x and 5.x Cypher queries to
+- `neo4j-dev:neo4j-cypher` — Upgrade Neo4j 4.x and 5.x Cypher queries to
   2025.x / 2026.x versions: handles deprecated syntax, function replacements,
   and version-specific migration steps.
-- `solo-neo4j-dev:neo4j-migration` — Upgrade Neo4j drivers to new major
+- `neo4j-dev:neo4j-migration` — Upgrade Neo4j drivers to new major
   versions across .NET, Go, Java, JavaScript / Node.js, and Python. Includes
   per-language migration guides under `references/`.
-- `solo-neo4j-dev:neo4j-cli-tools` — Use Neo4j command-line tooling:
+- `neo4j-dev:neo4j-cli-tools` — Use Neo4j command-line tooling:
   `neo4j-admin` (database administration), `cypher-shell` (query execution),
   `aura-cli` (cloud instance management), and the Neo4j MCP server setup for
   AI agents.

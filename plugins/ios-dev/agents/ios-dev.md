@@ -14,67 +14,67 @@ Skill tool by name — Claude Code resolves paths and versions automatically
 across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin-bundled (solo-ios-dev)
+### Plugin-bundled (ios-dev)
 
-Always available — ships with this plugin. Invoke with `solo-ios-dev:<name>`.
+Always available — ships with this plugin. Invoke with `ios-dev:<name>`.
 
 In-house:
 
-- `solo-ios-dev:ios-patterns` — Team SwiftUI conventions: i18n (String Catalog),
+- `ios-dev:ios-patterns` — Team SwiftUI conventions: i18n (String Catalog),
   date localization, ISO8601 date parsing, Previews, state management, sheet &
   navigation, list spacing, expandable animation, keyboard Done button.
 
 Vendored from third-party sources (see `skills/_vendored/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
-- `solo-ios-dev:iphone-apps` — Full iPhone app workflow in Swift (SwiftUI +
+- `ios-dev:iphone-apps` — Full iPhone app workflow in Swift (SwiftUI +
   UIKit) with build, debug, test, ship — CLI-only, no Xcode. Targets iOS 26
   with iOS 18 compatibility.
 
 App Store Connect CLI (`asc`) workflow — 22 skills, all `asc-*`:
 
-- `solo-ios-dev:asc-cli-usage` — `asc` CLI flags, output formats, pagination,
+- `ios-dev:asc-cli-usage` — `asc` CLI flags, output formats, pagination,
   auth, discovery — read this when designing or running asc commands.
-- `solo-ios-dev:asc-id-resolver` — Resolve ASC IDs (apps, builds, versions,
+- `ios-dev:asc-id-resolver` — Resolve ASC IDs (apps, builds, versions,
   groups, testers) from human-friendly names. Use when commands require IDs.
-- `solo-ios-dev:asc-app-create-ui` — Browser-automate the New App form
+- `ios-dev:asc-app-create-ui` — Browser-automate the New App form
   (no public API for app creation).
-- `solo-ios-dev:asc-signing-setup` — Bundle IDs, capabilities, certificates,
+- `ios-dev:asc-signing-setup` — Bundle IDs, capabilities, certificates,
   provisioning profiles, encrypted signing sync.
-- `solo-ios-dev:asc-xcode-build` — Build, archive, export, version/build
+- `ios-dev:asc-xcode-build` — Build, archive, export, version/build
   number management with `asc` + `xcodebuild`.
-- `solo-ios-dev:asc-build-lifecycle` — Track build processing, find latest
+- `ios-dev:asc-build-lifecycle` — Track build processing, find latest
   builds, clean up old builds.
-- `solo-ios-dev:asc-notarization` — macOS Developer ID signing + Apple
+- `ios-dev:asc-notarization` — macOS Developer ID signing + Apple
   notarization for non-App-Store distribution.
-- `solo-ios-dev:asc-testflight-orchestration` — TestFlight distribution,
+- `ios-dev:asc-testflight-orchestration` — TestFlight distribution,
   groups, testers, What to Test notes.
-- `solo-ios-dev:asc-crash-triage` — TestFlight crashes, beta feedback, hangs,
+- `ios-dev:asc-crash-triage` — TestFlight crashes, beta feedback, hangs,
   launch diagnostics.
-- `solo-ios-dev:asc-submission-health` — Preflight, submit, monitor review
+- `ios-dev:asc-submission-health` — Preflight, submit, monitor review
   status.
-- `solo-ios-dev:asc-release-flow` — End-to-end release flow with first-time
+- `ios-dev:asc-release-flow` — End-to-end release flow with first-time
   submission fixes (availability, IAP, subscriptions, Game Center, App Privacy).
-- `solo-ios-dev:asc-wall-submit` — Submit/update a Wall of Apps entry.
-- `solo-ios-dev:asc-metadata-sync` — Sync + validate App Store metadata and
+- `ios-dev:asc-wall-submit` — Submit/update a Wall of Apps entry.
+- `ios-dev:asc-metadata-sync` — Sync + validate App Store metadata and
   localizations; handles legacy metadata format migration.
-- `solo-ios-dev:asc-localize-metadata` — LLM-translated metadata
+- `ios-dev:asc-localize-metadata` — LLM-translated metadata
   (description / keywords / what's new / subtitle) across multiple languages.
-- `solo-ios-dev:asc-subscription-localization` — Bulk-localize subscription /
+- `ios-dev:asc-subscription-localization` — Bulk-localize subscription /
   IAP display names across all locales.
-- `solo-ios-dev:asc-whats-new-writer` — Generate localized release notes from
+- `ios-dev:asc-whats-new-writer` — Generate localized release notes from
   git log, bullets, or free text.
-- `solo-ios-dev:asc-aso-audit` — Offline ASO audit on canonical metadata,
+- `ios-dev:asc-aso-audit` — Offline ASO audit on canonical metadata,
   surface keyword gaps via Astro MCP.
-- `solo-ios-dev:asc-screenshot-resize` — Resize/validate screenshots for all
+- `ios-dev:asc-screenshot-resize` — Resize/validate screenshots for all
   device classes via macOS `sips`.
-- `solo-ios-dev:asc-shots-pipeline` — Screenshot automation: xcodebuild +
+- `ios-dev:asc-shots-pipeline` — Screenshot automation: xcodebuild +
   simctl + AXe + Koubou framing + upload.
-- `solo-ios-dev:asc-ppp-pricing` — Territory-specific subscription/IAP
+- `ios-dev:asc-ppp-pricing` — Territory-specific subscription/IAP
   pricing (PPP strategies).
-- `solo-ios-dev:asc-revenuecat-catalog-sync` — Reconcile ASC subscriptions /
+- `ios-dev:asc-revenuecat-catalog-sync` — Reconcile ASC subscriptions /
   IAP with RevenueCat products / entitlements / offerings.
-- `solo-ios-dev:asc-workflow` — Define, validate, run repo-local multi-step
+- `ios-dev:asc-workflow` — Define, validate, run repo-local multi-step
   automations with `asc workflow` and `.asc/workflow.json`.
 
 ### Optional: third-party Axiom plugin

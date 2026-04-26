@@ -1,0 +1,12 @@
+{
+  "name": "android-dev",
+  "version": "0.4.5",
+  "description": "Android/Kotlin expertise. Ships the android-dev agent, android-patterns, and 39 vendored third-party skills (Compose / architecture / Gradle + 18 gplay-* Google Play Console CLI + 6 official Android team skills).",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "solopreneur",
+      "version": ">=0.5.1"
+    }
+  ]
+}
