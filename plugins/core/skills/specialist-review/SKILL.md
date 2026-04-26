@@ -44,6 +44,10 @@ Read the full diff and identify which tech stacks are involved based on file pat
 | `*.kt`, `*.kts`, `android/`, Compose/Room imports | Android | `android-dev` |
 | LangChain/LangGraph/OpenAI/Anthropic imports | LLM/AI | `ai-engineer` |
 | `*.cypher`, Neo4j driver imports, graph schema | Neo4j | `neo4j-dev` |
+| `*.py`, FastAPI/Flask/Django imports | Python Backend | `general-purpose` |
+| `*.ts`, `*.tsx`, `*.jsx`, React/Next.js imports | Web Frontend | `general-purpose` |
+| `docs/gtm/`, `BRAND.md`, marketing copy | Marketing / Brand | `marketer` |
+| `*.css`, `*.scss`, design system files | Design | `designer` |
 
 List all detected stacks and which subagents will be dispatched. If only one stack
 is detected, dispatch one agent. If multiple, dispatch them **in parallel**.

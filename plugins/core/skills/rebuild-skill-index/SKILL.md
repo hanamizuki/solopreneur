@@ -136,7 +136,9 @@ Agents to read (each lives in its own sub-plugin):
 Locate each agent file via Glob (widens across any marketplace name the user
 chose at `claude plugin marketplace add --name`):
 
-    Glob: `$BASE/plugins/cache/*/<plugin>/*/agents/<name>.md`
+```
+Glob: $BASE/plugins/cache/*/<plugin>/*/agents/<name>.md
+```
 
 If multiple versions coexist, take the highest semver match.
 

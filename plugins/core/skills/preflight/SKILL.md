@@ -32,6 +32,10 @@ Identify keywords in the plan and map to subagents and context7 query targets:
 | Kotlin, Compose, Room, ViewModel, Android | Android | `android-dev` | Jetpack Compose, Kotlin Coroutines, relevant Jetpack libraries |
 | LangGraph, prompt, agent, tool calling, streaming, RAG, embedding, chain, node, state graph, LLM | Backend (LLM) | `ai-engineer` | LangGraph, LangChain |
 | Cypher, Neo4j, graph schema, neo4j driver | Graph DB | `neo4j-dev` | Neo4j, Cypher |
+| React, Next.js, TypeScript, TSX | Web | `general-purpose` | React, Next.js |
+| FastAPI, Python, Pydantic, CRUD, REST API | Backend (general) | `general-purpose` | FastAPI, Pydantic |
+| GTM, naming, brand, copywriting, social growth, X/LinkedIn | Marketing | `marketer` | brand voice, GTM strategy |
+| UI, UX, design system, CSS, Figma, design tokens | Design | `designer` | design systems, accessibility |
 
 If multiple platforms are involved → run Step 3 + Step 4 for each.
 

@@ -67,6 +67,10 @@ Infer the tech stack from the codebase:
 | `build.gradle` / `.kt` | Android/Kotlin | `android-dev` |
 | LangGraph / agent workflow | LLM/AI Agent | `ai-engineer` |
 | `*.cypher` / Neo4j driver | Neo4j | `neo4j-dev` |
+| `package.json` / `.tsx` / `.jsx` | Web / Next.js | `general-purpose` |
+| `pyproject.toml` / FastAPI | Python | `general-purpose` |
+| `docs/gtm/` / `BRAND.md` / marketing copy | Marketing | `marketer` |
+| `*.css` / `*.scss` / design system files | Design | `designer` |
 
 Cross-platform todo (e.g., iOS + Android) → spawn **two experts** in parallel.
 If no platform detected → skip expert review.

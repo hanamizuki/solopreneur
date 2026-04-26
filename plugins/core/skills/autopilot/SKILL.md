@@ -74,7 +74,7 @@ Based on the task content, propose a PR splitting strategy:
    - Short title
    - Files to create/modify (paths)
    - Dependencies on other PRs
-   - Required subagent type (ios-dev / android-dev / ai-engineer / neo4j-dev)
+   - Required subagent type (ios-dev / android-dev / ai-engineer / neo4j-dev / marketer / designer)
 
 3. **Validate the dependency graph**:
    - For PRs declared parallel: confirm file paths don't overlap
