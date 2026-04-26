@@ -34,12 +34,12 @@ claude plugin marketplace add hanamizuki/solopreneur
 claude plugin install solopreneur@solopreneur
 
 # Then install whichever roles apply
-claude plugin install solo-marketer@solopreneur        # GTM / naming / writing / slides
-claude plugin install solo-designer@solopreneur        # auto-pulls solopreneur
-claude plugin install solo-ios-dev@solopreneur         # auto-pulls solopreneur
-claude plugin install solo-android-dev@solopreneur     # auto-pulls solopreneur
-claude plugin install solo-ai-engineer@solopreneur     # auto-pulls solopreneur
-claude plugin install solo-neo4j-dev@solopreneur       # auto-pulls solopreneur
+claude plugin install solo-marketer@solopreneur
+claude plugin install solo-designer@solopreneur
+claude plugin install solo-ios-dev@solopreneur
+claude plugin install solo-android-dev@solopreneur
+claude plugin install solo-ai-engineer@solopreneur
+claude plugin install solo-neo4j-dev@solopreneur
 ```
 
 To update later:
