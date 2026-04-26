@@ -1,4 +1,3 @@
-```gitignore
 # Logs and temp files
 *.log
 *.tmp
@@ -71,5 +70,11 @@ htmlcov/
 
 # Git worktrees
 .worktrees/
-```
+
+# Claude Code per-project runtime state (sessions, settings.local.json, etc.)
+# Keep .claude/skills/ which holds project-bundled skills like /release.
+.claude/*
+!.claude/skills/
+
+# Personal backlog (not user-facing for this public marketplace repo)
 /todos

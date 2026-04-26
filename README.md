@@ -134,18 +134,14 @@ Idea
 
 #### Requirements
 
-| Component | Type | Required? | Used by |
-|---|---|---|---|
-| `git` | CLI | **Required** | Every skill |
-| `gh` (GitHub CLI) | CLI | **Required** | `/greenlight`, `/autopilot`, `/post-mortem`, `/todos-babysit` |
-| `jq` | CLI | **Required** | `/greenlight`, `scripts/sync-vendored.sh` |
-| [Codex CLI](https://github.com/openai/codex) | CLI | **Required for `/greenlight` uncommitted mode** | Also: `/second-opinion` (primary review path), `/greenlight` PR mode (one of the reviewer options), `/naming` (multi-model candidate generation) |
-| [superpowers](https://github.com/obra/superpowers) | Plugin | Strongly recommended | `/greenlight`, `/specialist-review` use `superpowers:requesting-code-review` and `receiving-code-review` for review framework. Graceful fallback if absent |
-| [context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7) | MCP | Strongly recommended | `/preflight`, `/specialist-review`, **and every stack agent** (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) call context7 for current official docs. Graceful skip if absent |
-| [`gstack /review`](https://github.com/garrytan/gstack/tree/main/review) | User skill | Recommended | `/greenlight` internal review phase: SQL safety, trust boundaries, structural issues |
-| [Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector) | GitHub App | Recommended | `/greenlight` PR mode default reviewer (`@codex review`) |
-| [Gemini Code Assist](https://github.com/apps/gemini-code-assist) | GitHub App | Optional | `/greenlight` PR mode alternative reviewer (`/gemini review`) |
-| [CodeRabbit](https://coderabbit.ai) | GitHub App | Optional | `/greenlight` passive reviewer (auto-triggered on push) |
+- **`git`**, **`gh`** (GitHub CLI), **`jq`**: required CLIs. Used across `/greenlight`, `/autopilot`, `/post-mortem`, `/todos-babysit`, and `scripts/sync-vendored.sh`.
+- **[Codex CLI](https://github.com/openai/codex)**: **required** for `/greenlight` uncommitted mode (the only path on `main` with uncommitted changes). Also used by `/second-opinion` (primary review path), `/greenlight` PR mode (one reviewer option), and `/naming` (multi-model candidate generation).
+- **[superpowers](https://github.com/obra/superpowers)** plugin: strongly recommended. `/greenlight` and `/specialist-review` use `superpowers:requesting-code-review` and `receiving-code-review` for the review framework. Graceful fallback if absent.
+- **[context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7)** MCP: strongly recommended. Used by `/preflight`, `/specialist-review`, and every stack agent (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) for current official docs. Graceful skip if absent.
+- **[`gstack /review`](https://github.com/garrytan/gstack/tree/main/review)**: recommended. Powers the `/greenlight` internal review phase (SQL safety, trust boundaries, structural issues).
+- **[Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector)**: recommended. `/greenlight` PR mode default reviewer (`@codex review`).
+- **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR mode alternative reviewer (`/gemini review`).
+- **[CodeRabbit](https://coderabbit.ai)**: optional. `/greenlight` passive reviewer (auto-triggered on push).
 
 ---
 
