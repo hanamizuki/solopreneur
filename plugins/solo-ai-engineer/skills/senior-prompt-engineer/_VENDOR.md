@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/openclaw/skills
 - **Source path**: `skills/alirezarezvani/senior-prompt-engineer`
 - **Pinned commit**: 0c675b4112c1d0ec4c8859e546c9184ad756ca93
-- **Synced at**: 2026-04-26T14:19:52Z
+- **Synced at**: 2026-04-26T14:32:12Z
 - **License**: see `../_vendored/LICENSES/openclaw-skills-LICENSE`
 
 To update: edit `skills/_vendored/manifest.json` if needed, then re-run this
