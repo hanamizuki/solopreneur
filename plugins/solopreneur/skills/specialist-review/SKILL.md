@@ -69,13 +69,12 @@ directly. Handle the result:
 - **Unknown-subagent-type error** (i.e., Claude Code reports the subagent
   type doesn't exist) → still perform the review for that stack, but do it
   **inline** using generic expertise. Prefix that stack's section in the
-  final report with the template below, substituting `<agent>` with the
-  specific agent name (e.g. `ios-dev`) and `<plugin>` with the matching
-  marketplace plugin name (`ios-dev`, `android-dev`,
-  `ai-engineer`, `neo4j-dev`):
+  final report with the template below, substituting `<plugin>` with the
+  agent / plugin name for that stack (`ios-dev`, `android-dev`,
+  `ai-engineer`, or `neo4j-dev`; the agent and plugin share the same name):
 
-  > ⚠️ `<agent>` not installed — review done with generic expertise. Install
-  > `<plugin>` for deeper, skill-index-backed review.
+  > ⚠️ Plugin `<plugin>` not installed. Review done with generic expertise.
+  > Install it for deeper, skill-index-backed review.
 
 - **Any other Agent error** (crash, timeout, tool failure) → surface to the
   user; do not silently fall back.
