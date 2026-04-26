@@ -1,6 +1,5 @@
 ---
 name: langgraph
-disable-model-invocation: true
 description: Understand LangGraph v1.0 thoroughly
 ---
 

@@ -160,10 +160,8 @@ installed on the machine.
 
 - **`solo-ai-engineer`** → `ai-engineer` agent. LangGraph (StateGraph,
   prebuilt agents, Supervisor/Swarm), LangChain, streaming patterns, tool
-  calling, structured output. Ships 4 skills, all with
-  `disable-model-invocation: true` so they only load when the agent (or
-  any explicit caller) invokes them — no auto-trigger cost on unrelated
-  projects:
+  calling, structured output. Ships 4 skills (auto-discoverable — model
+  may also fire them on description match):
   - `langgraph` (in-house) — deployment-first v1.0 patterns (`agent.py`
     with `app = ...compile()`, `langgraph.json` config, prefer
     `create_react_agent`).

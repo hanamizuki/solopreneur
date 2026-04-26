@@ -10,7 +10,6 @@
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/openclaw-skills-LICENSE",
-      "disable_model_invocation": true,
       "skills": [
         {
           "from": "skills/bullkis1/ai-engineer",

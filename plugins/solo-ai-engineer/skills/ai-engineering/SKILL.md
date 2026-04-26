@@ -1,6 +1,5 @@
 ---
 name: ai-engineering
-disable-model-invocation: true
 description: >-
   AI/ML engineering specialist for building intelligent features, RAG systems,
   LLM integrations, data pipelines, vector search, and AI-powered applications.

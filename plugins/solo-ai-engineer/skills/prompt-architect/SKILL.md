@@ -1,6 +1,5 @@
 ---
 name: prompt-architect
-disable-model-invocation: true
 description: >
   Transform rough ideas into professional-grade LLM prompts. Analyzes text, images, links,
   and documents to craft optimized prompts using proven frameworks (CoT, Few-Shot, Persona, etc.).
