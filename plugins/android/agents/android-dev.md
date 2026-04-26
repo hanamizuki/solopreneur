@@ -108,28 +108,27 @@ Google Play Console CLI (`gplay`) workflow — 18 skills, all `gplay-*`:
 - `solopreneur-android:gplay-user-management` — Users + grants on the developer
   account (`gplay users`, `gplay grants`).
 
-### Raw user skills
+Official Android team skills (Apache-2.0, from `github.com/android/skills`):
 
-Drop the skill folder under your active Claude Code skills directory
-(`$CLAUDE_CONFIG_DIR/skills/` or `~/.claude/skills/`); the Skill system
-auto-registers it. Invoke by bare name.
-
-- `agp-9-upgrade` — Upgrades or migrates an Android project to Android Gradle Plugin
-  (AGP) version 9. Includes AGP 9 breaking changes, compatibility checks (Gradle,
-  JDK, Kotlin), and the Upgrade Assistant workflow.
-- `migrate-xml-views-to-jetpack-compose` — Structured 10-step workflow for
-  migrating a single XML layout to Jetpack Compose with pixel-perfect visual
-  parity and interoperability.
-- `navigation-3` — Install, migrate to, and implement Jetpack Navigation 3:
-  deep links, multiple backstacks, scenes (dialog, bottom sheet, list-detail,
-  two-pane), conditional navigation, Hilt/ViewModel integration.
-- `r8-analyzer` — Analyzes R8 keep rules to identify redundancies and overly
-  broad rules. Recommends narrow, specific keep rules to optimize app size.
-- `edge-to-edge` — Migrates a Jetpack Compose app to adaptive edge-to-edge
-  display: status/navigation bar insets, IME insets, system bar legibility
-  (requires target SDK 35+).
-
-Source for the five above: `git clone https://github.com/android/skills ~/.claude/skills`.
+- `solopreneur-android:agp-9-upgrade` — Upgrades or migrates an Android project
+  to Android Gradle Plugin 9: breaking changes, compatibility checks (Gradle,
+  JDK, Kotlin), Upgrade Assistant workflow.
+- `solopreneur-android:migrate-xml-views-to-jetpack-compose` — Structured
+  10-step workflow for migrating a single XML layout to Jetpack Compose with
+  pixel-perfect visual parity and interoperability.
+- `solopreneur-android:navigation-3` — Install, migrate to, and implement
+  Jetpack Navigation 3: deep links, multiple backstacks, scenes (dialog,
+  bottom sheet, list-detail, two-pane), conditional navigation, Hilt /
+  ViewModel integration.
+- `solopreneur-android:r8-analyzer` — Analyzes R8 keep rules to identify
+  redundancies and overly broad rules; recommends narrow, specific keep rules
+  to optimize app size.
+- `solopreneur-android:edge-to-edge` — Migrates a Jetpack Compose app to
+  adaptive edge-to-edge display: status / navigation bar insets, IME insets,
+  system bar legibility (requires target SDK 35+).
+- `solopreneur-android:play-billing-library-version-upgrade` — Upgrade /
+  migrate an Android project from any older Play Billing Library version to
+  the current major version.
 
 ## Extended Discovery
 

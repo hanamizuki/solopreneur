@@ -6,7 +6,7 @@
       "repo": "https://github.com/new-silvermoon/awesome-android-agent-skills",
       "branch": "main",
       "rev": "e5d0275e9f28f4e5feb5939210d78ef39568c029",
-      "synced_at": "2026-04-26T11:01:10Z",
+      "synced_at": "2026-04-26T11:05:58Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/awesome-android-agent-skills-LICENSE",
@@ -70,7 +70,7 @@
       "repo": "https://github.com/TheBushidoCollective/han",
       "branch": "main",
       "rev": "6369f677026ec1236a20ce0f1c0b5a3c8039d27c",
-      "synced_at": "2026-04-26T11:01:12Z",
+      "synced_at": "2026-04-26T11:05:59Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/han-LICENSE",
@@ -86,7 +86,7 @@
       "repo": "https://github.com/wshobson/agents",
       "branch": "main",
       "rev": "27a7ed95755a5c3a2948694343a8e2cd7a7ef6fb",
-      "synced_at": "2026-04-26T11:01:14Z",
+      "synced_at": "2026-04-26T11:06:01Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/wshobson-agents-LICENSE",
@@ -102,7 +102,7 @@
       "repo": "https://github.com/tamtom/gplay-cli-skills",
       "branch": "main",
       "rev": "d3983dd3e9ee794654c7739892f121321e049724",
-      "synced_at": "2026-04-26T11:01:15Z",
+      "synced_at": "2026-04-26T11:06:03Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/gplay-cli-skills-LICENSE",
@@ -178,6 +178,42 @@
         {
           "from": "skills/gplay-vitals-monitoring",
           "to": "gplay-vitals-monitoring"
+        }
+      ]
+    },
+    {
+      "name": "android-skills",
+      "repo": "https://github.com/android/skills",
+      "branch": "main",
+      "rev": "b281881e3fbe044d29b4ea757de06758a4ca81ec",
+      "synced_at": "2026-04-26T11:06:04Z",
+      "license": "Apache-2.0",
+      "license_path": "LICENSE.txt",
+      "license_file": "LICENSES/android-skills-LICENSE.txt",
+      "skills": [
+        {
+          "from": "build/agp/agp-9-upgrade",
+          "to": "agp-9-upgrade"
+        },
+        {
+          "from": "jetpack-compose/migration/migrate-xml-views-to-jetpack-compose",
+          "to": "migrate-xml-views-to-jetpack-compose"
+        },
+        {
+          "from": "navigation/navigation-3",
+          "to": "navigation-3"
+        },
+        {
+          "from": "performance/r8-analyzer",
+          "to": "r8-analyzer"
+        },
+        {
+          "from": "play/play-billing-library-version-upgrade",
+          "to": "play-billing-library-version-upgrade"
+        },
+        {
+          "from": "system/edge-to-edge",
+          "to": "edge-to-edge"
         }
       ]
     }
