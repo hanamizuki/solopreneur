@@ -9,13 +9,13 @@ as a family of Claude Code plugins you install à la carte.
 
 | Plugin | What you get | Depends on |
 |---|---|---|
-| [`solopreneur`](./plugins/core) | 14 skills (review, pipelines, thinking partners, automation) | — |
-| [`solo-designer`](./plugins/designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) | `solopreneur` |
-| [`solo-marketer`](./plugins/marketer) | `marketer` agent + 7 skills (GTM, naming, writing, X/LinkedIn growth, slide design) | `solopreneur` |
-| [`solo-ios-dev`](./plugins/ios) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`iphone-apps` + `asc-*`) | `solopreneur` |
-| [`solo-android-dev`](./plugins/android) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + official) | `solopreneur` |
-| [`solo-ai-engineer`](./plugins/llm) | `ai-engineer` agent (LangGraph, agent workflows, tool calling, streaming) | `solopreneur` |
-| [`solo-neo4j-dev`](./plugins/neo4j) | `neo4j-dev` agent + 4 vendored Neo4j skills (cypher, cypher-guide, migration, cli-tools) | `solopreneur` |
+| [`solopreneur`](./plugins/solopreneur) | 14 skills (review, pipelines, thinking partners, automation) | — |
+| [`solo-designer`](./plugins/solo-designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) | `solopreneur` |
+| [`solo-marketer`](./plugins/solo-marketer) | `marketer` agent + 7 skills (GTM, naming, writing, X/LinkedIn growth, slide design) | `solopreneur` |
+| [`solo-ios-dev`](./plugins/solo-ios-dev) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`iphone-apps` + `asc-*`) | `solopreneur` |
+| [`solo-android-dev`](./plugins/solo-android-dev) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + official) | `solopreneur` |
+| [`solo-ai-engineer`](./plugins/solo-ai-engineer) | `ai-engineer` agent (LangGraph, agent workflows, tool calling, streaming) | `solopreneur` |
+| [`solo-neo4j-dev`](./plugins/solo-neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills (cypher, cypher-guide, migration, cli-tools) | `solopreneur` |
 
 Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
 **≥ v2.1.110** for plugin dependency resolution.

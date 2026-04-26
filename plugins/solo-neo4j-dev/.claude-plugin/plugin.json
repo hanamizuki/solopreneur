@@ -1,0 +1,12 @@
+{
+  "name": "solo-neo4j-dev",
+  "version": "0.0.2",
+  "description": "Neo4j graph database expertise — neo4j-dev agent and 4 vendored third-party skills (cypher / cypher-guide / migration / cli-tools).",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "solopreneur",
+      "version": ">=0.5.1"
+    }
+  ]
+}

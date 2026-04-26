@@ -1,9 +1,0 @@
-{
-  "name": "solo-marketer",
-  "version": "0.0.1",
-  "description": "Marketing / brand / writing expertise — marketer agent plus GTM strategy, naming, X/Twitter & LinkedIn growth, AI-pattern removal, and brand-aware slide design.",
-  "license": "MIT",
-  "dependencies": [
-    { "name": "solopreneur", "version": ">=0.5.1" }
-  ]
-}

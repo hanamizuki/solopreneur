@@ -1,0 +1,12 @@
+{
+  "name": "solo-ai-engineer",
+  "version": "0.3.2",
+  "description": "AI / LLM application engineering expertise — ai-engineer agent for LangGraph workflows, multi-agent systems, tool calling, and streaming.",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "solopreneur",
+      "version": ">=0.5.1"
+    }
+  ]
+}

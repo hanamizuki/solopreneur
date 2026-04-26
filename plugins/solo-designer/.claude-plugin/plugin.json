@@ -1,0 +1,12 @@
+{
+  "name": "solo-designer",
+  "version": "0.1.2",
+  "description": "UI/UX design expertise — designer agent and 10 vendored third-party design skills (taste-* archetype family + impeccable).",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "solopreneur",
+      "version": ">=0.5.1"
+    }
+  ]
+}

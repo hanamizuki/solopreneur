@@ -4,17 +4,17 @@ This repo ships **seven sub-plugins** from a single marketplace:
 
 | Plugin | Path | Depends on |
 |---|---|---|
-| `solopreneur` | `plugins/core/` | — |
-| `solo-designer` | `plugins/designer/` | `solopreneur` |
-| `solo-marketer` | `plugins/marketer/` | `solopreneur` |
-| `solo-ios-dev` | `plugins/ios/` | `solopreneur` |
-| `solo-android-dev` | `plugins/android/` | `solopreneur` |
-| `solo-ai-engineer` | `plugins/llm/` | `solopreneur` |
-| `solo-neo4j-dev` | `plugins/neo4j/` | `solopreneur` |
+| `solopreneur` | `plugins/solopreneur/` | — |
+| `solo-designer` | `plugins/solo-designer/` | `solopreneur` |
+| `solo-marketer` | `plugins/solo-marketer/` | `solopreneur` |
+| `solo-ios-dev` | `plugins/solo-ios-dev/` | `solopreneur` |
+| `solo-android-dev` | `plugins/solo-android-dev/` | `solopreneur` |
+| `solo-ai-engineer` | `plugins/solo-ai-engineer/` | `solopreneur` |
+| `solo-neo4j-dev` | `plugins/solo-neo4j-dev/` | `solopreneur` |
 
-(The directory under `plugins/` does not need to match the marketplace
-`name`. `plugins/llm/` ships as `solo-ai-engineer`; this is intentional and
-keeps existing git history intact.)
+Each plugin's directory name matches its marketplace `name` 1:1. The
+`Depends on` column shows the marketplace `name` declared in
+`plugins/<dir>/.claude-plugin/plugin.json` `dependencies`.
 
 ## Release rule
 
@@ -40,12 +40,13 @@ current set of commits:
    Example:
 
    ```bash
-   git tag -a solo-android-dev--v0.4.3 -m "solo-android-dev v0.4.3: add XYZ"
+   git tag -a solo-android-dev--v0.4.4 -m "solo-android-dev v0.4.4: add XYZ"
    ```
 
    The double-dash is required — Claude Code uses it to resolve plugin
-   versions from git tags. Use the **marketplace `name`** here, not the
-   directory name.
+   versions from git tags. The directory name now matches the marketplace
+   `name`, so either reference works — but stick to the marketplace `name`
+   for consistency with installer commands.
 3. **Push the commit and all new tags together** — this MUST be atomic, so
    that the merge commit does not appear on `origin/main` before the
    matching `<plugin>--v<version>` tags:
@@ -64,11 +65,10 @@ current set of commits:
 git diff --name-only <base>..HEAD | awk -F/ '/^plugins\// { print $2 }' | sort -u
 ```
 
-This prints **directory names** (e.g. `core`, `llm`); look up the matching
-marketplace `name` from `plugins/<dir>/.claude-plugin/plugin.json` before
-tagging. Bump + tag only the plugins that changed. If several plugins change
-together, each still gets its own bump and its own `<name>--v<version>` tag
-on the same merge commit.
+This prints directory names which now match the marketplace `name` 1:1
+(e.g. `solopreneur`, `solo-android-dev`). Bump + tag only the plugins that
+changed. If several plugins change together, each still gets its own bump
+and its own `<name>--v<version>` tag on the same merge commit.
 
 ### `marketplace.json` changes also bump
 
