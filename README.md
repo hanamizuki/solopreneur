@@ -213,7 +213,7 @@ extended index by `/rebuild-skill-index`.
 |--------|------|--------|---------|---------|
 | [impeccable](https://github.com/pbakaus/impeccable) | Skill | **Vendored** in `solopreneur-designer` | `designer` agent | Polish / critique / redesign frontend interfaces |
 | [taste-skill](https://github.com/Leonxlnx/taste-skill) | Skills | **Vendored** in `solopreneur-designer` (9 skills) | `designer` agent | `taste-*` archetype family (soft / brutalist / minimalist / redesign / stitch / output / gpt / image-to-code) — overrides default LLM design biases |
-| frontend-design | Plugin | Recommended install | `designer` agent | Creative, polished frontend code generation that avoids generic AI aesthetics. Ships in Anthropic's `claude-plugins-official` marketplace |
+| [frontend-design](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design) | Plugin | Recommended install | `designer` agent | Creative, polished frontend code generation that avoids generic AI aesthetics |
 | [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | Plugin | Recommended install | `designer` agent | UI/UX intelligence library — styles, palettes, font pairings, product types, UX guidelines, chart types across 10 stacks |
 
 User-level skills and the above plugins are auto-classified into the design

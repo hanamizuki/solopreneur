@@ -67,8 +67,7 @@ manual editing of this file needed.
 
 - **frontend-design** — Create distinctive, production-grade frontend
   interfaces; generates creative, polished code that avoids generic AI
-  aesthetics. Install: see Anthropic's `claude-plugins-official` marketplace
-  (plugin: `frontend-design`).
+  aesthetics. Install: https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design
 - **ui-ux-pro-max** — UI/UX intelligence library: 50+ styles, 161 color
   palettes, 57 font pairings, 161 product types, 99 UX guidelines, chart types
   across 10 stacks (React, Next.js, Vue, Svelte, etc.). Skills include

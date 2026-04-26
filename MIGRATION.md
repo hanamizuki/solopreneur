@@ -1,4 +1,45 @@
-# Migrating from v0.2.x to v0.3.0
+# Migration guide
+
+- [v0.4.x → v0.5.0](#v04x--v050) — designer agent split out of `solopreneur-core`
+- [v0.2.x → v0.3.0](#v02x--v030) — monolithic plugin split into six sub-plugins
+
+---
+
+## v0.4.x → v0.5.0
+
+`solopreneur-core` v0.5.0 **removes the `designer` agent**. The agent has
+moved into a new `solopreneur-designer` sub-plugin, which also bundles 10
+vendored design skills (the `taste-*` archetype family + `impeccable`).
+
+This is a breaking change for anyone who invoked `solopreneur-core:designer`
+or used the `designer` agent. Run:
+
+```bash
+# 1. Pull the updated marketplace
+claude plugin marketplace update solopreneur
+
+# 2. Update core (designer will disappear from this plugin)
+claude plugin update solopreneur-core
+
+# 3. Install the new designer plugin (auto-pulls core >=0.5.0)
+claude plugin install solopreneur-designer@solopreneur
+```
+
+After install, designer is callable as before via the `Agent` tool. The
+10 newly-bundled design skills are invokable as
+`solopreneur-designer:<name>` (e.g. `solopreneur-designer:taste-soft`,
+`solopreneur-designer:impeccable`).
+
+If you previously hand-installed `taste-*` or `impeccable` under
+`$CLAUDE_CONFIG_DIR/skills/`, you can delete those copies — the plugin
+ships pinned-version vendored copies with `_VENDOR.md` traceability sidecars.
+
+Run `/rebuild-skill-index` to refresh extended skill indexes (the skill now
+looks for `designer.md` inside `solopreneur-designer`, not `solopreneur-core`).
+
+---
+
+## v0.2.x → v0.3.0
 
 v0.3.0 splits the monolithic `solopreneur` plugin into **six focused
 sub-plugins** so you only pay the context cost of the stacks you actually
