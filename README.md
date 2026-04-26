@@ -14,7 +14,7 @@ as a family of Claude Code plugins you install à la carte.
 | [`solo-marketer`](./plugins/solo-marketer) | `marketer` agent + 7 skills (GTM, naming, writing, X/LinkedIn growth, slide design) | `solopreneur` |
 | [`solo-ios-dev`](./plugins/solo-ios-dev) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`iphone-apps` + `asc-*`) | `solopreneur` |
 | [`solo-android-dev`](./plugins/solo-android-dev) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + official) | `solopreneur` |
-| [`solo-ai-engineer`](./plugins/solo-ai-engineer) | `ai-engineer` agent (LangGraph, agent workflows, tool calling, streaming) | `solopreneur` |
+| [`solo-ai-engineer`](./plugins/solo-ai-engineer) | `ai-engineer` agent + `langgraph` skill (LangGraph v1.0 deployment-first patterns; loaded only when LangGraph is detected) | `solopreneur` |
 | [`solo-neo4j-dev`](./plugins/solo-neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills (cypher, cypher-guide, migration, cli-tools) | `solopreneur` |
 
 Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
@@ -160,7 +160,12 @@ installed on the machine.
 
 - **`solo-ai-engineer`** → `ai-engineer` agent. LangGraph (StateGraph,
   prebuilt agents, Supervisor/Swarm), LangChain, streaming patterns, tool
-  calling, structured output. (Renamed from `llm-dev` in v0.5.1.)
+  calling, structured output. Ships the `langgraph` skill —
+  deployment-first v1.0 patterns (`agent.py` with `app = ...compile()`,
+  `langgraph.json` config, prefer `create_react_agent`, Supervisor / Swarm
+  multi-agent shapes). Skill has `disable-model-invocation: true` so it
+  only loads when this agent invokes it on a project that actually uses
+  LangGraph.
 
 - **`solo-neo4j-dev`** → `neo4j-dev` agent. Modern Cypher (QPP, CALL
   subqueries), graph data modelling, schema design, Neo4j drivers, query
