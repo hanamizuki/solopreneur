@@ -60,6 +60,14 @@ Plugin directory names match marketplace names 1:1.
 PLUGINS=(solopreneur designer marketer ios-dev android-dev ai-engineer neo4j-dev)
 for p in "${PLUGINS[@]}"; do
   LAST_TAG=$(git tag -l "${p}--v*" --sort=-v:refname | head -1)
+  # Transitional fallback: the v0.5.x → v0.5.3 rename dropped the `solo-`
+  # prefix from sub-plugins. The first /release run after that rename has
+  # no `<bare>--v*` tag yet, so look for the legacy `solo-<bare>--v*` tag
+  # to avoid a misleading "NO TAG YET" message. Once the new tag exists,
+  # this fallback never fires again.
+  if [ -z "$LAST_TAG" ] && [ "$p" != "solopreneur" ]; then
+    LAST_TAG=$(git tag -l "solo-${p}--v*" --sort=-v:refname | head -1)
+  fi
   if [ -z "$LAST_TAG" ]; then
     echo "=== $p: NO TAG YET (first release) ==="
     git log --oneline -- "plugins/$p/"
