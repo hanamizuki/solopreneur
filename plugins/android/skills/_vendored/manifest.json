@@ -6,7 +6,7 @@
       "repo": "https://github.com/new-silvermoon/awesome-android-agent-skills",
       "branch": "main",
       "rev": "e5d0275e9f28f4e5feb5939210d78ef39568c029",
-      "synced_at": "2026-04-26T10:46:08Z",
+      "synced_at": "2026-04-26T11:01:10Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/awesome-android-agent-skills-LICENSE",
@@ -70,7 +70,7 @@
       "repo": "https://github.com/TheBushidoCollective/han",
       "branch": "main",
       "rev": "6369f677026ec1236a20ce0f1c0b5a3c8039d27c",
-      "synced_at": "2026-04-26T10:46:10Z",
+      "synced_at": "2026-04-26T11:01:12Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/han-LICENSE",
@@ -86,7 +86,7 @@
       "repo": "https://github.com/wshobson/agents",
       "branch": "main",
       "rev": "27a7ed95755a5c3a2948694343a8e2cd7a7ef6fb",
-      "synced_at": "2026-04-26T10:46:12Z",
+      "synced_at": "2026-04-26T11:01:14Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/wshobson-agents-LICENSE",
@@ -94,6 +94,90 @@
         {
           "from": "plugins/ui-design/skills/mobile-android-design",
           "to": "mobile-android-design"
+        }
+      ]
+    },
+    {
+      "name": "gplay-cli-skills",
+      "repo": "https://github.com/tamtom/gplay-cli-skills",
+      "branch": "main",
+      "rev": "d3983dd3e9ee794654c7739892f121321e049724",
+      "synced_at": "2026-04-26T11:01:15Z",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "license_file": "LICENSES/gplay-cli-skills-LICENSE",
+      "skills": [
+        {
+          "from": "skills/gplay-cli-usage",
+          "to": "gplay-cli-usage"
+        },
+        {
+          "from": "skills/gplay-gradle-build",
+          "to": "gplay-gradle-build"
+        },
+        {
+          "from": "skills/gplay-iap-setup",
+          "to": "gplay-iap-setup"
+        },
+        {
+          "from": "skills/gplay-metadata-sync",
+          "to": "gplay-metadata-sync"
+        },
+        {
+          "from": "skills/gplay-migrate-fastlane",
+          "to": "gplay-migrate-fastlane"
+        },
+        {
+          "from": "skills/gplay-ppp-pricing",
+          "to": "gplay-ppp-pricing"
+        },
+        {
+          "from": "skills/gplay-purchase-verification",
+          "to": "gplay-purchase-verification"
+        },
+        {
+          "from": "skills/gplay-release-flow",
+          "to": "gplay-release-flow"
+        },
+        {
+          "from": "skills/gplay-reports-download",
+          "to": "gplay-reports-download"
+        },
+        {
+          "from": "skills/gplay-review-management",
+          "to": "gplay-review-management"
+        },
+        {
+          "from": "skills/gplay-rollout-management",
+          "to": "gplay-rollout-management"
+        },
+        {
+          "from": "skills/gplay-screenshot-automation",
+          "to": "gplay-screenshot-automation"
+        },
+        {
+          "from": "skills/gplay-signing-setup",
+          "to": "gplay-signing-setup"
+        },
+        {
+          "from": "skills/gplay-submission-checks",
+          "to": "gplay-submission-checks"
+        },
+        {
+          "from": "skills/gplay-subscription-localization",
+          "to": "gplay-subscription-localization"
+        },
+        {
+          "from": "skills/gplay-testers-orchestration",
+          "to": "gplay-testers-orchestration"
+        },
+        {
+          "from": "skills/gplay-user-management",
+          "to": "gplay-user-management"
+        },
+        {
+          "from": "skills/gplay-vitals-monitoring",
+          "to": "gplay-vitals-monitoring"
         }
       ]
     }

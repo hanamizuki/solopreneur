@@ -67,6 +67,47 @@ upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 - `solopreneur-android:xml-to-compose-migration` — XML layout → Compose: layout
   mapping, state migration, incremental adoption with `ComposeView`/`AndroidView`.
 
+Google Play Console CLI (`gplay`) workflow — 18 skills, all `gplay-*`:
+
+- `solopreneur-android:gplay-cli-usage` — `gplay` CLI flags, output formats,
+  pagination, auth, discovery — read this when designing or running gplay
+  commands.
+- `solopreneur-android:gplay-signing-setup` — App signing, keystores, Play App
+  Signing setup / migration.
+- `solopreneur-android:gplay-gradle-build` — Gradle build, sign, package APK /
+  AAB before upload.
+- `solopreneur-android:gplay-release-flow` — End-to-end release across tracks
+  (internal / beta / production) with `gplay release`, promote, rollout.
+- `solopreneur-android:gplay-rollout-management` — Staged rollout orchestration
+  and monitoring.
+- `solopreneur-android:gplay-submission-checks` — Pre-submission validation
+  (metadata, screenshots, bundle integrity, data safety, policy) to avoid
+  rejections.
+- `solopreneur-android:gplay-testers-orchestration` — Closed testing groups,
+  beta tester management.
+- `solopreneur-android:gplay-metadata-sync` — Metadata + localization sync
+  (Fastlane format included).
+- `solopreneur-android:gplay-migrate-fastlane` — Migrate Fastlane supply →
+  `gplay`; import existing Fastlane metadata directories.
+- `solopreneur-android:gplay-screenshot-automation` — Android screenshot
+  pipelines: adb + Espresso / UI Automator + device framing + upload.
+- `solopreneur-android:gplay-iap-setup` — In-app products, subscriptions, base
+  plans, offers.
+- `solopreneur-android:gplay-purchase-verification` — Server-side receipt
+  validation via Google Play Developer API.
+- `solopreneur-android:gplay-subscription-localization` — Bulk-localize
+  subscription display names / descriptions / offer tags across all locales.
+- `solopreneur-android:gplay-ppp-pricing` — Region-specific PPP pricing for
+  subscriptions and IAP.
+- `solopreneur-android:gplay-review-management` — Review monitoring, filtering,
+  automated responses.
+- `solopreneur-android:gplay-vitals-monitoring` — App vitals: crash rate, ANR,
+  performance metrics.
+- `solopreneur-android:gplay-reports-download` — Financial / statistics report
+  listing + download via GCS.
+- `solopreneur-android:gplay-user-management` — Users + grants on the developer
+  account (`gplay users`, `gplay grants`).
+
 ### Raw user skills
 
 Drop the skill folder under your active Claude Code skills directory
@@ -89,13 +130,6 @@ auto-registers it. Invoke by bare name.
   (requires target SDK 35+).
 
 Source for the five above: `git clone https://github.com/android/skills ~/.claude/skills`.
-
-- `gplay-*` — Google Play Console CLI skills covering build, signing, release
-  flows, metadata, in-app purchases (setup, purchase verification,
-  subscription localization), testing tracks, rollout management, review
-  management, vitals monitoring, and reports. Installs ~20 skills all prefixed
-  `gplay-`.
-  Install: `npx skills add tamtom/gplay-cli-skills`
 
 ## Extended Discovery
 
