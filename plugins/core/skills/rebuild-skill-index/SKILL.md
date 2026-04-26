@@ -213,9 +213,9 @@ Be inclusive but not sloppy.
 - **No**: relational SQL without graph aspects, document DBs (Mongo, Firestore),
   vector DBs without a graph layer (Pinecone, Weaviate without Neo4j),
   generic prose
-- **Borderline**: GraphRAG skills that span LLM + graph — include in both
-  marketer (no — pure infra) … actually include only in neo4j-dev unless
-  the skill is explicitly about prompt orchestration.
+- **Borderline**: GraphRAG skills that span LLM + graph — include only in
+  neo4j-dev. If the skill is explicitly about prompt orchestration rather
+  than graph retrieval, it can also land in a future ai-engineer index.
 
 ## Step 4: Write output files
 

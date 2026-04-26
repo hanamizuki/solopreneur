@@ -230,7 +230,7 @@ extended index by `/rebuild-skill-index`.
 | Source | Type | Used by | Purpose |
 |--------|------|---------|---------|
 | [frontend-slides](https://github.com/zarazhangrui/frontend-slides) | Plugin | `marketer` agent, `/slide-design` | Single-HTML, animation-rich slide engine (recommended) |
-| [reveal.js](https://github.com/hakimel/reveal.js) | Library | `marketer` agent, `/slide-design` | Reveal.js — fragments, vertical stacks, speaker notes, Chart.js |
+| [revealjs-skill](https://github.com/ryanbbrown/revealjs-skill) | Plugin | `marketer` agent, `/slide-design` | Reveal.js scaffolding — fragments, vertical stacks, speaker notes, Chart.js (wraps [reveal.js](https://github.com/hakimel/reveal.js)) |
 
 User-level skills and the above plugins are auto-classified into the marketer
 extended index by `/rebuild-skill-index`.
@@ -240,7 +240,7 @@ extended index by `/rebuild-skill-index`.
 | Source | Type | Status | Used by | Purpose |
 |--------|------|--------|---------|---------|
 | [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills) | Skills | **Vendored** in `solo-neo4j-dev` (3 skills) | `neo4j-dev` agent | `neo4j-cypher` (4.x/5.x → 2025.x), `neo4j-migration` (driver upgrade), `neo4j-cli-tools` |
-| [tomasonjo/blogs](https://github.com/tomasonjo/blogs/tree/master/claude-skills/neo4j-cypher-guide) | Skill | **Vendored** in `solo-neo4j-dev` | `neo4j-dev` agent | `neo4j-cypher-guide` — modern Cypher read patterns (QPP, CALL subqueries, sorting) |
+| [tomasonjo/blogs](https://github.com/tomasonjo/blogs/tree/master/claude-skills/neo4j-cypher-guide) | Skill | **Vendored** in `solo-neo4j-dev` (1 skill) | `neo4j-dev` agent | `neo4j-cypher-guide` — modern Cypher read patterns (QPP, CALL subqueries, sorting) |
 
 ## CLI Tools
 

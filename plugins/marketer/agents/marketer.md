@@ -64,9 +64,11 @@ manual editing of this file needed.
 - **frontend-slides** — Single-HTML slide builder, zero dependencies,
   animation-rich, scroll-based. Used by `slide-design` as the primary slide
   engine. Install: https://github.com/zarazhangrui/frontend-slides
-- **revealjs** — Classic reveal.js slide deck scaffolding. Used by
-  `slide-design` as an alternative to frontend-slides for keyboard-driven
-  live presentations. Install: https://github.com/hakimel/reveal.js
+- **revealjs** — Claude Code plugin (`revealjs-skill`) that scaffolds
+  reveal.js slide decks. Used by `slide-design` as an alternative to
+  frontend-slides for keyboard-driven live presentations. Wraps the
+  underlying [reveal.js](https://github.com/hakimel/reveal.js) library.
+  Install: https://github.com/ryanbbrown/revealjs-skill
 
 ## Extended Discovery
 

@@ -1,6 +1,6 @@
 {
   "name": "solopreneur",
   "version": "0.5.1",
-  "description": "Core skills — plan review, code review loops, backlog management, and thinking partners. (Marketing / brand / writing skills split out into solo-marketer in v0.5.1; renamed from solopreneur-core.)",
+  "description": "Core skills — plan review, code review loops, backlog management, and thinking partners.",
   "license": "MIT"
 }

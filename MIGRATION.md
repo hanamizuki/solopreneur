@@ -86,7 +86,7 @@ claude plugin marketplace update solopreneur
 claude plugin install solopreneur@solopreneur
 
 # 4. Install the new and renamed sub-plugins you need
-claude plugin install solo-marketer@solopreneur        # GTM / naming / writing / slides
+claude plugin install solo-marketer@solopreneur        # auto-pulls solopreneur
 claude plugin install solo-designer@solopreneur        # auto-pulls solopreneur
 claude plugin install solo-ios-dev@solopreneur         # auto-pulls solopreneur
 claude plugin install solo-android-dev@solopreneur     # auto-pulls solopreneur
