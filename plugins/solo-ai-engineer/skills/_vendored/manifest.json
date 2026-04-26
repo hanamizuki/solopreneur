@@ -1,0 +1,29 @@
+{
+  "$schema_note": "Maintained by scripts/sync-vendored.sh. Do not edit `rev` or `synced_at` by hand — re-run sync to update.",
+  "sources": [
+    {
+      "name": "openclaw-skills",
+      "repo": "https://github.com/openclaw/skills",
+      "branch": "main",
+      "rev": "0c675b4112c1d0ec4c8859e546c9184ad756ca93",
+      "synced_at": "2026-04-26T14:19:52Z",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "license_file": "LICENSES/openclaw-skills-LICENSE",
+      "skills": [
+        {
+          "from": "skills/bullkis1/ai-engineer",
+          "to": "ai-engineering"
+        },
+        {
+          "from": "skills/alirezarezvani/senior-prompt-engineer",
+          "to": "senior-prompt-engineer"
+        },
+        {
+          "from": "skills/abdullah4ai/prompt-architect",
+          "to": "prompt-architect"
+        }
+      ]
+    }
+  ]
+}
