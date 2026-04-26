@@ -199,7 +199,7 @@ Store Connect CLI workflows and full iPhone app build/debug/ship.
 #### Bundled skills
 
 - **`ios-patterns`** (in-house) — SwiftUI conventions: i18n, date parsing, Previews, state management, sheet & navigation, list spacing, expandable animation, keyboard Done button.
-- **22× `asc-*`** — vendored from [rudrankriyam/app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills). End-to-end App Store Connect workflows: TestFlight, releases, metadata, IAP, signing, screenshots, crash triage, ASO audit, RevenueCat catalog sync, notarization, submission health, …
+- **`asc-cli` skills** (22) — vendored from [rudrankriyam/app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills). End-to-end App Store Connect workflows: TestFlight, releases, metadata, IAP, signing, screenshots, crash triage, ASO audit, RevenueCat catalog sync, notarization, submission health, …
 - **`iphone-apps`** — vendored from [glittercowboy/taches-cc-resources](https://github.com/glittercowboy/taches-cc-resources). CLI-only iPhone app workflow (build, debug, test, ship).
 
 #### Recommended companions
