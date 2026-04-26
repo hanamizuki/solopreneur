@@ -7,15 +7,15 @@ as a family of Claude Code plugins you install à la carte.
 
 ## What's in the box
 
-| Plugin | What you get | Depends on |
-|---|---|---|
-| [`solopreneur`](./plugins/solopreneur) | 14 in-house skills (review, pipelines, thinking partners, automation) | — |
-| [`solo-marketer`](./plugins/solo-marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) | `solopreneur` |
-| [`solo-designer`](./plugins/solo-designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) | `solopreneur` |
-| [`solo-ios-dev`](./plugins/solo-ios-dev) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`asc-*` + `iphone-apps`) | `solopreneur` |
-| [`solo-android-dev`](./plugins/solo-android-dev) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + Android official) | `solopreneur` |
-| [`solo-ai-engineer`](./plugins/solo-ai-engineer) | `ai-engineer` agent + `langgraph` + 3 vendored skills (LLM / prompt engineering) | `solopreneur` |
-| [`solo-neo4j-dev`](./plugins/solo-neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills | `solopreneur` |
+| Plugin | What you get |
+|---|---|
+| [`solopreneur`](./plugins/solopreneur) | 14 in-house skills (review, pipelines, thinking partners, automation) |
+| [`solo-marketer`](./plugins/solo-marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) |
+| [`solo-designer`](./plugins/solo-designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
+| [`solo-ios-dev`](./plugins/solo-ios-dev) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`asc-*` + `iphone-apps`) |
+| [`solo-android-dev`](./plugins/solo-android-dev) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + Android official) |
+| [`solo-ai-engineer`](./plugins/solo-ai-engineer) | `ai-engineer` agent + `langgraph` + 3 vendored skills (LLM / prompt engineering) |
+| [`solo-neo4j-dev`](./plugins/solo-neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills |
 
 Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
 **≥ v2.1.110** for plugin dependency resolution.
