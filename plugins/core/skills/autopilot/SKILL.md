@@ -34,7 +34,7 @@ Step 5: Schedule (CronCreate)
 
 Before proceeding, confirm that the execution-phase skills are available.
 
-**Co-packaged in `solopreneur-core`** (always present alongside this skill —
+**Co-packaged in `solopreneur`** (always present alongside this skill —
 no runtime check needed):
 - `/greenlight` — Automated PR review loop
 - `/preflight` — Pre-implementation best practice review (called by PR
@@ -74,7 +74,7 @@ Based on the task content, propose a PR splitting strategy:
    - Short title
    - Files to create/modify (paths)
    - Dependencies on other PRs
-   - Required subagent type (python-dev / nextjs-dev / ios-dev / android-dev / llm-dev)
+   - Required subagent type (ios-dev / android-dev / ai-engineer / neo4j-dev)
 
 3. **Validate the dependency graph**:
    - For PRs declared parallel: confirm file paths don't overlap
@@ -116,7 +116,7 @@ prs:
     branch: feature/xxx-pr1
     title: "feat(scope): description"
     type: code          # code | docs
-    subagent: python-dev
+    subagent: ai-engineer
     depends_on: []
     spec: pr1-models.md
 ```

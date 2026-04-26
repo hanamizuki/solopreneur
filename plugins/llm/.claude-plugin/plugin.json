@@ -1,9 +1,9 @@
 {
-  "name": "solopreneur-llm",
-  "version": "0.3.0",
-  "description": "LLM/LangGraph agent development expertise — llm-dev agent.",
+  "name": "solo-ai-engineer",
+  "version": "0.3.1",
+  "description": "AI / LLM application engineering expertise — ai-engineer agent for LangGraph workflows, multi-agent systems, tool calling, and streaming. (Renamed from solopreneur-llm; agent renamed from llm-dev to ai-engineer.)",
   "license": "MIT",
   "dependencies": [
-    { "name": "solopreneur-core", "version": ">=0.3.0" }
+    { "name": "solopreneur", "version": ">=0.5.1" }
   ]
 }

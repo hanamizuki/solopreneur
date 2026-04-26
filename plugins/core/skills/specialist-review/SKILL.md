@@ -3,7 +3,7 @@ name: specialist-review
 description: |
   Tech-stack-aware expert code review using specialized subagents. Detects which
   tech stacks are in the diff, then dispatches the matching specialist agents
-  (ios-dev, android-dev, llm-dev, python-dev, nextjs-dev) to review against
+  (ios-dev, android-dev, ai-engineer, neo4j-dev) to review against
   their skill-index best practices. Use when the user says "specialist review",
   "expert review", "stack review", or wants a multi-perspective code review
   with best practice verification. Also use after completing a significant
@@ -42,10 +42,8 @@ Read the full diff and identify which tech stacks are involved based on file pat
 |--------|-----------|----------|
 | `*.swift`, `*.xib`, `ios/`, SwiftUI/UIKit imports | iOS | `ios-dev` |
 | `*.kt`, `*.kts`, `android/`, Compose/Room imports | Android | `android-dev` |
-| `*.py`, FastAPI/Flask/Django imports | Python Backend | `python-dev` |
-| `*.ts`, `*.tsx`, `*.jsx`, React/Next.js imports | Web Frontend | `nextjs-dev` |
-| LangChain/LangGraph/OpenAI/Anthropic imports | LLM/AI | `llm-dev` |
-| `*.sql`, migrations, Supabase | Database | `python-dev` |
+| LangChain/LangGraph/OpenAI/Anthropic imports | LLM/AI | `ai-engineer` |
+| `*.cypher`, Neo4j driver imports, graph schema | Neo4j | `neo4j-dev` |
 
 List all detected stacks and which subagents will be dispatched. If only one stack
 is detected, dispatch one agent. If multiple, dispatch them **in parallel**.
@@ -56,10 +54,9 @@ for documentation lookup.
 
 ## Step 2.25: Check Specialist Agent Availability
 
-Since the v0.3.0 split, each specialist agent ships as its own sub-plugin
-(`solopreneur-ios`, `solopreneur-android`, `solopreneur-nextjs`,
-`solopreneur-python`, `solopreneur-llm`). Users may have only installed
-`solopreneur-core`.
+Each specialist agent ships as its own sub-plugin (`solo-ios-dev`,
+`solo-android-dev`, `solo-ai-engineer`, `solo-neo4j-dev`). Users may have
+only installed `solopreneur` (the core plugin).
 
 For each agent you plan to dispatch in Step 3, attempt the Agent dispatch
 directly. Handle the result:
@@ -69,12 +66,12 @@ directly. Handle the result:
   type doesn't exist) → still perform the review for that stack, but do it
   **inline** using generic expertise. Prefix that stack's section in the
   final report with the template below, substituting `<agent>` with the
-  specific agent name (e.g. `ios-dev`) and `<plugin-suffix>` with the plugin
-  slug (`ios`, `android`, `nextjs`, `python`, or `llm` — NOT the "Tech Stack"
-  column value; always strip `-dev` from the agent name):
+  specific agent name (e.g. `ios-dev`) and `<plugin>` with the matching
+  marketplace plugin name (`solo-ios-dev`, `solo-android-dev`,
+  `solo-ai-engineer`, `solo-neo4j-dev`):
 
   > ⚠️ `<agent>` not installed — review done with generic expertise. Install
-  > `solopreneur-<plugin-suffix>` for deeper, skill-index-backed review.
+  > `<plugin>` for deeper, skill-index-backed review.
 
 - **Any other Agent error** (crash, timeout, tool failure) → surface to the
   user; do not silently fall back.

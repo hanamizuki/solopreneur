@@ -3,11 +3,11 @@ name: rebuild-skill-index
 description: |
   Rebuild the per-machine, per-config extended skill index used by platform
   subagents. Scans installed Claude Code skills, classifies each by platform
-  relevance (iOS, Android, design, …) using the frontmatter description, and
-  writes one file per platform under `<base>/solopreneur/skill-index/` where
-  `<base>` is `$CLAUDE_CONFIG_DIR` or `~/.claude`. Use when the user says
-  "rebuild skill index", "refresh skill index", or after installing / removing
-  platform-related skills.
+  relevance (iOS, Android, design, marketer, neo4j-dev, …) using the
+  frontmatter description, and writes one file per platform under
+  `<base>/solopreneur/skill-index/` where `<base>` is `$CLAUDE_CONFIG_DIR`
+  or `~/.claude`. Use when the user says "rebuild skill index", "refresh
+  skill index", or after installing / removing platform-related skills.
 ---
 
 # Rebuild Skill Index
@@ -18,8 +18,8 @@ installed on this machine that is not already in the curated list inside the
 matching agent's markdown file.
 
 Outputs are consumed by the matching subagents (`ios-dev`, `android-dev`,
-`designer`, …) and any caller that dispatches them (`/specialist-review`,
-`/preflight`, `/todos-review`).
+`designer`, `marketer`, `neo4j-dev`) and any caller that dispatches them
+(`/specialist-review`, `/preflight`, `/todos-review`).
 
 ## Step 0: Resolve base directory
 
@@ -50,8 +50,8 @@ Shared sources (used by every platform's classifier):
 Android-specific sources:
 
 - None beyond the shared user-level glob. All curated Android skills are
-  vendored inside `solopreneur-android` itself (under
-  `<plugin>/skills/`) and excluded via the dedup list in Step 2.
+  vendored inside `solo-android-dev` itself (under `<plugin>/skills/`) and
+  excluded via the dedup list in Step 2.
 
 iOS-specific sources:
 
@@ -82,20 +82,37 @@ Design-specific sources:
    - If present: `$BASE/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/*/SKILL.md`
    - If absent, record a "missing" warning for the design output file.
 
+Marketer-specific sources:
+
 5. **frontend-slides plugin** (optional):
    ```bash
    ls "$BASE/plugins/cache/frontend-slides/frontend-slides/" | sort -V | tail -1
    ```
-   - Slide-oriented skills — included in the design index because
-     presentation design overlaps with product UI work.
+   - Slide-oriented skills — included in the marketer index because
+     presentations are a content/brand output (the `slide-design` curated
+     skill orchestrates them).
    - If present: `$BASE/plugins/cache/frontend-slides/frontend-slides/<version>/skills/*/SKILL.md`
    - If absent, skip silently (no warning — this is bonus, not required).
 
+6. **revealjs plugin** (optional):
+   ```bash
+   ls "$BASE/plugins/cache/revealjs/revealjs/" | sort -V | tail -1
+   ```
+   - Same rationale as frontend-slides — alternative slide engine used by
+     `slide-design`.
+   - If present: `$BASE/plugins/cache/revealjs/revealjs/<version>/skills/*/SKILL.md`
+   - If absent, skip silently.
+
+Neo4j-specific sources:
+
+- None beyond the shared user-level glob. All curated Neo4j skills are
+  vendored inside `solo-neo4j-dev` itself.
+
 ## Step 2: Read curated dedup lists
 
-Read each agent's markdown from the solopreneur plugin. Find the
-`## Curated Skills` section. Extract skill names from every bullet line that
-looks like:
+Read each agent's markdown from the solopreneur marketplace plugins. Find
+the `## Curated Skills` section. Extract skill names from every bullet line
+that looks like:
 
 ```
 - `<skill-name>` — <description>
@@ -104,19 +121,22 @@ looks like:
 The section is subdivided by source (Plugin-bundled / Third-party / …).
 Collect names from all subsections — they form the per-agent dedup blacklist
 and should not be re-included in that agent's extended index. Names may be
-bare (`asc-release-flow`) or namespaced (`solopreneur-ios:ios-patterns`,
+bare (`asc-release-flow`) or namespaced (`solo-ios-dev:ios-patterns`,
 `axiom:axiom-ios-ui`) — strip any `<plugin>:` prefix before comparing
 against candidate skill names.
 
-Agents to read (each lives in its own sub-plugin after the v0.3.0 split):
-- `ios-dev.md` (from `solopreneur-ios`) → iOS dedup list
-- `android-dev.md` (from `solopreneur-android`) → Android dedup list
-- `designer.md` (from `solopreneur-designer`) → design dedup list
+Agents to read (each lives in its own sub-plugin):
+
+- `ios-dev.md` (from `solo-ios-dev`) → iOS dedup list
+- `android-dev.md` (from `solo-android-dev`) → Android dedup list
+- `designer.md` (from `solo-designer`) → design dedup list
+- `marketer.md` (from `solo-marketer`) → marketer dedup list
+- `neo4j-dev.md` (from `solo-neo4j-dev`) → neo4j-dev dedup list
 
 Locate each agent file via Glob (widens across any marketplace name the user
 chose at `claude plugin marketplace add --name`):
 
-    Glob: `$BASE/plugins/cache/*/solopreneur-*/*/agents/<name>.md`
+    Glob: `$BASE/plugins/cache/*/<plugin>/*/agents/<name>.md`
 
 If multiple versions coexist, take the highest semver match.
 
@@ -162,14 +182,40 @@ Be inclusive but not sloppy.
 
 - **Yes**: visual design / typography / color / spacing / layout / motion /
   component styling / design systems / design review / critique / UX copy /
-  information architecture / presentation slides / mockup generation /
-  responsive design / accessibility when it's about visual contrast or type
+  information architecture / mockup generation / responsive design /
+  accessibility when it's about visual contrast or type
 - **No**: pure frontend implementation (React hooks, Next.js routing) without
   design framing, QA testing, backend, iOS/Android development patterns that
-  aren't design-focused, devops
+  aren't design-focused, devops, presentation slides (these go to marketer)
 - **Borderline** (polish / audit / harden / normalize and other "action verb"
   skills): include only when the description explicitly mentions UI / visual /
   design. When in doubt, skip — curated catches the must-haves.
+
+### Marketer classification
+
+- **Yes**: brand / GTM / positioning / messaging / naming / copywriting /
+  content strategy / social writing (X/Twitter, LinkedIn, Threads) /
+  newsletter / email marketing / SEO copy / AI-pattern removal /
+  presentation slides / pitch decks / community management / launch playbooks
+- **No**: pure dev (any language), pure design (visual systems without
+  brand voice), infra, QA testing
+- **Borderline**: skills that touch both brand and design (e.g. brand-aware
+  presentation builder) — include in marketer. Slide-design tooling
+  specifically goes here, not design.
+
+### Neo4j-dev classification
+
+- **Yes**: Cypher (read or write) / Neo4j drivers (Java, Python, Go, .NET,
+  JS) / graph schema / graph data modelling / `MERGE` patterns / `MATCH`
+  patterns / index & constraint design / vector indexes on graph / APOC /
+  GDS (Graph Data Science) / Neo4j Aura / `cypher-shell` / `neo4j-admin` /
+  knowledge graph / GraphRAG / text2cypher
+- **No**: relational SQL without graph aspects, document DBs (Mongo, Firestore),
+  vector DBs without a graph layer (Pinecone, Weaviate without Neo4j),
+  generic prose
+- **Borderline**: GraphRAG skills that span LLM + graph — include in both
+  marketer (no — pure infra) … actually include only in neo4j-dev unless
+  the skill is explicitly about prompt orchestration.
 
 ## Step 4: Write output files
 
@@ -245,13 +291,52 @@ Classified by: <model name running this skill>
   Path: <$BASE resolved>/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/<version>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
+## Missing
+<warnings for any optional source not found>
+```
+
+### `$BASE/solopreneur/skill-index/marketer.md`
+
+```markdown
+# Marketer Skills Index — Extended
+Generated: <ISO 8601 timestamp with timezone>
+Config: <resolved absolute $BASE>
+Classified by: <model name running this skill>
+
+## Auto-classified user skills
+- `<name>` — <one-line description trimmed to ~120 chars>
+  Path: <$BASE resolved>/skills/<name>/SKILL.md
+- ... (alphabetical by name)
+
 ## Auto-classified frontend-slides plugin skills (v<version>)
 - `<name>` — <one-line description trimmed to ~120 chars>
   Path: <$BASE resolved>/plugins/cache/frontend-slides/frontend-slides/<version>/skills/<name>/SKILL.md
 - ... (alphabetical by name)
 
+## Auto-classified revealjs plugin skills (v<version>)
+- `<name>` — <one-line description trimmed to ~120 chars>
+  Path: <$BASE resolved>/plugins/cache/revealjs/revealjs/<version>/skills/<name>/SKILL.md
+- ... (alphabetical by name)
+
 ## Missing
-<warnings for any optional source not found>
+<empty if all good; otherwise warnings>
+```
+
+### `$BASE/solopreneur/skill-index/neo4j-dev.md`
+
+```markdown
+# Neo4j Skills Index — Extended
+Generated: <ISO 8601 timestamp with timezone>
+Config: <resolved absolute $BASE>
+Classified by: <model name running this skill>
+
+## Auto-classified user skills
+- `<name>` — <one-line description trimmed to ~120 chars>
+  Path: <$BASE resolved>/skills/<name>/SKILL.md
+- ... (alphabetical by name)
+
+## Missing
+<empty if all good; otherwise warnings>
 ```
 
 Skip a section entirely if it would be empty (except `## Missing` — always
@@ -266,6 +351,8 @@ platforms that had no sources available):
 Wrote <$BASE resolved>/solopreneur/skill-index/ios.md
 Wrote <$BASE resolved>/solopreneur/skill-index/android.md
 Wrote <$BASE resolved>/solopreneur/skill-index/design.md
+Wrote <$BASE resolved>/solopreneur/skill-index/marketer.md
+Wrote <$BASE resolved>/solopreneur/skill-index/neo4j-dev.md
 
 iOS:
 - N user skills classified as iOS-relevant
@@ -282,7 +369,18 @@ Design:
 - N user skills classified as design-relevant
 - M frontend-design plugin skills classified as design-relevant (v<hash>)
 - L ui-ux-pro-max plugin skills classified as design-relevant (v<version>)
-- S frontend-slides plugin skills classified as design-relevant (v<version>)
+- K curated skills excluded from extended index
+- Warnings: <list, or "none">
+
+Marketer:
+- N user skills classified as marketer-relevant
+- S frontend-slides plugin skills classified as marketer-relevant (v<version>)
+- R revealjs plugin skills classified as marketer-relevant (v<version>)
+- K curated skills excluded from extended index
+- Warnings: <list, or "none">
+
+Neo4j:
+- N user skills classified as Neo4j-relevant
 - K curated skills excluded from extended index
 - Warnings: <list, or "none">
 ```
@@ -297,9 +395,11 @@ Design:
 - The plugin git repo only ships the curated lists inside each
   `agents/<name>.md`.
 - A single candidate skill can land in multiple platform indexes (design +
-  iOS overlap is common for SwiftUI-focused visual skills).
+  iOS overlap is common for SwiftUI-focused visual skills; brand + design
+  overlap exists too, but slide tooling specifically routes to marketer).
 - Classification is LLM judgment, not regex. Output may shift slightly
   between runs at the margin; that's acceptable because the curated list is
   the deterministic top-priority layer.
-- Other platforms (web, python, llm) will get the same treatment if their
-  agents start hitting the limits of the curated list.
+- The `ai-engineer` agent does not yet read an extended index file. If its
+  curated list grows beyond what's manageable, add an `ai-engineer.md`
+  output here following the same pattern.

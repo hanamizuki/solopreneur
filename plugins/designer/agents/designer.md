@@ -17,14 +17,14 @@ Skill tool by name — Claude Code resolves paths and versions automatically
 across configs. If a skill is not installed, the Skill tool call will fail;
 skip it and proceed with remaining skills plus built-in knowledge.
 
-### Plugin-bundled (solopreneur-designer)
+### Plugin-bundled (solo-designer)
 
-Always available — ships with this plugin. Invoke with `solopreneur-designer:<name>`.
+Always available — ships with this plugin. Invoke with `solo-designer:<name>`.
 
 Vendored from third-party sources (see `skills/_vendored/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
-- `solopreneur-designer:impeccable` — Design / redesign / critique / audit /
+- `solo-designer:impeccable` — Design / redesign / critique / audit /
   polish / animate / colorize a frontend interface. Covers websites, landing
   pages, dashboards, product UI, app shells, components, forms, settings,
   onboarding, empty states. Includes UX review, visual hierarchy, IA, cognitive
@@ -35,27 +35,27 @@ upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 The `taste-*` archetype family — pick the one that matches the product's
 personality (override default LLM design biases):
 
-- `solopreneur-designer:taste-skill` — Senior UI/UX engineer baseline:
+- `solo-designer:taste-skill` — Senior UI/UX engineer baseline:
   metric-based rules, strict component architecture, CSS hardware acceleration,
   balanced design engineering.
-- `solopreneur-designer:taste-soft` — High-end agency aesthetic: premium fonts,
+- `solo-designer:taste-soft` — High-end agency aesthetic: premium fonts,
   generous spacing, soft shadows, tasteful animations.
-- `solopreneur-designer:taste-brutalist` — Swiss / military terminal aesthetic:
+- `solo-designer:taste-brutalist` — Swiss / military terminal aesthetic:
   rigid grids, extreme type-scale contrast, utilitarian color, analog
   degradation effects. Data-heavy dashboards.
-- `solopreneur-designer:taste-minimalist` — Clean editorial: warm monochrome
+- `solo-designer:taste-minimalist` — Clean editorial: warm monochrome
   palette, typographic contrast, flat bento grids, muted pastels. No gradients,
   no heavy shadows.
-- `solopreneur-designer:taste-redesign` — Upgrades existing sites to premium
+- `solo-designer:taste-redesign` — Upgrades existing sites to premium
   quality without breaking functionality. Works with any CSS framework.
-- `solopreneur-designer:taste-stitch` — Semantic design system for Google
+- `solo-designer:taste-stitch` — Semantic design system for Google
   Stitch. Generates agent-friendly `DESIGN.md` files.
-- `solopreneur-designer:taste-output` — Overrides default LLM truncation:
+- `solo-designer:taste-output` — Overrides default LLM truncation:
   enforces complete code generation, bans placeholder patterns.
-- `solopreneur-designer:taste-gpt` — Elite UX/UI + advanced GSAP motion:
+- `solo-designer:taste-gpt` — Elite UX/UI + advanced GSAP motion:
   Python-driven layout randomization, strict AIDA structure, wide editorial
   typography (bans 6-line wraps), gapless scroll.
-- `solopreneur-designer:taste-image-to-code` — Image-to-code workflow for
+- `solo-designer:taste-image-to-code` — Image-to-code workflow for
   Codex: generate the design image first, deeply analyze, then implement.
 
 ### Optional: third-party plugins

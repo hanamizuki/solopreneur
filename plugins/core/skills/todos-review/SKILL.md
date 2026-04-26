@@ -65,27 +65,25 @@ Infer the tech stack from the codebase:
 |---|---|---|
 | `.xcodeproj` / `.swift` | iOS/SwiftUI | `ios-dev` |
 | `build.gradle` / `.kt` | Android/Kotlin | `android-dev` |
-| `package.json` / `.tsx` / `.jsx` / Next.js config / API routes | Web / Next.js | `nextjs-dev` |
-| `pyproject.toml` / FastAPI | Python | `python-dev` |
-| LangGraph / agent workflow | LLM/AI Agent | `llm-dev` |
+| LangGraph / agent workflow | LLM/AI Agent | `ai-engineer` |
+| `*.cypher` / Neo4j driver | Neo4j | `neo4j-dev` |
 
 Cross-platform todo (e.g., iOS + Android) → spawn **two experts** in parallel.
 If no platform detected → skip expert review.
 
-**Agent availability (post-v0.3.0 split):** each stack agent lives in its own
-sub-plugin (`solopreneur-ios`, `solopreneur-android`, `solopreneur-nextjs`,
-`solopreneur-python`, `solopreneur-llm`). When dispatching in Step 4:
+**Agent availability:** each stack agent lives in its own sub-plugin
+(`solo-ios-dev`, `solo-android-dev`, `solo-ai-engineer`, `solo-neo4j-dev`).
+When dispatching in Step 4:
 
 - **Success** → proceed as normal.
 - **Unknown-subagent-type error** → do the review inline with generic
   expertise and prepend the stack's output with the template below,
   substituting `<agent>` with the specific agent name (e.g. `ios-dev`) and
-  `<plugin-suffix>` with the plugin slug (`ios`, `android`, `nextjs`,
-  `python`, or `llm` — NOT the "Platform" column value; always strip
-  `-dev` from the agent name):
+  `<plugin>` with the matching marketplace plugin name (`solo-ios-dev`,
+  `solo-android-dev`, `solo-ai-engineer`, `solo-neo4j-dev`):
 
   > ⚠️ `<agent>` not installed — review done with generic expertise. Install
-  > `solopreneur-<plugin-suffix>` for deeper, skill-index-backed review.
+  > `<plugin>` for deeper, skill-index-backed review.
 
 - **Any other Agent error** → surface to the user; do not silently fall back.
 
