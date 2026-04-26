@@ -71,10 +71,8 @@ htmlcov/
 # Git worktrees
 .worktrees/
 
-# Claude Code per-project runtime state (sessions, settings.local.json, etc.)
-# Keep .claude/skills/ which holds project-bundled skills like /release.
-.claude/*
-!.claude/skills/
+# Claude Code per-project state (sessions, settings.local.json, project-level skills)
+.claude/
 
 # Personal backlog (not user-facing for this public marketplace repo)
 /todos
