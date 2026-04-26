@@ -16,7 +16,9 @@ skip it and proceed with remaining skills plus built-in knowledge.
 
 ### Plugin-bundled (solopreneur-android)
 
-Always available — ships with this plugin.
+Always available — ships with this plugin. Invoke with `solopreneur-android:<name>`.
+
+In-house:
 
 - `solopreneur-android:android-patterns` — Jetpack Compose patterns: `@Preview` setup
   (LocalInspectionMode, Vico charts rendering blank), Scaffold + bottom nav +
@@ -25,14 +27,51 @@ Always available — ships with this plugin.
   date formatting (MM/DD vs DD/MM, MIUI locale quirks). Index in SKILL.md points
   to individual references under `references/`.
 
+Vendored from third-party sources (see `skills/_vendored/manifest.json` for
+upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
+
+- `solopreneur-android:accessibility` — Audit/fix Android accessibility issues
+  (content descriptions, touch targets, contrast, focus & semantics), especially
+  in Jetpack Compose.
+- `solopreneur-android:architecture` — Modern Android Clean Architecture + Hilt:
+  UI/Domain/Data layers, dependency injection, module setup, project structure.
+- `solopreneur-android:compose-navigation` — Type-safe Navigation Compose: NavHost,
+  argument passing, deep links, nested graphs, adaptive navigation, testing.
+- `solopreneur-android:compose-performance-audit` — Diagnose & fix Compose runtime
+  perf: recomposition storms, unstable keys in Lazy lists, heavy work in
+  composition; guides Layout Inspector / Perfetto when needed.
+- `solopreneur-android:compose-ui` — Compose best practices: state hoisting,
+  modifier discipline, performance, theming.
+- `solopreneur-android:coroutines` — Production Kotlin Coroutines on Android:
+  structured concurrency, lifecycle scopes, Flow/StateFlow/SharedFlow,
+  cancellability, testing.
+- `solopreneur-android:data-layer` — Repository pattern + Room + Retrofit with
+  offline-first sync; SSOT semantics.
+- `solopreneur-android:gradle-build-performance` — Slow build diagnosis: Build
+  Scans, configuration vs execution, configuration cache, kapt/KSP bottlenecks,
+  CI optimization.
+- `solopreneur-android:gradle-logic` — Scalable build logic with Convention
+  Plugins + Version Catalogs (Now in Android pattern).
+- `solopreneur-android:jetpack-compose` — Declarative UI patterns: remember,
+  mutableStateOf, derivedStateOf, recomposition basics.
+- `solopreneur-android:kotlin-concurrency-expert` — Coroutine review &
+  remediation: ANR fixes, leak repair, GlobalScope removal, Dispatcher correctness,
+  minimal-change patches.
+- `solopreneur-android:mobile-android-design` — Material Design 3 + Compose
+  patterns: Material You dynamic color, adaptive layouts (phone/tablet/foldable),
+  Navigation Compose conventions, accessibility.
+- `solopreneur-android:testing` — Unit + Hilt integration + Roborazzi screenshot
+  testing strategy with libs.versions.toml setup.
+- `solopreneur-android:viewmodel` — `StateFlow` for UI state, `SharedFlow` for
+  one-off events (Toast/Snackbar/Navigate); update-with-reducer thread safety.
+- `solopreneur-android:xml-to-compose-migration` — XML layout → Compose: layout
+  mapping, state migration, incremental adoption with `ComposeView`/`AndroidView`.
+
 ### Raw user skills
 
 Drop the skill folder under your active Claude Code skills directory
 (`$CLAUDE_CONFIG_DIR/skills/` or `~/.claude/skills/`); the Skill system
 auto-registers it. Invoke by bare name.
-
-The following share the same install source
-(`git clone https://github.com/android/skills ~/.claude/skills`):
 
 - `agp-9-upgrade` — Upgrades or migrates an Android project to Android Gradle Plugin
   (AGP) version 9. Includes AGP 9 breaking changes, compatibility checks (Gradle,
@@ -49,7 +88,7 @@ The following share the same install source
   display: status/navigation bar insets, IME insets, system bar legibility
   (requires target SDK 35+).
 
-Others:
+Source for the five above: `git clone https://github.com/android/skills ~/.claude/skills`.
 
 - `gplay-*` — Google Play Console CLI skills covering build, signing, release
   flows, metadata, in-app purchases (setup, purchase verification,
@@ -74,8 +113,7 @@ you can Read directly.
 
 If the file does not exist, proceed with the curated list above + context7
 + built-in knowledge — do not block. (The user can run `/rebuild-skill-index`
-to generate it. Note: `rebuild-skill-index` currently only emits `ios.md` and
-`design.md` — this path will be absent until Android extended indexing ships.)
+to generate it.)
 
 ## Optional: context7 Documentation Lookup
 

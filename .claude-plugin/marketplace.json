@@ -22,7 +22,7 @@
     {
       "name": "solopreneur-android",
       "source": "./plugins/android",
-      "description": "Android/Kotlin expertise — android-dev agent and android-patterns skill.",
+      "description": "Android/Kotlin expertise — android-dev agent, android-patterns, and 15 vendored third-party skills.",
       "license": "MIT"
     },
     {

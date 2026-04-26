@@ -3,11 +3,11 @@ name: rebuild-skill-index
 description: |
   Rebuild the per-machine, per-config extended skill index used by platform
   subagents. Scans installed Claude Code skills, classifies each by platform
-  relevance (iOS, design, …) using the frontmatter description, and writes
-  one file per platform under `<base>/solopreneur/skill-index/` where `<base>`
-  is `$CLAUDE_CONFIG_DIR` or `~/.claude`. Use when the user says "rebuild skill
-  index", "refresh skill index", or after installing / removing platform-
-  related skills.
+  relevance (iOS, Android, design, …) using the frontmatter description, and
+  writes one file per platform under `<base>/solopreneur/skill-index/` where
+  `<base>` is `$CLAUDE_CONFIG_DIR` or `~/.claude`. Use when the user says
+  "rebuild skill index", "refresh skill index", or after installing / removing
+  platform-related skills.
 ---
 
 # Rebuild Skill Index
@@ -17,9 +17,9 @@ config. Each file is the extended list of every platform-relevant skill
 installed on this machine that is not already in the curated list inside the
 matching agent's markdown file.
 
-Outputs are consumed by the matching subagents (`ios-dev`, `designer`, …) and
-any caller that dispatches them (`/specialist-review`, `/preflight`,
-`/todos-review`).
+Outputs are consumed by the matching subagents (`ios-dev`, `android-dev`,
+`designer`, …) and any caller that dispatches them (`/specialist-review`,
+`/preflight`, `/todos-review`).
 
 ## Step 0: Resolve base directory
 
@@ -46,6 +46,12 @@ Shared sources (used by every platform's classifier):
 
 1. **User-level skills:**
    `Glob pattern: $BASE/skills/*/SKILL.md`
+
+Android-specific sources:
+
+- None beyond the shared user-level glob. All curated Android skills are
+  vendored inside `solopreneur-android` itself (under
+  `<plugin>/skills/`) and excluded via the dedup list in Step 2.
 
 iOS-specific sources:
 
@@ -104,6 +110,7 @@ against candidate skill names.
 
 Agents to read (each lives in its own sub-plugin after the v0.3.0 split):
 - `ios-dev.md` (from `solopreneur-ios`) → iOS dedup list
+- `android-dev.md` (from `solopreneur-android`) → Android dedup list
 - `designer.md` (from `solopreneur-core`) → design dedup list
 
 Locate each agent file via Glob (widens across any marketplace name the user
@@ -133,6 +140,19 @@ Be inclusive but not sloppy.
   tvOS / visionOS / Apple frameworks (CoreData, AVFoundation, CoreLocation,
   etc.) / Apple toolchain (lldb, Instruments, asc CLI, App Store Connect)
 - **No**: web (React, Vue, Next.js, CSS), Android (Kotlin, Compose, Room),
+  Python, LLM/agent frameworks, generic design tools, infra/devops, prose
+  helpers
+- **Borderline** (e.g. cross-platform performance audit, generic git
+  workflow): exclude. Curated catches must-haves; extended is best-effort.
+
+### Android classification
+
+- **Yes**: Kotlin / Jetpack Compose / Android Gradle / Hilt / Room / Retrofit /
+  Coroutines / Flow / WorkManager / KMP-on-Android / Material Design (Material
+  3, Material You) / AGP / R8 / ProGuard / Android Studio / `adb` / `gradlew` /
+  Google Play Console (`gplay-*`, signing, release flows, in-app purchases) /
+  Android-specific testing (Roborazzi, Espresso, Compose UI testing)
+- **No**: web (React, Vue, Next.js, CSS), iOS (Swift, SwiftUI, Xcode, asc CLI),
   Python, LLM/agent frameworks, generic design tools, infra/devops, prose
   helpers
 - **Borderline** (e.g. cross-platform performance audit, generic git
@@ -185,6 +205,23 @@ Classified by: <model name running this skill>
   (https://github.com/CharlesWiltgen/Axiom)
 ```
 
+### `$BASE/solopreneur/skill-index/android.md`
+
+```markdown
+# Android Skills Index — Extended
+Generated: <ISO 8601 timestamp with timezone>
+Config: <resolved absolute $BASE>
+Classified by: <model name running this skill>
+
+## Auto-classified user skills
+- `<name>` — <one-line description trimmed to ~120 chars>
+  Path: <$BASE resolved>/skills/<name>/SKILL.md
+- ... (alphabetical by name)
+
+## Missing
+<empty if all good; otherwise warnings>
+```
+
 ### `$BASE/solopreneur/skill-index/design.md`
 
 ```markdown
@@ -227,11 +264,17 @@ platforms that had no sources available):
 
 ```
 Wrote <$BASE resolved>/solopreneur/skill-index/ios.md
+Wrote <$BASE resolved>/solopreneur/skill-index/android.md
 Wrote <$BASE resolved>/solopreneur/skill-index/design.md
 
 iOS:
 - N user skills classified as iOS-relevant
 - M Axiom skills classified as iOS-relevant (axiom v<version>)
+- K curated skills excluded from extended index
+- Warnings: <list, or "none">
+
+Android:
+- N user skills classified as Android-relevant
 - K curated skills excluded from extended index
 - Warnings: <list, or "none">
 
@@ -258,5 +301,5 @@ Design:
 - Classification is LLM judgment, not regex. Output may shift slightly
   between runs at the margin; that's acceptable because the curated list is
   the deterministic top-priority layer.
-- Other platforms (android, web, python, llm) will get the same treatment if
-  their agents start hitting the limits of the curated list.
+- Other platforms (web, python, llm) will get the same treatment if their
+  agents start hitting the limits of the curated list.
