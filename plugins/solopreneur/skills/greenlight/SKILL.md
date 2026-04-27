@@ -12,11 +12,17 @@ description: |
   Also auto-detects uncommitted mode: when on main branch with uncommitted
   changes and no PR, runs Codex CLI `--uncommitted` review loop only, fixes
   in-place without committing, until codex reports clean.
+
+  Also supports post-commit mode for already-pushed commits on main without
+  an open PR: invoke `/greenlight post-commit <SHA>` (or `<SHA1>..<SHA2>`
+  for a range), or auto-detected when on main with no uncommitted changes
+  but commits ahead of origin. Runs Phase 1 subagents + Codex CLI + Gemini
+  CLI in parallel, fixes via new commits on top (no amend, no new PR).
 ---
 
 # Greenlight
 
-Automated review loop. Two modes:
+Automated review loop. Three modes:
 
 - **PR mode** (default, for open PRs on feature branches) — three phases:
   ```
@@ -26,18 +32,28 @@ Automated review loop. Two modes:
   ```
 - **Uncommitted mode** (auto-detected when on `main` + uncommitted changes + no PR):
   Codex CLI `--uncommitted` loop only. Fixes in-place, does NOT commit.
+- **Post-commit mode** (forced by `/greenlight post-commit <SHA>` arg, or auto-detected
+  when on `main` + no uncommitted + commits ahead of origin): Phase 1 subagents +
+  Codex CLI `--commit <SHA>` + Gemini CLI in parallel; merge findings; fix as new
+  commits on top (no amend, no new PR). Skips PR-bound bots.
 
 ### Arguments
 
 | Argument | Description | Example |
 |----------|-------------|---------|
-| `external` | Skip Phase 1 + 2 (internal review), jump to Phase 3 | `/greenlight external` |
-| `codex bot` / `codex cli` / `gemini` | Specify starting reviewer (combinable with `external`) | `/greenlight external gemini` |
+| `external` | Skip Phase 1 + 2 (internal review), jump to Phase 3 (PR mode only) | `/greenlight external` |
+| `codex bot` / `codex cli` / `gemini` | Specify starting reviewer (combinable with `external`, PR mode only) | `/greenlight external gemini` |
+| `post-commit [<SHA>\|<FROM>..<TO>]` | Force post-commit mode on already-pushed commits | `/greenlight post-commit c1e7e256` |
 
-**Parsing rules:** Extract `external` keyword from args (case-insensitive); the remainder
-is the reviewer specification. If no `external`, run the full three-phase flow.
+**Parsing rules:**
+- `post-commit` keyword (case-insensitive): forces post-commit mode regardless of repo
+  state. Remainder is the SHA spec (single SHA, `FROM..TO` range, or empty to ask).
+  Other args are ignored.
+- `external` keyword (case-insensitive): PR mode only. Remainder is the reviewer spec.
+- No keyword: mode comes from auto-detection (see Step 1 table).
 
-Arguments are ignored in **Uncommitted mode** — the only flow is codex CLI loop.
+Arguments other than `post-commit` are ignored in **Uncommitted mode** and
+**Post-commit mode** — those modes have fixed flows.
 
 ## Pre-flight Checks
 
@@ -56,7 +72,16 @@ else
   PR_EXISTS=no
   PR_STATE=none
 fi
-echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STATE"
+# Local commits not yet at upstream (only meaningful when upstream is set; default 0)
+COMMITS_AHEAD=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
+echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STATE AHEAD=$COMMITS_AHEAD"
+```
+
+Also peek at args (case-insensitive) for the `post-commit` keyword — it forces
+post-commit mode regardless of repo state:
+
+```
+HAS_POST_COMMIT_ARG = raw_args contains "post-commit" (case-insensitive)
 ```
 
 **Mode table:**
@@ -65,12 +90,17 @@ echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STAT
 |---|---|---|---|---|
 | `main` | yes | no | **uncommitted** | Enter Uncommitted mode (skip all phases below) |
 | `main` | yes | yes (open) | **ask** | Unusual — ask user: "On main with uncommitted + open PR. Run uncommitted mode on working tree, or abort?" |
+| `main` | no | no, AND (`HAS_POST_COMMIT_ARG=true` OR `AHEAD > 0`) | **post-commit** | Resolve commit range (use SHA arg if given; if auto-detected via `AHEAD > 0`, list `git log @{u}..HEAD --oneline` and confirm with user); enter Post-commit mode |
 | `main` | no | — | **stop** | Nothing to review on main; tell user |
 | feature / worktree | — | yes (open) | **pr** | Continue with Pre-flight Step 2 below (default flow) |
 | feature / worktree | yes | no | **ask** | Ambiguous — ask user: "On feature branch with uncommitted and no PR yet. (A) Commit and push first to create PR, then review (B) Run uncommitted mode on working tree (C) Abort" |
 | feature / worktree | no | no | **stop** | No PR + no changes; tell user to commit or create PR first |
 
+The post-commit row is more specific than the stop row — match it first; otherwise fall through to stop.
+
 If `MODE=uncommitted`, skip Steps 2-5 below and Argument Parsing; jump directly to **[Uncommitted Mode](#uncommitted-mode)**.
+
+If `MODE=post-commit`, skip PR-mode pre-flight Step 2 below; do Argument Parsing (post-commit subsection) to resolve `RANGE_SPEC`, then jump to **[Post-commit Mode](#post-commit-mode)**.
 
 ### Step 2: PR mode pre-flight (MODE=pr only)
 
@@ -108,6 +138,30 @@ codex login status 2>/dev/null && echo "CODEX_AUTH=true" || echo "CODEX_AUTH=fal
 ## Argument Parsing
 
 > **⏭️ Skip this section entirely if `MODE=uncommitted`** — jump to [Uncommitted Mode](#uncommitted-mode).
+
+### Post-commit mode parsing (MODE=post-commit only)
+
+```
+raw_args = args ?? ""
+spec = raw_args after "post-commit" keyword (trimmed) — empty if keyword absent
+
+if spec is empty:
+  if AHEAD > 0:
+    → list `git log @{u}..HEAD --oneline`, ask user which commits to review
+    → user picks a single SHA or a FROM..TO range (or "all of them" → use @{u}..HEAD)
+  else:
+    → ask user to provide a SHA or range (e.g., "/greenlight post-commit <SHA>")
+elif spec matches a single SHA (verify with `git rev-parse --verify <SHA>^{commit}`):
+  RANGE_SPEC = single, BASE_SHA = "<SHA>^", TIP_SHA = "<SHA>"
+elif spec matches "<FROM>..<TO>" (verify both SHAs exist):
+  RANGE_SPEC = range,  BASE_SHA = "<FROM>^", TIP_SHA = "<TO>"
+else:
+  → tell user spec is invalid, stop
+```
+
+After resolving, jump to **[Post-commit Mode](#post-commit-mode)** — skip the PR mode parsing block below.
+
+### PR mode parsing (MODE=pr only)
 
 ```
 # Parse external mode and reviewer from args
@@ -221,6 +275,157 @@ Uncommitted review loop complete.
 ```
 
 **Do not offer to commit or push.** User's CLAUDE.md rule on product repo main branch: wait for explicit user instruction.
+
+---
+
+## Post-commit Mode
+
+> **Only runs when `MODE=post-commit` from Pre-flight Step 1** (auto-detected via
+> `AHEAD > 0`, or forced by `/greenlight post-commit <SHA>` argument). PR mode and
+> Uncommitted mode skip this section entirely.
+
+Reviews already-on-`main` commits when no open PR exists. Runs Phase 1 internal
+subagents + Codex CLI + Gemini CLI in parallel. **Skips PR-bound reviewers** (Codex
+GitHub bot, Gemini Code Assist, CodeRabbit) since they require an open PR.
+
+Fixes are committed as **new commits on top** — no `git commit --amend` (commits in
+the range are already pushed to `origin/main`; amending would require force-push,
+which violates the "no rewriting shared history" rule).
+
+### Range resolution (recap)
+
+`RANGE_SPEC`, `BASE_SHA`, and `TIP_SHA` were resolved during Argument Parsing. The
+diff command depends on shape:
+
+| RANGE_SPEC | Diff command |
+|---|---|
+| single (`TIP_SHA`) | `git show <TIP_SHA>` |
+| range (`BASE_SHA..TIP_SHA`) | `git diff <BASE_SHA>..<TIP_SHA>` |
+
+### Phase 1: Internal Review (post-commit variant)
+
+Same as PR mode Phase 1 — dispatch the 4 subagents in parallel, report-only — but
+the diff range is `RANGE_SPEC` instead of `main...HEAD`. Each subagent prompt must
+include the actual diff content (output of the diff command above), not the raw
+shell expression. Subagents are still report-only.
+
+After all subagents return, consolidate findings (merge + dedupe) → `PHASE1_FINDINGS`.
+
+### Phase 2: Initial fix (Phase 1 findings only)
+
+If `PHASE1_FINDINGS` is non-empty, dispatch a fix subagent with the same evaluation
+framework as Uncommitted Mode (`superpowers:receiving-code-review` first), but with
+post-commit hard constraints:
+
+- Edit source files directly.
+- **After edits, run `git add` + `git commit` + `git push`.** Commit message:
+  `fix: post-commit review fixes (Phase 1) — <summary>`.
+- **Do NOT use `git commit --amend`.** Commits in the range are already pushed.
+- **Do NOT create a new PR or branch.**
+
+After push, advance `TIP_SHA` to the new HEAD so subsequent rounds review the fixes too.
+
+If `PHASE1_FINDINGS` is empty, skip Phase 2 and proceed straight to Phase 3.
+
+### Phase 3: External CLI loop
+
+Codex CLI and Gemini CLI run in parallel each round; results are merged + deduped;
+fixes commit on top; repeat.
+
+```
+round = 0
+LOOP (max 5 rounds):
+  round += 1
+
+  1. Verify still on main and BASE_SHA is reachable from HEAD:
+     ```bash
+     git branch --show-current  # must be main
+     git merge-base --is-ancestor <BASE_SHA> HEAD || echo "BASE not reachable"
+     ```
+     If branch changed or BASE unreachable → stop and tell user.
+
+  2. Dispatch Codex CLI and Gemini CLI **in parallel** (parallel Bash tool calls,
+     or `&`-backgrounded shell — never sequential):
+
+     **Codex CLI:**
+     ```bash
+     # Single commit:
+     codex review --commit <TIP_SHA> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>&1
+     # Range (BASE_SHA..TIP_SHA):
+     codex review --base <BASE_SHA> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>&1
+     ```
+     Capture stdout. Parse `[P*]` tags.
+
+     **Gemini CLI:**
+     ```bash
+     gemini -m gemini-3-pro-preview -p "$(cat <<'EOF'
+     Review the following commit(s) for issues. Format each finding as:
+       [P1|P2|P3] <file>:<line> — <issue> — Suggested fix: <fix>
+     If no issues, respond exactly: "No issues found."
+
+     Diff:
+     <DIFF_CONTENT>
+     EOF
+     )"
+     ```
+     Capture stdout. Parse for `[P*]` lines.
+
+     If either CLI fails (rate limit, non-zero exit, "usage limit" in stderr), proceed
+     with whichever succeeded. If both fail → stop, tell user, preserve commits.
+
+  3. Merge findings (`MERGED_FINDINGS`):
+     - For each Codex finding (file, line, topic), check if a Gemini finding overlaps:
+       same file, line within ±5, topic semantically similar → keep one (prefer the
+       more specific description).
+     - Result: deduped list of findings from both reviewers.
+
+  4. Parse `MERGED_FINDINGS`:
+     - Empty → **clean pass, exit loop.**
+     - All findings repeat prior rounds with the same reasoning already pushed back
+       → **push-back exit, exit loop.**
+     - Otherwise → continue to Step 5.
+
+  5. Dispatch fix subagent with `MERGED_FINDINGS` and prior-round push-backs.
+     Hard constraints (same as Phase 2):
+     - Invoke `superpowers:receiving-code-review` first to evaluate findings.
+     - Edit source files directly.
+     - **After edits: `git add` + `git commit` + `git push`.** Commit message:
+       `fix: post-commit review fixes (round <N>) — <summary>`.
+     - **Do NOT amend. Do NOT create branch or PR.**
+
+  6. Verify HEAD advanced and origin matches:
+     ```bash
+     git rev-parse HEAD
+     git fetch origin main
+     git rev-parse origin/main  # should equal HEAD
+     ```
+     Update `TIP_SHA = HEAD`. Loop back to Step 1.
+
+End: max 5 rounds → stop and report last round's findings; let user decide.
+```
+
+### Exit Conditions
+
+1. **Clean pass**: both Codex CLI and Gemini CLI report no `[P*]` findings → done.
+2. **Push-back exit**: all findings repeat prior rounds with the same reasoning → done.
+3. **Max 5 rounds** (lower than Uncommitted Mode's 10 — post-commit is a follow-up
+   review stage, not fresh implementation): stop and report last round; user decides.
+4. **Aborted invariants**: branch changed, BASE unreachable, both CLIs unavailable →
+   stop with specific reason.
+
+### Final report (on any exit)
+
+```
+Post-commit review loop complete.
+- Range: <RANGE_SPEC>
+- Exit reason: <clean pass / push-back / max rounds / aborted>
+- Rounds run: <N>
+- Items fixed: <M>  (across <K> new commits on top)
+- Items pushed back: <P>
+- Last commit pushed: <SHA>
+```
+
+**Do not offer to amend or open a PR.** Fixes live as new commits on `main`.
 
 ---
 
