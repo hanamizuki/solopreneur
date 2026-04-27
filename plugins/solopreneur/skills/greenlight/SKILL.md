@@ -74,15 +74,15 @@ else
 fi
 # Local commits not yet at upstream (only meaningful when upstream is set; default 0)
 COMMITS_AHEAD=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
-echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STATE AHEAD=$COMMITS_AHEAD"
+# Peek at args (case-insensitive) for the `post-commit` keyword — it forces
+# post-commit mode regardless of repo state.
+HAS_POST_COMMIT_ARG=$(echo "$RAW_ARGS" | grep -iq "post-commit" && echo true || echo false)
+echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STATE AHEAD=$COMMITS_AHEAD POST_COMMIT_ARG=$HAS_POST_COMMIT_ARG"
 ```
 
-Also peek at args (case-insensitive) for the `post-commit` keyword — it forces
-post-commit mode regardless of repo state:
-
-```
-HAS_POST_COMMIT_ARG = raw_args contains "post-commit" (case-insensitive)
-```
+**Override:** If `HAS_POST_COMMIT_ARG=true`, set `MODE=post-commit` immediately and
+skip the rest of this table — the explicit argument always wins over auto-detection,
+even when the working tree has uncommitted changes or there is an open PR.
 
 **Mode table:**
 
@@ -154,7 +154,11 @@ if spec is empty:
 elif spec matches a single SHA (verify with `git rev-parse --verify <SHA>^{commit}`):
   RANGE_SPEC = single, BASE_SHA = "<SHA>^", TIP_SHA = "<SHA>"
 elif spec matches "<FROM>..<TO>" (verify both SHAs exist):
-  RANGE_SPEC = range,  BASE_SHA = "<FROM>^", TIP_SHA = "<TO>"
+  # Follow standard git revision-range semantics: FROM is exclusive, TO is inclusive.
+  # `git diff <FROM>..<TO>` shows changes between FROM's tree and TO's tree, which
+  # equals the cumulative effect of commits (FROM, TO]. Do NOT use "<FROM>^" — that
+  # would include FROM itself, contradicting the `..` convention the user typed.
+  RANGE_SPEC = range,  BASE_SHA = "<FROM>", TIP_SHA = "<TO>"
 else:
   → tell user spec is invalid, stop
 ```
@@ -300,7 +304,10 @@ diff command depends on shape:
 | RANGE_SPEC | Diff command |
 |---|---|
 | single (`TIP_SHA`) | `git show <TIP_SHA>` |
-| range (`BASE_SHA..TIP_SHA`) | `git diff <BASE_SHA>..<TIP_SHA>` |
+| range (`BASE_SHA..TIP_SHA`) | `git log -p <BASE_SHA>..<TIP_SHA>` (preserves per-commit subject/message — preferred) or `git diff <BASE_SHA>..<TIP_SHA>` (unified diff only, when reviewer just wants the cumulative changes) |
+
+Range semantics: `BASE_SHA` is **exclusive** and `TIP_SHA` is **inclusive** — i.e. the
+review covers commits `(BASE_SHA, TIP_SHA]`. This matches standard git `..` convention.
 
 ### Phase 1: Internal Review (post-commit variant)
 
@@ -358,13 +365,24 @@ LOOP (max 5 rounds):
 
      **Gemini CLI:**
      ```bash
-     gemini -m gemini-3-pro-preview -p "$(cat <<'EOF'
+     # Capture the diff first — see "Range resolution" table above for the exact
+     # diff command to use. Use `git log -p <BASE>..<TIP>` form (or `git show` for
+     # single) so per-commit context (subject, author, message) is preserved.
+     if [ "$RANGE_SPEC" = "single" ]; then
+       DIFF_CONTENT=$(git show "$TIP_SHA")
+     else
+       DIFF_CONTENT=$(git log -p "$BASE_SHA".."$TIP_SHA")
+     fi
+     # Unquoted heredoc so $DIFF_CONTENT expands. Other shell metachars inside
+     # the diff are safe because the heredoc is wrapped in $(cat ...) and the
+     # outer "..." quotes the whole substitution before passing it as one arg.
+     gemini -m gemini-3-pro-preview -p "$(cat <<EOF
      Review the following commit(s) for issues. Format each finding as:
        [P1|P2|P3] <file>:<line> — <issue> — Suggested fix: <fix>
      If no issues, respond exactly: "No issues found."
 
      Diff:
-     <DIFF_CONTENT>
+     $DIFF_CONTENT
      EOF
      )"
      ```
