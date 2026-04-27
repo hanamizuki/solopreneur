@@ -179,15 +179,19 @@ if `git rev-parse <TIP_SHA>` != `git rev-parse HEAD`:
      HEAD=<short-SHA>. For historical-only review of a single commit, invoke per-commit
      instead: `codex review --commit <SHA>`."
 
-# Invariant: TIP_SHA must already exist on origin/main.
-# Post-commit mode's contract is "review already-pushed commits". If TIP_SHA is
-# local-only (never pushed) or origin/main has diverged, the per-round push in
-# Phase 3 would either publish unreviewed commits to origin/main (violating the
-# contract) or fail/rebase unexpectedly. Verify reachability up front.
+# Invariant: HEAD must equal origin/main (no stale local main).
+# Post-commit mode's contract is "review already-pushed commits". Combined with
+# the TIP_SHA == HEAD invariant above, requiring HEAD == origin/main ensures:
+#   (a) TIP_SHA is on origin/main — never publishes unreviewed local-only commits;
+#   (b) local main is fresh — per-round push will fast-forward, not be rejected;
+#   (c) reviewers see the same state that origin/main is at.
+# Plain ancestor-reachability is insufficient: a stale local main where
+# origin/main has advanced would still pass `merge-base --is-ancestor`, then
+# the fix-on-top + push later in the loop would be rejected.
 git fetch origin main
-if ! git merge-base --is-ancestor <TIP_SHA> origin/main:
-  → stop with: "Post-commit mode requires <TIP_SHA> to already exist on origin/main.
-     Got <TIP_SHA> not reachable from origin/main. Push first, then re-invoke."
+if `git rev-parse HEAD` != `git rev-parse origin/main`:
+  → stop with: "Post-commit mode requires HEAD == origin/main (no stale local main).
+     Got HEAD=<short-SHA>, origin/main=<short-SHA>. Pull/push to sync first, then re-invoke."
 ```
 
 After resolving, jump to **[Post-commit Mode](#post-commit-mode)** — skip the PR mode parsing block below.
