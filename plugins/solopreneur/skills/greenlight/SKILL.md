@@ -80,13 +80,19 @@ echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STAT
 ```
 
 **Override:**
-- If `HAS_POST_COMMIT_ARG=true` AND `HAS_UNCOMMITTED=no`, set `MODE=post-commit`
-  immediately and skip the rest of this table.
-- If `HAS_POST_COMMIT_ARG=true` AND `HAS_UNCOMMITTED=yes`, **stop and ask the user
-  how to proceed** before continuing — options: (A) stash uncommitted changes and
-  proceed with post-commit review, (B) abort, (C) proceed but only stage explicit
-  files for the fix commits. Do NOT auto-include uncommitted WIP in the post-commit
-  fix commits — they would be pushed to `origin/main` together with the review fix.
+- If `HAS_POST_COMMIT_ARG=true` AND `CURRENT_BRANCH != main`, **stop with a clear
+  error**: post-commit mode is only valid on `main` (Phase 3 hardcodes `main` /
+  `origin/main` checks and would crash on a feature branch). Tell the user to
+  either switch to `main` or use PR mode (`/greenlight` on the feature branch with
+  an open PR).
+- If `HAS_POST_COMMIT_ARG=true` AND `CURRENT_BRANCH == main` AND `HAS_UNCOMMITTED=no`,
+  set `MODE=post-commit` immediately and skip the rest of this table.
+- If `HAS_POST_COMMIT_ARG=true` AND `CURRENT_BRANCH == main` AND `HAS_UNCOMMITTED=yes`,
+  **stop and ask the user how to proceed** before continuing — options: (A) stash
+  uncommitted changes and proceed with post-commit review, (B) abort, (C) proceed
+  but only stage explicit files for the fix commits. Do NOT auto-include uncommitted
+  WIP in the post-commit fix commits — they would be pushed to `origin/main` together
+  with the review fix.
 
 **Mode table:**
 
@@ -161,6 +167,17 @@ elif spec matches "<FROM>..<TO>" (verify both SHAs exist):
   RANGE_SPEC = range,  BASE_SHA = "<FROM>", TIP_SHA = "<TO>"
 else:
   → tell user spec is invalid, stop
+
+# Invariant: TIP_SHA must equal HEAD.
+# Reviewing a historical range (TIP_SHA < HEAD) would let downstream tools leak
+# past the user's intended tip: `codex review --base BASE` reviews BASE..HEAD
+# (not BASE..TIP), and the per-round `TIP_SHA = HEAD` advance in Phase 3 would
+# sweep in unrelated intermediate commits on subsequent rounds. Rather than
+# silently expanding scope, reject historical ranges up front.
+if `git rev-parse <TIP_SHA>` != `git rev-parse HEAD`:
+  → stop with: "Post-commit mode requires TIP_SHA == HEAD. Got TIP=<short-SHA>,
+     HEAD=<short-SHA>. For historical-only review of a single commit, invoke per-commit
+     instead: `codex review --commit <SHA>`."
 ```
 
 After resolving, jump to **[Post-commit Mode](#post-commit-mode)** — skip the PR mode parsing block below.
@@ -309,6 +326,11 @@ diff command depends on shape:
 Range semantics: `BASE_SHA` is **exclusive** and `TIP_SHA` is **inclusive** — i.e. the
 review covers commits `(BASE_SHA, TIP_SHA]`. This matches standard git `..` convention.
 
+**Invariant: `TIP_SHA == HEAD`.** Enforced during Argument Parsing — historical ranges
+(TIP < HEAD) are rejected with a clear error. This keeps `codex review --base BASE`
+(which reviews to current HEAD) equivalent to `BASE..TIP_SHA`, and prevents the
+per-round `TIP_SHA = HEAD` advance from sweeping in unrelated intermediate commits.
+
 ### Phase 1: Internal Review (post-commit variant)
 
 Same as PR mode Phase 1 — dispatch the 4 subagents in parallel, report-only — but
@@ -347,12 +369,15 @@ round = 0
 LOOP (max 5 rounds):
   round += 1
 
-  1. Verify still on main and BASE_SHA is reachable from HEAD:
+  1. Verify still on main, BASE_SHA is reachable from HEAD, and TIP_SHA == HEAD:
      ```bash
      git branch --show-current  # must be main
      git merge-base --is-ancestor <BASE_SHA> HEAD || echo "BASE not reachable"
+     [ "$(git rev-parse <TIP_SHA>)" = "$(git rev-parse HEAD)" ] || echo "TIP != HEAD"
      ```
-     If branch changed or BASE unreachable → stop and tell user.
+     If branch changed, BASE unreachable, or TIP != HEAD → stop and tell user.
+     (TIP == HEAD is the invariant set during Argument Parsing and re-asserted
+     each round after the fix-commit advance — see Step 6.)
 
   2. Dispatch Codex CLI and Gemini CLI **in parallel** (parallel Bash tool calls,
      or `&`-backgrounded shell — never sequential):
@@ -366,12 +391,9 @@ LOOP (max 5 rounds):
      ```
      Capture stdout. Parse `[P*]` tags.
 
-     > **Caveat — `--base` reviews to current HEAD, not `<TIP_SHA>`.** If `<TIP_SHA>`
-     > equals HEAD (the common case after the most recent fix push), this is correct.
-     > If the user passed a historical range where `<TIP_SHA>` ≠ HEAD, the review will
-     > leak past `<TIP_SHA>` and cover commits the user did not ask about. Either
-     > update `<TIP_SHA>` to HEAD before running, or run `codex review --commit <SHA>`
-     > per commit in the range.
+     > Under the `TIP_SHA == HEAD` invariant, `codex review --base <BASE_SHA>` is
+     > equivalent to reviewing `<BASE_SHA>..<TIP_SHA>`. (Historical ranges where
+     > `<TIP_SHA>` ≠ HEAD are rejected during Argument Parsing.)
 
      **Gemini CLI:**
      ```bash
