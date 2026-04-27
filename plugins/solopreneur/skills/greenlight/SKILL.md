@@ -15,8 +15,7 @@ description: |
 
   Also supports post-commit mode for already-pushed commits on main without
   an open PR: invoke `/greenlight post-commit <SHA>` (or `<SHA1>..<SHA2>`
-  for a range), or auto-detected when on main with no uncommitted changes
-  but commits ahead of origin. Runs Phase 1 subagents + Codex CLI + Gemini
+  for a range) explicitly. Runs Phase 1 subagents + Codex CLI + Gemini
   CLI in parallel, fixes via new commits on top (no amend, no new PR).
 ---
 
@@ -32,10 +31,10 @@ Automated review loop. Three modes:
   ```
 - **Uncommitted mode** (auto-detected when on `main` + uncommitted changes + no PR):
   Codex CLI `--uncommitted` loop only. Fixes in-place, does NOT commit.
-- **Post-commit mode** (forced by `/greenlight post-commit <SHA>` arg, or auto-detected
-  when on `main` + no uncommitted + commits ahead of origin): Phase 1 subagents +
-  Codex CLI `--commit <SHA>` + Gemini CLI in parallel; merge findings; fix as new
-  commits on top (no amend, no new PR). Skips PR-bound bots.
+- **Post-commit mode** (explicit `/greenlight post-commit <SHA>` invocation only,
+  no auto-detect): Phase 1 subagents + Codex CLI `--commit <SHA>` + Gemini CLI in
+  parallel; merge findings; fix as new commits on top (no amend, no new PR). Skips
+  PR-bound bots.
 
 ### Arguments
 
@@ -72,17 +71,22 @@ else
   PR_EXISTS=no
   PR_STATE=none
 fi
-# Local commits not yet at upstream (only meaningful when upstream is set; default 0)
-COMMITS_AHEAD=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
 # Peek at args (case-insensitive) for the `post-commit` keyword — it forces
 # post-commit mode regardless of repo state.
+# RAW_ARGS = the args string from the skill invocation; the orchestrator must
+# export this before evaluating the snippet.
 HAS_POST_COMMIT_ARG=$(echo "$RAW_ARGS" | grep -iq "post-commit" && echo true || echo false)
-echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STATE AHEAD=$COMMITS_AHEAD POST_COMMIT_ARG=$HAS_POST_COMMIT_ARG"
+echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STATE POST_COMMIT_ARG=$HAS_POST_COMMIT_ARG"
 ```
 
-**Override:** If `HAS_POST_COMMIT_ARG=true`, set `MODE=post-commit` immediately and
-skip the rest of this table — the explicit argument always wins over auto-detection,
-even when the working tree has uncommitted changes or there is an open PR.
+**Override:**
+- If `HAS_POST_COMMIT_ARG=true` AND `HAS_UNCOMMITTED=no`, set `MODE=post-commit`
+  immediately and skip the rest of this table.
+- If `HAS_POST_COMMIT_ARG=true` AND `HAS_UNCOMMITTED=yes`, **stop and ask the user
+  how to proceed** before continuing — options: (A) stash uncommitted changes and
+  proceed with post-commit review, (B) abort, (C) proceed but only stage explicit
+  files for the fix commits. Do NOT auto-include uncommitted WIP in the post-commit
+  fix commits — they would be pushed to `origin/main` together with the review fix.
 
 **Mode table:**
 
@@ -90,7 +94,7 @@ even when the working tree has uncommitted changes or there is an open PR.
 |---|---|---|---|---|
 | `main` | yes | no | **uncommitted** | Enter Uncommitted mode (skip all phases below) |
 | `main` | yes | yes (open) | **ask** | Unusual — ask user: "On main with uncommitted + open PR. Run uncommitted mode on working tree, or abort?" |
-| `main` | no | no, AND (`HAS_POST_COMMIT_ARG=true` OR `AHEAD > 0`) | **post-commit** | Resolve commit range (use SHA arg if given; if auto-detected via `AHEAD > 0`, list `git log @{u}..HEAD --oneline` and confirm with user); enter Post-commit mode |
+| `main` | no | no, AND `HAS_POST_COMMIT_ARG=true` | **post-commit** | Resolve commit range from the SHA argument; enter Post-commit mode |
 | `main` | no | — | **stop** | Nothing to review on main; tell user |
 | feature / worktree | — | yes (open) | **pr** | Continue with Pre-flight Step 2 below (default flow) |
 | feature / worktree | yes | no | **ask** | Ambiguous — ask user: "On feature branch with uncommitted and no PR yet. (A) Commit and push first to create PR, then review (B) Run uncommitted mode on working tree (C) Abort" |
@@ -146,11 +150,7 @@ raw_args = args ?? ""
 spec = raw_args after "post-commit" keyword (trimmed) — empty if keyword absent
 
 if spec is empty:
-  if AHEAD > 0:
-    → list `git log @{u}..HEAD --oneline`, ask user which commits to review
-    → user picks a single SHA or a FROM..TO range (or "all of them" → use @{u}..HEAD)
-  else:
-    → ask user to provide a SHA or range (e.g., "/greenlight post-commit <SHA>")
+  → ask user to provide a SHA or range (e.g., "/greenlight post-commit <SHA>")
 elif spec matches a single SHA (verify with `git rev-parse --verify <SHA>^{commit}`):
   RANGE_SPEC = single, BASE_SHA = "<SHA>^", TIP_SHA = "<SHA>"
 elif spec matches "<FROM>..<TO>" (verify both SHAs exist):
@@ -284,8 +284,8 @@ Uncommitted review loop complete.
 
 ## Post-commit Mode
 
-> **Only runs when `MODE=post-commit` from Pre-flight Step 1** (auto-detected via
-> `AHEAD > 0`, or forced by `/greenlight post-commit <SHA>` argument). PR mode and
+> **Only runs when `MODE=post-commit` from Pre-flight Step 1**, which requires the
+> explicit `/greenlight post-commit <SHA>` argument (no auto-detect). PR mode and
 > Uncommitted mode skip this section entirely.
 
 Reviews already-on-`main` commits when no open PR exists. Runs Phase 1 internal
@@ -330,7 +330,10 @@ post-commit hard constraints:
 - **Do NOT use `git commit --amend`.** Commits in the range are already pushed.
 - **Do NOT create a new PR or branch.**
 
-After push, advance `TIP_SHA` to the new HEAD so subsequent rounds review the fixes too.
+After push, advance `TIP_SHA = HEAD`. If `RANGE_SPEC = single`, also set
+`RANGE_SPEC = range` (keep `BASE_SHA` unchanged) so subsequent rounds review the
+full cumulative range (`BASE_SHA..HEAD`) — not just the latest fix commit, which
+would forget the original commit under review.
 
 If `PHASE1_FINDINGS` is empty, skip Phase 2 and proceed straight to Phase 3.
 
@@ -357,21 +360,30 @@ LOOP (max 5 rounds):
      **Codex CLI:**
      ```bash
      # Single commit:
-     codex review --commit <TIP_SHA> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>&1
+     codex review --commit <TIP_SHA> -c 'model_reasoning_effort="high"' 2>&1
      # Range (BASE_SHA..TIP_SHA):
-     codex review --base <BASE_SHA> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>&1
+     codex review --base <BASE_SHA> -c 'model_reasoning_effort="high"' 2>&1
      ```
      Capture stdout. Parse `[P*]` tags.
+
+     > **Caveat — `--base` reviews to current HEAD, not `<TIP_SHA>`.** If `<TIP_SHA>`
+     > equals HEAD (the common case after the most recent fix push), this is correct.
+     > If the user passed a historical range where `<TIP_SHA>` ≠ HEAD, the review will
+     > leak past `<TIP_SHA>` and cover commits the user did not ask about. Either
+     > update `<TIP_SHA>` to HEAD before running, or run `codex review --commit <SHA>`
+     > per commit in the range.
 
      **Gemini CLI:**
      ```bash
      # Capture the diff first — see "Range resolution" table above for the exact
      # diff command to use. Use `git log -p <BASE>..<TIP>` form (or `git show` for
      # single) so per-commit context (subject, author, message) is preserved.
-     if [ "$RANGE_SPEC" = "single" ]; then
-       DIFF_CONTENT=$(git show "$TIP_SHA")
+     # Substitute <RANGE_SPEC>, <TIP_SHA>, <BASE_SHA> with their resolved values
+     # from the Range resolution step before running.
+     if [ "<RANGE_SPEC>" = "single" ]; then
+       DIFF_CONTENT=$(git show "<TIP_SHA>")
      else
-       DIFF_CONTENT=$(git log -p "$BASE_SHA".."$TIP_SHA")
+       DIFF_CONTENT=$(git log -p "<BASE_SHA>..<TIP_SHA>")
      fi
      # Unquoted heredoc so $DIFF_CONTENT expands. Other shell metachars inside
      # the diff are safe because the heredoc is wrapped in $(cat ...) and the
@@ -417,7 +429,9 @@ LOOP (max 5 rounds):
      git fetch origin main
      git rev-parse origin/main  # should equal HEAD
      ```
-     Update `TIP_SHA = HEAD`. Loop back to Step 1.
+     Update `TIP_SHA = HEAD`. If `RANGE_SPEC = single`, also set `RANGE_SPEC = range`
+     (keep `BASE_SHA` unchanged) so subsequent rounds review the full cumulative
+     range (`BASE_SHA..HEAD`) — not just the latest fix commit. Loop back to Step 1.
 
 End: max 5 rounds → stop and report last round's findings; let user decide.
 ```
