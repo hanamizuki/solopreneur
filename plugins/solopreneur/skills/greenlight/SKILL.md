@@ -178,6 +178,16 @@ if `git rev-parse <TIP_SHA>` != `git rev-parse HEAD`:
   → stop with: "Post-commit mode requires TIP_SHA == HEAD. Got TIP=<short-SHA>,
      HEAD=<short-SHA>. For historical-only review of a single commit, invoke per-commit
      instead: `codex review --commit <SHA>`."
+
+# Invariant: TIP_SHA must already exist on origin/main.
+# Post-commit mode's contract is "review already-pushed commits". If TIP_SHA is
+# local-only (never pushed) or origin/main has diverged, the per-round push in
+# Phase 3 would either publish unreviewed commits to origin/main (violating the
+# contract) or fail/rebase unexpectedly. Verify reachability up front.
+git fetch origin main
+if ! git merge-base --is-ancestor <TIP_SHA> origin/main:
+  → stop with: "Post-commit mode requires <TIP_SHA> to already exist on origin/main.
+     Got <TIP_SHA> not reachable from origin/main. Push first, then re-invoke."
 ```
 
 After resolving, jump to **[Post-commit Mode](#post-commit-mode)** — skip the PR mode parsing block below.
@@ -445,15 +455,25 @@ LOOP (max 5 rounds):
        `fix: post-commit review fixes (round <N>) — <summary>`.
      - **Do NOT amend. Do NOT create branch or PR.**
 
-  6. Verify HEAD advanced and origin matches:
+  6. Hard gate: verify the fix subagent's push actually landed on `origin/main`.
+     If `HEAD != origin/main` (push rejected, skipped, or never happened), stop —
+     do NOT advance `TIP_SHA` and do NOT loop, otherwise the next round would
+     review unpushed local state and the final report would falsely claim the
+     commit was pushed:
      ```bash
-     git rev-parse HEAD
      git fetch origin main
-     git rev-parse origin/main  # should equal HEAD
+     LOCAL_HEAD=$(git rev-parse HEAD)
+     REMOTE_HEAD=$(git rev-parse origin/main)
+     if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
+       stop with: "Push verification failed — HEAD ($LOCAL_HEAD) does not match
+       origin/main ($REMOTE_HEAD). The fix subagent's push was rejected or skipped.
+       Investigate before continuing."
+     fi
      ```
-     Update `TIP_SHA = HEAD`. If `RANGE_SPEC = single`, also set `RANGE_SPEC = range`
-     (keep `BASE_SHA` unchanged) so subsequent rounds review the full cumulative
-     range (`BASE_SHA..HEAD`) — not just the latest fix commit. Loop back to Step 1.
+     Push confirmed. Update `TIP_SHA = HEAD`. If `RANGE_SPEC = single`, also set
+     `RANGE_SPEC = range` (keep `BASE_SHA` unchanged) so subsequent rounds review
+     the full cumulative range (`BASE_SHA..HEAD`) — not just the latest fix commit.
+     Loop back to Step 1.
 
 End: max 5 rounds → stop and report last round's findings; let user decide.
 ```
