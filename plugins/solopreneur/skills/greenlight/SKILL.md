@@ -323,6 +323,13 @@ Fixes are committed as **new commits on top** — no `git commit --amend` (commi
 the range are already pushed to `origin/main`; amending would require force-push,
 which violates the "no rewriting shared history" rule).
 
+> **Convention:** the bash snippets in this section are illustrative pseudo-code,
+> not literal runnable scripts. The orchestrating agent translates them before
+> execution: substitute `<PLACEHOLDERS>` with concrete values, replace prose
+> directives like `stop with: "..."` with valid bash (e.g. `echo "..."; exit 1`),
+> and ensure heredoc terminators (`EOF`) start at column 1 (or use `<<-` with tabs).
+> Snippets prioritize readability over runnability.
+
 ### Range resolution (recap)
 
 `RANGE_SPEC`, `BASE_SHA`, and `TIP_SHA` were resolved during Argument Parsing. The
@@ -362,7 +369,23 @@ post-commit hard constraints:
 - **Do NOT use `git commit --amend`.** Commits in the range are already pushed.
 - **Do NOT create a new PR or branch.**
 
-After push, advance `TIP_SHA = HEAD`. If `RANGE_SPEC = single`, also set
+After push, **verify the push actually landed on `origin/main` before advancing
+`TIP_SHA`** — same hard gate as Phase 3 Step 6. If the fix subagent's push was
+rejected or skipped, Phase 3 would otherwise enter the loop reviewing local-only
+commits:
+
+```bash
+git fetch origin main
+LOCAL_HEAD=$(git rev-parse HEAD)
+REMOTE_HEAD=$(git rev-parse origin/main)
+if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
+  stop with: "Phase 2 push verification failed — HEAD ($LOCAL_HEAD) does not
+  match origin/main ($REMOTE_HEAD). The fix subagent's push was rejected or
+  skipped. Investigate before continuing."
+fi
+```
+
+Push confirmed. Advance `TIP_SHA = HEAD`. If `RANGE_SPEC = single`, also set
 `RANGE_SPEC = range` (keep `BASE_SHA` unchanged) so subsequent rounds review the
 full cumulative range (`BASE_SHA..HEAD`) — not just the latest fix commit, which
 would forget the original commit under review.
