@@ -117,11 +117,15 @@ decision the user already made about it.>
 - `<doc / README / URL / related skill>` — <why it matters>
 ```
 
-### 4. Hand it over
+### 4. Stop
 
-After printing the doc, end with one short line — e.g. *"Doc above is ready —
-copy it and paste into the next session."* Don't summarise the doc; the doc
-is the thing.
+The printed document is the entire response. Do not add a preamble before
+it (no "Here's the handoff doc"), a closing line after it (no "ready, copy
+it"), a summary, or any commentary. The user already knows what to do with
+the output — extra text just gets in their way when they copy.
+
+The only exception is step 1: if the next step is unclear, ask the focused
+question first and wait. After the answer, generate the doc and stop.
 
 ## Quality bar
 
@@ -141,6 +145,8 @@ The output must pass these checks. Revise before printing if any fails.
    should be backed by a file path or command listed in the doc.
 7. **No secret values.** Env var names only. Never paste keys, tokens, or
    passwords.
+8. **Document is the entire response.** No text before the markdown block,
+   no text after it. No "Here it is", no "ready to copy", no summary.
 
 ## Anti-patterns
 
@@ -179,4 +185,4 @@ User: `/handoff`
    dead ends, env requirements.
 5. Compose the markdown using the template, filling only the meaningful
    sections.
-6. Print it. End with a one-line "ready, copy it to grab."
+6. Print it. Nothing else — no preamble, no closing line, no commentary.
