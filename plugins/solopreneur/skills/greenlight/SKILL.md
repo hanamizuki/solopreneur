@@ -13,10 +13,11 @@ description: |
   changes and no PR, runs Codex CLI `--uncommitted` review loop only, fixes
   in-place without committing, until codex reports clean.
 
-  Also supports post-commit mode for already-pushed commits on main without
-  an open PR: invoke `/greenlight post-commit <SHA>` (or `<SHA1>..<SHA2>`
-  for a range) explicitly. Runs Phase 1 subagents + Codex CLI + Gemini
-  CLI in parallel, fixes via new commits on top (no amend, no new PR).
+  Also supports post-commit mode for committed work on main without an open
+  PR (whether already pushed or still local-only): invoke `/greenlight
+  post-commit <SHA>` (or `<SHA1>..<SHA2>` for a range) explicitly. Runs
+  Phase 1 subagents + Codex CLI + Gemini CLI in parallel, fixes via new
+  commits on top (no amend, no new PR), pushes after each round.
 ---
 
 # Greenlight
@@ -42,7 +43,7 @@ Automated review loop. Three modes:
 |----------|-------------|---------|
 | `external` | Skip Phase 1 + 2 (internal review), jump to Phase 3 (PR mode only) | `/greenlight external` |
 | `codex bot` / `codex cli` / `gemini` | Specify starting reviewer (combinable with `external`, PR mode only) | `/greenlight external gemini` |
-| `post-commit [<SHA>\|<FROM>..<TO>]` | Force post-commit mode on already-pushed commits | `/greenlight post-commit c1e7e256` |
+| `post-commit [<SHA>\|<FROM>..<TO>]` | Force post-commit mode on a commit / range on `main` (pushed or local-only) | `/greenlight post-commit c1e7e256` |
 
 **Parsing rules:**
 - `post-commit` keyword (case-insensitive): forces post-commit mode regardless of repo
@@ -179,19 +180,35 @@ if `git rev-parse <TIP_SHA>` != `git rev-parse HEAD`:
      HEAD=<short-SHA>. For historical-only review of a single commit, invoke per-commit
      instead: `codex review --commit <SHA>`."
 
-# Invariant: HEAD must equal origin/main (no stale local main).
-# Post-commit mode's contract is "review already-pushed commits". Combined with
-# the TIP_SHA == HEAD invariant above, requiring HEAD == origin/main ensures:
-#   (a) TIP_SHA is on origin/main — never publishes unreviewed local-only commits;
-#   (b) local main is fresh — per-round push will fast-forward, not be rejected;
-#   (c) reviewers see the same state that origin/main is at.
-# Plain ancestor-reachability is insufficient: a stale local main where
-# origin/main has advanced would still pass `merge-base --is-ancestor`, then
-# the fix-on-top + push later in the loop would be rejected.
+# Invariant: origin/main must be reachable from HEAD (local main not behind origin).
+# Post-commit mode's contract is "review committed work" — push state is not part
+# of the contract. Local-only commits (HEAD ahead of origin/main) are allowed: the
+# review loop's fix-on-top push will publish them together with the fix commits,
+# which is the expected "review then land" flow.
+# What we MUST prevent is a stale local main (HEAD behind origin/main): the
+# per-round fix-on-top push would be rejected as non-fast-forward, breaking the loop.
+# `git merge-base --is-ancestor origin/main HEAD` returns true iff origin/main is
+# reachable from HEAD — which holds when HEAD == origin/main OR HEAD is ahead of
+# origin/main, but fails when HEAD is behind. Exactly the condition we want.
 git fetch origin main
-if `git rev-parse HEAD` != `git rev-parse origin/main`:
-  → stop with: "Post-commit mode requires HEAD == origin/main (no stale local main).
-     Got HEAD=<short-SHA>, origin/main=<short-SHA>. Pull/push to sync first, then re-invoke."
+if ! git merge-base --is-ancestor origin/main HEAD:
+  → stop with: "Post-commit mode requires local main to not be behind origin/main
+     (origin/main must be reachable from HEAD). Got HEAD=<short-SHA>,
+     origin/main=<short-SHA>. Pull/rebase first, then re-invoke."
+
+# Invariant: BASE_SHA must be reachable from origin/main.
+# When HEAD is ahead of origin/main, the fix-on-top push at end-of-loop will
+# publish everything in (origin/main, HEAD]. If RANGE_SPEC starts past
+# origin/main (BASE_SHA itself local-only), commits in (origin/main, BASE_SHA]
+# would be pushed without ever being reviewed. Require BASE_SHA to be on or
+# before origin/main so the reviewed range (BASE_SHA, HEAD] covers every
+# local-only commit on the branch.
+if ! git merge-base --is-ancestor <BASE_SHA> origin/main:
+  → stop with: "BASE_SHA must be reachable from origin/main — the reviewed
+     range must cover all local-only commits, otherwise unreviewed commits
+     would be pushed by the fix-on-top loop. Got BASE=<short-SHA>, which is
+     itself local-only. Either widen the range to start at or before
+     origin/main, or push existing local commits first."
 ```
 
 After resolving, jump to **[Post-commit Mode](#post-commit-mode)** — skip the PR mode parsing block below.
@@ -319,13 +336,16 @@ Uncommitted review loop complete.
 > explicit `/greenlight post-commit <SHA>` argument (no auto-detect). PR mode and
 > Uncommitted mode skip this section entirely.
 
-Reviews already-on-`main` commits when no open PR exists. Runs Phase 1 internal
-subagents + Codex CLI + Gemini CLI in parallel. **Skips PR-bound reviewers** (Codex
-GitHub bot, Gemini Code Assist, CodeRabbit) since they require an open PR.
+Reviews committed work on `main` (pushed or local-only) when no open PR exists.
+Runs Phase 1 internal subagents + Codex CLI + Gemini CLI in parallel. **Skips
+PR-bound reviewers** (Codex GitHub bot, Gemini Code Assist, CodeRabbit) since
+they require an open PR.
 
-Fixes are committed as **new commits on top** — no `git commit --amend` (commits in
-the range are already pushed to `origin/main`; amending would require force-push,
-which violates the "no rewriting shared history" rule).
+Fixes are committed as **new commits on top** — no `git commit --amend`. Reasons:
+keeps the loop logic uniform whether or not the original commits were already
+pushed (amend would require force-push for pushed commits, violating the "no
+rewriting shared history" rule); preserves the original commit boundary; lets
+each review round produce a clearly attributable fix commit.
 
 > **Convention:** the bash snippets in this section are illustrative pseudo-code,
 > not literal runnable scripts. The orchestrating agent translates them before
@@ -370,7 +390,8 @@ post-commit hard constraints:
 - Edit source files directly.
 - **After edits, run `git add` + `git commit` + `git push`.** Commit message:
   `fix: post-commit review fixes (Phase 1) — <summary>`.
-- **Do NOT use `git commit --amend`.** Commits in the range are already pushed.
+- **Do NOT use `git commit --amend`.** Always fix as new commits on top — see
+  rationale at the top of Post-commit Mode.
 - **Do NOT create a new PR or branch.**
 
 After push, **verify the push actually landed on `origin/main` before advancing
@@ -513,6 +534,29 @@ End: max 5 rounds → stop and report last round's findings; let user decide.
    review stage, not fresh implementation): stop and report last round; user decides.
 4. **Aborted invariants**: branch changed, BASE unreachable, both CLIs unavailable →
    stop with specific reason.
+
+### Pre-exit push (clean pass / push-back / max rounds)
+
+If the loop exits without ever entering a fix step (Phase 1 clean + Phase 3
+round 1 clean), HEAD may still be ahead of origin/main with the reviewed
+local-only commits unpushed — fix subagents handle their own push, but a
+zero-finding fast path bypasses them entirely. Without this step, the final
+report's `Last commit pushed` claim would be false:
+
+```bash
+git fetch origin main
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+  git push origin main
+  git fetch origin main
+  if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+    stop with: "Pre-exit push failed — HEAD still does not match origin/main
+    after push. Investigate before reporting completion."
+  fi
+fi
+```
+
+Skip for the **Aborted invariants** exit — that path indicates the loop is in
+a bad state, don't publish anything.
 
 ### Final report (on any exit)
 
