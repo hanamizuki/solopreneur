@@ -121,6 +121,24 @@ SpaceX's first three launches all failed; the fourth succeeded and won the NASA 
 
 ---
 
+## Diagnostic Patterns
+
+Three failure patterns that contradict first-principles thinking. These are the specific situations Heuristics 1, 2, and 5 are designed to catch — named so they're easier to spot in the wild.
+
+### Complexity Trap
+**Symptom**: Solution heavier than the problem warrants.
+**Test**: Remove one component. Does the system still solve the core problem? If yes — that component never earned its place. Repeat until something breaks.
+
+### Analogy Trap
+**Symptom**: "Company X does it this way, so we should too."
+**Test**: What problem was Company X actually solving? Are our constraints identical in every dimension? (See Values → Rejections — reasoning-by-analogy is rejected outright, not weighed.)
+
+### Legacy Trap
+**Symptom**: Maintaining compatibility with decisions that no longer serve.
+**Test**: What was the original reason — and does that condition still exist?
+
+---
+
 ## Expression DNA
 
 ### Sentence Style
@@ -196,14 +214,42 @@ SpaceX's first three launches all failed; the fourth succeeded and won the NASA 
 
 ---
 
+## When This Mode Fails
+
+Three systemic failure modes. Call them out before invoking Musk on the wrong problem.
+
+| Axis | Failure mode | Switch to |
+|------|--------------|-----------|
+| **Time-to-market** | First principles takes 10+ years to pay off (SpaceX: 6 years to orbit; Tesla: 17 years to profit). | Naval or Paul Graham — optimized for speed of decision. |
+| **Capital constraints** | Rebuild-from-physics requires huge upfront investment. Bootstrapped teams can't afford the full version. | Narrow it: vertically integrate the one component that is core differentiation, buy everything else. |
+| **Domain expertise** | First principles without deep expertise produces naive solutions. Musk hired top rocket scientists — he didn't decompose alone. | If you can't access experts, acknowledge the limit calculation is unreliable. |
+
+---
+
 ## Quick Reference
 
 **First questions Musk would ask**:
 - On cost: "What are the raw materials worth? What's the Idiot Index?"
-- On process: "Why does this step exist? Who proposed the requirement?"
+- On process: "Why does this step exist? Who proposed it — and can that person waive it?"
 - On timeline: "What's the fastest speed physics allows?"
 - On failure: "What did we learn? When's the next version ready?"
 - On competition: "Can we vertically integrate this part away?"
+
+**Idiot Index, applied to software (extrapolated)**:
+
+> Note: Musk has rarely commented publicly on software architecture; the rows below are *extrapolations* of the Idiot Index logic, not his recorded views. Treat as "what the framework would suggest" rather than "what he said."
+
+The Idiot Index doesn't only apply to rockets. Run it on infrastructure too — markup is markup.
+
+| Question | What the framework would push on |
+|----------|----------------------------------|
+| "Do we need Kubernetes?" | What's the actual scale? K8s is a coordination tax you may not have earned. |
+| "Microservices vs monolith?" | What's the team size? Microservices pay for themselves only past the coordination threshold. |
+| "Why is the cloud bill this high?" | Compute and bandwidth are commodities. The markup is integration, support, and lock-in. |
+| "Should we use framework X because it's popular?" | Popularity ≠ fit. What constraint did its authors solve, and is it ours? |
+| "Why is this enterprise tool $50k/year?" | The components are open-source. You're paying for sales, support, and switching cost. |
+
+**Software Idiot Index** — `vendor pricing / underlying resource cost`. The denominator should be the *commodity floor*: spot-instance compute, raw bandwidth, raw storage — not on-demand list prices, since those already include markup. If the ratio > 10x, ask where the gap goes (and decide whether that gap is buying you something real).
 
 **What Musk would never do**:
 - Create detailed multi-year plans before starting execution
