@@ -50,7 +50,7 @@ git worktree list --porcelain | awk '
 ' | while IFS=$'\t' read -r wt br; do
   [ "$wt" = "$CURRENT_WORKTREE" ] && continue   # Never delete own worktree (would break session CWD)
   [ "$wt" = "$MAIN_REPO" ] && continue          # Never delete main repo
-  [ "$br" = "main" ] || [ "$br" = "master" ] && continue
+  [[ "$br" = "main" || "$br" = "master" ]] && continue
 
   # Only remove if the branch has a merged PR
   PR_NUM=$(gh pr list --state merged --head "$br" --json number --jq '.[0].number' 2>/dev/null)
@@ -164,7 +164,7 @@ Build the list of plan roots — union of `$BACKLOG`, `$DOING`, `$DONE_DIR`, and
    for root in "$BACKLOG" "$DOING" "$DONE_DIR" "$PLANS_DIR"; do
      [ -z "$root" ] && continue
      [ -d "$root" ] || continue
-     match=$(grep -rlE "^Plan-Branch: ${BRANCH}$" "$root"/*.md 2>/dev/null | head -1)
+     match=$(grep -lE "^Plan-Branch: ${BRANCH}$" "$root"/*.md 2>/dev/null | head -1)
      if [ -n "$match" ]; then
        PLAN_FILE="$match"
        break
@@ -179,9 +179,9 @@ Build the list of plan roots — union of `$BACKLOG`, `$DOING`, `$DONE_DIR`, and
    ```bash
    if [ -z "$PLAN_FILE" ]; then
      HANDOFF_SHA=$(git log --pretty=format:'%H %s' main..HEAD \
-       | grep "docs(handoff): context for ${BRANCH}" | head -1 | awk '{print $1}')
+       | grep -F "docs(handoff): context for ${BRANCH}" | head -1 | awk '{print $1}')
      if [ -n "$HANDOFF_SHA" ]; then
-       PLAN_FILE=$(git show --name-only "$HANDOFF_SHA" \
+       PLAN_FILE=$(git show --name-only --format='' "$HANDOFF_SHA" \
          | grep -E '\.md$' \
          | head -1)
      fi
@@ -286,7 +286,61 @@ Run as:
 ```bash
 TMPSCRIPT=$(mktemp /tmp/consolidate_XXXXXX.py)
 cat > "$TMPSCRIPT" << 'PYEOF'
-# <paste the Python script above here>
+import re, sys, os
+from datetime import date
+
+def consolidate(path, branch):
+    merge_date = date.today().isoformat()
+    with open(path) as f:
+        content = f.read()
+
+    lines = content.split('\n')
+
+    # 1. Update status line in first 20 lines
+    for i in range(min(20, len(lines))):
+        if re.match(r'^Status:', lines[i]):
+            lines[i] = f'Status: merged {merge_date}'
+            break
+
+    content = '\n'.join(lines)
+
+    # 2. Find all Handoff Context sections for this branch
+    pattern = rf'^## Handoff Context \([^)]*branch: {re.escape(branch)}\)'
+    matches = [(m.start(), m.group()) for m in re.finditer(pattern, content, re.MULTILINE)]
+
+    if not matches:
+        print(f'No Handoff Context sections found for branch {branch}')
+        return content
+
+    # 3. Rename the latest (last in file) to Final Progress
+    # Safe: matches are sorted ascending by position; latest_start is always the highest
+    # offset, so the rename does not affect byte offsets of earlier (old) headings.
+    latest_start, latest_heading = matches[-1]
+    new_heading = f'## Final Progress (merged {merge_date}, branch: {branch})'
+    content = content[:latest_start] + new_heading + content[latest_start + len(latest_heading):]
+
+    # 4. Delete older same-branch Handoff Context sections (all except latest)
+    # Iterate in reverse so higher-offset deletions don't shift lower-offset positions.
+    for old_start, old_heading in reversed(matches[:-1]):
+        section_start = old_start
+        after = content[section_start + len(old_heading):]
+        next_h2 = re.search(r'\n## ', after)
+        if next_h2:
+            section_end = section_start + len(old_heading) + next_h2.start()
+        else:
+            section_end = len(content)
+        rest = content[section_end:].lstrip('\n')
+        content = content[:section_start] + rest
+
+    return content
+
+if __name__ == '__main__':
+    path = sys.argv[1]
+    branch = sys.argv[2]
+    result = consolidate(path, branch)
+    with open(path, 'w') as f:
+        f.write(result)
+    print('Consolidation complete')
 PYEOF
 python3 "$TMPSCRIPT" "$PLAN_FILE" "$BRANCH"
 rm -f "$TMPSCRIPT"

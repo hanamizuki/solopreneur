@@ -45,6 +45,7 @@ BACKLOG=$(echo "$TODOS_CONFIG" | jq -r '.backlog // empty')
 DOING=$(echo "$TODOS_CONFIG" | jq -r '.doing  // empty')
 PLANS_DIR=$(echo "$PLANS_CONFIG" | jq -r '.dir // empty')
 PLANS_DIR="${PLANS_DIR:-docs/solopreneur/plans}"  # default
+MODE=$([ -n "$BACKLOG" ] && [ -n "$DOING" ] && echo "state-machine" || echo "flat")
 ```
 
 **Mode decision:**
@@ -170,9 +171,15 @@ Fill in the five sections based on context from the current conversation.
    `Plan-Branch:` line, check whether `Plan-Branch: <branch-name>` is already
    present. If it is absent, append the line inside the existing comment block:
    ```bash
-   # Add Plan-Branch: <branch-name> to the existing <!-- ... --> block
-   sed -i '' "/^-->/i\\
-   Plan-Branch: <branch-name>" "$PLAN_FILE"
+   python3 -c "
+import sys
+branch, path = sys.argv[1], sys.argv[2]
+with open(path) as f: content = f.read()
+idx = content.find('\n-->')
+if idx != -1:
+    content = content[:idx+1] + 'Plan-Branch: ' + branch + '\n' + content[idx+1:]
+with open(path, 'w') as f: f.write(content)
+" "<branch-name>" "$PLAN_FILE"
    ```
    If no comment block exists at the top (legacy file), prepend one:
    ```markdown

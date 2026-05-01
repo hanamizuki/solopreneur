@@ -79,7 +79,7 @@ write_solopreneur_config() {
   # which correctly handles object literals, strings, and arrays alike.
   local existing
   existing=$(cat "$primary" 2>/dev/null || echo '{}')
-  echo "$existing" \
+  printf '%s\n' "$existing" \
     | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
     > "$tmp"
 
@@ -103,6 +103,8 @@ write_solopreneur_config() {
 Skills are LLM-interpreted markdown — there is no runtime `source` or `import`
 mechanism. Each skill that reads or writes config must copy both function bodies
 verbatim into a bash block near the top of its config-access section, like this:
+
+Skills that only read config may inline only `read_solopreneur_config` and omit `write_solopreneur_config` — the write helper is only needed by skills that persist discovered config.
 
 ```bash
 # --- solopreneur config helpers (inlined from _shared/config.md) ---
@@ -128,7 +130,7 @@ write_solopreneur_config() {
   tmp=$(mktemp "${primary}.XXXXXX")
   local existing
   existing=$(cat "$primary" 2>/dev/null || echo '{}')
-  echo "$existing" \
+  printf '%s\n' "$existing" \
     | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
     > "$tmp"
   mv "$tmp" "$primary"

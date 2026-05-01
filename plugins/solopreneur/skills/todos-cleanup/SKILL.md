@@ -41,7 +41,7 @@ write_solopreneur_config() {
   tmp=$(mktemp "${primary}.XXXXXX")
   local existing
   existing=$(cat "$primary" 2>/dev/null || echo '{}')
-  echo "$existing" \
+  printf '%s\n' "$existing" \
     | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
     > "$tmp"
   mv "$tmp" "$primary"

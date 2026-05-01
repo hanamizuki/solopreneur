@@ -464,7 +464,7 @@ operational read/write sites + 1 doc-comment schema example.
 | Skill | Sites | Action |
 |-------|-------|--------|
 | `todos-cleanup` | 3 | Replace read at line 22, write at lines 43–49 |
-| `todos-babysit` | 4 operational + 1 doc-example | Replace reads at lines 25–26, 40, 268–269; update the JSON schema example at line 52 to reference `${CLAUDE_CONFIG_DIR:-~/.claude}` so docs match the cascade |
+| `todos-babysit` | 5 operational + 1 doc-example | Replace reads at lines 25–26, 40, 268–269; update the JSON schema example at line 52 to reference `${CLAUDE_CONFIG_DIR:-~/.claude}` so docs match the cascade |
 | `todos-review` | 1 | Replace read at line 21 |
 | `greenlight` | 5 | Replace read at line 130, write at lines 718–725; update doc references at 700, 718 |
 

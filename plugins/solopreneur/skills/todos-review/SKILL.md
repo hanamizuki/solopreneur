@@ -18,7 +18,7 @@ work, and surfaces better alternatives before any code is written.
 
 Resolve todo directory paths using the same config discovery as other todos-* skills:
 
-1. Check `${CLAUDE_CONFIG_DIR:-~/.claude}/solopreneur.json` for `todos` key
+1. Use `read_solopreneur_config todos` via the cascade helper (see `/todos-cleanup` Config Discovery for the full setup including helper definitions)
 2. If absent, scan project for todo directories, confirm with user, save to config
 
 See `/todos-cleanup` for the full discovery flow — use the same logic and config format.
