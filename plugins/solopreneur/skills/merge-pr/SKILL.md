@@ -52,7 +52,11 @@ git worktree list --porcelain | awk '
   [ "$wt" = "$MAIN_REPO" ] && continue          # Never delete main repo
   [[ "$br" = "main" || "$br" = "master" ]] && continue
 
-  # Only remove if the branch has a merged PR
+  # Only remove if the branch has a merged PR and no currently open PR
+  # (open PR check guards against branch-name reuse: an older merged PR
+  # with the same name must not cause deletion of an active worktree)
+  OPEN_PR=$(gh pr list --state open --head "$br" --json number --jq '.[0].number' 2>/dev/null)
+  [ -n "$OPEN_PR" ] && continue
   PR_NUM=$(gh pr list --state merged --head "$br" --json number --jq '.[0].number' 2>/dev/null)
   if [ -n "$PR_NUM" ]; then
     echo "Cleaning up stale worktree: $wt (branch: $br, PR #$PR_NUM merged)"
@@ -164,7 +168,7 @@ Build the list of plan roots — union of `$BACKLOG`, `$DOING`, `$DONE_DIR`, and
    for root in "$BACKLOG" "$DOING" "$DONE_DIR" "$PLANS_DIR"; do
      [ -z "$root" ] && continue
      [ -d "$root" ] || continue
-     match=$(grep -lE "^Plan-Branch: ${BRANCH}$" "$root"/*.md 2>/dev/null | head -1)
+     match=$(grep -lF "Plan-Branch: ${BRANCH}" "$root"/*.md 2>/dev/null | head -1)
      if [ -n "$match" ]; then
        PLAN_FILE="$match"
        break
@@ -201,7 +205,8 @@ Only runs if `PLAN_FILE` is set and the file exists on disk.
    (matched by branch name in the heading):
 
    ```bash
-   grep -n "^## Handoff Context (.*branch: ${BRANCH})" "$PLAN_FILE"
+   ESC_BRANCH=$(printf '%s' "$BRANCH" | sed 's/[]\.[*^$(){}?+|]/\\&/g')
+   grep -n "^## Handoff Context (.*branch: ${ESC_BRANCH})" "$PLAN_FILE"
    ```
 
 2. **Rename the latest matching section** to
