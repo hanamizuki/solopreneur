@@ -8,22 +8,11 @@ description: >
   prompt, convert a vague idea into a structured prompt, analyze why a prompt isn't working,
   or asks "write me a prompt for...", "improve this prompt", "prompt engineer this".
 
-  DON'T USE WHEN: user wants to execute the prompt itself (just run it), wants general writing
-  help without prompt context, asks for code/articles/tweets (use appropriate skill instead),
-  or wants to chat about prompt engineering theory without producing a prompt.
+  DON'T USE WHEN: user wants to execute the prompt (just run it), wants general writing help,
+  asks for content (code/articles/tweets), or wants theory chat without producing a prompt.
 
-  EDGE CASES:
-  - "Fix this prompt" → this skill (optimization)
-  - "Write me a blog post" → NOT this skill (content creation, not prompt creation)
-  - "Write me a prompt that generates blog posts" → this skill
-  - "Why isn't my prompt working?" → this skill (diagnosis + fix)
-  - "اكتب لي برومبت" → this skill
-  - "حسن هالبرومبت" → this skill
-  - "اكتب لي مقال" → NOT this skill (use katib-al-maqalat)
-
-  INPUTS: Rough idea, existing prompt, images, links, documents, or any combination.
-  OUTPUTS: Optimized prompt in a code block, ready to copy.
-  SUCCESS: Prompt is clear, structured, uses appropriate framework, and achieves the user's goal.
+  INPUTS: Rough idea, existing prompt, images, links, or documents.
+  OUTPUT: Optimized prompt in a code block, ready to copy.
 ---
 
 # The Prompt Architect

@@ -13,11 +13,9 @@ description: |
   changes and no PR, runs Codex CLI `--uncommitted` review loop only, fixes
   in-place without committing, until codex reports clean.
 
-  Also supports post-commit mode for committed work on main without an open
-  PR (whether already pushed or still local-only): invoke `/greenlight
-  post-commit <SHA>` (or `<SHA1>..<SHA2>` for a range) explicitly. Runs
-  Phase 1 subagents + Codex CLI + Gemini CLI in parallel, fixes via new
-  commits on top (no amend, no new PR), pushes after each round.
+  Also supports post-commit mode (explicit `/greenlight post-commit <SHA>`
+  or `<SHA1>..<SHA2>`): Phase 1 subagents + Codex CLI + Gemini in parallel,
+  fixes as new commits on top (no amend, no new PR), pushes after each round.
 ---
 
 # Greenlight
