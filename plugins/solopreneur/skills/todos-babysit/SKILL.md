@@ -18,12 +18,44 @@ PR status, reviews unhandled items, notifies the user, and auto-implements on ap
 
 ## Config Discovery
 
-Resolve todo directory paths and optional Discord config:
+Resolve todo directory paths and optional Discord config. Define the config helpers first:
+
+```bash
+# --- solopreneur config helpers (inlined from _shared/config.md) ---
+read_solopreneur_config() {
+  local key="$1"
+  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local fallback="$HOME/.claude/solopreneur.json"
+  if [ -f "$primary" ] && jq -e "has(\"$key\")" "$primary" >/dev/null 2>&1; then
+    jq -r ".${key} // empty" "$primary"
+    return
+  fi
+  if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
+    jq -r ".${key} // empty" "$fallback"
+  fi
+}
+
+write_solopreneur_config() {
+  local key="$1"
+  local value_expr="$2"
+  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local tmp
+  mkdir -p "$(dirname "$primary")"
+  tmp=$(mktemp "${primary}.XXXXXX")
+  local existing
+  existing=$(cat "$primary" 2>/dev/null || echo '{}')
+  echo "$existing" \
+    | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
+    > "$tmp"
+  mv "$tmp" "$primary"
+}
+# --- end solopreneur config helpers ---
+```
 
 1. **Check plugin config:**
    ```bash
-   jq -r '.todos // empty' ~/.claude/solopreneur.json 2>/dev/null
-   jq -r '.discord // empty' ~/.claude/solopreneur.json 2>/dev/null
+   read_solopreneur_config todos
+   read_solopreneur_config discord
    ```
 
 2. **If no `todos` config** — run the same directory discovery as `/todos-cleanup`:
@@ -37,7 +69,7 @@ Resolve todo directory paths and optional Discord config:
    fi
 
    # Also check plugin config for custom token path
-   TOKEN_PATH=$(jq -r '.discord.token_path // empty' ~/.claude/solopreneur.json 2>/dev/null)
+   TOKEN_PATH=$(read_solopreneur_config discord | jq -r '.token_path // empty')
    if [ -n "$TOKEN_PATH" ] && [ -f "$TOKEN_PATH" ]; then
      source "$TOKEN_PATH"
    fi
@@ -49,7 +81,7 @@ Resolve todo directory paths and optional Discord config:
      ask user for channel ID on first run, save to config
    - **No token** → fallback to terminal output (all notifications print inline)
 
-   Discord config format in `~/.claude/solopreneur.json`:
+   Discord config format in `${CLAUDE_CONFIG_DIR:-~/.claude}/solopreneur.json`:
    ```json
    {
      "discord": {
@@ -265,8 +297,8 @@ whether to `go` for each item regardless of readiness rating.
 **Find existing threads:**
 ```bash
 TOKEN="$DISCORD_BOT_TOKEN"
-CHANNEL_ID=$(jq -r '.discord.channel_id' ~/.claude/solopreneur.json)
-GUILD_ID=$(jq -r '.discord.guild_id' ~/.claude/solopreneur.json)
+CHANNEL_ID=$(read_solopreneur_config discord | jq -r '.channel_id')
+GUILD_ID=$(read_solopreneur_config discord | jq -r '.guild_id')
 
 # Active threads
 curl -s "https://discord.com/api/v10/guilds/$GUILD_ID/threads/active" \

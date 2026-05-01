@@ -15,11 +15,43 @@ related commits. Present findings for user confirmation, then move files.
 
 ## Config Discovery
 
-Before scanning, resolve the todo directory paths:
+Before scanning, resolve the todo directory paths. Define the config helpers first:
+
+```bash
+# --- solopreneur config helpers (inlined from _shared/config.md) ---
+read_solopreneur_config() {
+  local key="$1"
+  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local fallback="$HOME/.claude/solopreneur.json"
+  if [ -f "$primary" ] && jq -e "has(\"$key\")" "$primary" >/dev/null 2>&1; then
+    jq -r ".${key} // empty" "$primary"
+    return
+  fi
+  if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
+    jq -r ".${key} // empty" "$fallback"
+  fi
+}
+
+write_solopreneur_config() {
+  local key="$1"
+  local value_expr="$2"
+  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local tmp
+  mkdir -p "$(dirname "$primary")"
+  tmp=$(mktemp "${primary}.XXXXXX")
+  local existing
+  existing=$(cat "$primary" 2>/dev/null || echo '{}')
+  echo "$existing" \
+    | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
+    > "$tmp"
+  mv "$tmp" "$primary"
+}
+# --- end solopreneur config helpers ---
+```
 
 1. **Check plugin config:**
    ```bash
-   jq -r '.todos // empty' ~/.claude/solopreneur.json 2>/dev/null
+   read_solopreneur_config todos
    ```
    If the `todos` key exists, use its `backlog`, `done`, `doing`, `later` values.
 
@@ -40,13 +72,12 @@ Before scanning, resolve the todo directory paths:
 
 3. **Save to config** after user confirms:
    ```bash
-   EXISTING=$(cat ~/.claude/solopreneur.json 2>/dev/null || echo '{}')
-   echo "$EXISTING" | jq --argjson todos '{
+   write_solopreneur_config todos '{
      "backlog": "todos/backlog",
      "done": "todos/done",
      "doing": "todos/doing",
      "later": "todos/later"
-   }' '.todos = $todos' > ~/.claude/solopreneur.json
+   }'
    ```
    Substitute user-confirmed paths into the JSON.
 
