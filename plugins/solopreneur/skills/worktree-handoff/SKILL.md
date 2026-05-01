@@ -41,9 +41,9 @@ read_solopreneur_config() {
 TODOS_CONFIG=$(read_solopreneur_config todos)
 PLANS_CONFIG=$(read_solopreneur_config plans)
 
-BACKLOG=$(echo "$TODOS_CONFIG" | jq -r '.backlog // empty')
-DOING=$(echo "$TODOS_CONFIG" | jq -r '.doing  // empty')
-PLANS_DIR=$(echo "$PLANS_CONFIG" | jq -r '.dir // empty')
+BACKLOG=$(echo "${TODOS_CONFIG:-{}}" | jq -r '.backlog // empty')
+DOING=$(echo "${TODOS_CONFIG:-{}}" | jq -r '.doing  // empty')
+PLANS_DIR=$(echo "${PLANS_CONFIG:-{}}" | jq -r '.dir // empty')
 PLANS_DIR="${PLANS_DIR:-docs/solopreneur/plans}"  # default
 MODE=$([ -n "$BACKLOG" ] && [ -n "$DOING" ] && echo "state-machine" || echo "flat")
 ```
@@ -232,7 +232,7 @@ PR reviewers.
 
 Print this so the user can paste it into a new session:
 
-```
+```text
 cd /absolute/path/to/repo/.worktrees/<slug>
 
 Plan file: <relative/path/to/plan.md>
@@ -262,7 +262,7 @@ section is appended with the HealthKit duplicate-source root cause detail.
 Commit: `docs(handoff): context for fix/sleep-calculation`
 
 Output for user:
-```
+```text
 cd /path/to/project/.worktrees/fix-sleep-calculation
 
 Plan file: docs/solopreneur/plans/doing/2026-04-10-sleep-tracking.md

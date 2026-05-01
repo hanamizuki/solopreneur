@@ -81,7 +81,7 @@ write_solopreneur_config() {
   existing=$(cat "$primary" 2>/dev/null || echo '{}')
   printf '%s\n' "$existing" \
     | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
-    > "$tmp"
+    > "$tmp" || { rm -f "$tmp"; return 1; }
 
   # Atomic publish: rename is atomic on POSIX filesystems.
   mv "$tmp" "$primary"
@@ -132,7 +132,7 @@ write_solopreneur_config() {
   existing=$(cat "$primary" 2>/dev/null || echo '{}')
   printf '%s\n' "$existing" \
     | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
-    > "$tmp"
+    > "$tmp" || { rm -f "$tmp"; return 1; }
   mv "$tmp" "$primary"
 }
 # --- end solopreneur config helpers ---

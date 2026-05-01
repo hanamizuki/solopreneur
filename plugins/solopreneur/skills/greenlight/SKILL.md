@@ -152,12 +152,13 @@ If `MODE=post-commit`, skip PR-mode pre-flight Step 2 below; do Argument Parsing
      existing=$(cat "$primary" 2>/dev/null || echo '{}')
      printf '%s\n' "$existing" \
        | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
-       > "$tmp"
+       > "$tmp" || { rm -f "$tmp"; return 1; }
      mv "$tmp" "$primary"
    }
    # --- end solopreneur config helpers ---
 
-   read_solopreneur_config greenlight || echo "NO_CONFIG"
+   GL_CFG=$(read_solopreneur_config greenlight)
+   [ -z "$GL_CFG" ] && echo "NO_CONFIG" || echo "$GL_CFG"
    ```
    If config exists, read `fallback_order` from the `greenlight` key.
    If absent (`NO_CONFIG`), use default: codex-bot as starting reviewer, ask user on failure.

@@ -142,10 +142,10 @@ read_solopreneur_config() {
 TODOS_CONFIG=$(read_solopreneur_config todos)
 PLANS_CONFIG=$(read_solopreneur_config plans)
 
-BACKLOG=$(echo "$TODOS_CONFIG" | jq -r '.backlog // empty')
-DOING=$(echo "$TODOS_CONFIG"  | jq -r '.doing  // empty')
-DONE_DIR=$(echo "$TODOS_CONFIG" | jq -r '.done  // empty')
-PLANS_DIR=$(echo "$PLANS_CONFIG" | jq -r '.dir // empty')
+BACKLOG=$(echo "${TODOS_CONFIG:-{}}" | jq -r '.backlog // empty')
+DOING=$(echo "${TODOS_CONFIG:-{}}"  | jq -r '.doing  // empty')
+DONE_DIR=$(echo "${TODOS_CONFIG:-{}}" | jq -r '.done  // empty')
+PLANS_DIR=$(echo "${PLANS_CONFIG:-{}}" | jq -r '.dir // empty')
 PLANS_DIR="${PLANS_DIR:-docs/solopreneur/plans}"
 
 BRANCH=$(git branch --show-current)
@@ -401,7 +401,7 @@ of the *next* `/merge-pr` run (from any other session) will clean it up.
 
 ### Step 5: Report status
 
-```
+```text
 PR #<N> merged to main (commit <sha>)
 
 Current worktree retained (will be cleaned automatically when /merge-pr runs

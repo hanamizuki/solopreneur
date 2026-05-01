@@ -294,7 +294,7 @@ digraph handoff {
 8. **Output the handoff message.** Same shape as today, with the plan file
    path stated explicitly so the next session doesn't have to discover it:
 
-   ```
+   ```text
    cd /path/to/repo/.worktrees/<slug>
 
    Plan file: <relative/path/to/plan.md>
@@ -308,7 +308,7 @@ digraph handoff {
 
 New plan files created by `worktree-handoff` use:
 
-```
+```text
 <YYYY-MM-DD>-<branch-slug>.md
 ```
 

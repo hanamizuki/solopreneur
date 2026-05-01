@@ -46,7 +46,7 @@ write_solopreneur_config() {
   existing=$(cat "$primary" 2>/dev/null || echo '{}')
   printf '%s\n' "$existing" \
     | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
-    > "$tmp"
+    > "$tmp" || { rm -f "$tmp"; return 1; }
   mv "$tmp" "$primary"
 }
 # --- end solopreneur config helpers ---
@@ -69,7 +69,8 @@ write_solopreneur_config() {
    fi
 
    # Also check plugin config for custom token path
-   TOKEN_PATH=$(read_solopreneur_config discord | jq -r '.token_path // empty')
+   DISCORD_CFG=$(read_solopreneur_config discord)
+   TOKEN_PATH=$(echo "${DISCORD_CFG:-{}}" | jq -r '.token_path // empty')
    if [ -n "$TOKEN_PATH" ] && [ -f "$TOKEN_PATH" ]; then
      source "$TOKEN_PATH"
    fi
@@ -297,8 +298,9 @@ whether to `go` for each item regardless of readiness rating.
 **Find existing threads:**
 ```bash
 TOKEN="$DISCORD_BOT_TOKEN"
-CHANNEL_ID=$(read_solopreneur_config discord | jq -r '.channel_id')
-GUILD_ID=$(read_solopreneur_config discord | jq -r '.guild_id')
+DISCORD_CFG=$(read_solopreneur_config discord)
+CHANNEL_ID=$(echo "${DISCORD_CFG:-{}}" | jq -r '.channel_id // empty')
+GUILD_ID=$(echo "${DISCORD_CFG:-{}}" | jq -r '.guild_id // empty')
 
 # Active threads
 curl -s "https://discord.com/api/v10/guilds/$GUILD_ID/threads/active" \
