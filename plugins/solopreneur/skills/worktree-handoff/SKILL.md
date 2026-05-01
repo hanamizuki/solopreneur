@@ -1,21 +1,57 @@
 ---
 name: worktree-handoff
 description: |
-  Create a git worktree for a task and write a CONTEXT.md that captures the full
-  problem context, so the next session can pick up without re-explanation. Use when
-  the user says "open worktree", "worktree handoff", "create a worktree", "start
-  a new branch for this", or wants to hand off a task to a fresh session with full
-  context preserved.
+  Create a git worktree for a task and record handoff context into a plan file
+  that is committed to the branch. Discovers existing plan files in the user's
+  configured todos or plans directory, appends a dated Handoff Context section,
+  and commits everything before printing the next-session pickup message.
+  Use when the user says "open worktree", "worktree handoff", "create a worktree",
+  "start a new branch for this", or wants to hand off a task to a fresh session
+  with full context preserved.
 ---
 
 # Worktree Handoff
 
-Create an isolated workspace for a new or in-progress task, and write the complete
-task context into the new worktree so the next session doesn't need to start from scratch.
+Create an isolated workspace for a new or in-progress task, and record the complete
+task context into a plan file that gets committed to the branch. The next session reads
+the plan file to pick up without re-explanation.
 
 ## Flow
 
-### 1. Decide Worktree Name and Branch
+### Step 1: Resolve Mode and Paths
+
+Inline the cascade config helpers, then determine the operating mode:
+
+```bash
+# --- solopreneur config helpers (inlined from _shared/config.md) ---
+read_solopreneur_config() {
+  local key="$1"
+  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local fallback="$HOME/.claude/solopreneur.json"
+  if [ -f "$primary" ] && jq -e "has(\"$key\")" "$primary" >/dev/null 2>&1; then
+    jq -r ".${key} // empty" "$primary"
+    return
+  fi
+  if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
+    jq -r ".${key} // empty" "$fallback"
+  fi
+}
+# --- end solopreneur config helpers ---
+
+TODOS_CONFIG=$(read_solopreneur_config todos)
+PLANS_CONFIG=$(read_solopreneur_config plans)
+
+BACKLOG=$(echo "$TODOS_CONFIG" | jq -r '.backlog // empty')
+DOING=$(echo "$TODOS_CONFIG" | jq -r '.doing  // empty')
+PLANS_DIR=$(echo "$PLANS_CONFIG" | jq -r '.dir // empty')
+PLANS_DIR="${PLANS_DIR:-docs/solopreneur/plans}"  # default
+```
+
+**Mode decision:**
+- **State-machine mode**: `$BACKLOG` and `$DOING` are both non-empty
+- **Flat mode**: otherwise — uses `$PLANS_DIR`
+
+### Step 2: Decide Worktree Name and Branch
 
 Name based on task type and description:
 
@@ -28,7 +64,7 @@ Name based on task type and description:
 
 Worktree directory name = branch name slug (strip prefix, use `-` separators).
 
-### 2. Create Worktree
+### Step 3: Create Worktree
 
 **Always place worktrees under `.worktrees/`:**
 
@@ -36,93 +72,196 @@ Worktree directory name = branch name slug (strip prefix, use `-` separators).
 git worktree add .worktrees/<slug> -b <branch-name>
 ```
 
-**Prohibited:**
-- Operating on main
-- Placing worktrees outside `.worktrees/`
+**Prohibited:** operating on main, placing worktrees outside `.worktrees/`.
 
-### 3. Copy Environment Config Files (gitignored secrets/config)
+### Step 4: Copy Environment Config Files (gitignored secrets/config)
 
-Worktrees are separate directories — files excluded by `.gitignore` don't carry over
-automatically. **After creating the worktree, check for and copy relevant config files:**
+Worktrees are separate directories — gitignored files don't carry over automatically.
+Check `.gitignore` for config/secret patterns, find matching files in the main repo,
+copy them to the same relative paths in the worktree. Never copy build artifacts.
 
 ```bash
-# Get the main repo root
 MAIN_REPO="$(git worktree list | head -1 | awk '{print $1}')"
 WORKTREE=".worktrees/<slug>"
 
 # Find gitignored config files that exist in the main repo
 # Common patterns: .env, *.xcconfig, local.properties, secrets.json
-# Copy any that are relevant to this project
+# Copy any that are relevant to this project to the worktree's corresponding paths
 ```
 
-**Detection strategy:**
-1. Check `.gitignore` for patterns that match config/secret files
-2. Find files matching those patterns in the main repo
-3. Copy them to the corresponding paths in the worktree
+### Step 5: Discover Candidate Plan Files + Interactive Picker
 
-**Principle:** Only copy gitignored environment config files. Never copy build artifacts or caches.
+**Scan for candidates:**
 
-### 4. Write docs/CONTEXT.md
+```bash
+# State-machine mode: scan backlog + doing directories
+if [ "$MODE" = "state-machine" ]; then
+  echo "=== Backlog ===" && ls "$BACKLOG"/*.md 2>/dev/null | xargs -I{} basename {}
+  echo "=== Doing ===" && ls "$DOING"/*.md 2>/dev/null | xargs -I{} basename {}
+else
+  # Flat mode: scan plans dir (create dir if it doesn't exist yet)
+  mkdir -p "$PLANS_DIR"
+  ls "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {}
+fi
+```
 
-Write the complete task context into `docs/CONTEXT.md` in the new worktree.
-This file is the next session's sole knowledge source.
+Show the list to the user with sequential index numbers (in state-machine mode, number
+across both backlog and doing combined). Then ask:
 
-**CONTEXT.md structure:**
+> "Which plan does this worktree belong to? Enter a number to reuse an existing plan,
+> or 'new' to create a fresh plan file."
 
+If no plan files exist at all, skip the prompt and proceed directly to creating a new file.
+
+**Recording the source:** When the user picks a file from the backlog (state-machine mode),
+note which directory it came from so Step 6 knows to `git mv` it to doing.
+
+### Step 6: Prepare the Plan File
+
+#### If user picked 'new' (or no plans exist)
+
+Create a new file:
+- State-machine mode: `<doing>/<YYYY-MM-DD>-<branch-slug>.md`
+- Flat mode: `<plans-dir>/<YYYY-MM-DD>-<branch-slug>.md`
+
+Where `<branch-slug>` = branch name with `/` replaced by `-`
+(e.g., `fix/sleep-calculation` → `fix-sleep-calculation`).
+Date from `$(date +%Y-%m-%d)`.
+
+New file content:
 ```markdown
-# Context: <branch-name>
+<!--
+Plan-Branch: <branch-name>
+-->
 
-## Problem Background
-[Why is this being done? User reports? Screenshots? Logs?]
+## Handoff Context (<YYYY-MM-DD>, branch: <branch-name>)
 
-## Root Cause
-[Known technical issues, include file paths + line numbers]
+### Problem Background
+<why is this being done — user reports, screenshots, logs>
 
-## Items to Fix / Implement
-[Checklist, with expected approach for each item]
+### Root Cause
+<known technical issues, with file paths + line numbers>
 
-## Key Files
-[Table: file path | description]
+### Items to Fix / Implement
+- [ ] <item with expected approach>
 
-## Current Progress
-[Not started / which steps are already done]
+### Key Files
+| path | description |
+|------|-------------|
+
+### Current Progress
+Not started.
 ```
 
-**Writing principles:**
-- Be specific, not vague — include file names, line numbers, error messages, actual numbers
-- Include the root cause analysis already done — don't make the next session debug from scratch
-- If the conversation had screenshot descriptions or user-reported bug details, include everything
+Fill in the five sections based on context from the current conversation.
 
-If `docs/CONTEXT.md` already exists (from another task on main), **overwrite** its entire
-content with the current task's context.
+#### If user picked an existing file
 
-### 5. Output Instructions for the User
+1. **Move from backlog to doing (state-machine mode only):**
+   If the selected file is in `$BACKLOG`, move it:
+   ```bash
+   git mv "$BACKLOG/<filename>" "$DOING/<filename>"
+   PLAN_FILE="$DOING/<filename>"
+   ```
+   In flat mode, skip this step — the file stays in place.
 
-Output this message so the user can paste it into a new session:
+2. **Ensure the `Plan-Branch:` marker block exists at the top of the file.**
+   If the file already starts with an HTML comment block containing at least one
+   `Plan-Branch:` line, check whether `Plan-Branch: <branch-name>` is already
+   present. If it is absent, append the line inside the existing comment block:
+   ```bash
+   # Add Plan-Branch: <branch-name> to the existing <!-- ... --> block
+   sed -i '' "/^-->/i\\
+   Plan-Branch: <branch-name>" "$PLAN_FILE"
+   ```
+   If no comment block exists at the top (legacy file), prepend one:
+   ```markdown
+   <!--
+   Plan-Branch: <branch-name>
+   -->
+   ```
+
+3. **Append the handoff section at the end of the file:**
+   ```markdown
+
+   ## Handoff Context (<YYYY-MM-DD>, branch: <branch-name>)
+
+   ### Problem Background
+   <why is this being done — user reports, screenshots, logs>
+
+   ### Root Cause
+   <known technical issues, with file paths + line numbers>
+
+   ### Items to Fix / Implement
+   - [ ] <item with expected approach>
+
+   ### Key Files
+   | path | description |
+   |------|-------------|
+
+   ### Current Progress
+   <not started / steps done so far>
+   ```
+
+   Fill in the five sections based on context from the current conversation.
+   Be specific: include file names, line numbers, error messages, actual numbers.
+   Include root cause analysis already done so the next session doesn't debug from
+   scratch. If the conversation had screenshots or user-reported bug details,
+   include everything.
+
+### Step 7: Commit and Push
+
+```bash
+git add <plan-file-path>
+# Also stage the git mv result if the file moved from backlog to doing
+git commit -m "docs(handoff): context for <branch-name>"
+git push -u origin <branch-name>
+```
+
+Single commit. Push immediately so the doc is visible to the next session and to
+PR reviewers.
+
+### Step 8: Output the Next-Session Pickup Message
+
+Print this so the user can paste it into a new session:
 
 ```
-cd /path/to/repo/.worktrees/<slug>
+cd /absolute/path/to/repo/.worktrees/<slug>
 
-Read `docs/CONTEXT.md` first — it contains the full context for <one-line task description>.
-Branch: `<branch-name>`, <one sentence describing the core problem or goal>.
+Plan file: <relative/path/to/plan.md>
+Read the plan file for the full context — branch <branch-name> is tracked under
+the `Plan-Branch:` marker, and the latest `## Handoff Context` section captures
+the current state.
+Branch: <branch-name>, <one-line task description>.
 ```
+
+Use an absolute path in the `cd` command (from `git worktree list`). The plan file
+path should be relative to the repo root.
 
 ## Example
 
-User says: "Open a worktree to fix the sleep calculation — the issue is duplicate sources from HealthKit"
+User says: "Open a worktree to fix the sleep calculation — the issue is duplicate
+sources from HealthKit"
 
 ```bash
 git worktree add .worktrees/fix-sleep-calculation -b fix/sleep-calculation
 ```
 
-CONTEXT.md content: full problem background, root cause (HealthKit not deduplicating),
-key files list, suggested fix direction.
+Plan file discovery: user picks existing `2026-04-10-sleep-tracking.md` from
+backlog (state-machine mode). File is `git mv`'d to doing, `Plan-Branch:
+fix/sleep-calculation` is added to the marker block, and the Handoff Context
+section is appended with the HealthKit duplicate-source root cause detail.
+
+Commit: `docs(handoff): context for fix/sleep-calculation`
 
 Output for user:
 ```
 cd /path/to/project/.worktrees/fix-sleep-calculation
 
-Read `docs/CONTEXT.md` first — it contains the full context for the sleep calculation fix.
-Branch: `fix/sleep-calculation`, the issue is that HealthKit multi-source sleep samples
-aren't being deduplicated, causing displayed sleep time to exceed Apple Health's value.
+Plan file: docs/solopreneur/plans/doing/2026-04-10-sleep-tracking.md
+Read the plan file for the full context — branch fix/sleep-calculation is tracked
+under the `Plan-Branch:` marker, and the latest `## Handoff Context` section
+captures the current state.
+Branch: fix/sleep-calculation, deduplicate HealthKit multi-source sleep samples
+so displayed sleep time matches Apple Health's value.
 ```
