@@ -127,7 +127,38 @@ If `MODE=post-commit`, skip PR-mode pre-flight Step 2 below; do Argument Parsing
 
 4. Read reviewer fallback config:
    ```bash
-   jq -r '.greenlight // empty' ~/.claude/solopreneur.json 2>/dev/null || echo "NO_CONFIG"
+   # --- solopreneur config helpers (inlined from _shared/config.md) ---
+   read_solopreneur_config() {
+     local key="$1"
+     local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+     local fallback="$HOME/.claude/solopreneur.json"
+     if [ -f "$primary" ] && jq -e "has(\"$key\")" "$primary" >/dev/null 2>&1; then
+       jq -r ".${key} // empty" "$primary"
+       return
+     fi
+     if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
+       jq -r ".${key} // empty" "$fallback"
+     fi
+   }
+
+   write_solopreneur_config() {
+     local key="$1"
+     local value_expr="$2"
+     local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+     local tmp
+     mkdir -p "$(dirname "$primary")"
+     tmp=$(mktemp "${primary}.XXXXXX")
+     local existing
+     existing=$(cat "$primary" 2>/dev/null || echo '{}')
+     printf '%s\n' "$existing" \
+       | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
+       > "$tmp" || { rm -f "$tmp"; return 1; }
+     mv "$tmp" "$primary"
+   }
+   # --- end solopreneur config helpers ---
+
+   GL_CFG=$(read_solopreneur_config greenlight)
+   [ -z "$GL_CFG" ] && echo "NO_CONFIG" || echo "$GL_CFG"
    ```
    If config exists, read `fallback_order` from the `greenlight` key.
    If absent (`NO_CONFIG`), use default: codex-bot as starting reviewer, ask user on failure.
@@ -697,7 +728,7 @@ Otherwise → unavailable. Don't list Codex CLI when asking user for fallback op
 
 ### Fallback Logic
 
-**With config (`~/.claude/solopreneur.json` has `greenlight` key):**
+**With config (`${CLAUDE_CONFIG_DIR:-~/.claude}/solopreneur.json` has `greenlight` key):**
 Follow `fallback_order` array sequentially. Each reviewer failure auto-switches to next, notifying user.
 If all reviewers in array fail, stop and ask user.
 Once user selects a reviewer, maintain it for the rest of this review cycle — no per-round reset.
@@ -715,14 +746,12 @@ Once user selects a reviewer, maintain it for the rest of this review cycle — 
    - A) Yes, remember this
    - B) No, ask each time
 
-4. If user picks A, merge into `~/.claude/solopreneur.json`:
+4. If user picks A, save to primary solopreneur.json:
    ```bash
-   # Read existing config or start fresh
-   EXISTING=$(cat ~/.claude/solopreneur.json 2>/dev/null || echo '{}')
-   echo "$EXISTING" | jq --argjson gl '{
+   write_solopreneur_config greenlight '{
      "fallback_order": ["codex-bot", "gemini"],
      "created_at": "TIMESTAMP"
-   }' '.greenlight = $gl' > ~/.claude/solopreneur.json
+   }'
    ```
    (`fallback_order` = user's actual ordering, `TIMESTAMP` in ISO 8601)
 
