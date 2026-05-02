@@ -97,12 +97,10 @@ WORKTREE=".worktrees/<slug>"
 ```bash
 # State-machine mode: collect from backlog + doing
 if [ "$MODE" = "state-machine" ]; then
-  BACKLOG_FILES=$(ls "$BACKLOG"/*.md 2>/dev/null)
-  DOING_FILES=$(ls "$DOING"/*.md 2>/dev/null)
-  ALL_FILES=$(echo -e "$BACKLOG_FILES\n$DOING_FILES" | grep -v '^$')
+  ALL_FILES=$(find "$BACKLOG" "$DOING" -maxdepth 1 -name "*.md" 2>/dev/null)
 else
   mkdir -p "$PLANS_DIR"
-  ALL_FILES=$(ls "$PLANS_DIR"/*.md 2>/dev/null)
+  ALL_FILES=$(find "$PLANS_DIR" -maxdepth 1 -name "*.md" 2>/dev/null)
 fi
 ```
 
@@ -115,19 +113,26 @@ from the user's description). Then score each plan file:
 2. Search file **content** (title headings, `Plan-Branch:` lines, first 20 lines) for the key terms
 
 ```bash
-# Example: task is "fix sleep calculation duplicate sources"
-# Key terms: sleep, calculation, duplicate, healthkit, sources
-# Score each file: count how many key terms appear in name + first 20 lines of content
-for f in $ALL_FILES; do
-  score=$(grep -i -c "sleep\|calculation\|duplicate" "$f" 2>/dev/null || echo 0)
-  name_score=$(basename "$f" | grep -ic "sleep\|calculation" || echo 0)
-  echo "$((score + name_score * 2)) $f"
-done | sort -rn
+# ILLUSTRATIVE ONLY — substitute actual key terms extracted from the current
+# conversation before running. Do NOT execute this block with these hardcoded terms.
+TERMS="<term1>\|<term2>\|<term3>"  # replace with actual key terms
+CANDIDATES=""
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  score=$(head -20 "$f" | grep -i -c "$TERMS" 2>/dev/null || echo 0)
+  name_score=$(basename "$f" | grep -i -c "$TERMS" 2>/dev/null || echo 0)
+  total=$((score + name_score * 2))
+  [ "$total" -gt 0 ] && CANDIDATES="$CANDIDATES\n$total $f"
+done <<< "$ALL_FILES"
+CANDIDATES=$(printf '%b' "$CANDIDATES" | sort -rn)
+MATCH_COUNT=$([ -n "$CANDIDATES" ] && printf '%b' "$CANDIDATES" | grep -c . || echo 0)
 ```
+
+**Match count** = number of files with a score greater than zero (i.e., at least one key term found in the filename or first 20 lines of content).
 
 **Decision based on match count:**
 
-- **0 matches** — skip the prompt entirely; proceed directly to Step 6 to create a new file.
+- **0 matches** — if `$ALL_FILES` is non-empty, briefly tell the user: "No matching plans found for this task — creating a new plan file. (Reply with a filename to use an existing plan instead.)" Then proceed to Step 6 to create a new file.
 - **1 match** — use it automatically, no prompt. Print: `→ Matched plan: <filename>` so the user knows what was selected.
 - **2+ matches** — show only the matching candidates (not all files) with index numbers, then ask:
 
@@ -137,8 +142,9 @@ done | sort -rn
 
 **If no plan files exist at all**, skip all of the above and proceed directly to creating a new file.
 
-**Recording the source:** When a file comes from `$BACKLOG` (state-machine mode),
-note that so Step 6 knows to `git mv` it to doing.
+**Recording the source:** When a file is selected, set `PLAN_SOURCE=backlog` or
+`PLAN_SOURCE=doing` based on which directory it came from. Step 6 checks
+`$PLAN_SOURCE` to decide whether to run `git mv` (only when `PLAN_SOURCE=backlog`).
 
 ### Step 6: Prepare the Plan File
 
