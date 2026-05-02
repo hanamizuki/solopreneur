@@ -90,32 +90,55 @@ WORKTREE=".worktrees/<slug>"
 # Copy any that are relevant to this project to the worktree's corresponding paths
 ```
 
-### Step 5: Discover Candidate Plan Files + Interactive Picker
+### Step 5: Discover Candidate Plan Files + Context-Aware Picker
 
-**Scan for candidates:**
+**Collect all plan files:**
 
 ```bash
-# State-machine mode: scan backlog + doing directories
+# State-machine mode: collect from backlog + doing
 if [ "$MODE" = "state-machine" ]; then
-  echo "=== Backlog ===" && ls "$BACKLOG"/*.md 2>/dev/null | xargs -I{} basename {}
-  echo "=== Doing ===" && ls "$DOING"/*.md 2>/dev/null | xargs -I{} basename {}
+  BACKLOG_FILES=$(ls "$BACKLOG"/*.md 2>/dev/null)
+  DOING_FILES=$(ls "$DOING"/*.md 2>/dev/null)
+  ALL_FILES=$(echo -e "$BACKLOG_FILES\n$DOING_FILES" | grep -v '^$')
 else
-  # Flat mode: scan plans dir (create dir if it doesn't exist yet)
   mkdir -p "$PLANS_DIR"
-  ls "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {}
+  ALL_FILES=$(ls "$PLANS_DIR"/*.md 2>/dev/null)
 fi
 ```
 
-Show the list to the user with sequential index numbers (in state-machine mode, number
-across both backlog and doing combined). Then ask:
+**Context matching — before prompting the user:**
 
-> "Which plan does this worktree belong to? Enter a number to reuse an existing plan,
-> or 'new' to create a fresh plan file."
+Extract 3–5 key terms from the current conversation (task name, feature area, keywords
+from the user's description). Then score each plan file:
 
-If no plan files exist at all, skip the prompt and proceed directly to creating a new file.
+1. Search file **names** (basename) for the key terms
+2. Search file **content** (title headings, `Plan-Branch:` lines, first 20 lines) for the key terms
 
-**Recording the source:** When the user picks a file from the backlog (state-machine mode),
-note which directory it came from so Step 6 knows to `git mv` it to doing.
+```bash
+# Example: task is "fix sleep calculation duplicate sources"
+# Key terms: sleep, calculation, duplicate, healthkit, sources
+# Score each file: count how many key terms appear in name + first 20 lines of content
+for f in $ALL_FILES; do
+  score=$(grep -i -c "sleep\|calculation\|duplicate" "$f" 2>/dev/null || echo 0)
+  name_score=$(basename "$f" | grep -ic "sleep\|calculation" || echo 0)
+  echo "$((score + name_score * 2)) $f"
+done | sort -rn
+```
+
+**Decision based on match count:**
+
+- **0 matches** — skip the prompt entirely; proceed directly to Step 6 to create a new file.
+- **1 match** — use it automatically, no prompt. Print: `→ Matched plan: <filename>` so the user knows what was selected.
+- **2+ matches** — show only the matching candidates (not all files) with index numbers, then ask:
+
+  > "Found N matching plans. Which one does this worktree belong to? Enter a number to reuse it, or 'new' to create a fresh plan file."
+
+  In state-machine mode, note the source directory in parentheses (Backlog / Doing) next to each filename.
+
+**If no plan files exist at all**, skip all of the above and proceed directly to creating a new file.
+
+**Recording the source:** When a file comes from `$BACKLOG` (state-machine mode),
+note that so Step 6 knows to `git mv` it to doing.
 
 ### Step 6: Prepare the Plan File
 
