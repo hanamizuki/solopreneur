@@ -2,7 +2,7 @@
 Plan-Branch: feature/worktree-handoff-context-picker
 -->
 
-## Handoff Context (2026-05-02, branch: feature/worktree-handoff-context-picker)
+## Final Progress (merged 2026-05-02, branch: feature/worktree-handoff-context-picker)
 
 ### Problem Background
 `worktree-handoff` Step 5 was listing all plan files and asking the user to pick one every time. The user wants the skill to first detect context from the current conversation, find relevant plans automatically, and only prompt when there are multiple matches.
