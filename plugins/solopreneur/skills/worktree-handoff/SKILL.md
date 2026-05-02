@@ -119,8 +119,8 @@ TERMS="<term1>\|<term2>\|<term3>"  # replace with actual key terms
 CANDIDATES=""
 while IFS= read -r f; do
   [ -z "$f" ] && continue
-  score=$(head -20 "$f" | grep -i -c "$TERMS" 2>/dev/null || echo 0)
-  name_score=$(basename "$f" | grep -i -c "$TERMS" 2>/dev/null || echo 0)
+  score=$(head -20 "$f" | grep -i -c "$TERMS" 2>/dev/null); score=${score:-0}
+  name_score=$(basename "$f" | grep -i -c "$TERMS" 2>/dev/null); name_score=${name_score:-0}
   total=$((score + name_score * 2))
   [ "$total" -gt 0 ] && CANDIDATES="$CANDIDATES\n$total $f"
 done <<< "$ALL_FILES"
