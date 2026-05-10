@@ -2,7 +2,7 @@
 Plan-Branch: feature/autopilot-single-pr-mode
 -->
 
-## Handoff Context (2026-05-10, branch: feature/autopilot-single-pr-mode)
+## Final Progress (merged 2026-05-10, branch: feature/autopilot-single-pr-mode)
 
 ### Problem Background
 `/autopilot` is multi-PR only today. The closing line of `plugins/solopreneur/skills/autopilot/SKILL.md` (line 211) says:
