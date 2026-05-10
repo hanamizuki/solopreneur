@@ -33,6 +33,7 @@ What does **not** change:
 - `references/pr-subagent-template.md` — already covers Plan Mode → preflight → implement → PR → greenlight → CI → merge-pr → cleanup → result JSON. The "full flow runs" guarantee depends entirely on this template, so leave it alone.
 
 ### Key Files
+
 | path | description |
 |------|-------------|
 | `docs/spec/2026-05-09-autopilot-single-pr-mode.md` | Full design spec — read this first |

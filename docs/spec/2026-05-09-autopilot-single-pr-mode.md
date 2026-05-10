@@ -55,7 +55,7 @@ Unchanged.
 
 When the natural split is 1 PR, output a single PR descriptor instead of a dependency graph:
 
-```
+```text
 PR
   title:    feat(scope): <summary>
   branch:   feature/<short-name>
@@ -98,7 +98,7 @@ Multi-PR confirmation is unchanged.
 
 Single-PR confirmation reads:
 
-```
+```text
 Plan: 1 PR
   feat(scope): <summary>  (subagent: ai-engineer, branch: feature/<short-name>)
   Files: path/a.py, path/b.py
@@ -123,7 +123,7 @@ The 10-30 minute estimate is intentional. The user should know that "run now" bl
 
 #### New: single-PR + run now (inline dispatch)
 
-```
+```text
 1. Read references/pr-subagent-template.md (unchanged template).
 2. Read pr1-<short>.md (the spec just written).
 3. Assemble the prompt: standard prefix + spec content + standard suffix.
@@ -159,7 +159,7 @@ The "no recovery" tradeoff for run-now mode is intentional. If the user wanted r
 
 On success:
 
-```
+```text
 Autopilot Single-PR done
 ═════════════════════════
 ✅ #91 feat(scope): <summary> — 2 rounds, fixed 1, pushed back 0
@@ -169,7 +169,7 @@ Autopilot Single-PR done
 
 On block:
 
-```
+```text
 ❌ blocked: feat(scope): <summary>
    reason: <error from subagent>
    spec: docs/loops/<YYYY-MM-DD>_<short-name>/pr1-<short>.md

@@ -23,7 +23,7 @@ triggered via cron (see `references/orchestrator.md`).
 
 ## Flow Overview
 
-```
+```text
 User provides todo file
   ↓
 Step 0: Verify dependency skills are available
@@ -92,7 +92,7 @@ The reverse is also true.
 
 Output a single PR descriptor instead of a graph:
 
-```
+```text
 PR
   title:    feat(scope): <summary>
   branch:   feature/<short-name>
@@ -125,7 +125,7 @@ For each PR, list:
    - Check for circular dependencies
 
 **Present the dependency graph** for user confirmation:
-```
+```text
 PR1 (models) ──→ PR3 (router, depends on PR1)
 PR2 (worker) ──→ PR4 (docs, depends on all)
      ↑
@@ -151,7 +151,7 @@ of mode. What gets written depends on mode:
 |---|---|
 | Single-PR + run now | `pr1-<short>.md` only |
 | Single-PR + schedule | `plan.yaml` (1 PR entry) + `state.json` + `pr1-<short>.md` |
-| Multi-PR | `plan.yaml` + `state.json` + `pr1-*.md`, `pr2-*.md`, … |
+| Multi-PR | `plan.yaml` + `state.json` + `pr1-<short>.md`, `pr2-<short>.md`, … |
 
 **Spec naming**: always `pr1-<short>.md`, `pr2-<short>.md`, … — the same convention
 regardless of mode. Single-PR uses `pr1-<short>.md` (not `spec.md`) so that
@@ -160,7 +160,7 @@ add a PR2") doesn't require renaming the existing file.
 
 Example tree (multi-PR):
 
-```
+```text
 docs/loops/2026-03-29_mining-queries/
   ├── plan.yaml
   ├── state.json
@@ -241,7 +241,7 @@ Initial state (multi-PR or single-PR + schedule; **not** written for single-PR
 
 Present the final plan + preflight results for user confirmation:
 
-```
+```text
 Plan: 4 PRs
   PR1 (models) + PR2 (worker) → parallel
   PR3 (router) → waits for PR1
@@ -256,7 +256,7 @@ Schedule for automatic execution? Tell me when you'd like it to run.
 
 Present the plan and ask for execution mode:
 
-```
+```text
 Plan: 1 PR
   feat(scope): <summary>  (subagent: ai-engineer, branch: feature/<short-name>)
   Files: path/a.py, path/b.py
@@ -342,7 +342,7 @@ CronCreate(
 
 On success:
 
-```
+```text
 Autopilot Single-PR done
 ═════════════════════════
 ✅ #91 feat(scope): <summary> — 2 rounds, fixed 1, pushed back 0
@@ -352,7 +352,7 @@ Autopilot Single-PR done
 
 On block:
 
-```
+```text
 ❌ blocked: feat(scope): <summary>
    reason: <error from subagent>
    spec: docs/loops/<YYYY-MM-DD>_<short-name>/pr1-<short>.md
