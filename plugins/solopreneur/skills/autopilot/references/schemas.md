@@ -49,6 +49,11 @@ prs:
 | `prs[].depends_on` | ✅ | List of dependent PR ids; empty array = no dependencies |
 | `prs[].spec` | ✅ | Spec filename (relative to plan directory) |
 
+> **Length:** `prs[]` typically holds 2+ entries, but a length of **1** is also
+> valid — it occurs when `/autopilot` runs in single-PR + schedule mode. The
+> orchestrator's loop degenerates to a single iteration; no special handling
+> needed.
+
 ### Subagent Type Reference
 
 | Type | Use Case |
