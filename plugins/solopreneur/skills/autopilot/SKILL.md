@@ -105,6 +105,9 @@ PR
 Reason: scope is contained to a single module / single purpose, no split needed.
 ```
 
+`subagent` accepts the same values as multi-PR (see the multi-PR list below:
+`ios-dev / android-dev / ai-engineer / neo4j-dev / marketer / designer`).
+
 What is **dropped** in single-PR mode: dependency graph rendering, parallel
 safety check, batch loop planning. Proceed to Step 3.
 
@@ -133,6 +136,14 @@ Proceed to Step 3 after user confirms.
 
 ## Step 3: Write Artifacts
 
+**When to write — read this first:**
+
+- **Multi-PR**: write artifacts now, then proceed to Step 4.
+- **Single-PR (either run now or schedule)**: do **not** write any artifacts in
+  this step. Defer all writes until after the user confirms execution mode in
+  Step 4. This avoids leaving half-written `plan.yaml` / `state.json` / spec
+  files on disk if the user cancels at the confirmation gate.
+
 Output location is `docs/loops/<YYYY-MM-DD>_<short-name>/` — same convention regardless
 of mode. What gets written depends on mode:
 
@@ -146,12 +157,6 @@ of mode. What gets written depends on mode:
 regardless of mode. Single-PR uses `pr1-<short>.md` (not `spec.md`) so that
 `references/schemas.md` needs no exception, and a mid-flow pivot ("actually let's
 add a PR2") doesn't require renaming the existing file.
-
-**Write-ordering rule (single-PR only)**: do **not** write any artifacts until the
-user picks "run now" or "schedule" in Step 4. This avoids leaving half-written
-`plan.yaml` / `state.json` / spec files on disk if the user cancels at the
-confirmation gate. In multi-PR mode, write artifacts now, then proceed to Step 4
-as usual.
 
 Example tree (multi-PR):
 
@@ -281,13 +286,21 @@ After the user picks, write the artifacts per Step 3's table, then proceed to St
 
 1. Read `references/pr-subagent-template.md` (template is unchanged).
 2. Read the spec just written (`pr1-<short>.md`).
-3. Assemble the prompt: standard prefix + spec content + standard suffix.
-4. Resolve template variables:
+3. Resolve dispatch-time template variables:
    - `{BRANCH}`    = `feature/<short-name>`
    - `{TITLE}`     = `feat(scope): <summary>`
    - `{PR_ID}`     = `pr1`
    - `{PLAN_DIR}`  = `docs/loops/<YYYY-MM-DD>_<short-name>`
    - `{SPEC_FILE}` = `pr1-<short>.md`
+
+   Leave `{PR_NUMBER}`, `{REPO_ROOT}`, `{WORKTREE_PATH}` as `{...}` literals — the
+   subagent fills them in at runtime.
+4. Assemble the final prompt by concatenating, in order: the inner contents of
+   the `Standard Prefix` fenced code block, the spec content from step 2, and
+   the inner contents of the `Standard Suffix` fenced code block (do not
+   include the `## Standard Prefix` / `## Standard Suffix` markdown headers
+   or the surrounding triple-backtick fences). Substitute the variables from
+   step 3 into the result.
 5. Dispatch the Agent tool:
    - `subagent_type` = `<subagent declared in Step 2>`
    - `isolation`     = `"worktree"`

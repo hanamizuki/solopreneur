@@ -50,9 +50,10 @@ prs:
 | `prs[].spec` | ✅ | Spec filename (relative to plan directory) |
 
 > **Length:** `prs[]` typically holds 2+ entries, but a length of **1** is also
-> valid — it occurs when `/autopilot` runs in single-PR + schedule mode. The
+> valid — for example, when `/autopilot` runs in single-PR + schedule mode. The
 > orchestrator's loop degenerates to a single iteration; no special handling
-> needed.
+> needed. Note that single-PR + run-now writes no `plan.yaml` at all, so this
+> case never appears on disk for that mode.
 
 ### Subagent Type Reference
 
