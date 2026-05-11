@@ -3,10 +3,10 @@ name: mvp
 description: |
   Meta-orchestrator for building a brand-new app, product, or MVP from
   scratch. Drives the full flow: brainstorming → template lookup →
-  planning → autopilot. Use INSTEAD OF superpowers:brainstorming when
-  the user is starting a new product — this skill calls brainstorming
-  internally, then chains in template discovery, plan writing, and
-  autopilot dispatch. Triggers: "/mvp", "我要做 app", "想做產品",
+  planning → plan execution. Use INSTEAD OF superpowers:brainstorming
+  when the user is starting a new product — this skill calls
+  brainstorming internally, then chains in template discovery, plan
+  writing, and execution. Triggers: "/mvp", "我要做 app", "想做產品",
   "想做一個 app", "做個 MVP", "build a product", "build an app from
   scratch", "MVP from scratch", "start a new app", "new product".
 ---
@@ -21,11 +21,11 @@ brainstorming and plan writing.
 ## Flow
 
 ```
-0. Verify dependencies        (superpowers + ≥1 *-app-templates)
-1. superpowers:brainstorming  (clarify needs + classify platform)
-2. Template lookup            (find matching *-app-templates skill)
-3. superpowers:writing-plans  (template as architectural baseline)
-4. solopreneur:autopilot      (execute the plan)
+0. Verify dependencies          (superpowers + ≥1 *-app-templates)
+1. superpowers:brainstorming    (clarify needs + classify platform)
+2. Template lookup              (find matching *-app-templates skill)
+3. superpowers:writing-plans    (template as architectural baseline)
+4. superpowers:executing-plans  (execute with review checkpoints)
 ```
 
 ## Step 0: Verify dependencies
@@ -33,7 +33,7 @@ brainstorming and plan writing.
 **Required** (check via the available-skills list in the system-reminder):
 - `superpowers:brainstorming`
 - `superpowers:writing-plans`
-- `solopreneur:autopilot` — co-packaged with this skill
+- `superpowers:executing-plans`
 
 **Expected (≥1)**: any skill matching `*-app-templates`
 (e.g. `ios-dev:ios-app-templates`, `ai-engineer:ai-app-templates`).
@@ -106,18 +106,23 @@ If no templates were found:
 - Write a freeform plan from the brainstorm output.
 - State explicitly that no template was reused, so future readers know.
 
-## Step 4: Autopilot
+## Step 4: Execute the plan
 
-Before invoking autopilot, **stop and get explicit user approval** of
-the finalized plan. Do not assume the Step 3 draft is approved.
+Before handing off, **stop and get explicit user approval** of the
+finalized plan. Do not assume the Step 3 draft is approved.
 
-Once approved, hand off to `solopreneur:autopilot` with the plan file
-path as input. Autopilot handles PR splitting, worktree dispatch,
-review loop, and merge. This skill's job ends here.
+Once approved, hand off to `superpowers:executing-plans` with the plan
+file path as input. That skill executes the plan with built-in review
+checkpoints. This skill's job ends here.
+
+Heavier orchestration (PR splitting, worktree dispatch, automated
+review loops, merge) is intentionally **not** part of this flow — if
+the user later wants that for the same plan, they can invoke
+`solopreneur:autopilot` separately.
 
 ## Notes
 
 - **Don't skip steps.** Even if the user seems impatient,
   brainstorming → template lookup → plan is the value proposition.
-  Short-circuit to autopilot only if the user explicitly opts out of
+  Short-circuit to execution only if the user explicitly opts out of
   a phase.
