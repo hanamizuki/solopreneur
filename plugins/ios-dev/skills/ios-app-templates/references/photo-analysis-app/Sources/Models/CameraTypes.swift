@@ -62,6 +62,11 @@ enum CameraError: LocalizedError {
     /// shutter while a capture is pending and re-enable it once the
     /// continuation resolves.
     case captureInProgress
+    /// The capture session was torn down (e.g. \`stop()\`) while a capture
+    /// was in flight, before AVFoundation produced a final photo. The
+    /// pending continuation is resolved with this error so the caller can
+    /// distinguish "cancelled" from "hardware/encoder failure".
+    case captureCancelled
     case unauthorized
 
     var errorDescription: String? {
@@ -73,6 +78,7 @@ enum CameraError: LocalizedError {
         case .captureNotConfigured:      return "Capture pipeline is not configured."
         case .photoDataExtractionFailed: return "Failed to extract photo file data."
         case .captureInProgress:         return "Another capture is already in progress."
+        case .captureCancelled:          return "Capture was cancelled before the photo was delivered."
         case .unauthorized:              return "Camera access is not authorized."
         }
     }

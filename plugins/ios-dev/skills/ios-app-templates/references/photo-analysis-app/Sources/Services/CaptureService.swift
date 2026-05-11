@@ -113,9 +113,20 @@ final class CaptureService: NSObject {
     }
 
     /// Stop the capture session. Safe to call from any thread.
+    ///
+    /// If a \`capturePhoto()\` is in flight when this is called (delegate
+    /// callback has not yet fired), the pending continuation is resumed
+    /// with \`CameraError.captureCancelled\` so the caller does not deadlock
+    /// waiting for a photo that will never arrive.
     func stop() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
+            // Drain any in-flight capture before tearing down the session.
+            if let pending = self.captureContinuation {
+                Log.capture.notice("Cancelling in-flight capture due to session stop")
+                self.captureContinuation = nil
+                pending.resume(throwing: CameraError.captureCancelled)
+            }
             if self.session.isRunning {
                 self.session.stopRunning()
                 Log.capture.info("Capture session stopped")
