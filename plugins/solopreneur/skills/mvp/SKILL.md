@@ -235,8 +235,15 @@ subagent self-aborts on the branch rename. Two paths:
 
 **Path A: orchestrator is on `main` (no feature branch yet)**
 - Derive a new, unique feature branch name from the product
-  (e.g. `feature/mvp-photo-analyze`). Confirm it doesn't exist:
-  `git rev-parse --verify <name>` should fail.
+  (e.g. `feature/mvp-photo-analyze`). Confirm it doesn't exist
+  **locally or on origin** — both checks matter, because a stale remote
+  branch with the same name would block `git push -u` later:
+  ```
+  git fetch origin
+  git rev-parse --verify <name>                  # must fail (no local)
+  git ls-remote --exit-code origin refs/heads/<name>  # must fail (no remote)
+  ```
+  If either succeeds, pick a different name (e.g. append a short suffix).
 - Pass that name as `{TARGET_BRANCH}` and use `isolation: "worktree"`
   so the Agent tool creates a fresh worktree on an auto-generated
   branch; the subagent renames it to `{TARGET_BRANCH}` as its first
