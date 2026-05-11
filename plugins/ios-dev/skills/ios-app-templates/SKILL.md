@@ -32,6 +32,11 @@ copy files from `references/<template>/Sources/` into your new project.
 6. Wire the entry view (`CameraView` for photo-analysis-app) into your `NavigationStack`.
 7. Extend the template with your app-specific logic (persistence, custom UI, etc.).
 
+Note: `allowed-tools: Read, Glob` reflects what this skill itself needs
+(browse the catalog and read referenced files). The file-copy and Xcode
+scaffolding steps are performed by the calling agent using its own tool
+permissions — they do not need to be listed here.
+
 ## Related skills
 
 - `ios-dev:ios-patterns` — common SwiftUI conventions (i18n, Logger, Previews).
