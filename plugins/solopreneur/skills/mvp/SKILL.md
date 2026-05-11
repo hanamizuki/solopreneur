@@ -1,39 +1,145 @@
 ---
 name: mvp
 description: |
-  Meta-orchestrator for building a brand-new app, product, or MVP from
-  scratch. Drives the full flow: brainstorming → template lookup →
-  planning → plan execution. Use INSTEAD OF superpowers:brainstorming
-  when the user is starting a new product — this skill calls
-  brainstorming internally, then chains in template discovery, plan
-  writing, and execution. Triggers: "/mvp", "我要做 app", "想做產品",
+  Meta-orchestrator for going from a product idea to a demo-able MVP fast.
+  Drives the full flow: brainstorming → template lookup → MVP-flavored
+  plan → single-subagent execution. Optimized for **time-to-first-demo**,
+  not production quality — no TDD, no per-task review loops, no
+  hardening. Use INSTEAD OF superpowers:brainstorming when the user is
+  starting a new product from scratch — this skill calls brainstorming
+  internally, then chains in template discovery, plan writing, and
+  execution. Triggers: "/mvp", "我要做 app", "想做產品",
   "想做一個 app", "做個 MVP", "build a product", "build an app from
   scratch", "MVP from scratch", "start a new app", "new product".
 ---
 
 # MVP Orchestrator
 
-Drives the full new-app / new-product flow. This skill is orchestration
-only — it does NOT reimplement brainstorming or planning. It chains the
-right skills in the right order and inserts a template lookup between
-brainstorming and plan writing.
+Drives the full new-app / new-product flow with one explicit charter:
+**get to first demo fast.** Tests, edge cases, accessibility, i18n, and
+refactor passes are deferred — if the user wants those later they invoke
+`solopreneur:autopilot` on the same plan.
+
+This skill is orchestration only — it does NOT reimplement brainstorming
+or planning. It chains the right skills in the right order, inserts a
+template lookup between brainstorming and plan writing, and runs
+execution with a single implementer subagent under the MVP Charter
+(rather than via `superpowers:executing-plans` /
+`superpowers:subagent-driven-development`, which both enforce TDD
+discipline that kills demo velocity).
 
 ## Flow
 
+```text
+0. Verify dependencies        (superpowers + ≥1 *-app-templates)
+1. superpowers:brainstorming  (clarify needs + classify platform)
+2. Template lookup            (find matching *-app-templates skill)
+3. superpowers:writing-plans  (MVP-flavored plan, demo-velocity)
+4. Execute the plan (MVP)     (single implementer subagent, commit per step)
 ```
-0. Verify dependencies          (superpowers + ≥1 *-app-templates)
-1. superpowers:brainstorming    (clarify needs + classify platform)
-2. Template lookup              (find matching *-app-templates skill)
-3. superpowers:writing-plans    (template as architectural baseline)
-4. superpowers:executing-plans  (execute with review checkpoints)
+
+## MVP Charter
+
+The single source of truth for the demo-velocity tradeoffs. Step 3 passes
+the **Plan-writing rules** to `superpowers:writing-plans`; Step 4 passes
+the **Execution rules** and **BLOCKED handling** to the implementer
+subagent. Keep both copies in sync by referencing this section, not by
+restating.
+
+### Plan-writing rules (consumed by Step 3)
+
+- Each task = a visible slice the user can see in the app / simulator.
+- **Skip these categories entirely** — they're for a later hardening
+  pass, not MVP:
+  - Test tasks (no unit / integration / UI tests in the plan)
+  - Error-handling tasks (edge cases → `TODO` comments in code, not
+    plan tasks)
+  - Loading / empty / error state tasks
+  - Accessibility / i18n tasks
+  - Performance / refactor / cleanup tasks
+- Acceptance criteria for the whole plan: **"user can demo the core
+  action end-to-end"**, not "all tests pass".
+- Templates already encode baseline architecture — don't re-derive
+  what the template provides; reference it.
+
+### Execution rules (consumed by Step 4)
+
+- **No TDD.** Don't write tests. After each step, run the app /
+  simulator manually and check the happy path works — that is the
+  verification.
+- **Edge cases → `TODO` comments**, in the language's native syntax:
+  `// TODO: handle X` for Swift / Kotlin / JS / TS; `# TODO: handle X`
+  for Python / Ruby / shell / YAML. Final-report grep uses `TODO:` so
+  both forms surface.
+- **Loading / empty / error states → stub or skip.** Simplest possible
+  fallback; no spinners, no skeletons, no retry logic.
+- **No refactor passes, no cleanup commits.** Ship the first working
+  version of each slice.
+- **Trust the template.** Copy reference files as-is; only customize
+  where the plan explicitly calls for it.
+- **Ambiguity → simplest path forward.** Don't pause to ask unless
+  genuinely BLOCKED (see below).
+- **Stay within the worktree path** passed in handoff. Don't modify
+  files outside it (no `~/.claude/`, sibling repos, global config).
+
+**First action when dispatched into a fresh worktree** (created by
+`isolation: "worktree"`): the auto-created branch is `worktree-agent-xxx`,
+not the target branch. Rename it before doing anything else:
+
 ```
+git branch -m {TARGET_BRANCH}
+git branch --show-current  # confirm output equals {TARGET_BRANCH}
+```
+
+If the rename fails or the verification doesn't match, stop immediately
+and report (this is BLOCKED — see handling below). Same pattern as
+`solopreneur:autopilot`'s `pr-subagent-template.md`.
+
+If already in a worktree (orchestrator didn't pass `isolation: "worktree"`),
+skip the rename — assume the caller put you on the right branch.
+
+**Commit policy: one commit per plan step.**
+- After each step's implementation works (manual verify), commit and
+  push. Each step is an independently revertible slice.
+- Commit message: `feat(mvp): <step name>: <one-line outcome>`.
+- **Before the first commit, re-verify `git branch --show-current`
+  equals `{TARGET_BRANCH}` and is not `main` / `master`. Abort if
+  mismatch — never push to a branch you didn't start on.**
+- **First push of the run**: use `git push -u origin {TARGET_BRANCH}`
+  to set upstream. Path A always needs this (fresh branch, no
+  tracking). Path B may already track origin — try plain `git push`
+  first; if it fails with "has no upstream branch", fall back to
+  `git push -u origin {TARGET_BRANCH}`.
+- Subsequent pushes: plain `git push`.
+
+### BLOCKED handling
+
+A step is BLOCKED only when an action genuinely cannot proceed: missing
+credential, broken toolchain, plan step incoherent against current
+state, external service unreachable. Ambiguity that admits a "simplest
+path" is **not** BLOCKED.
+
+- **Subagent on BLOCKED**: commit any working partial slice first, then
+  return a structured report listing (a) last completed commit SHA,
+  (b) the blocking step, (c) what's needed to unblock. Do not attempt
+  workarounds that diverge from the plan.
+- **Orchestrator on BLOCKED return**: surface the report to the user,
+  do not re-dispatch automatically. User decides whether to resume,
+  amend the plan, or abort.
+
+### Stopping condition
+
+The user can run the app / simulator and demo the **core demo action**
+captured in Step 1 end-to-end. Stop there. No polishing, no hardening,
+no nice-to-haves.
+
+---
 
 ## Step 0: Verify dependencies
 
 **Required** (check via the available-skills list in the system-reminder):
 - `superpowers:brainstorming`
 - `superpowers:writing-plans`
-- `superpowers:executing-plans`
 
 **Expected (≥1)**: any skill matching `*-app-templates`
 (e.g. `ios-dev:ios-app-templates`, `ai-engineer:ai-app-templates`).
@@ -51,10 +157,17 @@ When brainstorming exits, capture:
 - One-paragraph product description
 - **Platforms** as a list (iOS / Android / web / AI backend) —
   usually one, sometimes multiple (e.g. iOS app + AI backend)
-- Key features and constraints
+- The **core demo action** — the single thing the user wants to show
+  someone at the end ("take a photo and see what Vision detected"). This
+  becomes the stopping condition for Step 4.
+- Key features and constraints (separated from "nice-to-haves")
 
-Confirm the platform list explicitly with the user before continuing —
-Step 2 iterates over it.
+**Confirm explicitly with the user before continuing:**
+"This is MVP mode — demo-only, no tests, no hardening. Edge cases get
+TODO markers. If you want production-grade, abort here and run the
+standard superpowers flow or `solopreneur:autopilot` instead."
+
+Proceed only on explicit confirmation.
 
 ## Step 2: Template lookup
 
@@ -88,41 +201,111 @@ Iterate over the platform list:
 restriction, or the user aborts mid-selection, record "no template" for
 that platform and proceed. Do not silently retry.
 
-## Step 3: Writing the plan
+## Step 3: Writing the plan (MVP-flavored, demo-velocity)
 
 Invoke `superpowers:writing-plans` via the Skill tool. Pass the Step 2
-records as context in the invocation prompt — `writing-plans` has no
-formal baseline parameter, so list each platform's template name and
-baseline path inline so the plan-writer can reference them.
+records (per-platform template name + baseline path) as context in the
+invocation prompt — `writing-plans` has no formal baseline parameter,
+so list them inline.
+
+**Also pass the MVP Charter's Plan-writing rules** (see top section)
+verbatim to `writing-plans` so the plan it produces is demo-flavored,
+not production-flavored.
 
 If templates were found:
 - Open the plan with each matched template's architectural baseline.
 - Reference the baseline path the template skill returned (one section
   per platform when multiple templates apply).
-- Layer app-specific requirements on top (persistence, custom UI, etc.).
-- Note divergence points: "we deviate from the template at X because Y".
+- Layer only the MVP-specific user-visible requirements on top.
 
 If no templates were found:
-- Write a freeform plan from the brainstorm output.
-- State explicitly that no template was reused, so future readers know.
+- Write a freeform MVP plan from the brainstorm output.
+- State explicitly that no template was reused and that the plan is
+  MVP-flavored (so a future hardening pass knows what's missing).
 
-## Step 4: Execute the plan
+## Step 4: Execute the plan (MVP mode)
 
-Before handing off, **stop and get explicit user approval** of the
+Before executing, **stop and get explicit user approval** of the
 finalized plan. Do not assume the Step 3 draft is approved.
 
-Once approved, hand off to `superpowers:executing-plans` with the plan
-file path as input. That skill executes the plan with built-in review
-checkpoints. This skill's job ends here.
+### 4a. Decide target branch + isolation
 
-Heavier orchestration (PR splitting, worktree dispatch, automated
-review loops, merge) is intentionally **not** part of this flow — if
-the user later wants that for the same plan, they can invoke
-`solopreneur:autopilot` separately.
+This is the orchestrator's responsibility — get it wrong and the
+subagent self-aborts on the branch rename. Two paths:
+
+**Path A: orchestrator is on `main` (no feature branch yet)**
+- Derive a new, unique feature branch name from the product
+  (e.g. `feature/mvp-photo-analyze`). Confirm it doesn't exist
+  **locally or on origin** — both checks matter, because a stale remote
+  branch with the same name would block `git push -u` later:
+  ```
+  git fetch origin
+  git rev-parse --verify <name>                  # must fail (no local)
+  git ls-remote --exit-code origin refs/heads/<name>  # must fail (no remote)
+  ```
+  If either succeeds, pick a different name (e.g. append a short suffix).
+- Pass that name as `{TARGET_BRANCH}` and use `isolation: "worktree"`
+  so the Agent tool creates a fresh worktree on an auto-generated
+  branch; the subagent renames it to `{TARGET_BRANCH}` as its first
+  action (see Charter).
+
+**Path B: orchestrator is already on a feature-branch worktree**
+- Use the current branch as `{TARGET_BRANCH}`. The branch already
+  exists and may already be checked out here — that's fine because
+  the subagent runs in the **same** worktree (no isolation, no
+  rename).
+- Dispatch **without** `isolation`. The Charter's "First action when
+  dispatched into a fresh worktree" block is skipped.
+
+Never pass an existing branch as `{TARGET_BRANCH}` together with
+`isolation: "worktree"` — the rename would fail (branch already
+exists, possibly checked out elsewhere).
+
+### 4b. Dispatch
+
+Dispatch a single implementer subagent via the **Agent tool**:
+
+- `subagent_type: general-purpose` by default. Single-platform MVPs MAY
+  use a stack-specific type (`ios-dev`, `ai-engineer`, etc.) if the
+  user prefers that agent's tool surface — but the MVP Charter still
+  applies and overrides the agent's normal TDD posture. Multi-platform
+  MVPs stay on `general-purpose` to avoid agent-per-step churn.
+- `isolation: "worktree"` only in **Path A** above. Omit in Path B.
+- `prompt`: assemble in this order
+  1. The full plan text, extracted from the plan file. **Embedded text
+     is authoritative for this run** — if the file changes mid-flight,
+     a new dispatch is required, not a re-read.
+  2. The Step 2 template records (template name + baseline path per
+     platform).
+  3. The **MVP Charter Execution rules** (verbatim from the top section).
+  4. The **MVP Charter BLOCKED handling** (verbatim).
+  5. Handoff details: `{TARGET_BRANCH}` (resolved in 4a) and
+     instructions to resolve `{WORKTREE_PATH}` via
+     `git rev-parse --show-toplevel` from the subagent's own cwd at
+     runtime. Pass the plan file path for cross-reference too.
+
+Do NOT delegate to `superpowers:executing-plans` or
+`superpowers:subagent-driven-development` — both enforce TDD discipline
+and per-task two-stage review, which is the right default for
+production work but kills MVP velocity.
+
+**Recovery**: if the subagent returns BLOCKED (see Charter), surface its
+report to the user; do not re-dispatch automatically.
+
+**Final report from this skill:**
+List each commit (SHA + step name) and append a "TODO for hardening"
+section — a snapshot of `TODO:` markers left in code at end-of-run. This
+becomes the input for a later `solopreneur:autopilot` pass if the user
+decides to harden. Re-grep before the hardening pass starts; the
+snapshot will go stale once any commits land.
 
 ## Notes
 
-- **Don't skip steps.** Even if the user seems impatient,
-  brainstorming → template lookup → plan is the value proposition.
-  Short-circuit to execution only if the user explicitly opts out of
-  a phase.
+- **Don't skip steps.** Brainstorming → template lookup → MVP plan is
+  the value proposition. Short-circuit to execution only if the user
+  explicitly opts out of a phase.
+- **Hardening is a separate pass.** When the user later wants tests,
+  edge cases, a11y, etc., they re-invoke against the same plan file —
+  `solopreneur:autopilot` for the heavy pipeline, or the standard
+  superpowers flow for a manual pass. MVP execute leaves the plan and
+  the `TODO:` markers as the handoff surface.
