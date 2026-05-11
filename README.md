@@ -12,7 +12,7 @@ automated PR cycles, marketing, design, and platform-specific experts. Install
 | [`solopreneur`](./plugins/solopreneur) | 14 in-house skills (review, pipelines, thinking partners, automation) |
 | [`marketer`](./plugins/marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) |
 | [`designer`](./plugins/designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
-| [`ios-dev`](./plugins/ios-dev) | `ios-dev` agent + `ios-patterns` + 23 vendored skills (`asc-*` + `iphone-apps`) |
+| [`ios-dev`](./plugins/ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 23 vendored skills (`asc-*` + `iphone-apps`) |
 | [`android-dev`](./plugins/android-dev) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + Android official) |
 | [`ai-engineer`](./plugins/ai-engineer) | `ai-engineer` agent + `langgraph` + 3 vendored skills (LLM / prompt engineering) |
 | [`neo4j-dev`](./plugins/neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills |
@@ -195,6 +195,7 @@ Store Connect CLI workflows and full iPhone app build/debug/ship.
 #### Bundled skills
 
 - **`ios-patterns`** (in-house): SwiftUI conventions: i18n, date parsing, Previews, state management, sheet & navigation, list spacing, expandable animation, keyboard Done button.
+- **`ios-app-templates`** (in-house): reference implementations for common app categories (currently `photo-analysis-app`).
 - **`asc-cli` skills** (22): vendored from [rudrankriyam/app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills). End-to-end App Store Connect workflows: TestFlight, releases, metadata, IAP, signing, screenshots, crash triage, ASO audit, RevenueCat catalog sync, notarization, submission health, …
 - **`iphone-apps`**: vendored from [glittercowboy/taches-cc-resources](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps). CLI-only iPhone app workflow (build, debug, test, ship).
 
