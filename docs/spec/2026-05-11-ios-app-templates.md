@@ -119,7 +119,8 @@ final class CameraModel {
     }
 
     private func analyze(photo: Photo) async {
-        let visionData = await VisionFrameworkService.collectComprehensiveVisionData(from: photo.image)
+        guard let image = UIImage(data: photo.data) else { return }
+        let visionData = (try? await VisionFrameworkService.collectComprehensiveVisionData(from: image)) ?? ComprehensiveVisionData()
         let prompt = visionData.summarizedForPrompt()  // 範本內提供 helper
         let response = (try? await foundationService.generateResponse(prompt: prompt)) ?? ""
         analysisResult = PhotoAnalysisResult(
