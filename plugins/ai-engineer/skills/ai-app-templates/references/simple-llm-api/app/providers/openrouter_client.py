@@ -31,9 +31,20 @@ def _client() -> OpenAI:
 
 
 def complete(messages: list[dict], model: str | None = None) -> str:
-    """Send a canonical messages array to OpenRouter and return the reply."""
+    """Send a canonical messages array to OpenRouter and return the reply.
+
+    Raises RuntimeError if the response has no text content (e.g. the model
+    returned only a tool call, hit the token cap before generating any text,
+    or refused to respond). main.py maps this to HTTP 502.
+    """
     response = _client().chat.completions.create(
         model=model or DEFAULT_MODEL,
         messages=messages,
     )
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    if content is None:
+        raise RuntimeError(
+            "OpenRouter returned no text content "
+            "(possible tool-only completion or empty response)"
+        )
+    return content
