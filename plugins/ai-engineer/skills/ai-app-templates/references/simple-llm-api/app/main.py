@@ -5,8 +5,15 @@ After the consuming agent picks a provider, the two unused
 providers/*_client.py files should be deleted.
 """
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+# Load .env into the process environment before any provider client reads
+# os.environ. `uv run` does not auto-load .env, so without this the
+# Quickstart's `cp .env.example .env` workflow only works when keys are
+# also exported in the shell.
+load_dotenv()
 
 # --- Provider selection point -------------------------------------------------
 # Change to anthropic_client or gemini_client to switch providers.
@@ -48,6 +55,15 @@ def chat(req: ChatRequest) -> ChatResponse:
         text = llm.complete(messages, model=model)
     except HTTPException:
         raise
+    except KeyError as e:
+        # Provider's _client() reads os.environ[<KEY>] lazily; missing key
+        # raises KeyError. Surface this as 500 (configuration error) rather
+        # than 502 (upstream failure) so operators can distinguish setup
+        # bugs from real upstream issues.
+        raise HTTPException(
+            status_code=500,
+            detail=f"configuration error: missing environment variable {e}",
+        )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"upstream LLM error: {e}")
     return ChatResponse(text=text, model=model)
