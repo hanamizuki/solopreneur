@@ -50,9 +50,15 @@ PhotoAnalysisResult (vision + LLM response + capturedAt)
 
 | Feature | Minimum |
 |---|---|
-| Camera capture (`CaptureService`, `CameraPreview`) | iOS 13+ |
-| Vision Framework (`VisionFrameworkService`) | iOS 11+ |
+| Template overall (uses Observation framework `@Observable` on `CameraModel`) | iOS 17+ |
+| AVFoundation camera capture (`CaptureService`, `CameraPreview`) | iOS 13+ (in isolation) |
+| Vision Framework (`VisionFrameworkService`) | iOS 11+ (in isolation) |
 | Foundation Models on-device LLM (`FoundationModelsService`) | iOS 26.0+, Apple Intelligence-supported device |
+
+The template's effective minimum is **iOS 17+** because `CameraModel` is annotated
+`@Observable` (Observation framework). To target iOS 13–16, replace `@Observable`
+with `ObservableObject` + `@Published`, and adjust the `View` to use
+`@StateObject` / `@ObservedObject`.
 
 `FoundationModelsService` is wrapped in `#if canImport(FoundationModels)` and
 `@available(iOS 26.0, *)`. On unsupported devices, replace the call site with a
