@@ -9,7 +9,7 @@ automated PR cycles, marketing, design, and platform-specific experts. Install
 
 | Plugin | What you get |
 |---|---|
-| [`solopreneur`](./plugins/solopreneur) | 14 in-house skills (review, pipelines, thinking partners, automation) |
+| [`solopreneur`](./plugins/solopreneur) | 15 in-house skills (review, pipelines, thinking partners, automation) |
 | [`marketer`](./plugins/marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) |
 | [`designer`](./plugins/designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
 | [`ios-dev`](./plugins/ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 23 vendored skills (`asc-*` + `iphone-apps`) |
@@ -70,13 +70,14 @@ explicitly; everything else is recommended and degrades gracefully if absent.
 
 ### `solopreneur` (core)
 
-The foundation. Every other plugin depends on this one. No agent, just 14
+The foundation. Every other plugin depends on this one. No agent, just 15
 skills that wrap the lifecycle around your work.
 
 #### Your Virtual Product Team
 
 | Skill | What it does |
 |---|---|
+| `/mvp` | **PM.** Drives the full new-product flow end-to-end: brainstorming → template lookup (auto-discovers `*-app-templates` in installed plugins) → plan → execution. Use when starting from scratch |
 | `/second-opinion` | **Advisor.** Challenges your plan across 5 dimensions (completeness, consistency, clarity, scope, feasibility) using an independent reviewer |
 | `/preflight` | **Tech Lead.** Reviews your technical plan against platform-specific best practices before you write a single line of code |
 | `/worktree-handoff` | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
@@ -113,6 +114,8 @@ Start them and walk away. They loop until the job is done.
 
 ```
 Idea
+ │
+ ├─ /mvp ────────────── Brand-new product? Start here. Brainstorm → template → plan → execute
  │
  ├─ /second-opinion ── Challenge the spec
  ├─ /preflight ─────── Verify the technical approach
