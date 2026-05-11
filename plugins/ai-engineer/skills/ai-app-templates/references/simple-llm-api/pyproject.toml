@@ -15,4 +15,8 @@ dependencies = [
 
 # All three provider SDKs are listed so the template stays runnable
 # regardless of which provider the consuming agent picks. After picking,
-# run `uv remove anthropic google-genai openai` for the two unused SDKs.
+# run `uv remove <unused-sdk-1> <unused-sdk-2>` to drop only the two
+# SDKs not used by the chosen provider — keep one of `anthropic`,
+# `google-genai`, or `openai`. Running the full
+# `uv remove anthropic google-genai openai` would remove the selected
+# provider's SDK too and break /chat at runtime.
