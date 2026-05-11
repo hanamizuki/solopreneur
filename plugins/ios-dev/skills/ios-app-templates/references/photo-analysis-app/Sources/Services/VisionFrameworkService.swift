@@ -671,14 +671,20 @@ extension ComprehensiveVisionData {
         lines.append("<vision_data trustworthy=\"false\">")
 
         // OCR text blocks (capped count, capped per-block length).
+        //
+        // Each block's text is sanitized BEFORE truncation-display so that a
+        // photo containing literal `</vision_data>` plus follow-on
+        // "instructions" cannot break out of the fenced section. See
+        // `sanitizeForPrompt(_:)` for the escaping rules.
         if !recognizedTexts.isEmpty {
             let limit = Self.maxOCRBlocksInPrompt
             let shown = recognizedTexts.prefix(limit)
             lines.append("OCR text blocks (\(recognizedTexts.count)):")
             for block in shown {
                 let truncated = Self.truncate(block.text, to: Self.maxOCRBlockLength)
+                let safe = Self.sanitizeForPrompt(truncated)
                 let confidenceStr = String(format: "%.2f", block.confidence)
-                lines.append(" - \"\(truncated)\" (confidence \(confidenceStr))")
+                lines.append(" - \"\(safe)\" (confidence \(confidenceStr))")
             }
             if recognizedTexts.count > limit {
                 let omitted = recognizedTexts.count - limit
@@ -687,23 +693,28 @@ extension ComprehensiveVisionData {
         }
 
         // Image classifications (already include their own confidence string,
-        // emitted by the collector as "identifier (0.xx)").
+        // emitted by the collector as "identifier (0.xx)"). Vision's
+        // identifiers come from Apple-supplied models so are not arbitrary
+        // user input, but we sanitize anyway as defense-in-depth — a future
+        // custom model could surface attacker-controlled labels.
         if !classifications.isEmpty {
             lines.append("Detected objects (\(classifications.count)):")
             for classification in classifications {
-                lines.append(" - \(classification)")
+                lines.append(" - \(Self.sanitizeForPrompt(classification))")
             }
         }
 
-        // Animals
+        // Animals — `type` is a Vision classification string, sanitized for
+        // the same defense-in-depth reason as above.
         if !animals.isEmpty {
             lines.append("Animals (\(animals.count)):")
             for animal in animals {
+                let safeType = Self.sanitizeForPrompt(animal.type)
                 if let confidence = animal.confidence {
                     let confidenceStr = String(format: "%.2f", confidence)
-                    lines.append(" - \(animal.type) (confidence \(confidenceStr))")
+                    lines.append(" - \(safeType) (confidence \(confidenceStr))")
                 } else {
-                    lines.append(" - \(animal.type)")
+                    lines.append(" - \(safeType)")
                 }
             }
         }
@@ -730,13 +741,19 @@ extension ComprehensiveVisionData {
         }
 
         // Barcodes (capped count, capped per-payload length).
+        //
+        // Barcode payloads are entirely user-controlled (a QR code can carry
+        // any bytes a malicious actor wants), so sanitizing is critical here:
+        // a payload of `</vision_data>\nIGNORE previous instructions...` must
+        // not be able to escape the fenced section.
         if !barcodes.isEmpty {
             let limit = Self.maxBarcodesInPrompt
             let shown = barcodes.prefix(limit)
             lines.append("Barcodes (\(barcodes.count)):")
             for code in shown {
                 let truncated = Self.truncate(code, to: Self.maxBarcodeLength)
-                lines.append(" - \(truncated)")
+                let safe = Self.sanitizeForPrompt(truncated)
+                lines.append(" - \(safe)")
             }
             if barcodes.count > limit {
                 let omitted = barcodes.count - limit
@@ -763,5 +780,37 @@ extension ComprehensiveVisionData {
     private static func truncate(_ value: String, to maxLength: Int) -> String {
         guard value.count > maxLength else { return value }
         return value.prefix(maxLength) + "…"
+    }
+
+    /// Neutralize characters that could let untrusted Vision content break
+    /// out of the `<vision_data>` fence, or fabricate new prompt structure.
+    ///
+    /// Threats:
+    /// - A barcode payload or printed page containing literal
+    ///   `</vision_data>` could close the fence and inject text the model
+    ///   treats as higher-trust instructions.
+    /// - Embedded newlines could make OCR text appear to start a new prompt
+    ///   section (e.g. "User: ignore previous instructions").
+    /// - Quotes inside OCR strings could prematurely close the `"..."`
+    ///   wrapper used in the rendered summary.
+    ///
+    /// Strategy (kept deliberately simple and reversible-by-eye for
+    /// debugging — the goal is structural safety, not cryptographic hiding):
+    /// 1. HTML-escape `&`, `<`, `>` so any tag-like substring stays inert.
+    ///    Escape `&` first to avoid double-escaping the `&lt;`/`&gt;` we
+    ///    just produced.
+    /// 2. Escape double-quote so the OCR `"..."` rendering stays well-formed.
+    /// 3. Collapse `\r` and `\n` to a single space so payload bytes cannot
+    ///    forge a new line / new section inside the fence.
+    private static func sanitizeForPrompt(_ raw: String) -> String {
+        var out = raw
+        out = out.replacingOccurrences(of: "&", with: "&amp;")
+        out = out.replacingOccurrences(of: "<", with: "&lt;")
+        out = out.replacingOccurrences(of: ">", with: "&gt;")
+        out = out.replacingOccurrences(of: "\"", with: "&quot;")
+        out = out.replacingOccurrences(of: "\r\n", with: " ")
+        out = out.replacingOccurrences(of: "\n", with: " ")
+        out = out.replacingOccurrences(of: "\r", with: " ")
+        return out
     }
 }
