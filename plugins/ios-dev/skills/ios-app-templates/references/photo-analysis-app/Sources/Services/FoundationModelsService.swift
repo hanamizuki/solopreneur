@@ -45,13 +45,22 @@ final class FoundationModelsService {
 
         Log.camera.debug("FoundationModels availability=\(String(describing: availability))")
 
-        guard availability == .available else {
+        // `SystemLanguageModel.Availability` is an enum with an associated
+        // value on the `.unavailable` case — it is NOT `Equatable`, so the
+        // previous `availability == .available` comparison did not compile.
+        // Use pattern matching instead.
+        guard case .available = availability else {
             Log.camera.notice("FoundationModels unavailable: \(String(describing: availability))")
             throw FoundationModelsError.modelNotAvailable(status: String(describing: availability))
         }
 
         do {
-            let session = LanguageModelSession()
+            // `LanguageModelSession` has no zero-arg init: per the public
+            // API the only init is
+            //   `init(model:tools:@InstructionsBuilder instructions:)`
+            // where `instructions` has no default. Pass a brief system-style
+            // instruction string here — callers customize via `prompt`.
+            let session = LanguageModelSession(instructions: "You analyze visual signals extracted from a photo and describe what you see.")
             let promptObject = Prompt(prompt)
             let response = try await session.respond(to: promptObject)
             let text = response.content
@@ -78,10 +87,14 @@ final class FoundationModelsService {
     func checkAvailability() -> String {
         #if canImport(FoundationModels)
         let model = SystemLanguageModel.default
+        // `Availability` is `enum { case available, case unavailable(UnavailableReason) }`
+        // — exhaustive switch with the associated value bound on the
+        // `.unavailable` case.
         switch model.availability {
-        case .available:   return "available"
-        case .unavailable: return "unavailable"
-        @unknown default:  return "unknown(\(String(describing: model.availability)))"
+        case .available:
+            return "available"
+        case .unavailable(let reason):
+            return "unavailable(\(String(describing: reason)))"
         }
         #else
         return "framework-not-imported"
