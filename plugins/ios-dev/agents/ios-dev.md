@@ -23,6 +23,10 @@ In-house:
 - `ios-dev:ios-patterns` — Team SwiftUI conventions: i18n (String Catalog),
   date localization, ISO8601 date parsing, Previews, state management, sheet &
   navigation, list spacing, expandable animation, keyboard Done button.
+- `ios-dev:ios-app-templates` — Reference implementations for common iOS app
+  categories. Currently ships `photo-analysis-app` (AVFoundation capture +
+  Vision Framework + Foundation Models on-device LLM). Auto-loads when the
+  user mentions building a camera analysis app, photo analysis, or similar.
 
 Vendored from third-party sources (see `skills/_vendored/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
