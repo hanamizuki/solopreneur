@@ -30,7 +30,7 @@ discipline that kills demo velocity).
 
 ## Flow
 
-```
+```text
 0. Verify dependencies        (superpowers + ≥1 *-app-templates)
 1. superpowers:brainstorming  (clarify needs + classify platform)
 2. Template lookup            (find matching *-app-templates skill)
@@ -84,8 +84,8 @@ restating.
 
 **Commit policy: one commit per plan step.**
 - After each step's implementation works (manual verify), commit and
-  push. Each step is an independently revertable slice.
-- Commit message: `feat(mvp): <step name> — <one-line outcome>`.
+  push. Each step is an independently revertible slice.
+- Commit message: `feat(mvp): <step name>: <one-line outcome>`.
 - **Before the first commit, verify `git branch --show-current` is not
   `main` / `master` and matches the target branch passed in handoff.
   Abort if mismatch — never push to a branch you didn't start on.**
@@ -208,7 +208,11 @@ finalized plan. Do not assume the Step 3 draft is approved.
 
 Once approved, dispatch a single implementer subagent via the **Agent
 tool** with:
-- `subagent_type: general-purpose`
+- `subagent_type: general-purpose` by default. Single-platform MVPs MAY
+  use a stack-specific type (`ios-dev`, `ai-engineer`, etc.) if the
+  user prefers that agent's tool surface — but the MVP Charter still
+  applies and overrides the agent's normal TDD posture. Multi-platform
+  MVPs stay on `general-purpose` to avoid agent-per-step churn.
 - `isolation: "worktree"` if not already running inside a feature-branch
   worktree (creates a temporary isolated worktree, matching
   `solopreneur:autopilot`'s pattern). If already in a worktree, omit
@@ -221,8 +225,11 @@ tool** with:
      platform).
   3. The **MVP Charter Execution rules** (verbatim from the top section).
   4. The **MVP Charter BLOCKED handling** (verbatim).
-  5. Handoff details: working directory (worktree path), target branch,
-     plan file path for cross-reference.
+  5. Handoff details: `{TARGET_BRANCH}` (the orchestrator resolves this
+     at dispatch time — the feature branch the worktree is on), and
+     instructions to resolve `{WORKTREE_PATH}` via
+     `git rev-parse --show-toplevel` from the subagent's own cwd at
+     runtime. Pass the plan file path for cross-reference too.
 
 Do NOT delegate to `superpowers:executing-plans` or
 `superpowers:subagent-driven-development` — both enforce TDD discipline
