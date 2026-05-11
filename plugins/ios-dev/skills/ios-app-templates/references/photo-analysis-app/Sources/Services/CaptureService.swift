@@ -251,7 +251,7 @@ final class CaptureService: NSObject {
                 // disable the shutter button while a capture is pending.
                 if self.captureContinuation != nil {
                     Log.capture.notice("capturePhoto called while another capture is in flight; rejecting")
-                    continuation.resume(throwing: CameraError.captureNotConfigured)
+                    continuation.resume(throwing: CameraError.captureInProgress)
                     return
                 }
 

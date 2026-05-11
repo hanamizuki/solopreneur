@@ -58,6 +58,10 @@ enum CameraError: LocalizedError {
     /// `AVCapturePhoto.fileDataRepresentation()` returned nil — the captured
     /// photo could not be encoded into file data.
     case photoDataExtractionFailed
+    /// Another capture is already in flight. Callers should disable the
+    /// shutter while a capture is pending and re-enable it once the
+    /// continuation resolves.
+    case captureInProgress
     case unauthorized
 
     var errorDescription: String? {
@@ -68,6 +72,7 @@ enum CameraError: LocalizedError {
         case .addOutputFailed:           return "Unable to add capture output."
         case .captureNotConfigured:      return "Capture pipeline is not configured."
         case .photoDataExtractionFailed: return "Failed to extract photo file data."
+        case .captureInProgress:         return "Another capture is already in progress."
         case .unauthorized:              return "Camera access is not authorized."
         }
     }
