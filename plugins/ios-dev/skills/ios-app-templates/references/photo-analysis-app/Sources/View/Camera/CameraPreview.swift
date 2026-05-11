@@ -26,10 +26,11 @@ struct CameraPreview: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: PreviewView, context: Context) {
-        DispatchQueue.main.async { [self] in
-            // Explicit self capture for Swift 6 closure-capture rules.
-            self.previewLayer.frame = uiView.bounds
-        }
+        // `updateUIView` already runs on the main thread, so the previous
+        // \`DispatchQueue.main.async\` only deferred the frame update by one
+        // runloop, racing with \`PreviewView.layoutSubviews\` (which also
+        // sizes the sublayer). Set the frame inline.
+        previewLayer.frame = uiView.bounds
         uiView.onTap = onTap
     }
 }
