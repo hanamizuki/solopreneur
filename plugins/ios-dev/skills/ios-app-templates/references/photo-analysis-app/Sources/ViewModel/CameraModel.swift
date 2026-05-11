@@ -84,7 +84,12 @@ final class CameraModel {
     func focus(at point: CGPoint) {
         focusPoint = point
         isFocusing = true
-        captureService.setFocus(at: point)
+        // `point` is in preview-layer space (view-local pixels). The capture
+        // device expects normalized 0…1 sensor coordinates. AVFoundation
+        // provides the conversion, accounting for video gravity, mirroring,
+        // and rotation.
+        let devicePoint = captureService.previewLayer.captureDevicePointConverted(fromLayerPoint: point)
+        captureService.setFocus(at: devicePoint)
         // Reset the indicator after a short delay; UI animation owns timing.
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 600_000_000)
