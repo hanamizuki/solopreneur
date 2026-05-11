@@ -22,6 +22,11 @@
 //
 
 import Foundation
+// `@preconcurrency` is required here because AVFoundation's session and
+// device types are not yet annotated as `Sendable` in the public SDK. All
+// mutations in this file go through `sessionQueue` (a serial
+// DispatchQueue), which is the AVFoundation-recommended pattern. Remove
+// the attribute when Apple ships Sendable conformance for these types.
 @preconcurrency import AVFoundation
 import UIKit
 
