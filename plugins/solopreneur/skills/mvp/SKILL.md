@@ -21,35 +21,26 @@ brainstorming and plan writing.
 ## Flow
 
 ```
-1. Verify dependencies        (superpowers + ≥1 *-app-templates)
-2. superpowers:brainstorming  (clarify needs + classify platform)
-3. Template lookup            (find matching *-app-templates skill)
-4. superpowers:writing-plans  (template as architectural baseline)
-5. solopreneur:autopilot      (execute the plan)
+0. Verify dependencies        (superpowers + ≥1 *-app-templates)
+1. superpowers:brainstorming  (clarify needs + classify platform)
+2. Template lookup            (find matching *-app-templates skill)
+3. superpowers:writing-plans  (template as architectural baseline)
+4. solopreneur:autopilot      (execute the plan)
 ```
-
-Use TaskCreate to track the five steps as separate tasks. Mark each
-step complete only after its delegated skill has actually finished.
 
 ## Step 0: Verify dependencies
 
-Scan the available-skills list (system-reminder) for:
-
-**Required:**
+**Required** (check via the available-skills list in the system-reminder):
 - `superpowers:brainstorming`
 - `superpowers:writing-plans`
-- `solopreneur:autopilot` (co-packaged with this skill)
+- `solopreneur:autopilot` — co-packaged with this skill
 
-**Expected (at least one):**
-- Any skill matching `*-app-templates` — e.g.
-  `ios-dev:ios-app-templates`, `ai-engineer:ai-app-templates`
+**Expected (≥1)**: any skill matching `*-app-templates`
+(e.g. `ios-dev:ios-app-templates`, `ai-engineer:ai-app-templates`).
 
-If any required skill is missing → stop and tell the user which plugin
-to install.
-
-If no `*-app-templates` is available → continue, but warn the user that
-the plan will be freeform (no template baseline). Offer to install a
-relevant platform plugin first.
+Missing required skill → stop and tell the user what to install.
+No `*-app-templates` → continue with a warning that the plan will be
+freeform (no template baseline).
 
 ## Step 1: Brainstorming
 
@@ -58,71 +49,71 @@ Invoke `superpowers:brainstorming` via the Skill tool. Follow it fully
 
 When brainstorming exits, capture:
 - One-paragraph product description
-- **Platform classification** (iOS / Android / web / AI backend / multi)
+- **Platforms** as a list (iOS / Android / web / AI backend) —
+  usually one, sometimes multiple (e.g. iOS app + AI backend)
 - Key features and constraints
 
-Platform classification is what drives Step 2 — confirm it explicitly
-with the user before continuing.
+Confirm the platform list explicitly with the user before continuing —
+Step 2 iterates over it.
 
 ## Step 2: Template lookup
 
-Map the platform classification to a template skill **by naming
-convention**, not a hardcoded list:
+Discovery is **convention-based**, not hardcoded: for each platform
+captured in Step 1, look for `<plugin>:<platform>-app-templates` in the
+available-skills list. Examples:
 
-| Platform                | Template skill                       |
-|-------------------------|--------------------------------------|
-| iOS app                 | `ios-dev:ios-app-templates`          |
-| AI backend / LLM API    | `ai-engineer:ai-app-templates`       |
-| Android app             | `android-dev:android-app-templates`  |
-| Web app                 | `web-dev:web-app-templates`          |
+| Platform                | Template skill                      | Status   |
+|-------------------------|-------------------------------------|----------|
+| iOS app                 | `ios-dev:ios-app-templates`         | shipping |
+| AI backend / LLM API    | `ai-engineer:ai-app-templates`      | shipping |
+| Android app             | `android-dev:android-app-templates` | planned  |
+| Web app                 | `web-dev:web-app-templates`         | planned  |
 
-As new platforms add a `*-app-templates` skill, this step picks them up
-with no skill change here — discovery is convention-based.
+Iterate over the platform list:
 
-For the matched platform:
+1. Look up the matching `*-app-templates` skill in the available-skills
+   list. Not installed → warn user, mark this platform as no-template,
+   continue to the next platform.
+2. Invoke the template skill via the Skill tool. The template skill
+   browses its catalog and returns a candidate (or none).
+3. Present the candidate to the user:
+   - **Match** → record template name + the baseline path the template
+     skill returned (don't assume a specific layout — the template skill
+     owns its file structure).
+   - **No match** → continue without a template for this platform.
+   - **Partial match** → discuss with the user whether to adapt the
+     template or go freeform.
 
-1. Confirm the template skill exists in the available-skills list.
-   - Not installed → warn user, continue without template.
-2. Invoke the template skill via the Skill tool.
-3. The template skill browses its catalog and returns a candidate.
-4. Present the candidate to the user:
-   - **Match**: record template name + path to `references/<template>/`
-   - **No match**: continue without template (freeform plan)
-   - **Partial match**: discuss with the user whether to adapt the
-     template or go freeform
-
-A multi-platform product (e.g. iOS app + AI backend) should consult
-**both** template skills. Record both baselines for Step 3.
+**Recovery paths**: if the template skill errors, hits a tool
+restriction, or the user aborts mid-selection, record "no template" for
+that platform and proceed. Do not silently retry.
 
 ## Step 3: Writing the plan
 
 Invoke `superpowers:writing-plans` via the Skill tool.
 
 If templates were found:
-- Open the plan with the template's architectural baseline
-- Reference template files explicitly (`references/<template>/Sources/`)
-- Layer app-specific requirements on top (persistence, custom UI, etc.)
-- Note divergence points: "we deviate from the template at X because Y"
+- Open the plan with the matched template's architectural baseline.
+- Reference the baseline path the template skill returned.
+- Layer app-specific requirements on top (persistence, custom UI, etc.).
+- Note divergence points: "we deviate from the template at X because Y".
 
 If no templates were found:
-- Write a freeform plan from the brainstorm output
-- Note this explicitly so future readers know no template was reused
+- Write a freeform plan from the brainstorm output.
+- State explicitly that no template was reused, so future readers know.
 
 ## Step 4: Autopilot
 
-When the plan is complete and the user has approved it, hand off to
-`solopreneur:autopilot` with the plan file path as input.
+Before invoking autopilot, **stop and get explicit user approval** of
+the finalized plan. Do not assume the Step 3 draft is approved.
 
-Autopilot handles PR splitting, worktree dispatch, review loop, and
-merge. This skill's job ends here.
+Once approved, hand off to `solopreneur:autopilot` with the plan file
+path as input. Autopilot handles PR splitting, worktree dispatch,
+review loop, and merge. This skill's job ends here.
 
 ## Notes
 
-- **Orchestration only.** This skill does not write plan content,
-  template content, or code. All substance comes from delegated skills.
-- **Template discovery is convention-based.** Adding a new platform
-  template just requires creating a `<plugin>:<platform>-app-templates`
-  skill — MVP picks it up via the naming pattern.
-- **Don't skip steps.** Even if the user seems impatient, brainstorming
-  → template lookup → plan is the value proposition. Short-circuit to
-  autopilot only if the user explicitly opts out of a phase.
+- **Don't skip steps.** Even if the user seems impatient,
+  brainstorming → template lookup → plan is the value proposition.
+  Short-circuit to autopilot only if the user explicitly opts out of
+  a phase.
