@@ -49,7 +49,16 @@ struct FocusIndicatorView: View {
             }
         }
         .position(position)
-        .onAppear { applyInitialState(for: state) }
+        .onAppear {
+            applyInitialState(for: state)
+            // Kick off animations that only run when the view *transitions*
+            // into a non-idle state. Without this, a view first rendered
+            // with `.focusing` would show as a solid rectangle because the
+            // repeating blink is only wired up inside `animateStateChange`.
+            if state != .idle {
+                animateStateChange(to: state)
+            }
+        }
         .onChange(of: state) { _, newState in
             animateStateChange(to: newState)
         }
