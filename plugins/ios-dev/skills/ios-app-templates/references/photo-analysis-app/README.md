@@ -5,7 +5,7 @@ entirely on-device. No backend, no network dependency.
 
 ## Pipeline
 
-```
+```text
 User taps capture
     ↓
 CaptureService (AVFoundation) → Photo
@@ -69,7 +69,7 @@ Vision-extracted text is serialized into the prompt — see
 
 ## File index
 
-```
+```text
 Sources/
 ├── Core/Logging.swift                — Log categories
 ├── Models/
