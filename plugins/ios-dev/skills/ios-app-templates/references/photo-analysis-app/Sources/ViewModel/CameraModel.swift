@@ -39,6 +39,11 @@ final class CameraModel {
     private let captureService = CaptureService()
     private let foundationService = FoundationModelsService()
 
+    /// Tracks the in-flight focus-indicator reset task so rapid taps don't
+    /// produce flicker (each new tap cancels the previous reset before
+    /// starting a new one).
+    private var focusResetTask: Task<Void, Never>?
+
     /// The preview layer to display in the UI.
     var previewLayer: AVCaptureVideoPreviewLayer { captureService.previewLayer }
 
@@ -91,8 +96,12 @@ final class CameraModel {
         let devicePoint = captureService.previewLayer.captureDevicePointConverted(fromLayerPoint: point)
         captureService.setFocus(at: devicePoint)
         // Reset the indicator after a short delay; UI animation owns timing.
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 600_000_000)
+        // Cancel any in-flight reset so rapid taps don't trigger overlapping
+        // resets (which used to make the indicator flicker).
+        focusResetTask?.cancel()
+        focusResetTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
             isFocusing = false
         }
     }
