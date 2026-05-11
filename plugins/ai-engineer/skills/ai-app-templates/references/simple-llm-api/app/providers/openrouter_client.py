@@ -18,7 +18,7 @@ from openai import OpenAI
 
 # Locked 2026-05-11. Re-check openrouter.ai/models if stale.
 # Format: <provider-slug>/<model-id> — see openrouter.ai for the full list.
-DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
+DEFAULT_MODEL = "anthropic/claude-sonnet-4.6"
 
 
 @lru_cache(maxsize=1)

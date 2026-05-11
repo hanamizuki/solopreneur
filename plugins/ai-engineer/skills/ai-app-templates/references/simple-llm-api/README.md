@@ -33,7 +33,7 @@ curl http://localhost:8000/health
 
 ## Architecture
 
-```
+```text
 app/
 ├── main.py                  # FastAPI app, ChatRequest/Response, /health, /chat
 └── providers/
@@ -60,7 +60,7 @@ line in `main.py` — provider clients stay in canonical form.
 |---|---|---|---|---|
 | Anthropic | `ANTHROPIC_API_KEY` | `anthropic` | `claude-sonnet-4-6` | Native Claude API; requires `max_tokens` on every call |
 | Gemini | `GEMINI_API_KEY` | `google-genai` | `gemini-2.5-flash` | Role mapping (`assistant` → `model`); `system` goes to a separate `system_instruction` field |
-| OpenRouter | `OPENROUTER_API_KEY` | `openai` (OpenAI-compat) | `anthropic/claude-sonnet-4-6` | One key routes to many upstreams (Anthropic, Google, OSS) |
+| OpenRouter | `OPENROUTER_API_KEY` | `openai` (OpenAI-compat) | `anthropic/claude-sonnet-4.6` | One key routes to many upstreams (Anthropic, Google, OSS) |
 
 OpenRouter is the default because it has the lowest setup friction.
 
