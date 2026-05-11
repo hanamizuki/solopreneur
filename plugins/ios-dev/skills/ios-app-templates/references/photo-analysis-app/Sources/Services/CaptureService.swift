@@ -145,16 +145,44 @@ final class CaptureService: NSObject {
     /// Build the AVCaptureSession: pick a back camera, add it as input, add
     /// and configure the photo output. Must be called on `sessionQueue`.
     ///
-    /// Idempotent: if the session already has inputs (i.e. we ran setup
-    /// before and the session was stopped but not torn down), this returns
-    /// without re-adding anything. Adding the same input or output twice
-    /// raises an AVFoundation exception.
+    /// Idempotent: if the session is already fully configured (both input
+    /// AND photo output present) this returns without re-adding anything.
+    /// Adding the same input or output twice raises an AVFoundation
+    /// exception.
+    ///
+    /// Partial-setup recovery: if a prior call added the input but then
+    /// threw before adding the output (e.g. `addOutputFailed`), we tear
+    /// the session back down to a blank slate and rebuild from scratch.
+    /// Without this, a follow-up `start()` would skip setup, report
+    /// success, and leave `photoOutput` nil — every subsequent capture
+    /// would then fail with `captureNotConfigured`.
     private func setupSession() throws {
         // Idempotency guard. `start()` can be called again after `stop()`
         // (e.g. a view re-appearing), and AVFoundation will crash on a
         // duplicate `addInput` / `addOutput`. We tolerate the duplicate
-        // call but don't redo the work.
-        guard session.inputs.isEmpty else { return }
+        // call but don't redo the work — provided setup actually finished
+        // last time.
+        if !session.inputs.isEmpty && photoOutput != nil {
+            return
+        }
+
+        // Partial state from a previously-failed setup: drop whatever was
+        // attached so the rebuild below starts clean. This block runs
+        // inside its own configuration transaction; the main rebuild
+        // below opens its own with `beginConfiguration()` immediately
+        // after.
+        if !session.inputs.isEmpty || !session.outputs.isEmpty {
+            session.beginConfiguration()
+            for input in session.inputs {
+                session.removeInput(input)
+            }
+            for output in session.outputs {
+                session.removeOutput(output)
+            }
+            session.commitConfiguration()
+            photoOutput = nil
+            videoDeviceInput = nil
+        }
 
         session.beginConfiguration()
         defer { session.commitConfiguration() }
