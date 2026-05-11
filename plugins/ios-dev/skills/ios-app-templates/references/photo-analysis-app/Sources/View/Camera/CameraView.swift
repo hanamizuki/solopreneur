@@ -22,10 +22,12 @@ struct CameraView: View {
             }
             .ignoresSafeArea()
 
-            // Focus indicator
+            // Focus indicator. `FocusIndicatorView` already applies
+            // `.position(position)` internally, so do NOT wrap it with
+            // another `.position(point)` modifier — that would double up
+            // the positioning and end up at the wrong place.
             if model.isFocusing, let point = model.focusPoint {
-                FocusIndicatorView(style: .focusing)
-                    .position(point)
+                FocusIndicatorView.focusing(at: point)
                     .allowsHitTesting(false)
             }
 
