@@ -25,7 +25,9 @@ enum CaptureActivity {
     }
 }
 
-/// A captured photo wrapping its raw data representation.
+/// A captured photo. `data` is the encoded file representation (HEIC/JPEG)
+/// produced by `AVCapturePhoto.fileDataRepresentation()` at capture time —
+/// not raw pixel bytes.
 struct Photo: Sendable {
     let data: Data
     let timestamp: Date
@@ -35,7 +37,10 @@ struct Photo: Sendable {
         self.timestamp = timestamp
     }
 
-    /// Returns the photo file data representation suitable for writing or further processing.
+    /// API-symmetric accessor mirroring `AVCapturePhoto.fileDataRepresentation()`.
+    /// In this template the encoded bytes are stored eagerly, so this is a
+    /// pass-through returning `self.data`. Kept for call-site symmetry with
+    /// AVFoundation; you can also use `photo.data` directly.
     func fileDataRepresentation() -> Data? {
         return data
     }
@@ -47,19 +52,23 @@ enum CameraError: LocalizedError {
     case captureDeviceNotFound
     case addInputFailed
     case addOutputFailed
-    case captureFailed
-    case photoCaptureFailed
+    /// The capture pipeline (photo output) is not configured. Typically means
+    /// `start()` has not run or it failed to add the photo output.
+    case captureNotConfigured
+    /// `AVCapturePhoto.fileDataRepresentation()` returned nil — the captured
+    /// photo could not be encoded into file data.
+    case photoDataExtractionFailed
     case unauthorized
 
     var errorDescription: String? {
         switch self {
-        case .setupFailed:           return "Camera setup failed."
-        case .captureDeviceNotFound: return "No capture device found."
-        case .addInputFailed:        return "Unable to add capture input."
-        case .addOutputFailed:       return "Unable to add capture output."
-        case .captureFailed:         return "Capture failed."
-        case .photoCaptureFailed:    return "Photo capture processing failed."
-        case .unauthorized:          return "Camera access is not authorized."
+        case .setupFailed:               return "Camera setup failed."
+        case .captureDeviceNotFound:     return "No capture device found."
+        case .addInputFailed:            return "Unable to add capture input."
+        case .addOutputFailed:           return "Unable to add capture output."
+        case .captureNotConfigured:      return "Capture pipeline is not configured."
+        case .photoDataExtractionFailed: return "Failed to extract photo file data."
+        case .unauthorized:              return "Camera access is not authorized."
         }
     }
 }
