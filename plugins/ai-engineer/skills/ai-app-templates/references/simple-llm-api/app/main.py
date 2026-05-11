@@ -63,7 +63,7 @@ def chat(req: ChatRequest) -> ChatResponse:
         raise HTTPException(
             status_code=500,
             detail=f"configuration error: missing environment variable {e}",
-        )
+        ) from e
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"upstream LLM error: {e}")
+        raise HTTPException(status_code=502, detail=f"upstream LLM error: {e}") from e
     return ChatResponse(text=text, model=model)
