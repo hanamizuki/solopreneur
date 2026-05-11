@@ -105,6 +105,12 @@ skip the rename — assume the caller put you on the right branch.
 - **Before the first commit, re-verify `git branch --show-current`
   equals `{TARGET_BRANCH}` and is not `main` / `master`. Abort if
   mismatch — never push to a branch you didn't start on.**
+- **First push of the run**: use `git push -u origin {TARGET_BRANCH}`
+  to set upstream. Path A always needs this (fresh branch, no
+  tracking). Path B may already track origin — try plain `git push`
+  first; if it fails with "has no upstream branch", fall back to
+  `git push -u origin {TARGET_BRANCH}`.
+- Subsequent pushes: plain `git push`.
 
 ### BLOCKED handling
 
