@@ -62,45 +62,35 @@ enum VisionFrameworkService {
     /// Dispatch all Vision requests in a single `VNImageRequestHandler.perform`
     /// call and collect their results into a `ComprehensiveVisionData`.
     ///
-    /// We use a continuation that resolves once all request completion handlers
-    /// have fired. Each handler increments a "completed" counter; when it
-    /// reaches `totalRequests`, we resume. `hasResumed` guards against the
-    /// double-resume that would happen if `handler.perform` throws after some
-    /// callbacks have already run.
+    /// Threading model:
+    /// - `VNImageRequestHandler.perform(_:)` is **synchronous** — by the time
+    ///   it returns, every request's completion handler has fired. We do
+    ///   NOT need a pending-counter / `hasResumed` trick.
+    /// - `perform()` itself may run for hundreds of ms. We must NOT call it
+    ///   on the main actor; do it via `Task.detached` on a background
+    ///   executor so the @MainActor view model stays responsive.
+    /// - Vision is free to invoke individual completion handlers on whatever
+    ///   internal queues it chooses, and there is no documented guarantee
+    ///   that those callbacks are serialized with respect to each other.
+    ///   We therefore mutate the result through a small lock-guarded
+    ///   accumulator (`VisionDataAccumulator`), and only read its final
+    ///   snapshot after `perform()` returns.
     private static func performVisionAnalysis(on cgImage: CGImage) async throws -> ComprehensiveVisionData {
-        return try await withCheckedThrowingContinuation { continuation in
-            var data = ComprehensiveVisionData()
-            var pendingRequests = 0
-            var hasResumed = false
+        // Box the CGImage for Sendable transfer into the detached task.
+        // CGImage is reference-typed and not marked Sendable, but it is
+        // documented as thread-safe for read-only access (which is all
+        // Vision does); wrap it so the compiler stops asking.
+        let imageBox = UncheckedSendableBox(cgImage)
 
-            let totalRequests = 10
-            let checkCompletion = { (requestName: String) in
-                pendingRequests -= 1
-                let completed = totalRequests - pendingRequests
-                Log.vision.debug("Vision request finished [\(completed)/\(totalRequests)]: \(requestName)")
-                if pendingRequests == 0 && !hasResumed {
-                    hasResumed = true
-                    Log.vision.info("All Vision requests finished")
-                    continuation.resume(returning: data)
-                }
-            }
-
-            func handleError(_ error: Error?, requestName: String) {
-                if let error = error {
-                    Log.vision.error("\(requestName) failed: \(error.localizedDescription)")
-                }
-                checkCompletion(requestName)
-            }
+        return try await Task.detached(priority: .userInitiated) { () throws -> ComprehensiveVisionData in
+            let acc = VisionDataAccumulator()
 
             // 1. Image classification (also opportunistically flags documents
             //    by keyword match on the top classifications).
             let classifyRequest = VNClassifyImageRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("classification")
-                    handleError(error, requestName: "classification")
-                }
+                defer { acc.markPerformed("classification", error: error, requestName: "classification") }
                 guard let observations = request.results as? [VNClassificationObservation] else { return }
-                data.classifications = observations.prefix(10).map {
+                let mapped = observations.prefix(10).map {
                     "\($0.identifier) (\(String(format: "%.2f", $0.confidence)))"
                 }
                 let documentKeywords = [
@@ -112,71 +102,55 @@ enum VisionFrameworkService {
                         observation.identifier.lowercased().contains(keyword)
                     }
                 }
-                if hasDocumentClassification {
-                    data.hasDocument = true
-                    Log.vision.debug("Classification suggests document content")
-                }
+                acc.setClassifications(Array(mapped), hasDocument: hasDocumentClassification)
             }
-            pendingRequests += 1
 
             // 2. Face detection with capture-quality scoring.
             let faceRequest = VNDetectFaceCaptureQualityRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("face")
-                    handleError(error, requestName: "face detection")
-                }
+                defer { acc.markPerformed("face", error: error, requestName: "face detection") }
                 guard let observations = request.results as? [VNFaceObservation] else { return }
-                data.faces = observations.map { obs in
+                let faces = observations.map { obs in
                     FaceData(
                         quality: obs.faceCaptureQuality ?? 0.0,
                         boundingBox: obs.boundingBox
                     )
                 }
+                acc.setFaces(faces)
             }
-            pendingRequests += 1
 
             // 3. Human-body rectangle detection.
             let humanRequest = VNDetectHumanRectanglesRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("human")
-                    handleError(error, requestName: "human detection")
-                }
+                defer { acc.markPerformed("human", error: error, requestName: "human detection") }
                 guard let observations = request.results as? [VNHumanObservation] else { return }
-                data.humans = observations.map { obs in
+                let humans = observations.map { obs in
                     HumanData(
                         pose: "detected",
                         boundingBox: obs.boundingBox,
                         confidence: safeConfidence(from: obs)
                     )
                 }
+                acc.setHumans(humans)
             }
-            pendingRequests += 1
 
             // 4. Animal recognition (cats, dogs, etc.).
             let animalRequest = VNRecognizeAnimalsRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("animal")
-                    handleError(error, requestName: "animal recognition")
-                }
+                defer { acc.markPerformed("animal", error: error, requestName: "animal recognition") }
                 guard let observations = request.results as? [VNRecognizedObjectObservation] else { return }
-                data.animals = observations.compactMap { obs in
+                let animals = observations.compactMap { obs -> AnimalData? in
                     guard let label = obs.labels.first else { return nil }
                     return AnimalData(
                         type: label.identifier,
-                        confidence: Float(label.confidence),
+                        confidence: label.confidence,
                         boundingBox: obs.boundingBox
                     )
                 }
+                acc.setAnimals(animals)
             }
-            pendingRequests += 1
 
             // 5. OCR. Configured for accurate recognition with automatic
             //    language detection over the device's full supported set.
             let textRequest = VNRecognizeTextRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("ocr")
-                    handleError(error, requestName: "text recognition")
-                }
+                defer { acc.markPerformed("ocr", error: error, requestName: "text recognition") }
                 guard let observations = request.results as? [VNRecognizedTextObservation] else { return }
                 let recognizedTexts = observations.enumerated().compactMap { index, observation -> RecognizedTextBlock? in
                     guard let candidate = observation.topCandidates(1).first else { return nil }
@@ -190,11 +164,11 @@ enum VisionFrameworkService {
                         textId: String(format: "text_%03d", index + 1),
                         text: candidate.string,
                         boundingBox: bbox,
-                        confidence: Float(candidate.confidence),
+                        confidence: candidate.confidence,
                         language: nil
                     )
                 }
-                data.recognizedTexts = recognizedTexts
+                acc.setRecognizedTexts(recognizedTexts)
                 if !recognizedTexts.isEmpty {
                     Log.vision.debug("OCR captured \(recognizedTexts.count) text blocks")
                 }
@@ -206,101 +180,81 @@ enum VisionFrameworkService {
             textRequest.usesLanguageCorrection = true
             textRequest.automaticallyDetectsLanguage = true
 
-            if let supportedLanguages = try? textRequest.supportedRecognitionLanguages(),
-               !supportedLanguages.isEmpty {
-                textRequest.recognitionLanguages = supportedLanguages
-                Log.vision.info("OCR automatic language detection enabled with \(supportedLanguages.count) candidate languages")
-            } else {
-                // Fallback when the device cannot enumerate languages.
+            do {
+                let supportedLanguages = try textRequest.supportedRecognitionLanguages()
+                if !supportedLanguages.isEmpty {
+                    textRequest.recognitionLanguages = supportedLanguages
+                    Log.vision.info("OCR automatic language detection enabled with \(supportedLanguages.count) candidate languages")
+                } else {
+                    textRequest.recognitionLanguages = ["ja-JP", "zh-Hant", "zh-Hans", "en-US", "ko-KR"]
+                    Log.vision.notice("OCR supportedRecognitionLanguages returned empty list; using default fallback")
+                }
+            } catch {
+                // Don't swallow — log the diagnostic, then fall back so OCR
+                // still runs against a sensible default set.
+                Log.vision.error("OCR supportedRecognitionLanguages() failed: \(error.localizedDescription); using default fallback")
                 textRequest.recognitionLanguages = ["ja-JP", "zh-Hant", "zh-Hans", "en-US", "ko-KR"]
-                Log.vision.notice("OCR using default language fallback list")
             }
-
-            pendingRequests += 1
 
             // 6. Barcode detection.
             let barcodeRequest = VNDetectBarcodesRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("barcode")
-                    handleError(error, requestName: "barcode detection")
-                }
+                defer { acc.markPerformed("barcode", error: error, requestName: "barcode detection") }
                 guard let observations = request.results as? [VNBarcodeObservation] else { return }
-                data.barcodes = observations.compactMap { $0.payloadStringValue }
+                let barcodes = observations.compactMap { $0.payloadStringValue }
+                acc.setBarcodes(barcodes)
             }
-            pendingRequests += 1
 
             // 7. Rectangle detection. Detected rectangles also count as a
             //    document signal (receipts, business cards, paper, etc.).
             let rectangleRequest = VNDetectRectanglesRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("document")
-                    handleError(error, requestName: "rectangle detection")
-                }
+                defer { acc.markPerformed("document", error: error, requestName: "rectangle detection") }
                 guard let observations = request.results as? [VNRectangleObservation] else { return }
-                data.rectangles = observations.map { obs in
+                let rectangles = observations.map { obs in
                     RectangleData(
                         boundingBox: obs.boundingBox,
                         confidence: safeConfidence(from: obs)
                     )
                 }
-                if !observations.isEmpty {
-                    data.hasDocument = true
-                    Log.vision.debug("Rectangle detection suggests document content")
-                }
+                acc.setRectangles(rectangles, hasDocument: !observations.isEmpty)
             }
-            pendingRequests += 1
 
             // 8. Attention-based saliency (where a human would look).
             let salientRequest = VNGenerateAttentionBasedSaliencyImageRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("attention_saliency")
-                    handleError(error, requestName: "attention saliency")
-                }
+                defer { acc.markPerformed("attention_saliency", error: error, requestName: "attention saliency") }
                 guard let results = request.results as? [VNSaliencyImageObservation],
-                      let object = results.first else { return }
-                if let salientObjects = object.salientObjects {
-                    data.salientObjects = salientObjects.map { obs in
-                        SalientObjectData(
-                            boundingBox: obs.boundingBox,
-                            confidence: safeConfidence(from: obs),
-                            objectType: "unknown"
-                        )
-                    }
+                      let object = results.first,
+                      let salientObjects = object.salientObjects else { return }
+                let mapped = salientObjects.map { obs in
+                    SalientObjectData(
+                        boundingBox: obs.boundingBox,
+                        confidence: safeConfidence(from: obs),
+                        objectType: "unknown"
+                    )
                 }
+                acc.setSalientObjects(mapped)
             }
-            pendingRequests += 1
 
             // 9. Objectness-based saliency (where the dominant object is).
             let boundingBoxSaliency = VNGenerateObjectnessBasedSaliencyImageRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("objectness_saliency")
-                    handleError(error, requestName: "objectness saliency")
-                }
+                defer { acc.markPerformed("objectness_saliency", error: error, requestName: "objectness saliency") }
                 guard let results = request.results as? [VNSaliencyImageObservation],
-                      let object = results.first else { return }
-
-                if let salientObjectsList = object.salientObjects,
-                   !salientObjectsList.isEmpty,
-                   let region = salientObjectsList.first {
-                    let box = region.boundingBox
-                    data.saliencyRegion = "x:\(String(format: "%.2f", box.origin.x)), y:\(String(format: "%.2f", box.origin.y)), w:\(String(format: "%.2f", box.size.width)), h:\(String(format: "%.2f", box.size.height))"
-                }
+                      let object = results.first,
+                      let salientObjectsList = object.salientObjects,
+                      let region = salientObjectsList.first else { return }
+                let box = region.boundingBox
+                let formatted = "x:\(String(format: "%.2f", box.origin.x)), y:\(String(format: "%.2f", box.origin.y)), w:\(String(format: "%.2f", box.size.width)), h:\(String(format: "%.2f", box.size.height))"
+                acc.setSaliencyRegion(formatted)
             }
-            pendingRequests += 1
 
             // 10. Horizon angle (useful for landscape composition).
             let horizonRequest = VNDetectHorizonRequest { request, error in
-                defer {
-                    data.performedAnalyses.insert("horizon")
-                    handleError(error, requestName: "horizon detection")
-                }
+                defer { acc.markPerformed("horizon", error: error, requestName: "horizon detection") }
                 guard let results = request.results as? [VNHorizonObservation],
                       let horizon = results.first else { return }
-                data.horizonAngle = Float(horizon.angle)
+                acc.setHorizonAngle(Float(horizon.angle))
             }
-            pendingRequests += 1
 
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            let handler = VNImageRequestHandler(cgImage: imageBox.value, options: [:])
             let requests: [VNRequest] = [
                 classifyRequest,
                 faceRequest,
@@ -314,15 +268,15 @@ enum VisionFrameworkService {
                 horizonRequest
             ]
 
-            do {
-                try handler.perform(requests)
-            } catch {
-                if !hasResumed {
-                    hasResumed = true
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+            // `perform` is synchronous: by the time it returns, every
+            // completion handler above has been invoked. If it throws,
+            // propagate the error directly.
+            try handler.perform(requests)
+
+            let snapshot = acc.snapshot()
+            Log.vision.info("All Vision requests finished")
+            return snapshot
+        }.value
     }
 
     // MARK: - Safe confidence access
@@ -350,13 +304,12 @@ enum VisionFrameworkService {
             return confidence == 1.0 ? nil : confidence
         }
 
-        // VNHumanObservation inherits from VNDetectedObjectObservation but is
-        // not always directly castable across SDK versions; gate on class name.
-        if String(describing: type(of: observation)).contains("Human") {
-            if let detectedObs = observation as? VNDetectedObjectObservation {
-                return detectedObs.confidence
-            }
-            return nil
+        // VNHumanObservation inherits from VNDetectedObjectObservation. Use
+        // a direct downcast (preferred over `String(describing:).contains`
+        // which is brittle across SDK versions and breaks under stripped
+        // symbols).
+        if let humanObs = observation as? VNHumanObservation {
+            return humanObs.confidence
         }
 
         if let faceObs = observation as? VNFaceObservation {
@@ -383,17 +336,107 @@ enum VisionFrameworkService {
             return nil
         }
 
-        // Last-resort: reflect on the value in case a newer SDK adds an
-        // observation type we have not special-cased.
-        let mirror = Mirror(reflecting: observation)
-        for child in mirror.children {
-            if child.label == "confidence",
-               let confidenceValue = child.value as? Float {
-                return confidenceValue
-            }
-        }
-
+        // Unknown subtype — return nil rather than reflecting on the value
+        // with Mirror, since `VNObservation` is an Objective-C class and
+        // Mirror inspection of imported types is not a stable contract.
         return nil
+    }
+}
+
+// MARK: - Lock-guarded accumulator
+//
+// Vision request completion handlers can fire on internal queues without a
+// documented serialization guarantee. `VisionDataAccumulator` collects all
+// per-request results behind an `NSLock` so concurrent callbacks cannot
+// race when mutating the aggregate. It is `final` + non-`Sendable`-but-safe
+// via internal locking, captured by reference in the completion closures.
+
+private final class VisionDataAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = ComprehensiveVisionData()
+
+    func setClassifications(_ values: [String], hasDocument: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        data.classifications = values
+        if hasDocument { data.hasDocument = true }
+    }
+
+    func setFaces(_ values: [FaceData]) {
+        lock.lock(); defer { lock.unlock() }
+        data.faces = values
+    }
+
+    func setHumans(_ values: [HumanData]) {
+        lock.lock(); defer { lock.unlock() }
+        data.humans = values
+    }
+
+    func setAnimals(_ values: [AnimalData]) {
+        lock.lock(); defer { lock.unlock() }
+        data.animals = values
+    }
+
+    func setRecognizedTexts(_ values: [RecognizedTextBlock]) {
+        lock.lock(); defer { lock.unlock() }
+        data.recognizedTexts = values
+    }
+
+    func setBarcodes(_ values: [String]) {
+        lock.lock(); defer { lock.unlock() }
+        data.barcodes = values
+    }
+
+    func setRectangles(_ values: [RectangleData], hasDocument: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        data.rectangles = values
+        if hasDocument { data.hasDocument = true }
+    }
+
+    func setSalientObjects(_ values: [SalientObjectData]) {
+        lock.lock(); defer { lock.unlock() }
+        data.salientObjects = values
+    }
+
+    func setSaliencyRegion(_ value: String) {
+        lock.lock(); defer { lock.unlock() }
+        data.saliencyRegion = value
+    }
+
+    func setHorizonAngle(_ value: Float) {
+        lock.lock(); defer { lock.unlock() }
+        data.horizonAngle = value
+    }
+
+    /// Mark a Vision request as performed and log any error. Centralizes the
+    /// per-callback bookkeeping that used to live in the original `defer` +
+    /// `handleError` closures.
+    func markPerformed(_ label: String, error: Error?, requestName: String) {
+        if let error {
+            Log.vision.error("\(requestName) failed: \(error.localizedDescription)")
+        }
+        lock.lock(); defer { lock.unlock() }
+        data.performedAnalyses.insert(label)
+    }
+
+    /// Return a snapshot of the accumulated data. Call after all Vision
+    /// completion handlers have fired (i.e. after `perform` returns).
+    func snapshot() -> ComprehensiveVisionData {
+        lock.lock(); defer { lock.unlock() }
+        return data
+    }
+}
+
+// MARK: - Sendable box for non-Sendable Core Graphics types
+//
+// `CGImage` is a Core Foundation type and not marked Sendable, but it is
+// documented as safe for concurrent read-only access. To pass it across an
+// actor / Task boundary we box it in an `@unchecked Sendable` wrapper.
+
+private struct UncheckedSendableBox<T>: @unchecked Sendable {
+    let value: T
+
+    init(_ value: T) {
+        self.value = value
     }
 }
 
