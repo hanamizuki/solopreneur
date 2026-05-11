@@ -89,11 +89,18 @@ final class CaptureService: NSObject {
             throw CameraError.unauthorized
         }
 
-        if session.isRunning { return }
-
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             sessionQueue.async { [weak self] in
                 guard let self else {
+                    continuation.resume(returning: ())
+                    return
+                }
+                // Re-check inside the queue. Reading `session.isRunning`
+                // outside `sessionQueue` would race with concurrent
+                // `start()` calls and could cause `setupSession()` to run
+                // twice, which triggers AVFoundation exceptions on the
+                // duplicate `addInput` / `addOutput`.
+                if self.session.isRunning {
                     continuation.resume(returning: ())
                     return
                 }
@@ -102,7 +109,6 @@ final class CaptureService: NSObject {
                     Log.capture.info("Starting capture session")
                     self.session.startRunning()
                     Log.capture.info("Capture session running")
-                    self.configurePhotoOutput()
                     continuation.resume(returning: ())
                 } catch {
                     Log.capture.error("Capture session setup failed: \(error.localizedDescription)")
@@ -137,8 +143,19 @@ final class CaptureService: NSObject {
     // MARK: - Session configuration (sessionQueue only)
 
     /// Build the AVCaptureSession: pick a back camera, add it as input, add
-    /// the photo output. Must be called on `sessionQueue`.
+    /// and configure the photo output. Must be called on `sessionQueue`.
+    ///
+    /// Idempotent: if the session already has inputs (i.e. we ran setup
+    /// before and the session was stopped but not torn down), this returns
+    /// without re-adding anything. Adding the same input or output twice
+    /// raises an AVFoundation exception.
     private func setupSession() throws {
+        // Idempotency guard. `start()` can be called again after `stop()`
+        // (e.g. a view re-appearing), and AVFoundation will crash on a
+        // duplicate `addInput` / `addOutput`. We tolerate the duplicate
+        // call but don't redo the work.
+        guard session.inputs.isEmpty else { return }
+
         session.beginConfiguration()
         defer { session.commitConfiguration() }
 
@@ -189,20 +206,25 @@ final class CaptureService: NSObject {
         }
         session.addOutput(output)
         photoOutput = output
+
+        // Configure the photo output BEFORE `startRunning()`. Apple's
+        // docs for both `maxPhotoDimensions` and
+        // `isAutoDeferredPhotoDeliveryEnabled` recommend setting them
+        // while the session is still being assembled, because changing
+        // them after `startRunning()` may trigger a lengthy capture
+        // pipeline reconfiguration.
+        configurePhotoOutput(output, device: camera)
     }
 
-    /// Configure the photo output for low-latency capture. Must be called
-    /// after `session.startRunning()` because Zero Shutter Lag /
-    /// Responsive Capture support are only correctly detected when the
-    /// session is live.
-    private func configurePhotoOutput() {
-        guard let output = photoOutput, let device = videoDeviceInput?.device else {
-            Log.capture.error("Cannot configure photo output: missing output or device")
-            return
-        }
-
+    /// Apply per-output settings (max dimensions, quality prioritization,
+    /// Zero Shutter Lag, Responsive Capture). Called from `setupSession()`
+    /// while the session is still in a `beginConfiguration` transaction,
+    /// before `startRunning()`.
+    private func configurePhotoOutput(_ output: AVCapturePhotoOutput, device: AVCaptureDevice) {
         // Push the highest supported photo dimensions to the output so
-        // captures use the full sensor resolution.
+        // captures use the full sensor resolution. Setting this property
+        // doesn't itself require a session-configuration block, but doing
+        // it here keeps all output setup in one place.
         if let maxDimensions = device.activeFormat.supportedMaxPhotoDimensions.last {
             output.maxPhotoDimensions = maxDimensions
             Log.capture.info("Max photo dimensions: \(maxDimensions.width)x\(maxDimensions.height)")
@@ -212,19 +234,19 @@ final class CaptureService: NSObject {
         // producing high-quality images. `.speed` would disable ZSL.
         output.maxPhotoQualityPrioritization = .balanced
 
-        // Auto-deferred photo delivery (iOS 17+) hands the app a proxy
-        // photo immediately and finishes processing in the background —
-        // visibly reduces shutter latency.
-        if #available(iOS 17.0, *) {
-            if output.isAutoDeferredPhotoDeliverySupported {
-                output.isAutoDeferredPhotoDeliveryEnabled = true
-                Log.capture.info("Auto-deferred photo delivery enabled")
-            }
-        }
+        // NOTE: We deliberately do NOT enable `isAutoDeferredPhotoDeliveryEnabled`.
+        // When auto-deferred delivery is on, AVFoundation delivers the
+        // capture via `photoOutput(_:didFinishCapturingDeferredPhotoProxy:error:)`
+        // instead of `didFinishProcessingPhoto`. This template only implements
+        // the latter, so enabling auto-deferred delivery would silently hang
+        // the capture continuation forever. To opt in, also implement the
+        // deferred-proxy delegate callback and resume the same continuation
+        // there using `deferredPhotoProxy.fileDataRepresentation()`.
 
         // Zero Shutter Lag: the system keeps a small ring buffer of frames
         // so the moment the shutter is tapped is closer to "now" than to
-        // "after processing".
+        // "after processing". The support flag is available as soon as the
+        // output is attached; we don't need to wait for `startRunning()`.
         if output.isZeroShutterLagSupported {
             output.isZeroShutterLagEnabled = true
             Log.capture.info("Zero Shutter Lag enabled")
