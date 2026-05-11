@@ -54,6 +54,14 @@ final class CameraModel {
             try await captureService.start()
             status = .running
             Log.camera.info("Camera started")
+        } catch CameraError.unauthorized {
+            // Preserve the distinct `.unauthorized` state so the UI can show
+            // settings guidance specifically for permission denial, instead
+            // of collapsing it into the generic `.failed` hardware/setup
+            // error path.
+            status = .unauthorized
+            self.error = CameraError.unauthorized
+            Log.camera.notice("Camera start failed: not authorized")
         } catch {
             status = .failed
             self.error = error
