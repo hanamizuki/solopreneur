@@ -19,8 +19,32 @@
 //
 
 import Foundation
+import ImageIO
 import UIKit
 import Vision
+
+// MARK: - Orientation bridging
+//
+// `UIImage.Orientation` and `CGImagePropertyOrientation` cover the same
+// eight EXIF orientations, but their raw values differ (UIImage uses
+// 0…7 in display order, EXIF/CGImage uses 1…8). The mapping below is
+// the canonical one Apple documents for Vision-with-UIImage pipelines.
+
+extension CGImagePropertyOrientation {
+    init(_ uiOrientation: UIImage.Orientation) {
+        switch uiOrientation {
+        case .up:            self = .up
+        case .down:          self = .down
+        case .left:          self = .left
+        case .right:         self = .right
+        case .upMirrored:    self = .upMirrored
+        case .downMirrored:  self = .downMirrored
+        case .leftMirrored:  self = .leftMirrored
+        case .rightMirrored: self = .rightMirrored
+        @unknown default:    self = .up
+        }
+    }
+}
 
 // MARK: - Service Namespace
 
@@ -39,22 +63,33 @@ enum VisionFrameworkService {
     ///
     /// The `CGImage` is extracted on the main actor because `UIImage.cgImage`
     /// is not Sendable; the actual Vision work then runs off the main thread.
+    ///
+    /// The image's `imageOrientation` is forwarded to Vision as a
+    /// `CGImagePropertyOrientation` so OCR / face / rectangle / saliency
+    /// observations are produced in the image's upright coordinate space.
+    /// Without this, a portrait photo from the back camera will commonly
+    /// produce rotated/flipped bounding boxes.
     static func collectComprehensiveVisionData(from image: UIImage) async throws -> ComprehensiveVisionData {
-        let cgImage = try await MainActor.run { () throws -> CGImage in
+        let (cgImage, orientation) = try await MainActor.run { () throws -> (CGImage, CGImagePropertyOrientation) in
             guard let cgImage = image.cgImage else {
                 throw PhotoAnalysisError.invalidImage
             }
-            return cgImage
+            return (cgImage, CGImagePropertyOrientation(image.imageOrientation))
         }
-        return try await performVisionAnalysis(on: cgImage)
+        return try await performVisionAnalysis(on: cgImage, orientation: orientation)
     }
 
     /// Run the full Vision pipeline against a `CGImage` directly.
     ///
     /// Prefer this overload from background pipelines that already hold a
-    /// thread-safe `CGImage`, to avoid bouncing through `UIImage`.
-    static func collectComprehensiveVisionData(fromCGImage cgImage: CGImage) async throws -> ComprehensiveVisionData {
-        return try await performVisionAnalysis(on: cgImage)
+    /// thread-safe `CGImage`, to avoid bouncing through `UIImage`. Callers
+    /// must supply the orientation that matches the underlying pixels; pass
+    /// `.up` only when you know the bitmap is already upright.
+    static func collectComprehensiveVisionData(
+        fromCGImage cgImage: CGImage,
+        orientation: CGImagePropertyOrientation = .up
+    ) async throws -> ComprehensiveVisionData {
+        return try await performVisionAnalysis(on: cgImage, orientation: orientation)
     }
 
     // MARK: Core analysis
@@ -75,7 +110,10 @@ enum VisionFrameworkService {
     ///   We therefore mutate the result through a small lock-guarded
     ///   accumulator (`VisionDataAccumulator`), and only read its final
     ///   snapshot after `perform()` returns.
-    private static func performVisionAnalysis(on cgImage: CGImage) async throws -> ComprehensiveVisionData {
+    private static func performVisionAnalysis(
+        on cgImage: CGImage,
+        orientation: CGImagePropertyOrientation
+    ) async throws -> ComprehensiveVisionData {
         // Box the CGImage for Sendable transfer into the detached task.
         // CGImage is reference-typed and not marked Sendable, but it is
         // documented as thread-safe for read-only access (which is all
@@ -254,7 +292,15 @@ enum VisionFrameworkService {
                 acc.setHorizonAngle(Float(horizon.angle))
             }
 
-            let handler = VNImageRequestHandler(cgImage: imageBox.value, options: [:])
+            // Pass the image orientation so Vision interprets the bitmap
+            // upright. Bounding boxes in `VNObservation.boundingBox` remain
+            // in Vision's normalized coordinate space (origin lower-left)
+            // relative to the upright-oriented image, NOT the raw pixel grid.
+            let handler = VNImageRequestHandler(
+                cgImage: imageBox.value,
+                orientation: orientation,
+                options: [:]
+            )
             let requests: [VNRequest] = [
                 classifyRequest,
                 faceRequest,
@@ -410,9 +456,16 @@ private final class VisionDataAccumulator: @unchecked Sendable {
     /// Mark a Vision request as performed and log any error. Centralizes the
     /// per-callback bookkeeping that used to live in the original `defer` +
     /// `handleError` closures.
+    ///
+    /// `performedAnalyses` records *successful* requests only. The semantics
+    /// described on `ComprehensiveVisionData.performedAnalyses` are "ran and
+    /// produced a callback without error", so cache layers can distinguish
+    /// "ran but found nothing" from "didn't run / failed". A failed request
+    /// is logged and skipped from the set.
     func markPerformed(_ label: String, error: Error?, requestName: String) {
         if let error {
             Log.vision.error("\(requestName) failed: \(error.localizedDescription)")
+            return
         }
         lock.lock(); defer { lock.unlock() }
         data.performedAnalyses.insert(label)
