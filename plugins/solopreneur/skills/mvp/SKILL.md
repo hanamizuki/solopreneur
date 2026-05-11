@@ -90,11 +90,15 @@ that platform and proceed. Do not silently retry.
 
 ## Step 3: Writing the plan
 
-Invoke `superpowers:writing-plans` via the Skill tool.
+Invoke `superpowers:writing-plans` via the Skill tool. Pass the Step 2
+records as context in the invocation prompt — `writing-plans` has no
+formal baseline parameter, so list each platform's template name and
+baseline path inline so the plan-writer can reference them.
 
 If templates were found:
-- Open the plan with the matched template's architectural baseline.
-- Reference the baseline path the template skill returned.
+- Open the plan with each matched template's architectural baseline.
+- Reference the baseline path the template skill returned (one section
+  per platform when multiple templates apply).
 - Layer app-specific requirements on top (persistence, custom UI, etc.).
 - Note divergence points: "we deviate from the template at X because Y".
 
