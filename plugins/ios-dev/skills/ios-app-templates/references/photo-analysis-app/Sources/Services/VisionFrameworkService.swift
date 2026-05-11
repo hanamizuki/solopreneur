@@ -21,11 +21,6 @@
 import Foundation
 import UIKit
 import Vision
-import os
-
-// MARK: - Logger
-
-private let visionLog = Logger(subsystem: "app.photo-analysis", category: "Vision")
 
 // MARK: - Service Namespace
 
@@ -82,19 +77,17 @@ enum VisionFrameworkService {
             let checkCompletion = { (requestName: String) in
                 pendingRequests -= 1
                 let completed = totalRequests - pendingRequests
-                visionLog.debug("Vision request finished [\(completed)/\(totalRequests)]: \(requestName)")
+                Log.vision.debug("Vision request finished [\(completed)/\(totalRequests)]: \(requestName)")
                 if pendingRequests == 0 && !hasResumed {
                     hasResumed = true
-                    visionLog.info("All Vision requests finished")
+                    Log.vision.info("All Vision requests finished")
                     continuation.resume(returning: data)
                 }
             }
 
             func handleError(_ error: Error?, requestName: String) {
                 if let error = error {
-                    Task { @MainActor in
-                        visionLog.error("\(requestName) failed: \(error.localizedDescription)")
-                    }
+                    Log.vision.error("\(requestName) failed: \(error.localizedDescription)")
                 }
                 checkCompletion(requestName)
             }
@@ -121,7 +114,7 @@ enum VisionFrameworkService {
                 }
                 if hasDocumentClassification {
                     data.hasDocument = true
-                    visionLog.debug("Classification suggests document content")
+                    Log.vision.debug("Classification suggests document content")
                 }
             }
             pendingRequests += 1
@@ -190,7 +183,7 @@ enum VisionFrameworkService {
                     let bbox = observation.boundingBox
 
                     if index < 3 {
-                        visionLog.debug("OCR[\(index)]: '\(candidate.string.prefix(20))...' bbox=(\(String(format: "%.3f", bbox.origin.x)), \(String(format: "%.3f", bbox.origin.y)), \(String(format: "%.3f", bbox.width)), \(String(format: "%.3f", bbox.height)))")
+                        Log.vision.debug("OCR[\(index)]: '\(candidate.string.prefix(20))...' bbox=(\(String(format: "%.3f", bbox.origin.x)), \(String(format: "%.3f", bbox.origin.y)), \(String(format: "%.3f", bbox.width)), \(String(format: "%.3f", bbox.height)))")
                     }
 
                     return RecognizedTextBlock(
@@ -203,7 +196,7 @@ enum VisionFrameworkService {
                 }
                 data.recognizedTexts = recognizedTexts
                 if !recognizedTexts.isEmpty {
-                    visionLog.debug("OCR captured \(recognizedTexts.count) text blocks")
+                    Log.vision.debug("OCR captured \(recognizedTexts.count) text blocks")
                 }
             }
 
@@ -216,11 +209,11 @@ enum VisionFrameworkService {
             if let supportedLanguages = try? textRequest.supportedRecognitionLanguages(),
                !supportedLanguages.isEmpty {
                 textRequest.recognitionLanguages = supportedLanguages
-                visionLog.info("OCR automatic language detection enabled with \(supportedLanguages.count) candidate languages")
+                Log.vision.info("OCR automatic language detection enabled with \(supportedLanguages.count) candidate languages")
             } else {
                 // Fallback when the device cannot enumerate languages.
                 textRequest.recognitionLanguages = ["ja-JP", "zh-Hant", "zh-Hans", "en-US", "ko-KR"]
-                visionLog.notice("OCR using default language fallback list")
+                Log.vision.notice("OCR using default language fallback list")
             }
 
             pendingRequests += 1
@@ -252,7 +245,7 @@ enum VisionFrameworkService {
                 }
                 if !observations.isEmpty {
                     data.hasDocument = true
-                    visionLog.debug("Rectangle detection suggests document content")
+                    Log.vision.debug("Rectangle detection suggests document content")
                 }
             }
             pendingRequests += 1

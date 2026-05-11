@@ -31,4 +31,7 @@ enum Log {
 
     /// Focus flow + focus indicator.
     static let focus = Logger(subsystem: subsystem, category: "focus")
+
+    /// Vision Framework requests and the static collector.
+    static let vision = Logger(subsystem: subsystem, category: "vision")
 }
