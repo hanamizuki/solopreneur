@@ -82,13 +82,29 @@ restating.
 - **Stay within the worktree path** passed in handoff. Don't modify
   files outside it (no `~/.claude/`, sibling repos, global config).
 
+**First action when dispatched into a fresh worktree** (created by
+`isolation: "worktree"`): the auto-created branch is `worktree-agent-xxx`,
+not the target branch. Rename it before doing anything else:
+
+```
+git branch -m {TARGET_BRANCH}
+git branch --show-current  # confirm output equals {TARGET_BRANCH}
+```
+
+If the rename fails or the verification doesn't match, stop immediately
+and report (this is BLOCKED — see handling below). Same pattern as
+`solopreneur:autopilot`'s `pr-subagent-template.md`.
+
+If already in a worktree (orchestrator didn't pass `isolation: "worktree"`),
+skip the rename — assume the caller put you on the right branch.
+
 **Commit policy: one commit per plan step.**
 - After each step's implementation works (manual verify), commit and
   push. Each step is an independently revertible slice.
 - Commit message: `feat(mvp): <step name>: <one-line outcome>`.
-- **Before the first commit, verify `git branch --show-current` is not
-  `main` / `master` and matches the target branch passed in handoff.
-  Abort if mismatch — never push to a branch you didn't start on.**
+- **Before the first commit, re-verify `git branch --show-current`
+  equals `{TARGET_BRANCH}` and is not `main` / `master`. Abort if
+  mismatch — never push to a branch you didn't start on.**
 
 ### BLOCKED handling
 
