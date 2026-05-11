@@ -83,7 +83,8 @@ provider-agnostic.
 OpenAI-compatible REST surface. Pointing the `openai` Python SDK at
 `https://openrouter.ai/api/v1` gives you a battle-tested client without
 maintaining a separate one. The trade-off: model strings use OpenRouter's
-`<provider>/<model>` format (e.g. `anthropic/claude-sonnet-4-6`), not the
+`<provider>/<model>` format (e.g. `anthropic/claude-sonnet-4.6` — note the
+dot before the version, matching OpenRouter's listing page), not the
 upstream's native ID.
 
 **Lazy client initialisation.** Each provider's `Anthropic(...)`,
