@@ -16,14 +16,14 @@ description: |
 # MVP Orchestrator
 
 Drives the full new-app / new-product flow with one explicit charter:
-**get to first demo fast.** Quality, tests, edge cases, accessibility,
-i18n, and refactor passes are deferred — if the user wants those later
-they invoke `solopreneur:autopilot` on the same plan.
+**get to first demo fast.** Tests, edge cases, accessibility, i18n, and
+refactor passes are deferred — if the user wants those later they invoke
+`solopreneur:autopilot` on the same plan.
 
 This skill is orchestration only — it does NOT reimplement brainstorming
 or planning. It chains the right skills in the right order, inserts a
 template lookup between brainstorming and plan writing, and runs
-execution with a single implementer subagent under the MVP charter
+execution with a single implementer subagent under the MVP Charter
 (rather than via `superpowers:executing-plans` /
 `superpowers:subagent-driven-development`, which both enforce TDD
 discipline that kills demo velocity).
@@ -34,9 +34,84 @@ discipline that kills demo velocity).
 0. Verify dependencies        (superpowers + ≥1 *-app-templates)
 1. superpowers:brainstorming  (clarify needs + classify platform)
 2. Template lookup            (find matching *-app-templates skill)
-3. superpowers:writing-plans  (MVP-flavored, demo-velocity plan)
-4. MVP execute                (single implementer subagent, commit per step)
+3. superpowers:writing-plans  (MVP-flavored plan, demo-velocity)
+4. Execute the plan (MVP)     (single implementer subagent, commit per step)
 ```
+
+## MVP Charter
+
+The single source of truth for the demo-velocity tradeoffs. Step 3 passes
+the **Plan-writing rules** to `superpowers:writing-plans`; Step 4 passes
+the **Execution rules** and **BLOCKED handling** to the implementer
+subagent. Keep both copies in sync by referencing this section, not by
+restating.
+
+### Plan-writing rules (consumed by Step 3)
+
+- Each task = a visible slice the user can see in the app / simulator.
+- **Skip these categories entirely** — they're for a later hardening
+  pass, not MVP:
+  - Test tasks (no unit / integration / UI tests in the plan)
+  - Error-handling tasks (edge cases → `TODO` comments in code, not
+    plan tasks)
+  - Loading / empty / error state tasks
+  - Accessibility / i18n tasks
+  - Performance / refactor / cleanup tasks
+- Acceptance criteria for the whole plan: **"user can demo the core
+  action end-to-end"**, not "all tests pass".
+- Templates already encode baseline architecture — don't re-derive
+  what the template provides; reference it.
+
+### Execution rules (consumed by Step 4)
+
+- **No TDD.** Don't write tests. After each step, run the app /
+  simulator manually and check the happy path works — that is the
+  verification.
+- **Edge cases → `TODO` comments**, in the language's native syntax:
+  `// TODO: handle X` for Swift / Kotlin / JS / TS; `# TODO: handle X`
+  for Python / Ruby / shell / YAML. Final-report grep uses `TODO:` so
+  both forms surface.
+- **Loading / empty / error states → stub or skip.** Simplest possible
+  fallback; no spinners, no skeletons, no retry logic.
+- **No refactor passes, no cleanup commits.** Ship the first working
+  version of each slice.
+- **Trust the template.** Copy reference files as-is; only customize
+  where the plan explicitly calls for it.
+- **Ambiguity → simplest path forward.** Don't pause to ask unless
+  genuinely BLOCKED (see below).
+- **Stay within the worktree path** passed in handoff. Don't modify
+  files outside it (no `~/.claude/`, sibling repos, global config).
+
+**Commit policy: one commit per plan step.**
+- After each step's implementation works (manual verify), commit and
+  push. Each step is an independently revertable slice.
+- Commit message: `feat(mvp): <step name> — <one-line outcome>`.
+- **Before the first commit, verify `git branch --show-current` is not
+  `main` / `master` and matches the target branch passed in handoff.
+  Abort if mismatch — never push to a branch you didn't start on.**
+
+### BLOCKED handling
+
+A step is BLOCKED only when an action genuinely cannot proceed: missing
+credential, broken toolchain, plan step incoherent against current
+state, external service unreachable. Ambiguity that admits a "simplest
+path" is **not** BLOCKED.
+
+- **Subagent on BLOCKED**: commit any working partial slice first, then
+  return a structured report listing (a) last completed commit SHA,
+  (b) the blocking step, (c) what's needed to unblock. Do not attempt
+  workarounds that diverge from the plan.
+- **Orchestrator on BLOCKED return**: surface the report to the user,
+  do not re-dispatch automatically. User decides whether to resume,
+  amend the plan, or abort.
+
+### Stopping condition
+
+The user can run the app / simulator and demo the **core demo action**
+captured in Step 1 end-to-end. Stop there. No polishing, no hardening,
+no nice-to-haves.
+
+---
 
 ## Step 0: Verify dependencies
 
@@ -60,13 +135,17 @@ When brainstorming exits, capture:
 - One-paragraph product description
 - **Platforms** as a list (iOS / Android / web / AI backend) —
   usually one, sometimes multiple (e.g. iOS app + AI backend)
-- The **core demo action** — the single thing the user wants to be able
-  to show someone at the end ("take a photo and see what Vision detected")
+- The **core demo action** — the single thing the user wants to show
+  someone at the end ("take a photo and see what Vision detected"). This
+  becomes the stopping condition for Step 4.
 - Key features and constraints (separated from "nice-to-haves")
 
-Confirm the platform list and the core demo action explicitly with the
-user before continuing — Step 2 iterates over platforms, Step 4 stops
-when the core demo action works.
+**Confirm explicitly with the user before continuing:**
+"This is MVP mode — demo-only, no tests, no hardening. Edge cases get
+TODO markers. If you want production-grade, abort here and run the
+standard superpowers flow or `solopreneur:autopilot` instead."
+
+Proceed only on explicit confirmation.
 
 ## Step 2: Template lookup
 
@@ -100,30 +179,16 @@ Iterate over the platform list:
 restriction, or the user aborts mid-selection, record "no template" for
 that platform and proceed. Do not silently retry.
 
-## Step 3: Writing the plan (MVP-flavored)
+## Step 3: Writing the plan (MVP-flavored, demo-velocity)
 
 Invoke `superpowers:writing-plans` via the Skill tool. Pass the Step 2
 records (per-platform template name + baseline path) as context in the
 invocation prompt — `writing-plans` has no formal baseline parameter,
 so list them inline.
 
-**Also pass this MVP charter to writing-plans** verbatim so the plan it
-produces is demo-flavored, not production-flavored:
-
-> Write a demo-velocity plan, not a production plan. Each task = a
-> visible slice the user can see in the app / simulator. **Skip these
-> categories entirely** — they're for a later hardening pass, not MVP:
-> - Test tasks (no unit / integration / UI tests in the plan)
-> - Error-handling tasks (edge cases → `// TODO` comments in code,
->   not plan tasks)
-> - Loading / empty / error state tasks
-> - Accessibility / i18n tasks
-> - Performance / refactor / cleanup tasks
->
-> Acceptance criteria for the whole plan: **"user can demo the core
-> action end-to-end"**, not "all tests pass". Templates already encode
-> baseline architecture — don't re-derive what the template provides;
-> reference it.
+**Also pass the MVP Charter's Plan-writing rules** (see top section)
+verbatim to `writing-plans` so the plan it produces is demo-flavored,
+not production-flavored.
 
 If templates were found:
 - Open the plan with each matched template's architectural baseline.
@@ -136,77 +201,51 @@ If no templates were found:
 - State explicitly that no template was reused and that the plan is
   MVP-flavored (so a future hardening pass knows what's missing).
 
-## Step 4: MVP execute
+## Step 4: Execute the plan (MVP mode)
 
 Before executing, **stop and get explicit user approval** of the
 finalized plan. Do not assume the Step 3 draft is approved.
 
-Once approved, **dispatch a single implementer subagent** via the Agent
-tool (`general-purpose` type). Do NOT delegate to
-`superpowers:executing-plans` or `superpowers:subagent-driven-development`
-— both enforce TDD discipline and per-task two-stage review, which is
-the right default for production work but kills MVP velocity.
+Once approved, dispatch a single implementer subagent via the **Agent
+tool** with:
+- `subagent_type: general-purpose`
+- `isolation: "worktree"` if not already running inside a feature-branch
+  worktree (creates a temporary isolated worktree, matching
+  `solopreneur:autopilot`'s pattern). If already in a worktree, omit
+  isolation.
+- `prompt`: assemble in this order
+  1. The full plan text, extracted from the plan file. **Embedded text
+     is authoritative for this run** — if the file changes mid-flight,
+     a new dispatch is required, not a re-read.
+  2. The Step 2 template records (template name + baseline path per
+     platform).
+  3. The **MVP Charter Execution rules** (verbatim from the top section).
+  4. The **MVP Charter BLOCKED handling** (verbatim).
+  5. Handoff details: working directory (worktree path), target branch,
+     plan file path for cross-reference.
 
-The subagent prompt must include:
+Do NOT delegate to `superpowers:executing-plans` or
+`superpowers:subagent-driven-development` — both enforce TDD discipline
+and per-task two-stage review, which is the right default for
+production work but kills MVP velocity.
 
-1. The full plan text (extracted from the plan file — don't make the
-   subagent re-read it).
-2. The Step 2 template records (template name + baseline path per
-   platform).
-3. The **MVP charter** below, verbatim.
-4. Concrete handoff details: working directory (worktree path),
-   target branch, plan file path for cross-reference.
+**Recovery**: if the subagent returns BLOCKED (see Charter), surface its
+report to the user; do not re-dispatch automatically.
 
-### MVP charter (include verbatim in the subagent prompt)
-
-You are building an MVP demo, not a production app. Optimize for
-**time-to-first-demo**, not for code quality or completeness.
-
-**Hard rules:**
-- **No TDD.** Do not write tests. After each step, run the app /
-  simulator manually and check the happy path works. That is the
-  verification.
-- **Edge cases → `// TODO`.** Inline `// TODO: handle X` comments where
-  edge cases would normally branch. Do not implement them now.
-- **Loading / empty / error states → stub or skip.** Simplest possible
-  fallback; no spinners, no skeletons, no retry logic.
-- **No refactor passes, no cleanup commits.** Ship the first working
-  version of each slice.
-- **Trust the template.** Copy the template's reference files as-is;
-  only customize where the plan explicitly calls for it.
-- **Ambiguity → simplest path.** Don't pause to ask unless genuinely
-  blocked (missing key, broken toolchain, plan step is incoherent).
-
-**Commit policy: one commit per plan step.**
-- After each step's implementation works (manual verify in the
-  app / simulator), commit and push immediately.
-- Commit message format: `feat(mvp): <step name> — <one-line outcome>`.
-- Each step becomes an independently revertable slice.
-
-**Stopping condition:**
-The user can run the app / simulator and demo the **core demo action**
-captured in Step 1 end-to-end. Stop there. Do not continue polishing,
-hardening, or adding nice-to-haves.
-
-**Final report:**
-List each commit (SHA + step name) and append a short "TODO for
-hardening" section enumerating the `// TODO` comments left in code —
-this becomes the input for a later `solopreneur:autopilot` pass if the
-user decides to harden.
+**Final report from this skill:**
+List each commit (SHA + step name) and append a "TODO for hardening"
+section — a snapshot of `TODO:` markers left in code at end-of-run. This
+becomes the input for a later `solopreneur:autopilot` pass if the user
+decides to harden. Re-grep before the hardening pass starts; the
+snapshot will go stale once any commits land.
 
 ## Notes
 
-- **MVP ≠ production.** This skill's value is the explicit "demo only"
-  charter that lets the implementer skip all the things that slow a
-  TDD build. If the user wants a production-grade build, they should
-  invoke `superpowers:writing-plans` + `superpowers:subagent-driven-development`
-  directly, or run `solopreneur:autopilot` on the MVP plan once the
-  demo works.
-- **Don't skip steps.** Even if the user seems impatient,
-  brainstorming → template lookup → MVP plan is the value proposition.
-  Short-circuit to execution only if the user explicitly opts out of a
-  phase.
+- **Don't skip steps.** Brainstorming → template lookup → MVP plan is
+  the value proposition. Short-circuit to execution only if the user
+  explicitly opts out of a phase.
 - **Hardening is a separate pass.** When the user later wants tests,
-  edge cases, a11y, etc., they re-invoke against the same plan file
-  with autopilot or the standard superpowers flow. MVP execute leaves
-  the plan and the `// TODO` markers as the handoff surface.
+  edge cases, a11y, etc., they re-invoke against the same plan file —
+  `solopreneur:autopilot` for the heavy pipeline, or the standard
+  superpowers flow for a manual pass. MVP execute leaves the plan and
+  the `TODO:` markers as the handoff surface.
