@@ -112,7 +112,11 @@ these four manual steps:
 
 Optional follow-ups:
 
-- `uv remove anthropic google-genai openai` to drop the two unused SDKs.
+- `uv remove <unused-sdk-1> <unused-sdk-2>` to drop only the two unused
+  SDKs. Pick from `anthropic`, `google-genai`, `openai`, skipping the
+  one used by your chosen provider (OpenRouter uses `openai`). Running
+  `uv remove anthropic google-genai openai` would remove all three and
+  break the chosen client at runtime.
 - Set up `.env` with the chosen provider's key.
 - Smoke test:
   ```bash
