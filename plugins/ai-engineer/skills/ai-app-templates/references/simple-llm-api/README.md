@@ -14,9 +14,15 @@ over HTTP.
 
 ## Quickstart
 
+The default provider is **OpenRouter**. For the smoothest first run,
+use an OpenRouter key — the import line in `app/main.py` already points
+at `openrouter_client`. If you want a different provider, follow the
+"Workflow for the consuming agent" section below first (it covers
+switching the import line) before continuing here.
+
 ```bash
 uv sync
-cp .env.example .env       # uncomment ONE provider key line and fill it
+cp .env.example .env       # uncomment OPENROUTER_API_KEY and fill it
 uv run uvicorn app.main:app --reload
 
 curl -X POST http://localhost:8000/chat \
