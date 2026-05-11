@@ -894,7 +894,7 @@ final class CaptureService: NSObject {
         try await withCheckedThrowingContinuation { continuation in
             sessionQueue.async {
                 guard let output = self.photoOutput else {
-                    continuation.resume(throwing: CameraError.captureFailed)
+                    continuation.resume(throwing: CameraError.captureNotConfigured)
                     return
                 }
                 self.captureContinuation = continuation
@@ -926,7 +926,7 @@ extension CaptureService: AVCapturePhotoCaptureDelegate {
             return
         }
         guard let data = photo.fileDataRepresentation() else {
-            captureContinuation?.resume(throwing: CameraError.photoCaptureFailed)
+            captureContinuation?.resume(throwing: CameraError.photoDataExtractionFailed)
             captureContinuation = nil
             return
         }
