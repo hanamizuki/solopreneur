@@ -222,17 +222,42 @@ If no templates were found:
 Before executing, **stop and get explicit user approval** of the
 finalized plan. Do not assume the Step 3 draft is approved.
 
-Once approved, dispatch a single implementer subagent via the **Agent
-tool** with:
+### 4a. Decide target branch + isolation
+
+This is the orchestrator's responsibility — get it wrong and the
+subagent self-aborts on the branch rename. Two paths:
+
+**Path A: orchestrator is on `main` (no feature branch yet)**
+- Derive a new, unique feature branch name from the product
+  (e.g. `feature/mvp-photo-analyze`). Confirm it doesn't exist:
+  `git rev-parse --verify <name>` should fail.
+- Pass that name as `{TARGET_BRANCH}` and use `isolation: "worktree"`
+  so the Agent tool creates a fresh worktree on an auto-generated
+  branch; the subagent renames it to `{TARGET_BRANCH}` as its first
+  action (see Charter).
+
+**Path B: orchestrator is already on a feature-branch worktree**
+- Use the current branch as `{TARGET_BRANCH}`. The branch already
+  exists and may already be checked out here — that's fine because
+  the subagent runs in the **same** worktree (no isolation, no
+  rename).
+- Dispatch **without** `isolation`. The Charter's "First action when
+  dispatched into a fresh worktree" block is skipped.
+
+Never pass an existing branch as `{TARGET_BRANCH}` together with
+`isolation: "worktree"` — the rename would fail (branch already
+exists, possibly checked out elsewhere).
+
+### 4b. Dispatch
+
+Dispatch a single implementer subagent via the **Agent tool**:
+
 - `subagent_type: general-purpose` by default. Single-platform MVPs MAY
   use a stack-specific type (`ios-dev`, `ai-engineer`, etc.) if the
   user prefers that agent's tool surface — but the MVP Charter still
   applies and overrides the agent's normal TDD posture. Multi-platform
   MVPs stay on `general-purpose` to avoid agent-per-step churn.
-- `isolation: "worktree"` if not already running inside a feature-branch
-  worktree (creates a temporary isolated worktree, matching
-  `solopreneur:autopilot`'s pattern). If already in a worktree, omit
-  isolation.
+- `isolation: "worktree"` only in **Path A** above. Omit in Path B.
 - `prompt`: assemble in this order
   1. The full plan text, extracted from the plan file. **Embedded text
      is authoritative for this run** — if the file changes mid-flight,
@@ -241,8 +266,7 @@ tool** with:
      platform).
   3. The **MVP Charter Execution rules** (verbatim from the top section).
   4. The **MVP Charter BLOCKED handling** (verbatim).
-  5. Handoff details: `{TARGET_BRANCH}` (the orchestrator resolves this
-     at dispatch time — the feature branch the worktree is on), and
+  5. Handoff details: `{TARGET_BRANCH}` (resolved in 4a) and
      instructions to resolve `{WORKTREE_PATH}` via
      `git rev-parse --show-toplevel` from the subagent's own cwd at
      runtime. Pass the plan file path for cross-reference too.
