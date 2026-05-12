@@ -68,8 +68,8 @@ jobs:
           # pre/post manifest sources (name + rev) as a sorted set — that only
           # changes when upstream branch HEAD actually moves, and the
           # set-equality form correctly handles source add/remove/reorder.
-          pre_revs=$(git show "HEAD:$MANIFEST_PATH" | jq -S '[.sources[] | {name, rev}]')
-          post_revs=$(jq -S '[.sources[] | {name, rev}]' "$MANIFEST_PATH")
+          pre_revs=$(git show "HEAD:$MANIFEST_PATH" | jq -c '[.sources[] | {name, rev}] | sort_by(.name, .rev)')
+          post_revs=$(jq -c '[.sources[] | {name, rev}] | sort_by(.name, .rev)' "$MANIFEST_PATH")
           if [[ "$pre_revs" == "$post_revs" ]]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No upstream rev changes for ${{ matrix.plugin }}."
