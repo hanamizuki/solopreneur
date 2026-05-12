@@ -5,27 +5,33 @@ on:
     paths:
       - 'plugins/*/skills/**'
       - 'plugins/*/scripts/sync-vendored.sh'
-      - 'plugins/solopreneur/scripts/sync-vendored.sh'
       - '.github/workflows/validate-vendored.yml'
   push:
     branches: [main]
     paths:
       - 'plugins/*/skills/**'
       - 'plugins/*/scripts/sync-vendored.sh'
-      - 'plugins/solopreneur/scripts/sync-vendored.sh'
 
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: validate-vendored-${{ github.ref }}-${{ matrix.plugin }}
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
         plugin: [ai-engineer, android-dev, designer, ios-dev, neo4j-dev]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Re-sync to pinned revs
         working-directory: plugins/${{ matrix.plugin }}
@@ -33,14 +39,16 @@ jobs:
 
       - name: Check for drift
         run: |
-          # Exclude manifest.json — sync-vendored.sh always bumps `synced_at`
-          # even in --pinned mode, so a freshly re-synced manifest legitimately
-          # differs from the committed one. The rev field is what we care
-          # about, and any rev mismatch would have triggered re-fetch and
-          # produced file diffs in the skills/ directory.
+          # Exclude manifest.json and _VENDOR.md sidecars — sync-vendored.sh
+          # always bumps `synced_at` timestamps in both, even in --pinned mode,
+          # so a freshly re-synced manifest and sidecars legitimately differ
+          # from committed ones. The rev field is what we care about, and any
+          # rev mismatch would have triggered re-fetch and produced file diffs
+          # in the skills/ directory outside these excluded paths.
           if ! git diff --exit-code \
                  -- 'plugins/${{ matrix.plugin }}/skills/' \
-                 ':!plugins/${{ matrix.plugin }}/skills/_vendored/manifest.json'; then
+                 ':!plugins/${{ matrix.plugin }}/skills/_vendored/manifest.json' \
+                 ':!plugins/${{ matrix.plugin }}/skills/**/_VENDOR.md'; then
             echo
             echo "::error::Vendored skill files in plugins/${{ matrix.plugin }}/ drift from pinned manifest revs."
             echo "::error::Either revert the hand-edits, or update the manifest and re-run sync-vendored.sh."
