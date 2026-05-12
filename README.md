@@ -14,7 +14,7 @@ automated PR cycles, marketing, design, and platform-specific experts. Install
 | [`designer`](./plugins/designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
 | [`ios-dev`](./plugins/ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 23 vendored skills (`asc-*` + `iphone-apps`) |
 | [`android-dev`](./plugins/android-dev) | `android-dev` agent + `android-patterns` + 39 vendored skills (Compose + `gplay-*` + Android official) |
-| [`ai-engineer`](./plugins/ai-engineer) | `ai-engineer` agent + `langgraph` + 3 vendored skills (LLM / prompt engineering) |
+| [`ai-engineer`](./plugins/ai-engineer) | `ai-engineer` agent + `langgraph` + `ai-app-templates` + 1 vendored skill (`senior-prompt-engineer`) |
 | [`neo4j-dev`](./plugins/neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills |
 
 Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
@@ -233,19 +233,13 @@ from 5 different upstream repos.
 ### `ai-engineer`
 
 The `ai-engineer` agent for LangGraph / LangChain / streaming / tool calling /
-structured output, plus the in-house `langgraph` skill and 3 vendored skills.
+structured output, plus 2 in-house skills and 1 vendored skill.
 
 #### Bundled skills
 
 - **`langgraph`** (in-house): deployment-first v1.0 patterns (`agent.py` with `app = ...compile()`, `langgraph.json` config, prefer `create_react_agent`).
-- **`ai-engineering`**: vendored from [openclaw/skills](https://github.com/openclaw/skills/tree/main/skills/bullkis1/ai-engineer) (originally authored by `bullkis1`, namespaced as `ai-engineer` in the source repo). Production AI fundamentals: LLM provider selection, vector DB selection, full RAG pipeline, evals, drift detection.
-- **`senior-prompt-engineer`**: vendored from [openclaw/skills](https://github.com/openclaw/skills/tree/main/skills/alirezarezvani/senior-prompt-engineer) (originally authored by `alirezarezvani`). Advanced prompt patterns + LLM eval frameworks + agent orchestration.
-- **`prompt-architect`**: vendored from [openclaw/skills](https://github.com/openclaw/skills/tree/main/skills/abdullah4ai/prompt-architect) (originally authored by `abdullah4ai`). Single-prompt design discipline: ingest → clarify → structure → ship.
-
-> Note: [openclaw/skills](https://github.com/openclaw/skills) is a community
-> aggregator hosting skills from many authors. The three skills above each
-> ship from a different upstream contributor, vendored together via that
-> aggregator with each one's source path preserved in `_VENDOR.md`.
+- **`ai-app-templates`** (in-house): reference implementations for common AI backend shapes (currently `simple-llm-api`: minimal FastAPI service with one `POST /chat` endpoint, provider chosen at scaffold time — Anthropic / Gemini / OpenRouter).
+- **`senior-prompt-engineer`**: vendored from [alirezarezvani/claude-skills](https://github.com/alirezarezvani/claude-skills/tree/main/engineering-team/skills/senior-prompt-engineer). Advanced prompt patterns + LLM eval frameworks + agent orchestration.
 
 (No external requirements.)
 
