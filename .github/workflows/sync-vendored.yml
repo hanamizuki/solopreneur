@@ -1,0 +1,173 @@
+name: Sync vendored skills
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: 'Single plugin to sync (leave empty to sync all)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: [ai-engineer, android-dev, designer, ios-dev, neo4j-dev]
+    concurrency:
+      group: vendor-sync-${{ matrix.plugin }}
+      cancel-in-progress: false   # serialize, don't cancel — this job mutates
+    steps:
+      - name: Gate matrix entry on dispatch filter
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PLUGIN: ${{ github.event.inputs.plugin }}
+          MATRIX_PLUGIN: ${{ matrix.plugin }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]] \
+             && [[ -n "$DISPATCH_PLUGIN" ]] \
+             && [[ "$DISPATCH_PLUGIN" != "$MATRIX_PLUGIN" ]]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping (dispatch filter targets $DISPATCH_PLUGIN)."
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.should_run == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Run sync-vendored.sh
+        if: steps.gate.outputs.should_run == 'true'
+        working-directory: plugins/${{ matrix.plugin }}
+        run: ./scripts/sync-vendored.sh
+
+      - name: Detect changes
+        if: steps.gate.outputs.should_run == 'true'
+        id: diff
+        env:
+          MANIFEST_PATH: plugins/${{ matrix.plugin }}/skills/_vendored/manifest.json
+        run: |
+          set -euo pipefail
+          # sync-vendored.sh always bumps `synced_at` timestamps in manifest.json
+          # and _VENDOR.md sidecars, so plain `git diff` is noisy. Compare
+          # pre/post manifest sources (name + rev) as a sorted set — that only
+          # changes when upstream branch HEAD actually moves, and the
+          # set-equality form correctly handles source add/remove/reorder.
+          pre_revs=$(git show "HEAD:$MANIFEST_PATH" | jq -c '[.sources[] | {name, rev}] | sort_by(.name, .rev)')
+          post_revs=$(jq -c '[.sources[] | {name, rev}] | sort_by(.name, .rev)' "$MANIFEST_PATH")
+          if [[ "$pre_revs" == "$post_revs" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No upstream rev changes for ${{ matrix.plugin }}."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          # No revert of cosmetic timestamp dirt — Create-PR is gated on
+          # changed=true, so workspace dirt is never acted on when changed=false,
+          # and the runner VM is destroyed after the job.
+
+      - name: Build PR body
+        if: steps.gate.outputs.should_run == 'true' && steps.diff.outputs.changed == 'true'
+        id: body
+        env:
+          MANIFEST_PATH: plugins/${{ matrix.plugin }}/skills/_vendored/manifest.json
+          MATRIX_PLUGIN: ${{ matrix.plugin }}
+        run: |
+          set -euo pipefail
+          pre_json=$(git show "HEAD:$MANIFEST_PATH")
+          post_json=$(cat "$MANIFEST_PATH")
+          body_path="${RUNNER_TEMP}/pr-body.md"
+          {
+            echo "> [!WARNING]"
+            echo "> Auto-vendored third-party code. Inspect the linked compare URLs below for unexpected upstream changes before merging."
+            echo
+            echo "Automated sync of vendored skills for **${MATRIX_PLUGIN}** plugin."
+            echo
+            echo "## Upstream rev changes"
+            echo
+            echo "| Source | Old rev | New rev | Compare |"
+            echo "| --- | --- | --- | --- |"
+
+            count=$(printf '%s' "$post_json" | jq '.sources | length')
+            for i in $(seq 0 $((count - 1))); do
+              name=$(printf '%s' "$post_json" | jq -r ".sources[$i].name")
+              repo=$(printf '%s' "$post_json" | jq -r ".sources[$i].repo")
+              new=$(printf '%s' "$post_json" | jq -r ".sources[$i].rev // \"\"")
+              old=$(printf '%s' "$pre_json" | jq -r --arg n "$name" '(.sources[] | select(.name == $n) | .rev) // ""')
+              if [[ "$old" != "$new" ]]; then
+                old_short="${old:0:8}"
+                new_short="${new:0:8}"
+                compare="${repo%.git}/compare/${old}...${new}"
+                if [[ -z "$old" ]]; then
+                  echo "| \`$name\` | _(new)_ | \`$new_short\` | — |"
+                else
+                  echo "| \`$name\` | \`$old_short\` | \`$new_short\` | [diff]($compare) |"
+                fi
+              fi
+            done
+
+            echo
+            echo "---"
+            echo
+            echo "Generated by \`.github/workflows/sync-vendored.yml\`."
+            echo "To re-sync manually: \`cd plugins/${MATRIX_PLUGIN} && ./scripts/sync-vendored.sh\`."
+          } > "$body_path"
+          delim="ghadelimiter_$(openssl rand -hex 16)"
+          {
+            echo "body<<${delim}"
+            cat "$body_path"
+            echo "${delim}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Self-validate pinned manifest reproduces synced files
+        if: steps.gate.outputs.should_run == 'true' && steps.diff.outputs.changed == 'true'
+        working-directory: plugins/${{ matrix.plugin }}
+        run: |
+          set -euo pipefail
+          # PRs opened by GITHUB_TOKEN don't trigger pull_request workflows
+          # (GitHub anti-recursion guard), so validate-vendored.yml will SKIP
+          # on auto-PRs. Re-run sync in --pinned mode here as a stand-in: it
+          # must reproduce identical content (modulo cosmetic timestamps),
+          # otherwise the manifest and synced files are out of sync and the
+          # PR shouldn't be opened.
+          ./scripts/sync-vendored.sh --pinned
+          if ! git diff --exit-code \
+                 -- 'skills/' \
+                 ':!skills/_vendored/manifest.json' \
+                 ':!skills/**/_VENDOR.md'; then
+            echo "::error::Pinned re-sync drifted from upstream sync — investigate before opening PR."
+            exit 1
+          fi
+
+      - name: Create or update sync PR
+        if: steps.gate.outputs.should_run == 'true' && steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676  # v7.0.11
+        with:
+          branch: vendor-sync/${{ matrix.plugin }}
+          base: main
+          commit-message: |
+            chore(${{ matrix.plugin }}): sync vendored skills
+
+            Automated by .github/workflows/sync-vendored.yml.
+          title: 'chore(${{ matrix.plugin }}): sync vendored skills'
+          body: ${{ steps.body.outputs.body }}
+          labels: |
+            automated
+            vendor-sync
+          author: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          committer: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          delete-branch: true
