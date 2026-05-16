@@ -7,6 +7,7 @@ description: Use this skill to migrate your Jetpack Compose app to add adaptive 
 license: Complete terms in LICENSE.txt
 metadata:
   author: Google LLC
+  last-updated: '2026-04-01'
   keywords:
   - android
   - compose
