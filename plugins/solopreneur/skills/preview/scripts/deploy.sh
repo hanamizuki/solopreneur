@@ -27,9 +27,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIR="${1:?usage: deploy.sh <dir>}"
 
 # --- derive the Vercel project name ---
-# $PREVIEW_PROJECT wins verbatim. Otherwise base it on the proposal dir's
-# enclosing repo (basename of git toplevel), or the proposal dir's parent
-# when not in a git repo, with a "-preview" suffix.
+# $PREVIEW_PROJECT wins verbatim — used exactly as given, NOT sanitized, so an
+# explicit project name or a real Vercel project ID (e.g. prj_…) passes through
+# untouched to `vercel link --project`. Otherwise derive from the proposal dir's
+# enclosing repo (basename of git toplevel), or the proposal dir's parent when
+# not in a git repo, with a "-preview" suffix, then sanitize the derived name.
 if [ -n "${PREVIEW_PROJECT:-}" ]; then
   PROJECT_NAME="$PREVIEW_PROJECT"
 else
@@ -38,19 +40,17 @@ else
   else
     raw_name="$(basename "$(dirname "$DIR")")"
   fi
-  PROJECT_NAME="${raw_name}-preview"
-fi
-
-# Sanitize to a Vercel-legal project name: lowercase, only [a-z0-9-],
-# collapse repeated '-', no leading/trailing '-', never contains '---',
-# max 100 chars. Never empty — fall back to "cc-preview".
-PROJECT_NAME="$(printf '%s' "$PROJECT_NAME" \
-  | tr '[:upper:]' '[:lower:]' \
-  | sed -e 's/[^a-z0-9-]/-/g' -e 's/-\{2,\}/-/g' -e 's/^-*//' -e 's/-*$//' \
-  | cut -c1-100 \
-  | sed -e 's/-*$//')"
-if [ -z "$PROJECT_NAME" ]; then
-  PROJECT_NAME="cc-preview"
+  # Sanitize the *derived* name to a Vercel-legal project name: lowercase,
+  # only [a-z0-9-], collapse repeated '-', no leading/trailing '-', never
+  # contains '---', max 100 chars. Never empty — fall back to "cc-preview".
+  PROJECT_NAME="$(printf '%s' "${raw_name}-preview" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -e 's/[^a-z0-9-]/-/g' -e 's/-\{2,\}/-/g' -e 's/^-*//' -e 's/-*$//' \
+    | cut -c1-100 \
+    | sed -e 's/-*$//')"
+  if [ -z "$PROJECT_NAME" ]; then
+    PROJECT_NAME="cc-preview"
+  fi
 fi
 
 # --- preflight (CLI installed, logged in, token valid) ---
