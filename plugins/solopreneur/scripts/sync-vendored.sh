@@ -175,6 +175,28 @@ for i in $(seq 0 $((source_count - 1))); do
       fi
     fi
 
+    # Body-path rewrite: upstream skills (notably impeccable) hardcode their
+    # standalone-install path `.claude/skills/<name>/scripts/...` inside
+    # SKILL.md and reference/*.md. In vendored form the skill lives in the
+    # plugin install dir, not under the user's cwd, so the bare path either
+    # fails or silently executes the user's standalone copy (collision).
+    # Rewrite to `${CLAUDE_SKILL_DIR}/`, which Claude Code resolves to the
+    # actual skill directory across personal / project / plugin levels.
+    # Idempotent — the same upstream pattern gets rewritten on every re-sync.
+    find "$dst_path" -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
+      awk -v needle=".claude/skills/$to/" -v repl='${CLAUDE_SKILL_DIR}/' '
+        {
+          out = ""
+          s = $0
+          while ((idx = index(s, needle)) > 0) {
+            out = out substr(s, 1, idx - 1) repl
+            s = substr(s, idx + length(needle))
+          }
+          print out s
+        }
+      ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+    done
+
     # Drop a small _VENDOR.md sidecar so the source is traceable from the skill folder.
     if [[ -n "$license_file" ]]; then
       license_line="see \`../_vendored/LICENSES/$(basename "$license_file")\`"
