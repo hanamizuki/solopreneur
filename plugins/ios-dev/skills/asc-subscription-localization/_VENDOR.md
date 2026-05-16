@@ -5,9 +5,9 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/rudrankriyam/app-store-connect-cli-skills
 - **Source path**: `skills/asc-subscription-localization`
-- **Pinned commit**: c45a9fa1f63dc2d2152010905260c2d8586dc51f
-- **Synced at**: 2026-04-26T10:55:03Z
+- **Pinned commit**: 8e67f1969e1b204403c7278417ab977f61decf20
+- **Synced at**: 2026-05-16T13:09:13Z
 - **License**: see `../_vendored/LICENSES/app-store-connect-cli-skills-LICENSE`
 
-To update: edit `skills/_vendored/manifest.json` if needed, then re-run this plugin's
-`./scripts/sync-vendored.sh`.
+To update: edit `skills/_vendored/manifest.json` if needed, then re-run this
+plugin's `./scripts/sync-vendored.sh`.
