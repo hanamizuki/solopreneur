@@ -203,7 +203,12 @@ for i in $(seq 0 $((source_count - 1))); do
         # is already an intentional substitution (see _VENDOR.md), not a
         # byte-for-byte mirror, and `grep -F` confines us to files with a
         # command-invocation line, which conventionally end in newline.
-        awk -v needle="$needle" -v repl='${CLAUDE_SKILL_DIR}/' '
+        # Emit `"${CLAUDE_SKILL_DIR}/"` quoted: if CLAUDE_SKILL_DIR contains
+        # spaces (possible on macOS user homes), an unquoted expansion would
+        # word-split the resulting `node ${CLAUDE_SKILL_DIR}/scripts/foo.mjs`
+        # into multiple argv segments and break the command. The quoted form
+        # concatenates safely with the following unquoted `scripts/...`.
+        awk -v needle="$needle" -v repl='"${CLAUDE_SKILL_DIR}/"' '
           {
             out = ""
             s = $0
@@ -250,10 +255,11 @@ edits will be overwritten on the next \`scripts/sync-vendored.sh\` run.
 **Path rewrite**: during sync, bundled-script paths under the skill folder
 (\`.claude/skills/<to>/\`, and \`.claude/skills/<upstream-name>/\` if the
 manifest renames the folder) are mechanically rewritten to
-\`\${CLAUDE_SKILL_DIR}/\` so the skill resolves correctly when installed as
-a plugin. The vendored body therefore differs from upstream verbatim by
-exactly that substitution — see \`scripts/sync-vendored.sh\` for the
-transformation.
+\`"\${CLAUDE_SKILL_DIR}/"\` (quoted so a skill-dir path containing spaces
+doesn't word-split the resulting command) so the skill resolves correctly
+when installed as a plugin. The vendored body therefore differs from
+upstream verbatim by exactly that substitution — see
+\`scripts/sync-vendored.sh\` for the transformation.
 
 To update: edit \`skills/_vendored/manifest.json\` if needed, then re-run this
 plugin's \`./scripts/sync-vendored.sh\`.
