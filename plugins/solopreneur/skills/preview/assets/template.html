@@ -64,6 +64,45 @@
     color: var(--ink);
   }
   .doc .meta { font-size: .85rem; color: #9ca3af; margin: 0 0 2rem; }
+
+  /* Revision changelog callout — the agent refreshes this each review
+     round (see SKILL.md Step 5). Minimal modifier on the existing
+     .callout: a touch more presence so the reader notices "what
+     changed since last review" at the top of the page. */
+  .doc .callout.revision-log { border-left-color: #1a7f37; }
+  .doc .callout.revision-log strong { color: #1a7f37; }
+
+  /* --- GitHub-diff-style revision markup ---
+     On a post-feedback revision the agent wraps removed text in <del>
+     (kept in place, struck through) and added/changed text in <ins>
+     (highlighted). Semantic tags, so they render meaningfully even
+     without CSS and are screen-reader friendly. Rules are intentionally
+     unscoped (not under .doc) so they apply wherever the agent injects
+     diff markup — inside paragraphs, tables, lists, or callouts. */
+  del {
+    background: #ffebe9;
+    color: #82071e;
+    text-decoration: line-through;
+    text-decoration-color: rgba(130, 7, 30, .55);
+    border-radius: 3px;
+    padding: 0 .15em;
+  }
+  ins {
+    background: #e6ffec;
+    color: inherit;
+    text-decoration: none; /* background is the signal — keep prose readable */
+    border-radius: 3px;
+    padding: 0 .15em;
+  }
+
+  /* Clean view gate. Toggled by the comment overlay's 乾淨版 / 顯示修改
+     button. When body has .diff-clean: removed text is hidden entirely
+     and added text reads as ordinary prose (no highlight). The page
+     ships WITHOUT this class, so the diff is visible on load — the
+     reader sees how their feedback was applied first, like a GitHub PR
+     opening on the diff. */
+  body.diff-clean del { display: none; }
+  body.diff-clean ins { background: none; color: inherit; padding: 0; }
 </style>
 </head>
 <body>

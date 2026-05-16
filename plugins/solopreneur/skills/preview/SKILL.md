@@ -179,9 +179,48 @@ open <path-to-proposal-dir>/index.html
 ```
 The comment overlay works the same way over `file://` — they can still highlight + comment + export. Only the share-via-URL part is missing, which is fine if it's just self-review.
 
-### 5. Wait for feedback
+### 5. Wait for feedback (revise diff-style, never silently replace)
 
-When the user comes back with pasted comment markdown (it looks like `## comments on: …` followed by `### comment 1` blocks with `> quoted text` and the user's note), use those comments to revise the HTML and redeploy. Each redeploy is a new URL — share the new one and note what changed at the top.
+When the user comes back with pasted comment markdown (it looks like
+`## comments on: …` followed by `### comment 1` blocks with `> quoted text`
+and the user's note), revise the HTML **as a visible diff**, not a silent
+rewrite. The reader should see exactly how their feedback was applied — like
+a GitHub PR. Do this every revision round:
+
+1. **Flatten the previous round first (per-round reset).** Before applying
+   this round's edits, remove the prior round's diff markup so the page
+   represents the last-reviewed accepted state with no diff:
+   - Delete every existing `<del>…</del>` node entirely (that text was
+     rejected last round — it's gone now).
+   - Unwrap every `<ins>…</ins>` (keep the inner text, drop the tags — that
+     text was accepted last round, it's now just normal content).
+   The diff always means "changes since your last review", never a
+   cumulative pile-up across rounds.
+2. **Apply this round's changes as diff.** For each change driven by a
+   comment: wrap the removed text in `<del>…</del>` (leave it in place,
+   struck through — do not delete it) and the new/changed text in
+   `<ins>…</ins>`. Reordering counts: `<del>` the old position, `<ins>` the
+   new one.
+3. **Refresh the revision changelog at the top.** Maintain a single
+   `<div class="callout revision-log">…</div>` near the top of `<main>`
+   (just after the lead paragraph). Each round, rewrite it with a heading
+   like `revision N — changes from review` and a short list of what changed
+   this round and which comment each item addresses. Replace it wholesale
+   each round (it describes only the current round, matching the per-round
+   diff).
+4. **Never silently replace content on a revision.** Every post-feedback
+   content change goes through the `<del>` / `<ins>` mechanism. Do not edit
+   text in place without wrapping it — the reader must be able to see
+   exactly what moved.
+5. **The reader can toggle to a clean view.** The comment overlay shows a
+   `乾淨版` / `顯示修改` button (added by `comment-overlay.js`); the page
+   **defaults to showing the diff** on load. You don't need to do anything
+   for this — just produce correct `<del>` / `<ins>` markup and the toggle
+   + CSS gate handle the rest.
+
+Then redeploy. Each redeploy is a new URL — share the new one. The
+`revision-log` callout (not a free-floating note) is where you summarize
+what changed.
 
 ## The comment overlay (what the user sees)
 
@@ -190,8 +229,9 @@ When the user comes back with pasted comment markdown (it looks like `## comment
 - They submit → the comment is saved in `localStorage` (survives reload during their review session)
 - A floating `export comments (N)` button shows the count
 - Clicking it opens an export modal with the full markdown shown in an editable textarea, plus three buttons: Copy / Close / Clear. Nothing auto-clears — the user can reopen, recopy, or edit-before-copy as needed.
+- On a revised page (one that contains `<del>` / `<ins>` diff markup) a second floating button appears above the export button: `乾淨版` / `顯示修改`. It toggles between the GitHub-diff view (removed text struck through, added text highlighted) and a clean rendered view. **The page defaults to the diff view** so the reader immediately sees how their feedback was applied. The choice persists in `localStorage` for the review session. On a first-draft page (no diff markup yet) this button is hidden.
 
-Their workflow is: open URL, skim, highlight problem spots while reading, click export, edit if needed, click Copy, paste back. Yours is to act on each `> quote` + comment pair.
+Their workflow is: open URL, skim, highlight problem spots while reading, click export, edit if needed, click Copy, paste back. On a revision they land on the diff, see exactly what changed, and can flip to `乾淨版` to read the clean result. Yours is to act on each `> quote` + comment pair.
 
 ## What not to do
 
@@ -199,11 +239,13 @@ Their workflow is: open URL, skim, highlight problem spots while reading, click 
 - **Don't write a multi-file React project** — single `index.html` + the `comment-overlay.js` sidekick is the whole stack. If a proposal genuinely needs React + shadcn level complexity, fall back to a heavier multi-file builder skill if one is available and deploy its built HTML bundle via `deploy.sh`.
 - **Don't pre-decide the layout before reading the content.** A "proposal" that's really a numbers-driven recommendation needs charts, not paragraphs; a "doc" that's really a flow needs a diagram, not prose.
 - **Don't reuse `index.html` across unrelated proposals** — every preview should have its own immutable URL for the user to revisit.
+- **Don't let diff markup accumulate across rounds.** Always flatten the previous round (delete old `<del>`, unwrap old `<ins>`) before applying the new one — otherwise after a few iterations the page is an unreadable pile of strikethroughs and the diff stops meaning "changes since your last review".
+- **Don't silently replace content when revising after feedback.** Every post-feedback content change goes through `<del>` / `<ins>` so the reader can see exactly what moved. Editing text in place without the diff markup defeats the point of the revision view.
 
 ## Files in this skill
 
 - `scripts/preflight.sh` — verifies Vercel CLI + auth (auto-invoked by deploy.sh; can be run standalone)
 - `scripts/deploy.sh` — deploy a directory, print URL (runs preflight first)
 - `assets/template.html` — base template with typography + CDN libs
-- `assets/comment-overlay.js` — comment functionality (must be copied alongside `index.html`)
+- `assets/comment-overlay.js` — comment functionality + the diff/clean revision toggle (must be copied alongside `index.html`)
 - `references/libs.md` — Alpine / Chart.js / Mermaid recipes — **read before writing interactive UI**
