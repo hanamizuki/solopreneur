@@ -12,8 +12,9 @@ description: |
 
 # Tech Vetting: Plan Review
 
-Pre-implementation technical plan review. Verify whether the approach follows best
-practices and surface potential issues before any code is written.
+Pre-implementation technical vetting. Vet whether the approach follows the latest
+official docs and platform best practices, and surface potential issues before any
+code is written.
 
 ## Step 1: Get the Plan
 

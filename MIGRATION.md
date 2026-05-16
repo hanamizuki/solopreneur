@@ -121,6 +121,12 @@ replacement plugins.
 **Agent rename inside `ai-engineer`:** `llm-dev` → `ai-engineer`. If you
 dispatch this subagent from custom scripts, update the `subagent_type`.
 
+**Skill rename inside `solopreneur`:** `/preflight` → `/tech-vetting`. The
+pre-implementation plan-vetting skill was renamed to better describe what it
+does (vet a plan against the latest official docs + platform best practices).
+There is no alias — invoking `/preflight` no longer resolves. Update any
+custom scripts, cron jobs, or muscle memory to `/tech-vetting`.
+
 ### What to run
 
 ```bash
