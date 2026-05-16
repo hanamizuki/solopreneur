@@ -144,6 +144,36 @@ The final proposal path is `<parent>/<YYYY-MM-DD>-<short-slug>/`. Each proposal 
    ```
    Tell the user you did this (one short line) so they don't see a phantom diff.
 
+### 2.5 Define what goes in
+
+Before writing the HTML, know exactly which deliverable the preview is
+**for**. A preview of the wrong artifact wastes the whole round.
+
+**Self-assess ambiguity first — don't ask reflexively.** Ask the user
+**only if** any of these hold:
+
+- the session discussed **≥2 separable topics / deliverables** and the
+  preview request didn't name which one;
+- the request is a bare "做個 preview" / "make a preview" arriving after a
+  **wide-ranging discussion** with no single clear target;
+- **multiple candidate artifacts** plausibly exist (e.g. a plan *and* a
+  pricing model *and* a roadmap).
+
+**If it's clear** (the common case — the user just asked to preview the
+thing you were both just working on): state in **one line** what you're
+about to preview ("Previewing the Q3 pricing proposal — the 3-tier table +
+the calculator.") and proceed. No question.
+
+**If it's ambiguous:** use `AskUserQuestion` with **multiSelect**, listing
+the session's candidate pieces as options (one option per separable
+artifact, plus the natural combinations if they belong together). The
+selected set becomes the **content contract** for Step 3 — build exactly
+that, nothing the user didn't pick. Don't editorialize the list; surface
+what was actually discussed.
+
+This step adds zero friction to the normal "preview what we just did" path
+and only interrupts when the target genuinely isn't determinable.
+
 ### 3. Write `index.html`
 
 Start from `assets/template.html` (copy it in, replace the `{{TITLE}}` / `{{DATE}}` / `{{LEAD_PARAGRAPH}}` / `{{AUTHOR_OR_CONTEXT}}` placeholders, then build the body).
@@ -224,14 +254,56 @@ what changed.
 
 ## The comment overlay (what the user sees)
 
+The overlay behaves like the comment feature the reviewer already knows
+from Google Docs / Notion / a GitHub PR review: a comment leaves a
+**visible mark** on the text and lives in a side panel they can revisit,
+edit, and delete — not a fire-and-forget toast.
+
 - They highlight any text on the page → a small `+ comment` button appears
 - They click it → a modal asks for their note
-- They submit → the comment is saved in `localStorage` (survives reload during their review session)
-- A floating `export comments (N)` button shows the count
-- Clicking it opens an export modal with the full markdown shown in an editable textarea, plus three buttons: Copy / Close / Clear. Nothing auto-clears — the user can reopen, recopy, or edit-before-copy as needed.
-- On a revised page (one that contains `<del>` / `<ins>` diff markup) a second floating button appears above the export button: `乾淨版` / `顯示修改`. It toggles between the GitHub-diff view (removed text struck through, added text highlighted) and a clean rendered view. **The page defaults to the diff view** so the reader immediately sees how their feedback was applied. The choice persists in `localStorage` for the review session. On a first-draft page (no diff markup yet) this button is hidden.
+- They submit → the highlighted text gets a persistent yellow **marker**
+  (`<mark class="cmt-mark">`) and a card appears in the comment panel
+  **immediately, with no reload**. The marker *is* the confirmation —
+  there is no transient "comment added" toast. The comment is saved in
+  `localStorage` (survives reload during the review session) and is
+  re-anchored to the same text on every reload by its surrounding context,
+  so it survives Alpine re-renders and the diff/clean toggle.
+- **Desktop (≥1024px):** a fixed comment panel docks on the right. Page
+  content is shifted left so the panel never covers it. Cards are ordered
+  by where their marker sits in the document. Clicking a marker scrolls the
+  panel to its card and flashes it; clicking a card scrolls the page to its
+  marker and flashes it. Each card has `編輯` (inline edit) and `刪`
+  (delete — removes the marker and restores the original text). The export
+  button and the `乾淨版` / `顯示修改` toggle live in a sticky bar inside
+  the panel.
+- **Mobile (<1024px):** no docked panel. Tapping a marker opens a bottom
+  sheet with just that comment (edit / delete). A floating `comments (N)`
+  button opens a full-list bottom sheet.
+- If a comment's anchor text can no longer be found on the page (it was
+  edited away, or it's older data with no anchor), the comment is **not
+  lost** — it still shows in the panel marked *detached*; it just can't
+  scroll to a marker.
+- A floating `export comments (N)` button shows the count. Clicking it
+  opens an export modal with the full markdown in an editable textarea,
+  plus three buttons: Copy / Close / Clear. Nothing auto-clears — the user
+  can reopen, recopy, or edit-before-copy as needed. The exported markdown
+  format is unchanged: `## comments on: <title>`, the URL,
+  `exported: <iso>`, then `### comment N` / `> quote` / blank / comment /
+  blank blocks.
+- On a revised page (one that contains `<del>` / `<ins>` diff markup) a
+  `乾淨版` / `顯示修改` toggle appears. It toggles between the GitHub-diff
+  view (removed text struck through, added text highlighted) and a clean
+  rendered view. **The page defaults to the diff view** so the reader
+  immediately sees how their feedback was applied. The choice persists in
+  `localStorage` for the review session. Markers coexist with diff markup —
+  the toggle still works on a page that has both. On a first-draft page (no
+  diff markup yet) this toggle is hidden.
 
-Their workflow is: open URL, skim, highlight problem spots while reading, click export, edit if needed, click Copy, paste back. On a revision they land on the diff, see exactly what changed, and can flip to `乾淨版` to read the clean result. Yours is to act on each `> quote` + comment pair.
+Their workflow is: open URL, skim, highlight problem spots while reading
+(each becomes a visible marker + panel card they can revisit and edit),
+click export, edit if needed, click Copy, paste back. On a revision they
+land on the diff, see exactly what changed, and can flip to `乾淨版` to
+read the clean result. Yours is to act on each `> quote` + comment pair.
 
 ## What not to do
 
