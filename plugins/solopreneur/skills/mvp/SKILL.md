@@ -2,12 +2,13 @@
 name: mvp
 description: |
   Meta-orchestrator for going from a product idea to a demo-able MVP fast.
-  Drives the full flow: brainstorming → template lookup → MVP-flavored
-  plan → single-subagent execution. Optimized for **time-to-first-demo**,
-  not production quality — no TDD, no per-task review loops, no
-  hardening. Use INSTEAD OF superpowers:brainstorming when the user is
-  starting a new product from scratch — this skill calls brainstorming
-  internally, then chains in template discovery, plan writing, and
+  Drives the full flow: brainstorming → PRD visual confirmation (user
+  gate) → template lookup → MVP-flavored plan → single-subagent
+  execution. Optimized for **time-to-first-demo**, not production
+  quality — no TDD, no per-task review loops, no hardening. Use INSTEAD
+  OF superpowers:brainstorming when the user is starting a new product
+  from scratch — this skill calls brainstorming internally, then chains
+  in a PRD confirmation phase, template discovery, plan writing, and
   execution. Triggers: "/mvp", "我要做 app", "想做產品",
   "想做一個 app", "做個 MVP", "build a product", "build an app from
   scratch", "MVP from scratch", "start a new app", "new product".
@@ -33,20 +34,27 @@ discipline that kills demo velocity).
 ```text
 0. Verify dependencies        (superpowers + ≥1 *-app-templates)
 1. superpowers:brainstorming  (clarify needs + classify platform)
-2. Template lookup            (find matching *-app-templates skill)
-3. superpowers:writing-plans  (MVP-flavored plan, demo-velocity)
-4. Execute the plan (MVP)     (single implementer subagent, commit per step)
+2. PRD visual confirmation    (render spec via /preview, user-gated)
+3. Template lookup            (find matching *-app-templates; PRD↔template decision)
+4. superpowers:writing-plans  (MVP-flavored plan, demo-velocity)
+5. Execute the plan (MVP)     (single implementer subagent, commit per step)
 ```
 
 ## MVP Charter
 
-The single source of truth for the demo-velocity tradeoffs. Step 3 passes
-the **Plan-writing rules** to `superpowers:writing-plans`; Step 4 passes
+The single source of truth for the demo-velocity tradeoffs. Step 4 passes
+the **Plan-writing rules** to `superpowers:writing-plans`; Step 5 passes
 the **Execution rules** and **BLOCKED handling** to the implementer
 subagent. Keep both copies in sync by referencing this section, not by
 restating.
 
-### Plan-writing rules (consumed by Step 3)
+> PRD visual confirmation (Step 2) is a user gate of the same nature as
+> Step 1's. Both the markdown spec (source of truth) and the confirmed
+> PRD are handed to `writing-plans` (Step 4). The Execution rules
+> (Step 5) are unchanged — the PRD is pre-execution direction
+> confirmation; it does not alter the demo-velocity execution discipline.
+
+### Plan-writing rules (consumed by Step 4)
 
 - Each task = a visible slice the user can see in the app / simulator.
 - **Skip these categories entirely** — they're for a later hardening
@@ -62,7 +70,7 @@ restating.
 - Templates already encode baseline architecture — don't re-derive
   what the template provides; reference it.
 
-### Execution rules (consumed by Step 4)
+### Execution rules (consumed by Step 5)
 
 - **No TDD.** Don't write tests. After each step, run the app /
   simulator manually and check the happy path works — that is the
@@ -141,6 +149,9 @@ no nice-to-haves.
 - `superpowers:brainstorming`
 - `superpowers:writing-plans`
 
+**Co-packaged in `solopreneur`** (always present alongside this skill —
+no runtime check needed): `solopreneur:preview` (used by Step 2).
+
 **Expected (≥1)**: any skill matching `*-app-templates`
 (e.g. `ios-dev:ios-app-templates`, `ai-engineer:ai-app-templates`).
 
@@ -159,7 +170,7 @@ When brainstorming exits, capture:
   usually one, sometimes multiple (e.g. iOS app + AI backend)
 - The **core demo action** — the single thing the user wants to show
   someone at the end ("take a photo and see what Vision detected"). This
-  becomes the stopping condition for Step 4.
+  becomes the stopping condition for Step 5.
 - Key features and constraints (separated from "nice-to-haves")
 
 **Confirm explicitly with the user before continuing:**
@@ -169,7 +180,57 @@ standard superpowers flow or `solopreneur:autopilot` instead."
 
 Proceed only on explicit confirmation.
 
-## Step 2: Template lookup
+## Step 2: PRD visual confirmation
+
+Brainstorming produced a committed markdown spec — the **source of truth**.
+This step renders it as an interactive visual PRD so the user confirms
+UI/UX, data shape, flow, and business logic *before* any template or plan
+work. For a single-implementer, no-review-loop MVP run, a wrong direction
+caught here is far cheaper than one caught after execution. This is a
+deliberate velocity tradeoff: the PRD round is heavier than plain
+brainstorming, but it de-risks the unsupervised execution that follows.
+
+**Inputs**: the brainstorming markdown spec (source of truth) plus the
+Step 1 captures (product description, platforms, core demo action,
+features vs nice-to-haves).
+
+1. Invoke `solopreneur:preview` via the Skill tool. Pass the markdown spec
+   as the source content **and** explicit PRD rendering instructions: do
+   not render a markdown wall — present it the most graspable way, and it
+   MUST cover these four (form follows content otherwise):
+   - **UI/UX** — wireframe / mockup of the core screens, especially the
+     core demo action flow (use `/preview`'s `mock-*` / `mockup` recipes).
+   - **Data structure** — conceptual entity / relationship + key data
+     flow as a Mermaid diagram. **Conceptual level only — no schema DDL,
+     no file layout.** Keeping it conceptual is what keeps the PRD
+     template-agnostic (see Step 3's divergence handling).
+   - **Flow diagram** — user flow / business-logic flow as Mermaid.
+   - **Business logic** — the rules in skimmable form (tables / callouts).
+2. **Override `/preview`'s in-repo commit behavior for this run.** At this
+   point `/mvp` may be on the product repo's `main` (Path A — no feature
+   branch yet, Step 5 creates it) or in an existing feature-branch worktree
+   (Path B). To keep the defer uniform across both paths — and because
+   committing to product `main` is forbidden in the Path A case — instruct
+   `/preview`: do **not** commit the proposal, do **not** modify
+   `.gitignore`. Generate + deploy (or local fallback) only. The PRD dir
+   physically lands at `/preview`'s resolved in-repo path
+   (e.g. `docs/preview/<date>-<slug>/`) but stays uncommitted in the
+   working tree. Record that path — Step 5 commits it onto the feature
+   branch.
+3. Iterate using `/preview`'s native comment-overlay + revision loop until
+   the user is satisfied.
+4. **PRD-complete gate.** Explicitly ask: "PRD discussion complete?
+   Confirming moves to template lookup." Mirror Step 1's confirmation
+   gate — proceed only on explicit confirmation.
+5. **Reconcile the markdown spec.** Visual iteration almost always changes
+   requirements; fold those changes back into the brainstorming markdown
+   spec so it stays the source of truth. It remains uncommitted in the
+   working tree; Step 5 commits it alongside the PRD.
+
+**Carry-forward**: the PRD dir path and the (updated, still-uncommitted)
+markdown spec path, both consumed by Step 5.
+
+## Step 3: Template lookup
 
 Discovery is **convention-based**, not hardcoded: for each platform
 captured in Step 1, look for `<plugin>:<platform>-app-templates` in the
@@ -197,16 +258,34 @@ Iterate over the platform list:
    - **Partial match** → discuss with the user whether to adapt the
      template or go freeform.
 
+**PRD ↔ template divergence (decision sub-step).** When a candidate
+template's technical approach diverges from the confirmed PRD (e.g. the
+PRD specifies an external OpenAI API but the template uses an on-device
+Foundation Model):
+
+- **Product / UX / business logic**: the PRD always wins. A template must
+  never silently reshape the product; if it can't conform, that part goes
+  freeform.
+- **Technical approach / data structure / provider**: the PRD is the
+  default. But if the template offers a materially faster path with a
+  different approach, surface the divergence explicitly and ask the user:
+  (a) adapt the PRD to the template's approach to gain template velocity,
+  or (b) keep the PRD's approach and hand-build that part freeform. The
+  user decides consciously. If they pick (a), fold the change back into
+  the markdown spec and note it in the PRD.
+
 **Recovery paths**: if the template skill errors, hits a tool
 restriction, or the user aborts mid-selection, record "no template" for
 that platform and proceed. Do not silently retry.
 
-## Step 3: Writing the plan (MVP-flavored, demo-velocity)
+## Step 4: Writing the plan (MVP-flavored, demo-velocity)
 
-Invoke `superpowers:writing-plans` via the Skill tool. Pass the Step 2
+Invoke `superpowers:writing-plans` via the Skill tool. Pass the Step 3
 records (per-platform template name + baseline path) as context in the
 invocation prompt — `writing-plans` has no formal baseline parameter,
-so list them inline.
+so list them inline. Also pass the confirmed PRD (its path, and that it
+is the visual rendering of the spec) alongside the markdown spec and the
+per-platform template records.
 
 **Also pass the MVP Charter's Plan-writing rules** (see top section)
 verbatim to `writing-plans` so the plan it produces is demo-flavored,
@@ -223,12 +302,12 @@ If no templates were found:
 - State explicitly that no template was reused and that the plan is
   MVP-flavored (so a future hardening pass knows what's missing).
 
-## Step 4: Execute the plan (MVP mode)
+## Step 5: Execute the plan (MVP mode)
 
 Before executing, **stop and get explicit user approval** of the
-finalized plan. Do not assume the Step 3 draft is approved.
+finalized plan. Do not assume the Step 4 draft is approved.
 
-### 4a. Decide target branch + isolation
+### 5a. Decide target branch + isolation
 
 This is the orchestrator's responsibility — get it wrong and the
 subagent self-aborts on the branch rename. Two paths:
@@ -261,7 +340,40 @@ Never pass an existing branch as `{TARGET_BRANCH}` together with
 `isolation: "worktree"` — the rename would fail (branch already
 exists, possibly checked out elsewhere).
 
-### 4b. Dispatch
+### 5a-bis. Bring the deferred PRD + spec into git
+
+The PRD dir and the updated markdown spec sit uncommitted in the working
+tree of the checkout where Step 2 ran (Path A: `main`; Path B: the existing
+feature worktree). Step 2 deferred their commit. They must land on
+`{TARGET_BRANCH}`:
+
+- **Path A** (`isolation: "worktree"`, fresh worktree on an auto branch):
+  the PRD/spec files were created in the *original* `main` checkout, not
+  the new worktree — and the worktree does not exist until the Agent tool
+  creates it at dispatch time, so the orchestrator **cannot** copy into it
+  beforehand. Instead, the orchestrator passes the **absolute source
+  paths** of the PRD dir + updated markdown spec (in the original `main`
+  checkout) in the handoff prompt. The subagent's *first* action after the
+  branch rename — before any plan step — is to copy them into its own
+  worktree (resolved via `git rev-parse --show-toplevel`) and make a
+  dedicated `docs(mvp): PRD + spec` commit that includes them **and** the
+  `**/comment-overlay.js` line `/preview` normally appends to
+  `.gitignore` (deferred from Step 2).
+- **Path B** (same worktree, no isolation): the PRD/spec are already in
+  this worktree; commit them on the feature branch as the first commit,
+  same `.gitignore` line included.
+- **Path A cleanup (mandatory).** Copying into the worktree does not remove
+  the originals — without this the run leaves product `main` dirty with
+  stale PRD/spec/comment-overlay files, blocking later main-branch work.
+  After the subagent confirms the `docs(mvp): PRD + spec` commit is pushed,
+  the orchestrator restores the original `main` checkout to clean: delete
+  the (untracked) PRD dir and `git checkout -- <markdown-spec-path>` to
+  discard the uncommitted Step 2 reconcile edits. The authoritative
+  reconciled copy now lives on `{TARGET_BRANCH}` and returns to `main` via
+  the eventual PR merge. Path B needs no cleanup — the files are already in
+  the feature worktree where they belong.
+
+### 5b. Dispatch
 
 Dispatch a single implementer subagent via the **Agent tool**:
 
@@ -275,14 +387,24 @@ Dispatch a single implementer subagent via the **Agent tool**:
   1. The full plan text, extracted from the plan file. **Embedded text
      is authoritative for this run** — if the file changes mid-flight,
      a new dispatch is required, not a re-read.
-  2. The Step 2 template records (template name + baseline path per
+  2. The Step 3 template records (template name + baseline path per
      platform).
   3. The **MVP Charter Execution rules** (verbatim from the top section).
   4. The **MVP Charter BLOCKED handling** (verbatim).
-  5. Handoff details: `{TARGET_BRANCH}` (resolved in 4a) and
+  5. Handoff details: `{TARGET_BRANCH}` (resolved in 5a) and
      instructions to resolve `{WORKTREE_PATH}` via
      `git rev-parse --show-toplevel` from the subagent's own cwd at
      runtime. Pass the plan file path for cross-reference too.
+  6. The **5a-bis PRD/spec bootstrap** (verbatim). Path A: the absolute
+     source paths of the PRD dir + updated markdown spec (in the original
+     `main` checkout), plus the instruction that the subagent's *first*
+     action after the branch rename is to copy them into its worktree and
+     make a dedicated `docs(mvp): PRD + spec` commit — including the
+     deferred `**/comment-overlay.js` `.gitignore` line — before any
+     plan-step commit. Path B: the files are already in the worktree; same
+     dedicated first commit, no copy. Without this item the PRD/spec stays
+     uncommitted or gets folded into the first feature commit, defeating
+     5a-bis.
 
 Do NOT delegate to `superpowers:executing-plans` or
 `superpowers:subagent-driven-development` — both enforce TDD discipline
@@ -301,8 +423,8 @@ snapshot will go stale once any commits land.
 
 ## Notes
 
-- **Don't skip steps.** Brainstorming → template lookup → MVP plan is
-  the value proposition. Short-circuit to execution only if the user
+- **Don't skip steps.** Brainstorming → PRD → template lookup → MVP plan
+  is the value proposition. Short-circuit to execution only if the user
   explicitly opts out of a phase.
 - **Hardening is a separate pass.** When the user later wants tests,
   edge cases, a11y, etc., they re-invoke against the same plan file —
