@@ -78,7 +78,7 @@ brainstorming, but it de-risks the unsupervised execution that follows.
 Step 1 captures (product description, platforms, core demo action,
 features vs nice-to-haves).
 
-1. Invoke `superpowers:preview` via the Skill tool. Pass the markdown spec
+1. Invoke `solopreneur:preview` via the Skill tool. Pass the markdown spec
    as the source content **and** explicit PRD rendering instructions: do
    not render a markdown wall — present it the most graspable way, and it
    MUST cover these four (form follows content otherwise):

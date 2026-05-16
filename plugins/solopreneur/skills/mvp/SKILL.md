@@ -148,6 +148,9 @@ no nice-to-haves.
 - `superpowers:brainstorming`
 - `superpowers:writing-plans`
 
+**Co-packaged in `solopreneur`** (always present alongside this skill —
+no runtime check needed): `solopreneur:preview` (used by Step 2).
+
 **Expected (≥1)**: any skill matching `*-app-templates`
 (e.g. `ios-dev:ios-app-templates`, `ai-engineer:ai-app-templates`).
 
@@ -190,7 +193,7 @@ brainstorming, but it de-risks the unsupervised execution that follows.
 Step 1 captures (product description, platforms, core demo action,
 features vs nice-to-haves).
 
-1. Invoke `superpowers:preview` via the Skill tool. Pass the markdown spec
+1. Invoke `solopreneur:preview` via the Skill tool. Pass the markdown spec
    as the source content **and** explicit PRD rendering instructions: do
    not render a markdown wall — present it the most graspable way, and it
    MUST cover these four (form follows content otherwise):
@@ -374,6 +377,13 @@ Dispatch a single implementer subagent via the **Agent tool**:
      instructions to resolve `{WORKTREE_PATH}` via
      `git rev-parse --show-toplevel` from the subagent's own cwd at
      runtime. Pass the plan file path for cross-reference too.
+  6. The **5a-bis PRD/spec bootstrap instruction** (verbatim): the
+     subagent's *first* commit must be a dedicated
+     `docs(mvp): PRD + spec` commit that adds the copied-in PRD dir, the
+     updated markdown spec, and the deferred `**/comment-overlay.js`
+     `.gitignore` line — made before any plan-step commit. Without this
+     item the PRD/spec stays uncommitted or gets folded into the first
+     feature commit, defeating 5a-bis.
 
 Do NOT delegate to `superpowers:executing-plans` or
 `superpowers:subagent-driven-development` — both enforce TDD discipline
