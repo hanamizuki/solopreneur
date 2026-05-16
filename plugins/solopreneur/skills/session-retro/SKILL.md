@@ -163,7 +163,7 @@ Review each subagent dispatch in the session:
 
 1. **Was the agent necessary?** Could the task have been done with direct tool calls instead?
    Exception: if a skill's instructions explicitly require dispatching a subagent (e.g.,
-   preflight dispatching platform expert agents, todos-review using Explore), that is
+   tech-vetting dispatching platform expert agents, todos-review using Explore), that is
    expected behavior — do not flag it as overuse.
 2. **Was the subagent type appropriate?** (e.g., using `Explore` for a task that only needed `Grep`)
 3. **Was the model tier justified?** Check the actual model used — subagents may have a

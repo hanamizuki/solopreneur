@@ -103,7 +103,7 @@ line. The old `solopreneur-*` plugin names are gone.
 **Plugins removed:** `solopreneur-nextjs` and `solopreneur-python`. Both
 shipped only an agent and no curated skills. The `nextjs-dev` and
 `python-dev` specialist subagents are no longer dispatchable from
-`/specialist-review`, `/preflight`, `/todos-review`, or `/autopilot`. Use the
+`/specialist-review`, `/tech-vetting`, `/todos-review`, or `/autopilot`. Use the
 `general-purpose` subagent for those stacks until / unless we ship
 replacement plugins.
 
@@ -120,6 +120,12 @@ replacement plugins.
 
 **Agent rename inside `ai-engineer`:** `llm-dev` → `ai-engineer`. If you
 dispatch this subagent from custom scripts, update the `subagent_type`.
+
+**Skill rename inside `solopreneur`:** `/preflight` → `/tech-vetting`. The
+pre-implementation plan-vetting skill was renamed to better describe what it
+does (vet a plan against the latest official docs + platform best practices).
+There is no alias — invoking `/preflight` no longer resolves. Update any
+custom scripts, cron jobs, or muscle memory to `/tech-vetting`.
 
 ### What to run
 

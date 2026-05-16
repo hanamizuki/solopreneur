@@ -1,18 +1,20 @@
 ---
-name: preflight
+name: tech-vetting
 description: |
-  Pre-implementation best practice review. Analyzes a technical plan against
-  platform-specific best practices before coding begins. Use when the user says
-  "preflight", "review the plan", "best practice review", "sanity check this
+  Pre-implementation technical vetting. Vets a technical plan against the
+  latest official docs and platform-specific best practices before coding
+  begins. Use when the user says "tech vetting", "tech-vetting", "vet the
+  plan", "review the plan", "best practice review", "sanity check this
   approach", or wants to verify a technical plan is sound before implementation.
   Works best with context7 MCP server for documentation lookups (gracefully
   degrades without it).
 ---
 
-# Preflight: Plan Review
+# Tech Vetting: Plan Review
 
-Pre-implementation technical plan review. Verify whether the approach follows best
-practices and surface potential issues before any code is written.
+Pre-implementation technical vetting. Vet whether the approach follows the latest
+official docs and platform best practices, and surface potential issues before any
+code is written.
 
 ## Step 1: Get the Plan
 
