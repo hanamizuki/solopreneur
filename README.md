@@ -9,7 +9,7 @@ automated PR cycles, marketing, design, and platform-specific experts. Install
 
 | Plugin | What you get |
 |---|---|
-| [`solopreneur`](./plugins/solopreneur) | 15 in-house skills (review, pipelines, thinking partners, automation) |
+| [`solopreneur`](./plugins/solopreneur) | 16 in-house skills (review, pipelines, thinking partners, automation) |
 | [`marketer`](./plugins/marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) |
 | [`designer`](./plugins/designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
 | [`ios-dev`](./plugins/ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 23 vendored skills (`asc-*` + `iphone-apps`) |
@@ -70,7 +70,7 @@ explicitly; everything else is recommended and degrades gracefully if absent.
 
 ### `solopreneur` (core)
 
-The foundation. Every other plugin depends on this one. No agent, just 15
+The foundation. Every other plugin depends on this one. No agent, just 16
 skills that wrap the lifecycle around your work.
 
 #### Your Virtual Product Team
@@ -82,6 +82,7 @@ skills that wrap the lifecycle around your work.
 | `/tech-vetting` | **Tech Lead.** Vets your technical plan against the latest official docs and platform-specific best practices before you write a single line of code |
 | `/worktree-handoff` | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
 | `/handoff` | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). No worktree, no file save |
+| `/preview` | **Presenter.** Turns any proposal / plan / idea into an interactive HTML page, deploys it to Vercel for a shareable URL, with an in-page comment overlay so reviewers can highlight text and leave in-context feedback you can act on directly |
 | `/specialist-review` | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
 | `/post-mortem` | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
 | `/session-retro` | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
@@ -126,6 +127,8 @@ Idea
  │   ├─ /specialist-review ── Expert code review per PR
  │   └─ /greenlight ────────── External review loop per PR
  │
+ ├─ /preview ───────── Make it human-reviewable, collect in-context feedback
+ │
  ├─ /post-mortem ───── Trace the root cause when something breaks
  ├─ /session-retro ─── Capture lessons from this session
  │
@@ -145,6 +148,7 @@ Idea
 - **[Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector)**: recommended. `/greenlight` PR mode default reviewer (`@codex review`).
 - **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR mode alternative reviewer (`/gemini review`).
 - **[CodeRabbit](https://coderabbit.ai)**: optional. `/greenlight` passive reviewer (auto-triggered on push).
+- **[Vercel CLI](https://vercel.com/docs/cli)**: optional. `/preview` deploys previews to a shareable URL when present, and gracefully degrades to a local `open` of the HTML when absent.
 
 ---
 
