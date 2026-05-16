@@ -146,6 +146,16 @@ feature worktree). Step 2 deferred their commit. They must land on
 - **Path B** (same worktree, no isolation): the PRD/spec are already in
   this worktree; commit them on the feature branch as the first commit,
   same `.gitignore` line included.
+- **Path A cleanup (mandatory).** Copying into the worktree does not remove
+  the originals — without this the run leaves product `main` dirty with
+  stale PRD/spec/comment-overlay files, blocking later main-branch work.
+  After the subagent confirms the `docs(mvp): PRD + spec` commit is pushed,
+  the orchestrator restores the original `main` checkout to clean: delete
+  the (untracked) PRD dir and `git checkout -- <markdown-spec-path>` to
+  discard the uncommitted Step 2 reconcile edits. The authoritative
+  reconciled copy now lives on `{TARGET_BRANCH}` and returns to `main` via
+  the eventual PR merge. Path B needs no cleanup — the files are already in
+  the feature worktree where they belong.
 ```
 
 ## F. MVP Charter — add a short note (near the Charter intro, after the existing "single source of truth" paragraph)
