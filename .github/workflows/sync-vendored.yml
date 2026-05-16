@@ -140,10 +140,23 @@ jobs:
           set -euo pipefail
           # PRs opened by GITHUB_TOKEN don't trigger pull_request workflows
           # (GitHub anti-recursion guard), so validate-vendored.yml will SKIP
-          # on auto-PRs. Re-run sync in --pinned mode here as a stand-in: it
-          # must reproduce identical content (modulo cosmetic timestamps),
-          # otherwise the manifest and synced files are out of sync and the
-          # PR shouldn't be opened.
+          # on auto-PRs. Re-run sync in --pinned mode here as a stand-in: a
+          # --pinned re-sync must reproduce exactly what the non-pinned sync
+          # (the earlier "Run sync-vendored.sh" step) just produced, modulo
+          # the cosmetic synced_at churn excluded below — otherwise the
+          # manifest and synced files are out of sync and the PR shouldn't
+          # be opened.
+          #
+          # The invariant we want is pinned-result == non-pinned-result. But
+          # the non-pinned sync wrote into the working tree uncommitted and
+          # unstaged, so a naive post-pinned `git diff` would baseline against
+          # HEAD and report non-pinned-vs-HEAD — which is non-empty by
+          # definition whenever upstream actually drifted (the precondition
+          # for reaching this step), making this gate fail on every real
+          # sync. Snapshot the non-pinned result into the index first so the
+          # post-pinned `git diff` (working tree vs index) measures exactly
+          # the pinned-vs-non-pinned invariant instead.
+          git add -A
           ./scripts/sync-vendored.sh --pinned
           if ! git diff --exit-code \
                  -- 'skills/' \
