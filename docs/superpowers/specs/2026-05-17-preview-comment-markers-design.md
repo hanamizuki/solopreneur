@@ -101,7 +101,7 @@ is **never** dropped or allowed to crash the page.
 
 `comments[]` entry:
 
-```
+```json
 {
   id:      string,   // crypto.randomUUID() || Date.now()+"-"+rand
   quote:   string,   // === anchor.exact, kept for byte-identical export

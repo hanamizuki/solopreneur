@@ -110,13 +110,26 @@
           if (!n.nodeValue) return NodeFilter.FILTER_REJECT;
           let p = n.parentNode;
           while (p && p !== document.body) {
-            const tag = p.nodeName;
-            if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") {
-              return NodeFilter.FILTER_REJECT;
-            }
-            // Skip anything inside the overlay's own injected UI.
-            if (p.nodeType === 1 && p.dataset && p.dataset.cmtUi === "1") {
-              return NodeFilter.FILTER_REJECT;
+            if (p.nodeType === 1) {
+              const tag = p.nodeName;
+              if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") {
+                return NodeFilter.FILTER_REJECT;
+              }
+              // Skip anything inside the overlay's own injected UI.
+              if (p.dataset && p.dataset.cmtUi === "1") {
+                return NodeFilter.FILTER_REJECT;
+              }
+              // Skip text that is currently hidden. Critical for the
+              // diff/clean toggle: in clean view `body.diff-clean del`
+              // is display:none — without this, a marker could re-anchor
+              // onto removed text the reader cannot see. Walking the
+              // ancestor chain once (we're already iterating it) keeps
+              // this cheap; getComputedStyle reflects the active CSS gate.
+              if (p.hidden) return NodeFilter.FILTER_REJECT;
+              const cs = window.getComputedStyle(p);
+              if (cs.display === "none" || cs.visibility === "hidden") {
+                return NodeFilter.FILTER_REJECT;
+              }
             }
             p = p.parentNode;
           }
@@ -553,7 +566,10 @@
     row.append(saveB, cancelB);
     ta.after(row);
 
-    const finish = () => renderPanel();
+    const finish = () => {
+      renderPanel();
+      rerenderSheetIfOpen();
+    };
     saveB.addEventListener("click", () => {
       const v = ta.value.trim();
       if (v) {
@@ -581,7 +597,12 @@
     detachedIds.delete(id);
     const idx = comments.findIndex((x) => x.id === id);
     if (idx !== -1) comments.splice(idx, 1);
+    if (sheetMode === "single" && sheetCurrentId === id) {
+      // The single-comment sheet now has nothing to show.
+      closeSheet();
+    }
     save();
+    rerenderSheetIfOpen();
     announce("comment deleted");
   }
 
@@ -653,6 +674,34 @@
   let sheetScrim = null;
   let sheet = null;
   let savedScrollY = 0;
+  // Track what the open sheet is showing so edit/delete can refresh it
+  // (renderPanel() only rebuilds the desktop list, not the mobile sheet).
+  let sheetMode = null; // "single" | "all" | null
+  let sheetCurrentId = null;
+
+  function rerenderSheetIfOpen() {
+    if (!sheet) return;
+    const body = sheet.querySelector(".cmt-sheet-body");
+    if (!body) return;
+    body.textContent = "";
+    if (sheetMode === "single" && sheetCurrentId) {
+      const c = comments.find((x) => x.id === sheetCurrentId);
+      if (c) body.appendChild(buildCard(c));
+      else
+        body.appendChild(
+          el("div", "", { cls: "cmt-empty", text: "No comments yet." })
+        );
+    } else if (sheetMode === "all") {
+      const ordered = orderedComments();
+      if (!ordered.length) {
+        body.appendChild(
+          el("div", "", { cls: "cmt-empty", text: "No comments yet." })
+        );
+      } else {
+        ordered.forEach((c) => body.appendChild(buildCard(c)));
+      }
+    }
+  }
 
   function lockScroll() {
     savedScrollY = window.scrollY;
@@ -670,11 +719,18 @@
   }
 
   function closeSheet() {
+    // Only unlock if a sheet was actually open. The resize handler calls
+    // closeSheet() on every breakpoint crossing; an unconditional
+    // unlockScroll() would window.scrollTo(0, savedScrollY=0) and jump
+    // the page to the top even when no sheet existed.
+    const wasOpen = !!sheet || !!sheetScrim;
     if (sheet) sheet.remove();
     if (sheetScrim) sheetScrim.remove();
     sheet = null;
     sheetScrim = null;
-    unlockScroll();
+    sheetMode = null;
+    sheetCurrentId = null;
+    if (wasOpen) unlockScroll();
   }
 
   function ensureSheet() {
@@ -714,11 +770,15 @@
   function openSheetSingle(id) {
     const c = comments.find((x) => x.id === id);
     if (!c) return;
+    sheetMode = "single";
+    sheetCurrentId = id;
     const body = ensureSheet();
     body.appendChild(buildCard(c));
   }
 
   function openSheetAll() {
+    sheetMode = "all";
+    sheetCurrentId = null;
     const body = ensureSheet();
     const ordered = orderedComments();
     if (!ordered.length) {
