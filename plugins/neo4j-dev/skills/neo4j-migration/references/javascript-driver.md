@@ -4,7 +4,7 @@ Package: https://www.npmjs.com/package/neo4j
 
 # Upgrade paths
 
-Important: Do not ever start upgrading the codebase before collecting all changelogs between the current, and the requested version
+Collect all changelogs between current and target version before upgrading.
 
 ## Upgrading
 

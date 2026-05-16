@@ -1,21 +1,8 @@
 # neo4j-mcp Reference
 
-## Overview
-
-The Neo4j Model Context Protocol (MCP) server is an official tool that enables AI agents (like Claude) to interact with Neo4j graph databases. It implements the Model Context Protocol, providing tools for query execution, schema inspection, and graph operations.
-
-## What is MCP?
-
-The Model Context Protocol (MCP) is a standardized way for AI agents to:
-- **Tools**: Execute functions with defined schemas and predictable outputs
-- **Resources**: Access read-only context (database views, schemas, etc.)
-- **Prompts**: Use pre-defined templates for common operations
-
 ## Installation
 
-### Download Binary
-
-Visit the [official repository](https://github.com/neo4j/mcp) and download the binary for your platform:
+Download binary from [github.com/neo4j/mcp](https://github.com/neo4j/mcp):
 
 ```bash
 # macOS/Linux
@@ -27,17 +14,7 @@ sudo mv neo4j-mcp /usr/local/bin/
 neo4j-mcp --version
 ```
 
-### System Requirements
-
-- **Neo4j Database**: Any deployment type (Aura, Self-Managed, Docker, Desktop, Sandbox)
-- **APOC Plugin**: Required for full functionality
-- **Network Access**: Connection to Neo4j instance
-
-## Basic Syntax
-
-```bash
-neo4j-mcp [OPTIONS]
-```
+Requires: APOC plugin, network access to Neo4j.
 
 ## Configuration Options
 
