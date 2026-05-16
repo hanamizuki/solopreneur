@@ -337,30 +337,65 @@
     addBtn.style.display = "none";
   });
 
-  // Build a TextQuoteSelector anchor from a live Range: exact selection
-  // plus ~CTX chars of surrounding text content for disambiguation.
-  function buildAnchor(range) {
-    const exact = range.toString();
-    if (!exact) return null;
-    const { nodes, text } = collectTextNodes();
-    if (!nodes.length) return { exact: exact, prefix: "", suffix: "" };
-
-    // Locate exact's absolute char position via the start container.
-    let base = 0;
+  // Map a Range boundary (node, offset) to an absolute index into the
+  // concatenated text built by collectTextNodes(). Returns -1 if the
+  // boundary's text node isn't in the collected set.
+  function indexOfBoundary(nodes, container, offset) {
+    if (container.nodeType === 3) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].node === container) return nodes[i].start + offset;
+      }
+      return -1;
+    }
+    // Element container: offset is a child index. Resolve to the first
+    // collected text node at/after that child position.
+    const child = container.childNodes[offset] || null;
     for (let i = 0; i < nodes.length; i++) {
-      if (nodes[i].node === range.startContainer) {
-        base = nodes[i].start + range.startOffset;
-        break;
+      const nd = nodes[i].node;
+      if (child && (nd === child || (child.contains && child.contains(nd)))) {
+        return nodes[i].start;
+      }
+      if (!child && container.contains(nd)) {
+        // offset past last child: end of container's text
+        return nodes[i].end;
       }
     }
-    // If the start container wasn't a collected text node (rare), fall
-    // back to first occurrence of exact.
-    if (text.slice(base, base + exact.length) !== exact) {
+    return -1;
+  }
+
+  // Build a TextQuoteSelector anchor from a live Range.
+  //
+  // exact MUST be sliced from the SAME concatenated text that findRange()
+  // searches, not from range.toString(). Browsers insert "\n" between
+  // block elements in Selection/Range.toString(), but collectTextNodes()
+  // concatenates raw nodeValues with no separator. Using toString() for a
+  // cross-block selection would store an `exact` containing newlines that
+  // findRange() can never locate, detaching the comment on the next pass.
+  function buildAnchor(range) {
+    const { nodes, text } = collectTextNodes();
+    let start = indexOfBoundary(nodes, range.startContainer, range.startOffset);
+    let end = indexOfBoundary(nodes, range.endContainer, range.endOffset);
+
+    let exact;
+    if (start !== -1 && end !== -1 && end > start) {
+      exact = text.slice(start, end);
+    } else {
+      // Fallback: container mapping failed (e.g. selection touches a node
+      // collectTextNodes skipped). Use toString() and try to find it.
+      exact = range.toString();
+      if (!exact) return null;
       const found = text.indexOf(exact);
-      base = found === -1 ? 0 : found;
+      if (found === -1) {
+        // Last resort: keep toString() value; findRange() will likely
+        // mark it detached, which is the documented graceful degrade.
+        return { exact: exact, prefix: "", suffix: "" };
+      }
+      start = found;
+      end = found + exact.length;
     }
-    const prefix = text.slice(Math.max(0, base - CTX), base);
-    const suffix = text.slice(base + exact.length, base + exact.length + CTX);
+    if (!exact) return null;
+    const prefix = text.slice(Math.max(0, start - CTX), start);
+    const suffix = text.slice(end, end + CTX);
     return { exact: exact, prefix: prefix, suffix: suffix };
   }
 

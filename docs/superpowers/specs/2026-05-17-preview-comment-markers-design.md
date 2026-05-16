@@ -73,7 +73,16 @@ rejected.
 On comment create:
 
 - Capture the selection Range.
-- `exact` = selected string.
+- `exact` is sliced from the **same separator-free concatenation** of
+  text-node values that the re-anchor pass searches, NOT from
+  `Range.toString()`. Browsers insert `\n` between block elements in
+  `Selection`/`Range.toString()`, but the concatenation has no
+  separators; using `toString()` for a cross-block selection would store
+  an `exact` containing newlines that the re-anchor step could never
+  locate, immediately detaching the comment. Range boundaries are mapped
+  to absolute indices in the concatenation; `exact` is the slice between
+  them. A `toString()`-based fallback covers the rare case where a
+  boundary node was not collected.
 - `prefix` = up to ~32 chars of text content immediately before the range.
 - `suffix` = up to ~32 chars immediately after.
 - Persist `anchor: {exact, prefix, suffix}` plus a stable `id`.
