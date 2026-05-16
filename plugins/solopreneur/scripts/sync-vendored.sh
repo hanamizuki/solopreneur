@@ -198,6 +198,11 @@ for i in $(seq 0 $((source_count - 1))); do
         # Skip files that don't contain the literal needle — avoids
         # rewriting (and mtime-touching) files that have nothing to change.
         grep -q -F "$needle" "$f" || continue
+        # awk's `print` ensures a trailing newline. If upstream lacks one,
+        # the rewritten file gains one byte — accepted: the vendored body
+        # is already an intentional substitution (see _VENDOR.md), not a
+        # byte-for-byte mirror, and `grep -F` confines us to files with a
+        # command-invocation line, which conventionally end in newline.
         awk -v needle="$needle" -v repl='${CLAUDE_SKILL_DIR}/' '
           {
             out = ""
