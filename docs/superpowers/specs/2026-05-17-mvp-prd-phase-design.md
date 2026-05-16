@@ -174,3 +174,11 @@ the "(consumed by Step N)" headings).
 
 Change `Brainstorming → template lookup → MVP plan` to
 `Brainstorming → PRD → template lookup → MVP plan`.
+
+## H. Frontmatter `description` — include the PRD gate
+
+The skill frontmatter is what users/agents see when selecting `/mvp`, so
+it must advertise the new phase. Change the flow line to
+`brainstorming → PRD visual confirmation (user gate) → template lookup →
+MVP-flavored plan → single-subagent execution`, and the "chains in"
+sentence to include "a PRD confirmation phase" before template discovery.

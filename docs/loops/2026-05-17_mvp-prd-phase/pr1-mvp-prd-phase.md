@@ -204,6 +204,14 @@ the "(consumed by Step N)" headings).
 Change `Brainstorming → template lookup → MVP plan` to
 `Brainstorming → PRD → template lookup → MVP plan`.
 
+### H. Frontmatter `description` — include the PRD gate
+
+The skill frontmatter is what users/agents see when selecting `/mvp`, so
+it must advertise the new phase. Change the flow line to
+`brainstorming → PRD visual confirmation (user gate) → template lookup →
+MVP-flavored plan → single-subagent execution`, and the "chains in"
+sentence to include "a PRD confirmation phase" before template discovery.
+
 ## Acceptance Criteria
 
 - [ ] `## Step 2: PRD visual confirmation` exists between Step 1 and the
@@ -226,6 +234,9 @@ Change `Brainstorming → template lookup → MVP plan` to
       action / stopping condition) still says Step 1.
 - [ ] `docs/superpowers/specs/2026-05-17-mvp-prd-phase-design.md` exists
       and contains the full "Approved Design" (sections A–G) in English.
+- [ ] SKILL.md frontmatter `description` includes the PRD visual
+      confirmation gate in both the flow line and the "chains in"
+      sentence (section H).
 - [ ] No changes to any file other than the three listed (SKILL.md +
       design doc + this autopilot spec artifact).
 

@@ -2,12 +2,13 @@
 name: mvp
 description: |
   Meta-orchestrator for going from a product idea to a demo-able MVP fast.
-  Drives the full flow: brainstorming → template lookup → MVP-flavored
-  plan → single-subagent execution. Optimized for **time-to-first-demo**,
-  not production quality — no TDD, no per-task review loops, no
-  hardening. Use INSTEAD OF superpowers:brainstorming when the user is
-  starting a new product from scratch — this skill calls brainstorming
-  internally, then chains in template discovery, plan writing, and
+  Drives the full flow: brainstorming → PRD visual confirmation (user
+  gate) → template lookup → MVP-flavored plan → single-subagent
+  execution. Optimized for **time-to-first-demo**, not production
+  quality — no TDD, no per-task review loops, no hardening. Use INSTEAD
+  OF superpowers:brainstorming when the user is starting a new product
+  from scratch — this skill calls brainstorming internally, then chains
+  in a PRD confirmation phase, template discovery, plan writing, and
   execution. Triggers: "/mvp", "我要做 app", "想做產品",
   "想做一個 app", "做個 MVP", "build a product", "build an app from
   scratch", "MVP from scratch", "start a new app", "new product".
