@@ -296,4 +296,62 @@
   }
 
   updateBadge();
+
+  // --- diff / clean toggle (bottom-right, above export button) ---
+  // On a post-feedback revision the agent rewrites the page with
+  // GitHub-diff markup: removed text in <del>, added/changed text in
+  // <ins> (see SKILL.md Step 5). This button lets the reader flip
+  // between the diff view and a clean rendered view by toggling
+  // body.diff-clean (CSS gate lives in template.html). State persists
+  // to localStorage so it survives reload during a review session.
+  //
+  // Default when nothing is stored: diff VISIBLE (no diff-clean class) —
+  // the reader should see how their feedback was applied first, like a
+  // GitHub PR opening on the diff. On a first-draft page there is no
+  // diff markup yet, so the button hides itself entirely.
+  const DIFF_CLEAN_KEY = "preview_diff_clean_v1";
+
+  // Page has diff markup only after a revision round.
+  const hasDiff = !!document.querySelector("del, ins");
+
+  let diffClean = false;
+  try {
+    diffClean = localStorage.getItem(DIFF_CLEAN_KEY) === "1";
+  } catch (_) {
+    diffClean = false;
+  }
+
+  // Apply persisted state synchronously (script runs at end of <body>,
+  // so this settles before paint — no diff flash).
+  document.body.classList.toggle("diff-clean", diffClean);
+
+  const diffBtn = el(
+    "button",
+    "position:fixed;bottom:64px;right:20px;z-index:9998;padding:10px 16px;background:#1f2937;color:#fff;border:none;border-radius:8px;font:500 14px system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.2);display:none",
+    { id: "cmt-diff-toggle" }
+  );
+
+  function updateDiffBtn() {
+    // Only meaningful when the page actually carries diff markup.
+    diffBtn.style.display = hasDiff ? "inline-block" : "none";
+    // Label reflects what the click will DO:
+    //   diff visible  → offer 乾淨版 (hide diff)
+    //   clean view    → offer 顯示修改 (show diff)
+    diffBtn.textContent = document.body.classList.contains("diff-clean")
+      ? "顯示修改"
+      : "乾淨版";
+  }
+
+  diffBtn.addEventListener("click", () => {
+    const clean = document.body.classList.toggle("diff-clean");
+    try {
+      localStorage.setItem(DIFF_CLEAN_KEY, clean ? "1" : "0");
+    } catch (_) {
+      /* storage blocked — toggle still works for this session */
+    }
+    updateDiffBtn();
+  });
+
+  document.body.appendChild(diffBtn);
+  updateDiffBtn();
 })();
