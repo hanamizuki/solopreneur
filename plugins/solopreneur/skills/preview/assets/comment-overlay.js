@@ -39,7 +39,7 @@
   let pending = null;
 
   document.addEventListener("mouseup", (e) => {
-    if (e.target.closest("#cmt-add,#cmt-modal,#cmt-export,#cmt-fallback")) return;
+    if (e.target.closest("#cmt-add,#cmt-modal,#cmt-export,#cmt-fallback,#cmt-diff-toggle")) return;
     const sel = window.getSelection();
     const text = sel && sel.toString().trim();
     if (!text) {
