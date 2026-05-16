@@ -345,10 +345,14 @@ working tree (Step 2 deferred their commit). They must land on
 
 - **Path A** (`isolation: "worktree"`, fresh worktree on an auto branch):
   the PRD/spec files were created in the *original* `main` checkout, not
-  the new worktree. After resolving `{TARGET_BRANCH}` in 5a and before
-  dispatch, the orchestrator copies the PRD dir + updated markdown spec
-  into the worktree path. The implementer's first commit is a dedicated
-  `docs(mvp): PRD + spec` commit that includes them **and** the
+  the new worktree — and the worktree does not exist until the Agent tool
+  creates it at dispatch time, so the orchestrator **cannot** copy into it
+  beforehand. Instead, the orchestrator passes the **absolute source
+  paths** of the PRD dir + updated markdown spec (in the original `main`
+  checkout) in the handoff prompt. The subagent's *first* action after the
+  branch rename — before any plan step — is to copy them into its own
+  worktree (resolved via `git rev-parse --show-toplevel`) and make a
+  dedicated `docs(mvp): PRD + spec` commit that includes them **and** the
   `**/comment-overlay.js` line `/preview` normally appends to
   `.gitignore` (deferred from Step 2).
 - **Path B** (same worktree, no isolation): the PRD/spec are already in
@@ -377,13 +381,16 @@ Dispatch a single implementer subagent via the **Agent tool**:
      instructions to resolve `{WORKTREE_PATH}` via
      `git rev-parse --show-toplevel` from the subagent's own cwd at
      runtime. Pass the plan file path for cross-reference too.
-  6. The **5a-bis PRD/spec bootstrap instruction** (verbatim): the
-     subagent's *first* commit must be a dedicated
-     `docs(mvp): PRD + spec` commit that adds the copied-in PRD dir, the
-     updated markdown spec, and the deferred `**/comment-overlay.js`
-     `.gitignore` line — made before any plan-step commit. Without this
-     item the PRD/spec stays uncommitted or gets folded into the first
-     feature commit, defeating 5a-bis.
+  6. The **5a-bis PRD/spec bootstrap** (verbatim). Path A: the absolute
+     source paths of the PRD dir + updated markdown spec (in the original
+     `main` checkout), plus the instruction that the subagent's *first*
+     action after the branch rename is to copy them into its worktree and
+     make a dedicated `docs(mvp): PRD + spec` commit — including the
+     deferred `**/comment-overlay.js` `.gitignore` line — before any
+     plan-step commit. Path B: the files are already in the worktree; same
+     dedicated first commit, no copy. Without this item the PRD/spec stays
+     uncommitted or gets folded into the first feature commit, defeating
+     5a-bis.
 
 Do NOT delegate to `superpowers:executing-plans` or
 `superpowers:subagent-driven-development` — both enforce TDD discipline

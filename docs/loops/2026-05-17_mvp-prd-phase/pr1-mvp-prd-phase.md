@@ -46,6 +46,10 @@ Charter cross-reference renumbering:
 - `docs/superpowers/specs/2026-05-17-mvp-prd-phase-design.md` — **create**;
   contains the "Approved Design" section below verbatim (the brainstorming
   design artifact, produced inside this PR so it never touches `main`).
+- `docs/loops/2026-05-17_mvp-prd-phase/pr1-mvp-prd-phase.md` — **this file**;
+  the autopilot single-PR spec artifact, committed alongside the change per
+  the repo's `docs/loops/` convention (same as prior loop PRs). It is the
+  third committed file by design, not an out-of-scope addition.
 
 ## Approved Design
 
@@ -205,7 +209,8 @@ Change `Brainstorming → template lookup → MVP plan` to
       action / stopping condition) still says Step 1.
 - [ ] `docs/superpowers/specs/2026-05-17-mvp-prd-phase-design.md` exists
       and contains the full "Approved Design" (sections A–G) in English.
-- [ ] No changes to any file other than the two listed.
+- [ ] No changes to any file other than the three listed (SKILL.md +
+      design doc + this autopilot spec artifact).
 
 ## Notes
 
@@ -215,7 +220,8 @@ Change `Brainstorming → template lookup → MVP plan` to
   the `grep` consistency check + manual read against the acceptance
   criteria.
 - Do not "improve" unrelated parts of the SKILL.md. Scope is exactly the
-  PRD-step insertion + renumber + the two listed files.
+  PRD-step insertion + renumber + the three listed files (SKILL.md +
+  design doc + this autopilot spec artifact).
 - The renumbering is the highest-risk part. After editing, grep every
   `Step [0-9]` occurrence and reconcile each against the mapping table —
   a missed cross-reference is the most likely defect.
