@@ -5,9 +5,9 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `jetpack-compose/migration/migrate-xml-views-to-jetpack-compose`
-- **Pinned commit**: b281881e3fbe044d29b4ea757de06758a4ca81ec
-- **Synced at**: 2026-04-26T11:06:04Z
+- **Pinned commit**: 4328beaf36f00265db107eb316f9add6b8764144
+- **Synced at**: 2026-05-16T13:09:17Z
 - **License**: see `../_vendored/LICENSES/android-skills-LICENSE.txt`
 
-To update: edit `skills/_vendored/manifest.json` if needed, then re-run this plugin's
-`./scripts/sync-vendored.sh`.
+To update: edit `skills/_vendored/manifest.json` if needed, then re-run this
+plugin's `./scripts/sync-vendored.sh`.

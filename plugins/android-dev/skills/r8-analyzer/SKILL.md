@@ -7,6 +7,7 @@ description: Analyzes Android build files and R8 keep rules to identify redundan
 license: Complete terms in LICENSE.txt
 metadata:
   author: Google LLC
+  last-updated: '2026-04-25'
   keywords:
   - R8
   - proguard
@@ -27,8 +28,7 @@ metadata:
   - If refining the rule, give instructions on finding a narrower and specific keep rule using the [/references/REFLECTION-GUIDE.md](references/REFLECTION-GUIDE.md).
   - If removing, provide reasoning on why it needs to be removed.
 - \[ \] Step 8: After keep analysis, order the keep rule analysis based on the impact to the codebase hierarchy defined in [references/KEEP-RULES-IMPACT-HIERARCHY.md](references/KEEP-RULES-IMPACT-HIERARCHY.md)
-- \[ \] Step 9: Advise the user to run tests using [UI
-  automator](https://developer.android.com/training/testing/other-components/ui-automator) to assess that there is no issue with the suggested changes, concentrating on the packages where keep rules will be affected.
+- \[ \] Step 9: Advise the user to run tests using [UI automator](references/android/training/testing/other-components/ui-automator.md) to assess that there is no issue with the suggested changes, concentrating on the packages where keep rules will be affected.
 
 ## Mandatory rules
 
