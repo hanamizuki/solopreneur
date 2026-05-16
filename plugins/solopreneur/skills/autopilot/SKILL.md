@@ -239,7 +239,7 @@ Initial state (multi-PR or single-PR + schedule; **not** written for single-PR
 
 ### Multi-PR
 
-Present the final plan + tech-vetting results for user confirmation:
+Present the final plan + Tech Vetting results for user confirmation:
 
 ```text
 Plan: 4 PRs
@@ -247,7 +247,7 @@ Plan: 4 PRs
   PR3 (router) → waits for PR1
   PR4 (docs) → waits for all
 
-Tech vetting: all passed ✅
+Tech Vetting: all passed ✅
 
 Schedule for automatic execution? Tell me when you'd like it to run.
 ```

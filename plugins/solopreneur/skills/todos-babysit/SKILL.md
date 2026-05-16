@@ -392,7 +392,7 @@ Based on review results and todo content, create an implementation plan.
 ### Step 2: Tech Vetting
 
 Invoke `/tech-vetting` to verify the plan against platform best practices.
-Report tech-vetting results to the user — wait for confirmation before proceeding.
+Report Tech Vetting results to the user — wait for confirmation before proceeding.
 
 ### Step 3: Create Worktree & Implement
 
@@ -457,5 +457,5 @@ After `/greenlight` completes:
 - **Auto-cleanup**: Merged PR worktrees and local branches are cleaned up
 - **Noise avoidance**: Previously reviewed, unchanged todos are not re-notified
 - **Conflict escalation**: Simple conflicts auto-resolved, complex ones escalated to user
-- **Tech-vetting gate**: Implementation plan must pass tech-vetting; in interactive mode wait
+- **Tech Vetting gate**: Implementation plan must pass tech-vetting; in interactive mode wait
   for user confirmation
