@@ -50,6 +50,16 @@
   const Z = { highlight: 100001, bar: 100005, picker: 100007, toast: 100010 };
   const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'; // ease-out-quint
   const PREFIX = 'impeccable-live';
+  const sessionState = window.__IMPECCABLE_LIVE_SESSION__?.createLiveBrowserSessionState({
+    prefix: PREFIX,
+    storage: localStorage,
+    idFactory: () => crypto.randomUUID().replace(/-/g, '').slice(0, 8),
+  });
+  if (!sessionState) {
+    console.error('[impeccable] live-browser-session.js was not loaded. Live mode cannot start safely.');
+    window.__IMPECCABLE_LIVE_INIT__ = false;
+    return;
+  }
   const HIGHLIGHT_TRANSITION =
     'top 140ms ' + EASE +
     ', left 140ms ' + EASE +
@@ -112,6 +122,8 @@
   let hasProjectContext = false;
   let selectedAction = 'impeccable';
   let selectedCount = 3;
+  const browserOwner = sessionState.owner;
+  let checkpointTimer = null;
 
   // Scroll lock — holds window.scrollY at a fixed value while the session is
   // active, so HMR DOM patches and variant swaps can't drift the page. See
@@ -126,21 +138,9 @@
   // (Previously: saveSession wrote scrollY alongside state, so every call
   // during resume overwrote the pre-reload value with whatever the browser
   // had landed on, typically 0.)
-  const SCROLL_KEY_SUFFIX = '-scroll';
-  function writeScrollY(y) {
-    try { localStorage.setItem(LS_KEY + SCROLL_KEY_SUFFIX, String(y)); } catch {}
-  }
-  function readScrollY() {
-    try {
-      const raw = localStorage.getItem(LS_KEY + SCROLL_KEY_SUFFIX);
-      if (raw == null) return null;
-      const n = parseFloat(raw);
-      return isFinite(n) ? n : null;
-    } catch { return null; }
-  }
-  function clearScrollY() {
-    try { localStorage.removeItem(LS_KEY + SCROLL_KEY_SUFFIX); } catch {}
-  }
+  function writeScrollY(y) { sessionState.writeScrollY(y); }
+  function readScrollY() { return sessionState.readScrollY(); }
+  function clearScrollY() { sessionState.clearScrollY(); }
 
   // Pre-empt the browser: apply manual scroll restoration and jump to the
   // saved scrollY at script-parse time. Retries on fonts.ready and load
@@ -196,6 +196,45 @@
   }
 
   function id8() { return crypto.randomUUID().replace(/-/g, '').slice(0, 8); }
+
+  // Modal-aware chrome: keep our floating UI clickable inside Radix /
+  // Headless UI / vaul portals.
+  //
+  // Two host-page behaviors break us when the picked element lives inside a
+  // modal dialog:
+  //
+  //   1. Modal scroll-lock disables outside pointer events. Radix's
+  //      `DismissableLayer` sets `document.body.style.pointerEvents = 'none'`
+  //      while a modal is open and only restores `auto` on the layer. Our
+  //      chrome inherits `none` from <body> and becomes unclickable.
+  //   2. The dialog's outside-interaction handler (Radix's
+  //      `usePointerDownOutside`) listens at document level and dismisses
+  //      the dialog whenever a `pointerdown` lands outside the layer node.
+  //      Our chrome is a sibling of <body>, so Radix classifies our clicks
+  //      as outside and tears the dialog down mid-task.
+  //
+  // We can't reliably re-parent our chrome into the dialog subtree (z-index
+  // stacking, scroll containers, theming all become host-page concerns), so
+  // we defang both behaviors at our root:
+  //
+  //   - `pointer-events: auto !important` overrides the inherited `none`.
+  //   - Stop `pointerdown` / `mousedown` propagation so the document-level
+  //     dismiss listener never fires for our clicks.
+  //   - Stop `focusin` propagation so any focus shifts inside our chrome
+  //     don't read as "focus moved outside the dialog" to focus traps.
+  //
+  // Click events still bubble normally — only the early pointer/focus
+  // signals that drive outside-interaction detection are silenced.
+  function defangOutsideHandlers(rootEl, { setPointerEvents = true } = {}) {
+    if (!rootEl) return;
+    if (setPointerEvents) {
+      rootEl.style.setProperty('pointer-events', 'auto', 'important');
+    }
+    const stop = (e) => e.stopPropagation();
+    rootEl.addEventListener('pointerdown', stop);
+    rootEl.addEventListener('mousedown', stop);
+    rootEl.addEventListener('focusin', stop);
+  }
 
   // ---------------------------------------------------------------------------
   // Highlight overlay
@@ -336,6 +375,11 @@
     annotOverlayEl.addEventListener('pointerup', onAnnotUp);
     annotOverlayEl.addEventListener('pointercancel', onAnnotUp);
     document.body.appendChild(annotOverlayEl);
+    // Modal-host friendliness: pointer-events is already 'auto' on this
+    // overlay; we only need to silence the host's outside-interaction
+    // listeners. Don't override pointer-events here (the overlay toggles
+    // visibility via display:none, which is fine).
+    defangOutsideHandlers(annotOverlayEl, { setPointerEvents: false });
   }
 
   function updateClearChip() {
@@ -811,6 +855,7 @@
       maxWidth: '520px', minWidth: '320px',
     });
     document.body.appendChild(barEl);
+    defangOutsideHandlers(barEl);
   }
 
   function positionBar() {
@@ -1330,6 +1375,7 @@
 
     pickerEl.appendChild(grid);
     document.body.appendChild(pickerEl);
+    defangOutsideHandlers(pickerEl);
 
     // Cache the palette on the picker so toggleActionPicker's state refresh
     // uses the same theme-aware colors when it repaints chips.
@@ -1443,6 +1489,10 @@
 
     paramsPanelEl.appendChild(paramsPanelBody);
     document.body.appendChild(paramsPanelEl);
+    // Don't override pointer-events: the panel toggles between 'none' (closed,
+    // click-through) and 'auto' (open) on its own. Just silence the host's
+    // outside-interaction listeners while the panel is open.
+    defangOutsideHandlers(paramsPanelEl, { setPointerEvents: false });
     paramsPanelInner = paramsPanelEl; // compatibility alias for the rest of the code
   }
 
@@ -1535,6 +1585,7 @@
           paramsCurrentValues[p.id] = v;
           readout.textContent = formatRangeValue(input);
           applyParamValue(variantEl, p, v);
+          queueCheckpoint('param_changed');
         });
         row.appendChild(input);
       } else if (p.kind === 'toggle') {
@@ -1565,6 +1616,7 @@
           knob.style.left = next ? '18px' : '2px';
           readout.textContent = next ? 'On' : 'Off';
           applyParamValue(variantEl, p, next);
+          queueCheckpoint('param_changed');
         });
         row.appendChild(track);
       } else if (p.kind === 'steps') {
@@ -1601,6 +1653,7 @@
               btn.style.color = on ? 'oklch(98% 0 0)' : P.text;
             });
             applyParamValue(variantEl, p, o.value);
+            queueCheckpoint('param_changed');
           });
           segRow.appendChild(b);
           segBtns.push({ btn: b, val: o.value });
@@ -1822,19 +1875,26 @@
           return;
         }
 
+        const previousVisibleVariant = currentSessionId === sessionId ? visibleVariant : 0;
+
         // Replace the live element with the full wrapper from source
         const wrapper = srcWrapper.cloneNode(true);
         liveEl.parentElement.replaceChild(wrapper, liveEl);
 
-        // Update state: count variants, show the first one
+        // Update state: count variants, preserving the user's current variant
+        // when a late HMR/source reinjection lands after they have cycled.
         const variants = wrapper.querySelectorAll('[data-impeccable-variant]:not([data-impeccable-variant="original"])');
         arrivedVariants = variants.length;
         expectedVariants = parseInt(wrapper.dataset.impeccableVariantCount || arrivedVariants);
-        visibleVariant = 1;
-        showVariantInDOM(sessionId, 1);
+        const saved = loadSession();
+        const savedVisibleVariant = saved && saved.id === sessionId ? saved.visible : 0;
+        visibleVariant = previousVisibleVariant > 0 && previousVisibleVariant <= arrivedVariants
+          ? previousVisibleVariant
+          : (savedVisibleVariant > 0 && savedVisibleVariant <= arrivedVariants ? savedVisibleVariant : 1);
+        showVariantInDOM(sessionId, visibleVariant);
 
         // Update selectedElement to the visible variant's content
-        selectedElement = pickVariantContent(wrapper, 1) || wrapper.parentElement;
+        selectedElement = pickVariantContent(wrapper, visibleVariant) || wrapper.parentElement;
 
         state = 'CYCLING';
         hideShaderOverlay();
@@ -1857,6 +1917,7 @@
     updateSelectedElement();
     updateBarContent('cycling');
     saveSession();
+    queueCheckpoint('variant_changed');
   }
 
   function updateSelectedElement() {
@@ -1865,6 +1926,18 @@
     if (!wrapper) return;
     const visEl = pickVariantContent(wrapper, visibleVariant);
     if (visEl) selectedElement = visEl;
+  }
+
+  function readVisibleVariantFromDOM(sessionId) {
+    const wrapper = document.querySelector('[data-impeccable-variants="' + sessionId + '"]');
+    if (!wrapper) return 0;
+    const variants = wrapper.querySelectorAll('[data-impeccable-variant]:not([data-impeccable-variant="original"])');
+    for (const variant of variants) {
+      if (variant.style.display === 'none') continue;
+      const idx = parseInt(variant.dataset.impeccableVariant || '0', 10);
+      if (idx > 0) return idx;
+    }
+    return 0;
   }
 
   // Resolve the element that represents the variant's visible content.
@@ -2057,8 +2130,10 @@
       updating = true;
       arrivedVariants = count;
       if (visibleVariant === 0 && arrivedVariants > 0) {
-        visibleVariant = 1;
-        showVariantInDOM(sessionId, 1);
+        const saved = loadSession();
+        const savedVisibleVariant = saved && saved.id === sessionId ? saved.visible : 0;
+        visibleVariant = savedVisibleVariant > 0 && savedVisibleVariant <= arrivedVariants ? savedVisibleVariant : 1;
+        showVariantInDOM(sessionId, visibleVariant);
         // showVariantInDOM hid the original (display:none); if we were still
         // anchored to the original's content, its boundingRect is now zero
         // and the bar snaps to (0,0). Re-point at the visible variant instead.
@@ -2078,6 +2153,7 @@
         updateBarContent('generating');
       }
       saveSession();
+      queueCheckpoint(state === 'CYCLING' ? 'variants_ready' : 'variants_progress');
       updating = false;
     });
 
@@ -2186,6 +2262,7 @@
 
   /** Server died or became unreachable. Reset UI to a clean state. */
   function handleServerLost() {
+    const recoveryState = currentSessionId ? state : 'IDLE';
     if (state === 'GENERATING' || state === 'CYCLING' || state === 'SAVING') {
       showToast('Live server disconnected. Session ended.', 5000);
     }
@@ -2196,21 +2273,61 @@
     stopScrollTracking();
     if (variantObserver) { variantObserver.disconnect(); variantObserver = null; }
     stopScrollLock();
-    clearScrollY();
-    clearSession();
+    // Preserve local session state on server loss. The durable journal is the
+    // source of truth, but localStorage plus the variant wrapper lets the UI
+    // resume after a helper restart or page reload instead of treating a
+    // transient disconnect as an explicit discard.
     selectedElement = null;
-    currentSessionId = null;
     selectedAction = 'impeccable';
-    state = 'IDLE';
+    state = recoveryState;
+    if (currentSessionId) saveSession();
   }
 
-  function sendEvent(msg) {
+  function sendEvent(msg, opts) {
     msg.token = TOKEN;
-    fetch('http://localhost:' + PORT + '/events', {
+    function handleFailure(err) {
+      console.error('[impeccable] Failed to send event:', err);
+      if (opts && opts.throwOnError) throw err;
+      return null;
+    }
+    return fetch('http://localhost:' + PORT + '/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(msg),
-    }).catch(err => console.error('[impeccable] Failed to send event:', err));
+    }).then(res => {
+      if (res.ok) return res;
+      return handleFailure(new Error('HTTP ' + res.status + ' ' + res.statusText));
+    }).catch(handleFailure);
+  }
+
+  function checkpointPayload(reason) {
+    return {
+      type: 'checkpoint',
+      id: currentSessionId,
+      revision: sessionState.nextCheckpointRevision(),
+      owner: browserOwner,
+      phase: String(state || '').toLowerCase(),
+      reason,
+      pageUrl: location.pathname,
+      expectedVariants,
+      arrivedVariants,
+      visibleVariant,
+      paramValues: { ...paramsCurrentValues },
+    };
+  }
+
+  function sendCheckpoint(reason) {
+    if (!currentSessionId) return Promise.resolve(null);
+    return sendEvent(checkpointPayload(reason)).catch(() => null);
+  }
+
+  function queueCheckpoint(reason) {
+    if (!currentSessionId) return;
+    if (checkpointTimer) clearTimeout(checkpointTimer);
+    checkpointTimer = setTimeout(() => {
+      checkpointTimer = null;
+      sendCheckpoint(reason);
+    }, 120);
   }
 
   // ---------------------------------------------------------------------------
@@ -2446,6 +2563,7 @@
     state = 'GENERATING';
     showBar('generating');
     saveSession();
+    sendCheckpoint('generate_started');
     writeScrollY(window.scrollY);
     if (variantObserver) variantObserver.disconnect();
     variantObserver = startVariantObserver(currentSessionId);
@@ -2572,11 +2690,15 @@
       if (!isTransparentColor(cs.backgroundColor)) return cs.backgroundColor;
       node = node.parentElement;
     }
-    return (
-      getComputedStyle(document.body).backgroundColor ||
-      getComputedStyle(document.documentElement).backgroundColor ||
-      '#ffffff'
-    );
+    // The walk already passed through <body> and <html>; if they had been
+    // opaque we would have returned. Falling through with the previous
+    // `getComputedStyle(body).backgroundColor || …` chain is a trap: that
+    // call returns the literal string `"rgba(0, 0, 0, 0)"` for a page that
+    // never set its own bg, which is truthy and short-circuits the chain to
+    // transparent-black — modern-screenshot then renders the capture on a
+    // black canvas and the shader overlay flashes solid black during load.
+    // The browser canvas defaults to white, so we do too.
+    return '#ffffff';
   }
 
   // Capture the element (with current annotations baked in) and return a PNG
@@ -2866,13 +2988,12 @@ void main() {
 
   function handleAccept() {
     if (!currentSessionId || arrivedVariants === 0) return;
+    const domVisibleVariant = readVisibleVariantFromDOM(currentSessionId);
+    if (domVisibleVariant > 0) visibleVariant = domVisibleVariant;
     const acceptPayload = { type: 'accept', id: currentSessionId, variantId: String(visibleVariant) };
     if (Object.keys(paramsCurrentValues).length > 0) {
       acceptPayload.paramValues = { ...paramsCurrentValues };
     }
-    sendEvent(acceptPayload);
-    markSessionHandled();
-
     // The accepted variant is already the only visible child of the wrapper
     // (all other variants are display:none). HMR from the source rewrite will
     // replace the wrapper imminently. Don't eagerly replaceChild here — React
@@ -2882,9 +3003,28 @@ void main() {
     const acceptedSessionId = currentSessionId;
     const acceptedVariant = visibleVariant;
 
-    state = 'CONFIRMED';
-    updateBarContent('confirmed');
-    setTimeout(function() {
+    state = 'SAVING';
+    updateBarContent('saving');
+
+    sendEvent(acceptPayload, { throwOnError: true })
+      .then(() => {
+        markSessionHandled();
+        confirmAcceptAfterReceipt();
+      })
+      .catch(() => {
+        state = 'CYCLING';
+        updateBarContent('cycling');
+        showToast('Could not confirm accept with the live server. Session kept for recovery; try Accept again.', 5000);
+      });
+
+    function confirmAcceptAfterReceipt() {
+      state = 'CONFIRMED';
+      updateBarContent('confirmed');
+      scheduleAcceptCleanup();
+    }
+
+    function scheduleAcceptCleanup() {
+      setTimeout(function() {
       hideBar();
       hideHighlight();
       stopScrollTracking();
@@ -2913,50 +3053,46 @@ void main() {
         accepted.style.display = 'contents';
         parent.replaceChild(accepted, wrapper);
       }
-    }, 2000);
+      }, 2000);
+    }
   }
 
   function handleDiscard() {
     if (!currentSessionId) return;
-    sendEvent({ type: 'discard', id: currentSessionId });
-    markSessionHandled();
-    // Instant DOM restore + fire-and-forget (script handles file cleanup)
-    cleanup();
+    sendEvent({ type: 'discard', id: currentSessionId }, { throwOnError: true })
+      .then(() => {
+        markSessionHandled();
+        cleanup();
+      })
+      .catch(() => showToast('Could not confirm discard with the live server. Session kept for recovery.', 5000));
   }
 
   // ---------------------------------------------------------------------------
-  // Session persistence via localStorage
+  // Session persistence via live-browser-session.js
   // ---------------------------------------------------------------------------
   // Survives page reloads, browser close/reopen, HMR, and accidental refreshes.
-
-  const LS_KEY = PREFIX + '-session';
 
   function saveSession() {
     if (!currentSessionId) return;
     // NOTE: scrollY is stored under a separate key (writeScrollY). Storing
     // it here would overwrite the Go-time value every time state changes.
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify({
-        id: currentSessionId,
-        state: state,
-        action: selectedAction,
-        count: selectedCount,
-        expected: expectedVariants,
-        arrived: arrivedVariants,
-        visible: visibleVariant,
-      }));
-    } catch { /* quota exceeded or private mode */ }
+    sessionState.saveSession({
+      id: currentSessionId,
+      state,
+      action: selectedAction,
+      count: selectedCount,
+      expected: expectedVariants,
+      arrived: arrivedVariants,
+      visible: visibleVariant,
+    });
   }
 
   function loadSession() {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
+    return sessionState.loadSession();
   }
 
   function clearSession() {
-    try { localStorage.removeItem(LS_KEY); } catch {}
+    sessionState.clearSession();
   }
 
   /** Mark session as handled (accepted/discarded). The agent will clean up
@@ -2964,19 +3100,15 @@ void main() {
    *  prevents resumeSession from picking it up again after reload. */
   function markSessionHandled() {
     if (!currentSessionId) return;
-    try {
-      localStorage.setItem(LS_KEY + '-handled', currentSessionId);
-    } catch {}
+    sessionState.markHandled(currentSessionId);
   }
 
   function isSessionHandled(id) {
-    try {
-      return localStorage.getItem(LS_KEY + '-handled') === id;
-    } catch { return false; }
+    return sessionState.isHandled(id);
   }
 
   function clearHandled() {
-    try { localStorage.removeItem(LS_KEY + '-handled'); } catch {}
+    sessionState.clearHandled();
   }
 
   function cleanup() {
@@ -3024,8 +3156,16 @@ void main() {
 
   function showToast(message, duration) {
     if (toastEl) toastEl.remove();
+    // Stack the toast above the global bar (which sits at bottom:14px) so
+    // the two never overlap. Read the bar's actual rect — its height varies
+    // with hover-expanded labels — and fall back to a sensible default
+    // when the bar isn't mounted yet.
+    const barRect = globalBarEl?.getBoundingClientRect();
+    const barTopFromBottom = barRect && barRect.height > 0
+      ? Math.max(16, window.innerHeight - barRect.top + 12)
+      : 16;
     toastEl = el('div', {
-      position: 'fixed', bottom: '16px', left: '50%',
+      position: 'fixed', bottom: barTopFromBottom + 'px', left: '50%',
       transform: 'translateX(-50%) translateY(8px)',
       background: C.ink, color: C.white,
       fontFamily: FONT, fontSize: '12px',
@@ -3099,6 +3239,7 @@ void main() {
     // hid. Now that state is CYCLING, re-fire.
     if (state === 'CYCLING') refreshParamsPanel();
     saveSession();
+    queueCheckpoint('browser_resumed');
 
     // Start observing for more variants AFTER initial setup
     if (variantObserver) variantObserver.disconnect();
@@ -3148,13 +3289,33 @@ void main() {
       // page bg. Used for screenshots and theme QA.
       const override = localStorage.getItem('impeccable-dev-theme');
       if (override === 'light' || override === 'dark') return override;
-      const bg = getComputedStyle(document.body).backgroundColor
-        || getComputedStyle(document.documentElement).backgroundColor;
-      const m = bg.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-      if (!m) return 'light';
-      const [, r, g, b] = m;
+
+      // Walk body → html, taking the first opaque background. The browser's
+      // default body / html background is `rgba(0, 0, 0, 0)`, which a naive
+      // regex would read as black and mislabel a perfectly white page as
+      // dark. Honoring alpha avoids that — and falling through to <html>
+      // catches the common pattern of a bg only on <html> (or only on body).
+      function readOpaque(el) {
+        if (!el) return null;
+        const bg = getComputedStyle(el).backgroundColor;
+        const m = bg.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/);
+        if (!m) return null;
+        const alpha = m[4] == null ? 1 : parseFloat(m[4]);
+        if (alpha < 0.5) return null; // transparent / nearly transparent → skip
+        return [+m[1], +m[2], +m[3]];
+      }
+
+      const rgb = readOpaque(document.body) || readOpaque(document.documentElement);
+      // Both transparent → fall back to the browser's effective canvas color.
+      // White is the universal default; only one in a thousand sites swaps it
+      // via `color-scheme: dark` on <html>, and `prefers-color-scheme` lets
+      // us catch that case.
+      if (!rgb) {
+        return matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      const [r, g, b] = rgb;
       // Perceptual luminance (Rec. 709)
-      const L = (0.2126 * +r + 0.7152 * +g + 0.0722 * +b) / 255;
+      const L = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
       return L > 0.55 ? 'light' : 'dark';
     } catch { return 'light'; }
   }
@@ -3357,15 +3518,24 @@ void main() {
     });
     inner.appendChild(divider);
 
-    // Exit (subtle × on the right) — SVG for baseline-free centering
+    // Exit × on the right — intentionally subtle (textDim at rest, text on
+    // hover) so it sits behind the active toggles in visual hierarchy.
+    //
+    // Explicit padding + box-sizing here is load-bearing: a host page like
+    // `button { padding: 0.5rem 1rem; }` (very common in resets) would
+    // otherwise inflate this 24x24 button into 56x40 and push the SVG out
+    // of the visible bar — the X stays invisible even though the styles in
+    // DevTools look fine. Every other chrome button sets padding inline;
+    // this one needed it too.
     const exitBtn = el('button', {
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      width: '26px', height: '26px', borderRadius: '6px',
+      padding: '0', boxSizing: 'border-box',
+      width: '24px', height: '24px', borderRadius: '6px',
       border: 'none', background: 'transparent',
       color: P.textDim, fontFamily: FONT, fontSize: '0', lineHeight: '0',
       cursor: 'pointer', transition: 'color 0.12s ease, background 0.12s ease',
     });
-    exitBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5"/></svg>';
+    exitBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg>';
     exitBtn.title = 'Exit live mode';
     exitBtn.addEventListener('mouseenter', () => { exitBtn.style.color = P.text; exitBtn.style.background = P.exitHover; });
     exitBtn.addEventListener('mouseleave', () => { exitBtn.style.color = P.textDim; exitBtn.style.background = 'transparent'; });
@@ -3383,6 +3553,7 @@ void main() {
     });
 
     document.body.appendChild(globalBarEl);
+    defangOutsideHandlers(globalBarEl);
 
     requestAnimationFrame(() => {
       globalBarEl.style.opacity = '1';
@@ -3525,7 +3696,7 @@ void main() {
   }
 
   // ---------------------------------------------------------------------------
-  // Design System Panel — visualizes the project's DESIGN.json sidecar
+  // Design System Panel — visualizes the project's .impeccable/design.json sidecar
   // ---------------------------------------------------------------------------
 
   const DESIGN_PREFS_KEY = 'impeccable-live-design-panel';
@@ -3537,7 +3708,7 @@ void main() {
     open: false,
     tab: 'visual',          // 'visual' | 'raw'
     parsed: null,           // parseDesignMd output (frontmatter + body sections)
-    sidecar: null,          // DESIGN.json v2 payload (extensions + components + narrative)
+    sidecar: null,          // .impeccable/design.json v2 payload (extensions + components + narrative)
     hasMd: false,
     hasSidecar: false,
     present: null,          // true/false once fetch resolves
@@ -3595,6 +3766,11 @@ void main() {
     designShadow.appendChild(root);
 
     document.body.appendChild(designHost);
+    // The host is pointer-events: none; the panel inside the shadow DOM
+    // manages its own auto/none. Events bubble through the shadow boundary,
+    // so attaching here silences host-page outside-interaction handlers
+    // without touching the host's click-through behavior.
+    defangOutsideHandlers(designHost, { setPointerEvents: false });
 
     loadDesignPrefs();
     renderDesignChrome();
@@ -4033,7 +4209,7 @@ void main() {
     box.className = 'stale';
     box.innerHTML = `
       <span class="stale-dot"></span>
-      <span class="stale-text"><strong>DESIGN.md is newer than DESIGN.json.</strong> Run <code>/impeccable document</code> to refresh the sidecar.</span>
+      <span class="stale-text"><strong>DESIGN.md is newer than .impeccable/design.json.</strong> Run <code>/impeccable document</code> to refresh the sidecar.</span>
     `;
     return box;
   }
@@ -4041,7 +4217,7 @@ void main() {
   function renderParsedMdCta() {
     const box = document.createElement('div');
     box.className = 'parsed-md-cta';
-    box.innerHTML = `<strong>Basic view</strong>This panel reads the tokens in your <code>DESIGN.md</code> frontmatter. Running <code>/impeccable document</code> also generates a <code>DESIGN.json</code> sidecar with your project's actual component snippets (button, input, nav) and tonal ramps, rendered live below the tokens.`;
+    box.innerHTML = `<strong>Basic view</strong>This panel reads the tokens in your <code>DESIGN.md</code> frontmatter. Running <code>/impeccable document</code> also generates a <code>.impeccable/design.json</code> sidecar with your project's actual component snippets (button, input, nav) and tonal ramps, rendered live below the tokens.`;
     return box;
   }
 
@@ -4501,7 +4677,7 @@ void main() {
 
   function cssSafe(v) {
     // Strip anything outside valid CSS value chars to prevent injection via
-    // DESIGN.json values rendered into inline style strings.
+    // .impeccable/design.json values rendered into inline style strings.
     return String(v).replace(/[<>"'`\n]/g, '');
   }
 
