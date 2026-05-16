@@ -206,8 +206,10 @@ features vs nice-to-haves).
    - **Flow diagram** — user flow / business-logic flow as Mermaid.
    - **Business logic** — the rules in skimmable form (tables / callouts).
 2. **Override `/preview`'s in-repo commit behavior for this run.** At this
-   point `/mvp` is on the product repo's `main` (no feature branch yet —
-   Step 5 creates it). Committing to product `main` is forbidden. Instruct
+   point `/mvp` may be on the product repo's `main` (Path A — no feature
+   branch yet, Step 5 creates it) or in an existing feature-branch worktree
+   (Path B). To keep the defer uniform across both paths — and because
+   committing to product `main` is forbidden in the Path A case — instruct
    `/preview`: do **not** commit the proposal, do **not** modify
    `.gitignore`. Generate + deploy (or local fallback) only. The PRD dir
    physically lands at `/preview`'s resolved in-repo path
@@ -221,8 +223,8 @@ features vs nice-to-haves).
    gate — proceed only on explicit confirmation.
 5. **Reconcile the markdown spec.** Visual iteration almost always changes
    requirements; fold those changes back into the brainstorming markdown
-   spec so it stays the source of truth. It remains uncommitted on `main`;
-   Step 5 commits it alongside the PRD.
+   spec so it stays the source of truth. It remains uncommitted in the
+   working tree; Step 5 commits it alongside the PRD.
 
 **Carry-forward**: the PRD dir path and the (updated, still-uncommitted)
 markdown spec path, both consumed by Step 5.
@@ -339,8 +341,9 @@ exists, possibly checked out elsewhere).
 
 ### 5a-bis. Bring the deferred PRD + spec into git
 
-The PRD dir and the updated markdown spec sit uncommitted in the `main`
-working tree (Step 2 deferred their commit). They must land on
+The PRD dir and the updated markdown spec sit uncommitted in the working
+tree of the checkout where Step 2 ran (Path A: `main`; Path B: the existing
+feature worktree). Step 2 deferred their commit. They must land on
 `{TARGET_BRANCH}`:
 
 - **Path A** (`isolation: "worktree"`, fresh worktree on an auto branch):

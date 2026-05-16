@@ -95,8 +95,10 @@ features vs nice-to-haves).
    - **Flow diagram** — user flow / business-logic flow as Mermaid.
    - **Business logic** — the rules in skimmable form (tables / callouts).
 2. **Override `/preview`'s in-repo commit behavior for this run.** At this
-   point `/mvp` is on the product repo's `main` (no feature branch yet —
-   Step 5 creates it). Committing to product `main` is forbidden. Instruct
+   point `/mvp` may be on the product repo's `main` (Path A — no feature
+   branch yet, Step 5 creates it) or in an existing feature-branch worktree
+   (Path B). To keep the defer uniform across both paths — and because
+   committing to product `main` is forbidden in the Path A case — instruct
    `/preview`: do **not** commit the proposal, do **not** modify
    `.gitignore`. Generate + deploy (or local fallback) only. The PRD dir
    physically lands at `/preview`'s resolved in-repo path
@@ -110,8 +112,8 @@ features vs nice-to-haves).
    gate — proceed only on explicit confirmation.
 5. **Reconcile the markdown spec.** Visual iteration almost always changes
    requirements; fold those changes back into the brainstorming markdown
-   spec so it stays the source of truth. It remains uncommitted on `main`;
-   Step 5 commits it alongside the PRD.
+   spec so it stays the source of truth. It remains uncommitted in the
+   working tree; Step 5 commits it alongside the PRD.
 
 **Carry-forward**: the PRD dir path and the (updated, still-uncommitted)
 markdown spec path, both consumed by Step 5.
@@ -152,16 +154,21 @@ dispatch / commit-policy content:
 ```markdown
 ### 5a-bis. Bring the deferred PRD + spec into git
 
-The PRD dir and the updated markdown spec sit uncommitted in the `main`
-working tree (Step 2 deferred their commit). They must land on
+The PRD dir and the updated markdown spec sit uncommitted in the working
+tree of the checkout where Step 2 ran (Path A: `main`; Path B: the existing
+feature worktree). Step 2 deferred their commit. They must land on
 `{TARGET_BRANCH}`:
 
 - **Path A** (`isolation: "worktree"`, fresh worktree on an auto branch):
   the PRD/spec files were created in the *original* `main` checkout, not
-  the new worktree. After resolving `{TARGET_BRANCH}` in 5a and before
-  dispatch, the orchestrator copies the PRD dir + updated markdown spec
-  into the worktree path. The implementer's first commit is a dedicated
-  `docs(mvp): PRD + spec` commit that includes them **and** the
+  the new worktree — and the worktree does not exist until the Agent tool
+  creates it at dispatch time, so the orchestrator **cannot** copy into it
+  beforehand. Instead, the orchestrator passes the **absolute source
+  paths** of the PRD dir + updated markdown spec (in the original `main`
+  checkout) in the handoff prompt. The subagent's *first* action after the
+  branch rename — before any plan step — is to copy them into its own
+  worktree (resolved via `git rev-parse --show-toplevel`) and make a
+  dedicated `docs(mvp): PRD + spec` commit that includes them **and** the
   `**/comment-overlay.js` line `/preview` normally appends to
   `.gitignore` (deferred from Step 2).
 - **Path B** (same worktree, no isolation): the PRD/spec are already in
