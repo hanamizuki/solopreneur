@@ -2,8 +2,8 @@
 
 Gathers design context for a project and writes two complementary files at the project root:
 
-- **PRODUCT.md** (strategic): register, target users, product purpose, brand personality, anti-references, strategic design principles. Answers "who/what/why".
-- **DESIGN.md** (visual): visual theme, color palette, typography, components, layout. Follows the [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/format/). Answers "how it looks".
+- **PRODUCT.md** (strategic): root project file for register, target users, product purpose, brand personality, anti-references, strategic design principles. Answers "who/what/why".
+- **DESIGN.md** (visual): root project file for visual theme, color palette, typography, components, layout. Follows the [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/format/). Answers "how it looks".
 
 Every other impeccable command reads these files before doing any work.
 
@@ -19,12 +19,14 @@ The output tells you whether PRODUCT.md and/or DESIGN.md already exist. If `migr
 
 Decision tree:
 - **Neither file exists (empty project or no context yet)**: do Steps 2-4 (write PRODUCT.md), then decide on DESIGN.md based on whether there's code to analyze.
-- **PRODUCT.md exists, DESIGN.md missing**: skip to Step 5 — offer to run `/impeccable document` for DESIGN.md.
+- **PRODUCT.md exists, DESIGN.md missing**: skip to Step 5 and offer to run `/impeccable document` for DESIGN.md.
 - **PRODUCT.md exists but has no `## Register` section (legacy)**: add it. Infer a hypothesis from the codebase (see Step 2), confirm with the user, write the field.
-- **Both exist**: STOP and call the AskUserQuestion tool to clarify. which to refresh. Skip the one the user doesn't want changed.
+- **Both exist**: STOP and call the AskUserQuestion tool to clarify. Ask which file to refresh. Skip the one the user doesn't want changed.
 - **Just DESIGN.md exists (unusual)**: do Steps 2-4 to produce PRODUCT.md.
 
 Never silently overwrite an existing file. Always confirm first.
+
+If teach was invoked as a setup blocker by another command, such as `/impeccable craft landing page`, pause that command here. Complete teach, re-run the loader, then resume the original command with the freshly loaded context. For craft, resume into shape next; teach creates project context, but it is not a substitute for the task-specific shape interview and confirmed design brief.
 
 ## Step 2: Explore the codebase
 
@@ -42,21 +44,36 @@ Also form a **register hypothesis** from what you find:
 - Brand signals: `/`, `/about`, `/pricing`, `/blog/*`, `/docs/*`, hero sections, big typography, scroll-driven sections, landing-page-shaped content.
 - Product signals: `/app/*`, `/dashboard`, `/settings`, `/(auth)`, forms, data tables, side/top nav, app-shell components.
 
-Register is a hypothesis at this point, not a decision — Step 3 confirms it.
+Register is a hypothesis at this point, not a decision; Step 3 confirms it.
 
 Note what you've learned and what remains unclear. This exploration feeds both PRODUCT.md and DESIGN.md.
 
 ## Step 3: Ask strategic questions (for PRODUCT.md)
 
-STOP and call the AskUserQuestion tool to clarify. Focus only on what you couldn't infer from the codebase.
+STOP and call the AskUserQuestion tool to clarify. Ask only about what you couldn't infer from the codebase.
 
-### Register (ask first — it shapes everything below)
+### Interview mode, not confirmation mode
 
-Every design task is either **brand** (marketing, landing, campaign, long-form content, portfolio — design IS the product) or **product** (app UI, admin, dashboards, tools — design SERVES the product).
+If the repo is empty or the user's brief is sparse, run a short interview before proposing PRODUCT.md. Do **not** turn a one-sentence request into a complete inferred PRODUCT.md and ask for blanket confirmation.
 
-If Step 2 produced a clear hypothesis, lead with it: *"From the codebase, this looks like a [brand / product] surface — does that match your intent, or should we treat it differently?"*
+- Use the harness's structured question tool when one exists. Otherwise, ask directly in chat and stop.
+- Ask **2-3 questions per round**, then wait for answers.
+- Use inferred answers as hypotheses or options, not as finished facts.
+- Complete at least one real user-answer round before drafting PRODUCT.md, unless every required answer is directly discoverable from repo docs.
+- Round 1 should establish register, users/purpose, and desired outcome.
+- Round 2 should establish brand personality or references, anti-references, and accessibility needs.
 
-If the signal is genuinely split (e.g. a product with a big marketing landing), STOP and call the AskUserQuestion tool to clarify. which register describes the **primary** surface. The register can be overridden per task later, but PRODUCT.md carries one default.
+### Minimum viable interview
+
+Ask enough to complete PRODUCT.md. At minimum, cover register confirmation, users and purpose, brand personality, anti-references, and accessibility needs unless each answer is directly discoverable from repo context. After at least one interview round, you may propose inferred answers, but the user must confirm them before you write PRODUCT.md. Never synthesize PRODUCT.md from the original task prompt alone.
+
+### Register (ask first; it shapes everything below)
+
+Every design task is either **brand** (marketing, landing, campaign, long-form content, portfolio: design IS the product) or **product** (app UI, admin, dashboards, tools: design SERVES the product).
+
+If Step 2 produced a clear hypothesis, lead with it: *"From the codebase, this looks like a [brand / product] surface. Does that match your intent, or should we treat it differently?"*
+
+If the signal is genuinely split (e.g. a product with a big marketing landing), STOP and call the AskUserQuestion tool to clarify. Ask which register describes the **primary** surface. The register can be overridden per task later, but PRODUCT.md carries one default.
 
 ### Users & Purpose
 - Who uses this? What's their context when using it?
@@ -67,7 +84,7 @@ If the signal is genuinely split (e.g. a product with a big marketing landing), 
 ### Brand & Personality
 - How would you describe the brand personality in 3 words?
 - Reference sites or apps that capture the right feel? What specifically about them?
-  - For brand, push for real-world references in the right lane (tech-minimal, editorial-magazine, consumer-warm, brutalist-grid, etc.) — not generic "modern" adjectives.
+  - For brand, push for real-world references in the right lane (tech-minimal, editorial-magazine, consumer-warm, brutalist-grid, etc.), not generic "modern" adjectives.
   - For product, push for category best-tool references (Linear, Figma, Notion, Raycast, Stripe).
 - What should this explicitly NOT look like? Any anti-references?
 
@@ -75,9 +92,11 @@ If the signal is genuinely split (e.g. a product with a big marketing landing), 
 - Specific accessibility requirements? (WCAG level, known user needs)
 - Considerations for reduced motion, color blindness, or other accommodations?
 
-Skip questions where the answer is already clear. **Do NOT ask about colors, fonts, radii, or visual styling here** — those belong in DESIGN.md, not PRODUCT.md.
+Skip questions where the answer is already clear. **Do NOT ask about colors, fonts, radii, or visual styling here.** Those belong in DESIGN.md, not PRODUCT.md.
 
 ## Step 4: Write PRODUCT.md
+
+Write PRODUCT.md only after the user has confirmed the strategic answers from Step 3. If an inferred answer is uncertain or unconfirmed, ask before writing.
 
 Synthesize into a strategic document:
 
@@ -101,7 +120,7 @@ product
 [What this should NOT look like. Specific bad-example sites or patterns to avoid.]
 
 ## Design Principles
-[3-5 strategic principles derived from the conversation. Principles like "practice what you preach", "show, don't tell", "expert confidence" — NOT visual rules like "use OKLCH" or "magenta accent".]
+[3-5 strategic principles derived from the conversation. Principles like "practice what you preach", "show, don't tell", "expert confidence". NOT visual rules like "use OKLCH" or "magenta accent".]
 
 ## Accessibility & Inclusion
 [WCAG level, known user needs, considerations]
@@ -109,7 +128,7 @@ product
 
 Register is either `brand` or `product` as a bare value. No prose, no commentary.
 
-Write to `PROJECT_ROOT/PRODUCT.md`. If `.impeccable.md` existed, the loader already renamed it — merge into that content rather than starting from scratch.
+Write to `PROJECT_ROOT/PRODUCT.md`. If `.impeccable.md` existed, the loader already renamed it; merge into that content rather than starting from scratch.
 
 ## Step 5: Decide on DESIGN.md
 
@@ -134,4 +153,4 @@ Summarize:
 
 If teach was invoked as a blocker by another impeccable command (e.g. the user ran `/impeccable polish` with no PRODUCT.md), resume that original task now with the fresh context.
 
-Optionally STOP and call the AskUserQuestion tool to clarify. whether they'd like a brief summary of PRODUCT.md appended to CLAUDE.md for easier agent reference. If yes, append a short **Design Context** pointer section there.
+Optionally STOP and call the AskUserQuestion tool to clarify. Ask whether they'd like a brief summary of PRODUCT.md appended to CLAUDE.md for easier agent reference. If yes, append a short **Design Context** pointer section there.

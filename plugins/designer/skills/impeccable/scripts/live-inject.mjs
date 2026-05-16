@@ -2,23 +2,24 @@
  * CLI helper: insert/remove the live variant mode script tag in the project's
  * main HTML entry point.
  *
- * On first live run, the agent generates `config.json` in this script's
- * directory with the project's insertion target (framework-specific). On
+ * On first live run, the agent generates `.impeccable/live/config.json`
+ * with the project's insertion target (framework-specific). On
  * every subsequent run, this script handles insert/remove deterministically
  * with zero LLM involvement.
  *
  * Usage:
  *   node live-inject.mjs --port PORT   # Insert the live script tag
  *   node live-inject.mjs --remove      # Remove the live script tag
- *   node live-inject.mjs --check       # Check whether config.json exists
+ *   node live-inject.mjs --check       # Check whether live config exists
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveLiveConfigPath } from './impeccable-paths.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = process.env.IMPECCABLE_LIVE_CONFIG || path.join(__dirname, 'config.json');
+const CONFIG_PATH = resolveLiveConfigPath({ cwd: process.cwd(), scriptsDir: __dirname });
 const MARKER_OPEN_TEXT = 'impeccable-live-start';
 const MARKER_CLOSE_TEXT = 'impeccable-live-end';
 
@@ -39,12 +40,12 @@ export async function injectCli() {
     console.log(`Usage: node live-inject.mjs [options]
 
 Insert or remove the live mode script tag in the project's HTML entry point.
-Reads configuration from config.json (in this same directory).
+Reads configuration from .impeccable/live/config.json.
 
 Modes:
   --port PORT   Insert script tag pointing at http://localhost:PORT/live.js
   --remove      Remove the script tag (if present)
-  --check       Print whether config.json exists and its content
+  --check       Print whether .impeccable/live/config.json exists and its content
 
 Output (JSON):
   { ok, file, inserted|removed, config? }`);
@@ -388,7 +389,16 @@ export function patchCspMeta(content, port) {
 
     const newContentAttr = `content=${contentAttr.quote}${patched}${contentAttr.quote}`;
     const marker = `${CSP_MARKER_ATTR}="${Buffer.from(original, 'utf-8').toString('base64')}"`;
-    const newAttrs = attrs.replace(contentAttr.full, newContentAttr) + ' ' + marker;
+    // The tagRe captures any whitespace between the last attribute and the
+    // closing `/>` as part of `attrs`. Naively appending ` ${marker}` after
+    // a replace would land it BEFORE that trailing space, leaving a double
+    // space inside attrs and clobbering the space before `/>`. Split off
+    // the trailing whitespace, splice the marker into the attribute body,
+    // and re-append the original trailing whitespace so a self-closing
+    // `<meta … />` round-trips byte-for-byte.
+    const trailingWs = (attrs.match(/[ \t]*$/) || [''])[0];
+    const attrsBody = attrs.slice(0, attrs.length - trailingWs.length);
+    const newAttrs = attrsBody.replace(contentAttr.full, newContentAttr) + ' ' + marker + trailingWs;
     const newTag = tag.full.replace(attrs, newAttrs);
 
     result = result.slice(0, tag.start) + newTag + result.slice(tag.end);
