@@ -183,19 +183,46 @@ for i in $(seq 0 $((source_count - 1))); do
     # Rewrite to `${CLAUDE_SKILL_DIR}/`, which Claude Code resolves to the
     # actual skill directory across personal / project / plugin levels.
     # Idempotent — the same upstream pattern gets rewritten on every re-sync.
-    find "$dst_path" -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
-      awk -v needle=".claude/skills/$to/" -v repl='${CLAUDE_SKILL_DIR}/' '
-        {
-          out = ""
-          s = $0
-          while ((idx = index(s, needle)) > 0) {
-            out = out substr(s, 1, idx - 1) repl
-            s = substr(s, idx + length(needle))
+    #
+    # We limit `find` to `*.md` because markdown is the only doc surface
+    # upstream skills use today. If a future skill bundles `.txt` / `.mdx` /
+    # other doc files that also reference `.claude/skills/<name>/`, extend
+    # the filter (e.g. `\( -name '*.md' -o -name '*.mdx' \)`).
+    #
+    # Use process substitution (not `find ... | while`) so the loop runs in
+    # the parent shell and `set -e` propagates awk/mv failures out of the
+    # script instead of being swallowed by the subshell.
+    rewrite_pass() {
+      local needle="$1"
+      while IFS= read -r -d '' f; do
+        # Skip files that don't contain the literal needle — avoids
+        # rewriting (and mtime-touching) files that have nothing to change.
+        grep -q -F "$needle" "$f" || continue
+        awk -v needle="$needle" -v repl='${CLAUDE_SKILL_DIR}/' '
+          {
+            out = ""
+            s = $0
+            while ((idx = index(s, needle)) > 0) {
+              out = out substr(s, 1, idx - 1) repl
+              s = substr(s, idx + length(needle))
+            }
+            print out s
           }
-          print out s
-        }
-      ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-    done
+        ' "$f" > "$f.tmp" || { echo "    error: rewrite failed for $f" >&2; rm -f "$f.tmp"; exit 1; }
+        mv "$f.tmp" "$f" || { echo "    error: mv failed for $f" >&2; exit 1; }
+      done < <(find "$dst_path" -type f -name '*.md' -print0)
+    }
+
+    rewrite_pass ".claude/skills/$to/"
+
+    # If the manifest renames the skill folder (basename of `from` differs
+    # from `to`), upstream body text still references the old name. Do a
+    # second pass with the upstream basename so those references also get
+    # rewritten to ${CLAUDE_SKILL_DIR}/.
+    from_basename="$(basename "$from")"
+    if [[ "$from_basename" != "$to" ]]; then
+      rewrite_pass ".claude/skills/$from_basename/"
+    fi
 
     # Drop a small _VENDOR.md sidecar so the source is traceable from the skill folder.
     if [[ -n "$license_file" ]]; then
@@ -214,6 +241,14 @@ edits will be overwritten on the next \`scripts/sync-vendored.sh\` run.
 - **Pinned commit**: $rev
 - **Synced at**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 - **License**: $license_line
+
+**Path rewrite**: during sync, bundled-script paths under the skill folder
+(\`.claude/skills/<to>/\`, and \`.claude/skills/<upstream-name>/\` if the
+manifest renames the folder) are mechanically rewritten to
+\`\${CLAUDE_SKILL_DIR}/\` so the skill resolves correctly when installed as
+a plugin. The vendored body therefore differs from upstream verbatim by
+exactly that substitution — see \`scripts/sync-vendored.sh\` for the
+transformation.
 
 To update: edit \`skills/_vendored/manifest.json\` if needed, then re-run this
 plugin's \`./scripts/sync-vendored.sh\`.
