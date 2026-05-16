@@ -1,8 +1,6 @@
-This reference file should be used to upgrade Cypher queries for different versions of the Neo4j database
-
 # Upgrade paths
 
-Important: Do not ever start upgrading the queries before collecting all changelogs between the current, and the requested version
+Collect all changelogs between current and target version before upgrading queries.
 
 ## Upgrading
 

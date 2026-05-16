@@ -10,7 +10,7 @@ If you're upgrading from version 1.7, first run the upgrade to version 4.0 by fo
 
 ## Upgrading from versions >= 4.0
 
-Important: Do not ever start upgrading the codebase before collecting all changelogs between the current, and the requested version
+Collect all changelogs between current and target version before upgrading.
 
 Check the changelog between the major versions by following these links:
 - [4.1 changelog](https://raw.githubusercontent.com/wiki/neo4j/neo4j-dotnet-driver/4.1-Changelog.md)
