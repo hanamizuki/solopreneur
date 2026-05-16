@@ -4,11 +4,11 @@ Package: https://central.sonatype.com/artifact/org.neo4j.driver/neo4j-java-drive
 
 # Upgrade paths
 
-Important: Before performing the upgrade, make sure that the new version of the driver is compatible with Java version used in the project
+Verify new driver version is compatible with the project's Java version before upgrading.
 
 ## Upgrading
 
-Important: Do not ever start upgrading the codebase before collecting all changelogs between the current, and the requested version
+Collect all changelogs between current and target version before upgrading.
 
 Check the changelog between the major versions by following these links:
 - [4.4 changelog](https://raw.githubusercontent.com/wiki/neo4j/neo4j-java-driver/4.4-changelog.md)
