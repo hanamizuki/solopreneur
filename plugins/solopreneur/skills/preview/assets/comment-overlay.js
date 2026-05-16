@@ -245,12 +245,18 @@
     const sel = id
       ? '.cmt-mark[data-cmt-id="' + cssEsc(id) + '"]'
       : ".cmt-mark";
+    // Normalize each parent once after unwrapping: several markers often
+    // share a parent (multiple comments in one paragraph), so per-mark
+    // normalize() would re-walk the same subtree repeatedly.
+    const parents = new Set();
     document.querySelectorAll(sel).forEach((m) => {
       const parent = m.parentNode;
+      if (!parent) return;
+      parents.add(parent);
       while (m.firstChild) parent.insertBefore(m.firstChild, m);
       parent.removeChild(m);
-      parent.normalize();
     });
+    parents.forEach((p) => p.normalize());
   }
 
   function cssEsc(s) {
@@ -336,7 +342,7 @@
     }
     // If the start container wasn't a collected text node (rare), fall
     // back to first occurrence of exact.
-    if (text.substr(base, exact.length) !== exact) {
+    if (text.slice(base, base + exact.length) !== exact) {
       const found = text.indexOf(exact);
       base = found === -1 ? 0 : found;
     }
@@ -552,10 +558,13 @@
       const v = ta.value.trim();
       if (v) {
         c.comment = v;
-        const m = document.querySelector(
-          '.cmt-mark[data-cmt-id="' + cssEsc(c.id) + '"]'
-        );
-        if (m) m.setAttribute("aria-label", "comment: " + v.slice(0, 60));
+        // A range spanning multiple text nodes produces several <mark>
+        // elements sharing one data-cmt-id — update them all.
+        document
+          .querySelectorAll('.cmt-mark[data-cmt-id="' + cssEsc(c.id) + '"]')
+          .forEach((m) => {
+            m.setAttribute("aria-label", "comment: " + v.slice(0, 60));
+          });
         save();
       }
       finish();
