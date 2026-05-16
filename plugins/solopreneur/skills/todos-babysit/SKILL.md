@@ -389,10 +389,10 @@ When user approves a todo with `go`:
 
 Based on review results and todo content, create an implementation plan.
 
-### Step 2: Preflight
+### Step 2: Tech Vetting
 
-Invoke `/preflight` to verify the plan against platform best practices.
-Report preflight results to the user — wait for confirmation before proceeding.
+Invoke `/tech-vetting` to verify the plan against platform best practices.
+Report tech-vetting results to the user — wait for confirmation before proceeding.
 
 ### Step 3: Create Worktree & Implement
 
@@ -457,5 +457,5 @@ After `/greenlight` completes:
 - **Auto-cleanup**: Merged PR worktrees and local branches are cleaned up
 - **Noise avoidance**: Previously reviewed, unchanged todos are not re-notified
 - **Conflict escalation**: Simple conflicts auto-resolved, complex ones escalated to user
-- **Preflight gate**: Implementation plan must pass preflight; in interactive mode wait
+- **Tech-vetting gate**: Implementation plan must pass tech-vetting; in interactive mode wait
   for user confirmation

@@ -53,11 +53,11 @@ Enter Plan Mode (EnterPlanMode). Based on the spec above:
 - Verification passes → exit Plan Mode (ExitPlanMode)
 - Verification fails → stop and report what's missing
 
-### 2. Preflight Review
-Invoke the /preflight skill with the Step 1 implementation plan as input.
-/preflight will detect the tech stack, query official docs, and dispatch expert
+### 2. Tech Vetting
+Invoke the /tech-vetting skill with the Step 1 implementation plan as input.
+/tech-vetting will detect the tech stack, query official docs, and dispatch expert
 subagents for best practice review.
-If /preflight finds serious issues → adjust the plan and re-run /preflight.
+If /tech-vetting finds serious issues → adjust the plan and re-run /tech-vetting.
 If only suggestions → note them and keep them in mind during implementation.
 
 ### 3. Implement + Test

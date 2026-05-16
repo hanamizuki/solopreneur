@@ -19,7 +19,7 @@ matching agent's markdown file.
 
 Outputs are consumed by the matching subagents (`ios-dev`, `android-dev`,
 `designer`, `marketer`, `neo4j-dev`) and any caller that dispatches them
-(`/specialist-review`, `/preflight`, `/todos-review`).
+(`/specialist-review`, `/tech-vetting`, `/todos-review`).
 
 ## Step 0: Resolve base directory
 

@@ -103,7 +103,7 @@ line. The old `solopreneur-*` plugin names are gone.
 **Plugins removed:** `solopreneur-nextjs` and `solopreneur-python`. Both
 shipped only an agent and no curated skills. The `nextjs-dev` and
 `python-dev` specialist subagents are no longer dispatchable from
-`/specialist-review`, `/preflight`, `/todos-review`, or `/autopilot`. Use the
+`/specialist-review`, `/tech-vetting`, `/todos-review`, or `/autopilot`. Use the
 `general-purpose` subagent for those stacks until / unless we ship
 replacement plugins.
 

@@ -79,7 +79,7 @@ skills that wrap the lifecycle around your work.
 |---|---|
 | `/mvp` | **PM.** Drives the full new-product flow end-to-end: brainstorming → template lookup (auto-discovers `*-app-templates` in installed plugins) → plan → execution. Use when starting from scratch |
 | `/second-opinion` | **Advisor.** Challenges your plan across 5 dimensions (completeness, consistency, clarity, scope, feasibility) using an independent reviewer |
-| `/preflight` | **Tech Lead.** Reviews your technical plan against platform-specific best practices before you write a single line of code |
+| `/tech-vetting` | **Tech Lead.** Vets your technical plan against the latest official docs and platform-specific best practices before you write a single line of code |
 | `/worktree-handoff` | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
 | `/handoff` | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). No worktree, no file save |
 | `/specialist-review` | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
@@ -118,7 +118,7 @@ Idea
  ├─ /mvp ────────────── Brand-new product? Start here. Brainstorm → template → plan → execute
  │
  ├─ /second-opinion ── Challenge the spec
- ├─ /preflight ─────── Verify the technical approach
+ ├─ /tech-vetting ──── Verify the technical approach
  │
  ├─ /worktree-handoff ─ Isolate the work
  ├─ /autopilot ──────── Split into PRs, auto-implement
@@ -140,7 +140,7 @@ Idea
 - **`git`**, **`gh`** (GitHub CLI), **`jq`**: required CLIs. Used across `/greenlight`, `/autopilot`, `/post-mortem`, `/todos-babysit`, and `scripts/sync-vendored.sh`.
 - **[Codex CLI](https://github.com/openai/codex)**: **required** for `/greenlight` uncommitted mode (the only path on `main` with uncommitted changes). Also used by `/second-opinion` (primary review path), `/greenlight` PR mode (one reviewer option), and `/naming` (multi-model candidate generation).
 - **[superpowers](https://github.com/obra/superpowers)** plugin: strongly recommended. `/greenlight` and `/specialist-review` use `superpowers:requesting-code-review` and `receiving-code-review` for the review framework. Graceful fallback if absent.
-- **[context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7)** MCP: strongly recommended. Used by `/preflight`, `/specialist-review`, and every stack agent (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) for current official docs. Graceful skip if absent.
+- **[context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7)** MCP: strongly recommended. Used by `/tech-vetting`, `/specialist-review`, and every stack agent (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) for current official docs. Graceful skip if absent.
 - **[`gstack /review`](https://github.com/garrytan/gstack/tree/main/review)**: recommended. Powers the `/greenlight` internal review phase (SQL safety, trust boundaries, structural issues).
 - **[Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector)**: recommended. `/greenlight` PR mode default reviewer (`@codex review`).
 - **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR mode alternative reviewer (`/gemini review`).
