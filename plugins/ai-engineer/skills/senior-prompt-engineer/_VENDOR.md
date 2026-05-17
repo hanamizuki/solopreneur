@@ -5,9 +5,18 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/alirezarezvani/claude-skills
 - **Source path**: `engineering-team/skills/senior-prompt-engineer`
-- **Pinned commit**: 0796e1d70a9de786a4f88c859124b357b94425f3
-- **Synced at**: 2026-05-16T13:09:12Z
+- **Pinned commit**: 0d477a06589aa730b98e351f46985c5c937de0bf
+- **Synced at**: 2026-05-17T11:31:07Z
 - **License**: see `../_vendored/LICENSES/claude-skills-LICENSE`
+
+**Path rewrite**: during sync, bundled-script paths under the skill folder
+(`.claude/skills/<to>/`, and `.claude/skills/<upstream-name>/` if the
+manifest renames the folder) are mechanically rewritten to
+`"${CLAUDE_SKILL_DIR}/"` (quoted so a skill-dir path containing spaces
+doesn't word-split the resulting command) so the skill resolves correctly
+when installed as a plugin. The vendored body therefore differs from
+upstream verbatim by exactly that substitution — see
+`scripts/sync-vendored.sh` for the transformation.
 
 To update: edit `skills/_vendored/manifest.json` if needed, then re-run this
 plugin's `./scripts/sync-vendored.sh`.
