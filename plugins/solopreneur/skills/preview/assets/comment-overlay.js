@@ -432,21 +432,49 @@
   }
   document.addEventListener("selectionchange", onSelectionChange);
 
-  // pointerdown + mousedown + touchstart all preventDefault so pressing
-  // the button does NOT collapse the live selection before click fires.
-  // Older iOS Safari does not deliver a usable pointerdown for this, so
-  // bind all three; the actual open happens on click.
+  // pointerdown + mousedown preventDefault so a (rare) pointer/mouse
+  // press on the fixed button does NOT collapse the live selection
+  // before the open fires. We deliberately do NOT preventDefault on
+  // touchstart: doing so suppresses the synthesized click on touch
+  // browsers and kills the only mobile create path. It is also
+  // unnecessary for selection preservation on touch — pendingText /
+  // pendingRange are captured in the debounced selectionchange handler
+  // BEFORE the tap and intentionally retained on selection collapse, so
+  // losing the live selection to the tap is already harmless here.
   function guardPress(e) {
     e.preventDefault();
   }
   addFixed.addEventListener("pointerdown", guardPress);
   addFixed.addEventListener("mousedown", guardPress);
-  addFixed.addEventListener("touchstart", guardPress, { passive: false });
-  addFixed.addEventListener("click", () => {
+
+  // Open the create modal from the retained pending selection. Guarded
+  // against a double-open: touchend fires first (and preventDefault()s
+  // its own synthesized click), but a stray click could still arrive on
+  // some browsers, so a short re-entrancy latch coalesces them.
+  let openingFromFixed = false;
+  function openFromFixed() {
+    if (openingFromFixed) return;
     if (!pendingText || !pendingRange) return;
+    openingFromFixed = true;
     document.body.classList.remove("cmt-add-visible");
     openModal(pendingText, pendingRange);
-  });
+    setTimeout(() => {
+      openingFromFixed = false;
+    }, 400);
+  }
+  // touchend: the reliable mobile open. preventDefault() here stops the
+  // browser from also dispatching the duplicate synthesized click.
+  addFixed.addEventListener(
+    "touchend",
+    (e) => {
+      e.preventDefault();
+      openFromFixed();
+    },
+    { passive: false }
+  );
+  // click: desktop / non-touch path (and a fallback if touchend was
+  // missed). The latch prevents a second modal when both fire.
+  addFixed.addEventListener("click", openFromFixed);
 
   // Map a Range boundary (node, offset) to an absolute index into the
   // concatenated text built by collectTextNodes(). Returns -1 if the
@@ -624,12 +652,15 @@
   // margin:0 (set in template.html) and no positioned / transformed /
   // will-change / contain ancestor exists, so the layer's containing
   // block is the initial containing block. The layer is
-  // position:absolute; top:0; height:0 (CSS), therefore a child card's
-  // `top` value equals its target Y in DOCUMENT coordinates 1:1
-  // (rect.top + window.scrollY). Do NOT reparent this layer under any
-  // positioned element or the cards will be offset. height:0 + absolute
-  // cards keep the layer out of flow so it never grows body scroll
-  // height.
+  // position:absolute; top:0 (CSS starts it at height:0), therefore a
+  // child card's `top` value equals its target Y in DOCUMENT
+  // coordinates 1:1 (rect.top + window.scrollY). Do NOT reparent this
+  // layer under any positioned element or the cards will be offset.
+  // layoutCards() then sets the layer's height to the lowest laid-out
+  // card's bottom so cards placed past main.doc's natural end still
+  // grow document.scrollHeight and remain reachable; layout is
+  // idempotent so the resulting ResizeObserver refire converges (its
+  // lastH dedupe stops it after one repeat).
   const marginLayer = el("div", "", {
     id: "cmt-margin-layer",
     cls: "cmt-margin-layer",
@@ -802,11 +833,19 @@
   // (3) set ALL `top` values last (write phase). No interleaved
   // read/write per card.
   function layoutCards() {
-    if (!marginLayer || !isDesktop()) return;
+    if (!marginLayer || !isDesktop()) {
+      // Not desktop / layer inert: collapse so it never reserves
+      // scroll height on mobile (where the sheet path is used).
+      if (marginLayer) marginLayer.style.height = "0px";
+      return;
+    }
     const cards = Array.prototype.slice.call(
       marginLayer.querySelectorAll(".cmt-card")
     );
-    if (!cards.length) return;
+    if (!cards.length) {
+      marginLayer.style.height = "0px";
+      return;
+    }
 
     // READ phase: marker Y (document coords) + card height for each.
     const measured = cards.map((card) => {
@@ -841,6 +880,25 @@
     measured.forEach((mi, i) => {
       mi.card.style.top = tops[i] + "px";
     });
+
+    // Extend the (otherwise height:0, out-of-flow) layer down to the
+    // lowest card's bottom so cards placed past the natural end of
+    // main.doc — a comment near the doc bottom, or a downward cascade —
+    // still grow document.scrollHeight and stay scrollable/reachable.
+    // tops[i] is already in document coords (layer is top:0 against the
+    // ICB; see the INVARIANT comment), so top + card height is the
+    // card's document-space bottom; the max over all cards is the
+    // needed layer height.
+    let maxBottom = 0;
+    for (let i = 0; i < measured.length; i++) {
+      const b = tops[i] + measured[i].h;
+      if (b > maxBottom) maxBottom = b;
+    }
+    // Idempotent: same markers -> same tops -> same maxBottom, so a
+    // ResizeObserver refire (this write can grow body height once)
+    // recomputes the identical value; the RO's lastH dedupe then stops
+    // it. Convergence in <=2 passes — do NOT weaken that guard.
+    marginLayer.style.height = maxBottom + "px";
   }
 
   // Single debounced scheduler. Every recompute hook (load / resize /
@@ -1329,8 +1387,12 @@
   // body height and marker Ys. A debounced ResizeObserver catches what
   // `load` misses. CRITICAL: never relayout synchronously here — route
   // through scheduleLayout() (debounced setTimeout) so we don't trip a
-  // resize-observer loop. The margin layer is height:0 with absolute
-  // cards, so its own writes never feed back into body's box.
+  // resize-observer loop. layoutCards() now sets the margin layer's
+  // height to the lowest card's bottom, so this write CAN grow body's
+  // box and fire the RO once — that is intentional and safe: layout is
+  // idempotent (same markers -> same tops -> same computed height), so
+  // the next pass writes the identical height and the lastH dedupe
+  // below halts it (convergence in <=2 passes).
   //
   // Hardening: dedupe on body height (skip when unchanged so a
   // steady-state RO callback can never re-arm the scheduler) and only

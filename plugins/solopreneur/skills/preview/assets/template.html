@@ -145,12 +145,18 @@
   /* --- Desktop margin annotations (>=1024px) ---
      No docked panel chrome. A transparent margin LAYER is appended as a
      direct child of <body> by comment-overlay.js. It is
-     position:absolute; top:0; height:0 so it never grows the page's
-     scroll height, and its cards (also position:absolute) carry a `top`
-     equal to their marker's Y in DOCUMENT coordinates. The layer must
-     have NO positioned/transformed/will-change/contain ancestor (body
-     has margin:0 and is the offset parent), so a child's `top` maps 1:1
-     to document Y. See the matching invariant comment in the JS. */
+     position:absolute; top:0 and starts at height:0; its cards (also
+     position:absolute) carry a `top` equal to their marker's Y in
+     DOCUMENT coordinates. layoutCards() then sets the layer's height to
+     the lowest laid-out card's bottom, so a card placed past the
+     natural end of main.doc still extends the page's scroll height and
+     stays reachable. Layout is idempotent (same markers -> same tops ->
+     same height) so the ResizeObserver refire this height write may
+     trigger converges immediately (its lastH dedupe halts it). The
+     layer must have NO positioned/transformed/will-change/contain
+     ancestor (body has margin:0 and is the offset parent), so a child's
+     `top` maps 1:1 to document Y. See the matching invariant comment in
+     the JS. */
   .cmt-margin-layer {
     position: absolute;
     top: 0;
@@ -163,7 +169,7 @@
     right: 16px;
     left: auto;
     width: 300px;
-    height: 0;            /* out of flow: never extends body scroll height */
+    height: 0;            /* JS raises this to the lowest card's bottom so overflowed cards stay reachable */
     z-index: 9997;
     display: none;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
