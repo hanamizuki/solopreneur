@@ -368,6 +368,14 @@
   }
 
   document.addEventListener("mouseup", (e) => {
+    // Touch browsers (e.g. Android Chrome) synthesize mouseup after a
+    // selection. Without this guard the absolute desktop #cmt-add button
+    // would appear on mobile alongside the fixed #cmt-add-fixed. The
+    // selectionchange handler has the mirror guard (isDesktop early-out).
+    if (!isDesktop()) {
+      addBtn.style.display = "none";
+      return;
+    }
     if (e.target.closest(UI_SEL)) return;
     const sel = window.getSelection();
     const text = sel && sel.toString().trim();
@@ -380,6 +388,12 @@
     pendingText = text;
     pendingRange = sel.getRangeAt(0).cloneRange();
     const rect = sel.getRangeAt(0).getBoundingClientRect();
+    // addBtn is position:absolute appended directly to <body>. This
+    // relies on the SAME body{margin:0} + no-positioned-ancestor
+    // absolute-positioning containing-block invariant documented for
+    // the margin layer: viewport rect + scroll offset == document
+    // coords only because the offset parent is the ICB. A future
+    // refactor that wraps <body> in a positioned element breaks both.
     addBtn.style.left = rect.right + window.scrollX + 8 + "px";
     addBtn.style.top = rect.top + window.scrollY - 4 + "px";
     addBtn.style.display = "block";
@@ -536,7 +550,18 @@
     document.body.appendChild(overlay);
     input.focus();
 
-    const close = () => overlay.remove();
+    // Clear the captured selection on every teardown path (cancel,
+    // overlay click, Escape, and the trailing close() inside commit()).
+    // Without this the pending range survives; combined with the
+    // deliberate keep-on-selectionchange-collapse behavior a later
+    // button tap could reopen the modal on a stale range. The
+    // keep-on-collapse path in onSelectionChange is unaffected — it
+    // never calls close().
+    const close = () => {
+      overlay.remove();
+      pendingText = null;
+      pendingRange = null;
+    };
     const commit = () => {
       const txt = input.value.trim();
       if (txt) {
@@ -1284,6 +1309,11 @@
     const now = isDesktop();
     if (now !== lastDesktop) {
       lastDesktop = now;
+      // cmt-add-visible is only added on mobile and never removed on a
+      // breakpoint cross; clear it so #cmt-add-fixed cannot persist onto
+      // desktop. The @media (min-width:1024px) rule also hides it — both
+      // are cheap, keep both.
+      document.body.classList.remove("cmt-add-visible");
       if (now) closeSheet();
       // Crossing into desktop must (re)build the margin cards;
       // renderPanel() rebuilds + reschedules layout. Crossing into
@@ -1298,11 +1328,22 @@
   // Post-load reflow (lazy images, async content, font swaps) changes
   // body height and marker Ys. A debounced ResizeObserver catches what
   // `load` misses. CRITICAL: never relayout synchronously here — route
-  // through scheduleLayout() (setTimeout + rAF) so we don't trip a
+  // through scheduleLayout() (debounced setTimeout) so we don't trip a
   // resize-observer loop. The margin layer is height:0 with absolute
   // cards, so its own writes never feed back into body's box.
+  //
+  // Hardening: dedupe on body height (skip when unchanged so a
+  // steady-state RO callback can never re-arm the scheduler) and only
+  // schedule when the margin layer is actually live (desktop + >=1
+  // comment). Keeps the single debounced-scheduler design.
   if (typeof ResizeObserver === "function") {
-    const ro = new ResizeObserver(() => scheduleLayout());
+    let lastH = -1;
+    const ro = new ResizeObserver(() => {
+      const h = document.body.offsetHeight;
+      if (h === lastH) return;
+      lastH = h;
+      if (isDesktop() && comments.length) scheduleLayout();
+    });
     ro.observe(document.body);
   }
 })();
