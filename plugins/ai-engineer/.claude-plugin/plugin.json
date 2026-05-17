@@ -1,6 +1,6 @@
 {
   "name": "ai-engineer",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "description": "AI / LLM application engineering expertise. Ships the ai-engineer agent plus in-house skills (langgraph, ai-app-templates) and 1 vendored skill (senior-prompt-engineer) for production LLM systems, RAG, agents, and prompt design.",
   "license": "MIT",
   "dependencies": [

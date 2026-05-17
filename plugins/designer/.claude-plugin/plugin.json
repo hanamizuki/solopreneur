@@ -1,6 +1,6 @@
 {
   "name": "designer",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "UI/UX design expertise. Ships the designer agent and 10 vendored third-party design skills (taste-* archetype family + impeccable).",
   "license": "MIT",
   "dependencies": [
