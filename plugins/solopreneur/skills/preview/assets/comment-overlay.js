@@ -1,8 +1,9 @@
 // preview skill: in-page comment overlay (Google Docs-style markers)
 //
 // Highlight text -> write a comment. The comment leaves a visible yellow
-// <mark> on the text and a card in a side panel (desktop) or a bottom
-// sheet (mobile). Comments persist to localStorage for the review session
+// <mark> on the text and a margin annotation card in the right gutter
+// (desktop) or a bottom sheet (mobile). Comments persist to localStorage
+// for the review session
 // and re-anchor to their text by surrounding context (W3C-style
 // TextQuoteSelector), so they survive reload, Alpine re-renders, and the
 // diff/clean toggle.
@@ -20,7 +21,8 @@
   const STORAGE_KEY = "preview_comments_v2";
   const LEGACY_KEY = "preview_comments_v1";
   const CTX = 32; // chars of prefix/suffix context captured for anchoring
-  const DESKTOP_MIN = 1024; // px; >= is docked panel, < is bottom sheet
+  const DESKTOP_MIN = 1024; // px; >= is margin layer, < is bottom sheet
+  const CARD_GAP = 12; // px vertical gap between cascaded margin cards
 
   let comments = [];
   try {
@@ -87,6 +89,26 @@
 
   function isDesktop() {
     return window.matchMedia("(min-width:" + DESKTOP_MIN + "px)").matches;
+  }
+
+  // Relative timestamp, pure function of an ISO string. Recomputed on
+  // every render (no ticking timer). Hardened: unparseable -> "" so a
+  // card never shows "NaN"; negative delta (clock skew / future ts)
+  // clamps to 0 -> "now"; old dates use an explicit locale format.
+  function relativeTime(ts) {
+    const t = Date.parse(ts);
+    if (isNaN(t)) return "";
+    let delta = Math.floor((Date.now() - t) / 1000);
+    if (delta < 0) delta = 0;
+    if (delta < 60) return "now";
+    if (delta < 3600) return Math.floor(delta / 60) + "m ago";
+    if (delta < 86400) return Math.floor(delta / 3600) + "h ago";
+    if (delta < 604800) return Math.floor(delta / 86400) + "d ago";
+    return new Date(t).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   }
 
   // ===================================================================
@@ -297,6 +319,8 @@
   // ===================================================================
   // Comment creation
   // ===================================================================
+  // Desktop creation button: floats next to the selection (absolute,
+  // document coordinates). Triggered by mouseup.
   const addBtn = el(
     "button",
     "position:absolute;display:none;z-index:9999;padding:4px 10px;background:#1f2937;color:#fff;border:none;border-radius:6px;font:500 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)",
@@ -304,20 +328,50 @@
   );
   document.body.appendChild(addBtn);
 
+  // Mobile creation button: a STABLE fixed position (bottom center,
+  // above the float cluster). Touch selection never fires mouseup and
+  // the OS selection callout covers the selection area, so anchoring a
+  // button to the selection is unreliable on phones — keep it parked.
+  const addFixed = el("button", "", {
+    id: "cmt-add-fixed",
+    cls: "cmt-add-fixed",
+    text: "+ comment",
+    attrs: { "data-cmt-ui": "1" },
+  });
+  document.body.appendChild(addFixed);
+
   let pendingText = null;
   let pendingRange = null;
 
-  document.addEventListener("mouseup", (e) => {
-    if (
-      e.target.closest(
-        "#cmt-add,#cmt-modal,#cmt-export-modal,#cmt-panel,#cmt-sheet,#cmt-sheet-scrim,#cmt-fab,.cmt-mark"
-      )
-    ) {
-      return;
+  const UI_SEL =
+    "#cmt-add,#cmt-add-fixed,#cmt-modal,#cmt-export-modal," +
+    "#cmt-margin-layer,#cmt-sheet,#cmt-sheet-scrim,#cmt-fab,.cmt-mark";
+
+  // Is a node part of the prose (inside main.doc) and NOT inside any
+  // overlay-injected UI? Used by both mouseup and selectionchange so a
+  // selection inside a card/modal never arms creation.
+  function selectionInDoc(sel) {
+    if (!sel || sel.rangeCount === 0) return false;
+    const doc = document.querySelector("main.doc");
+    if (!doc) return false;
+    const a = sel.anchorNode;
+    const f = sel.focusNode;
+    if (!a || !f) return false;
+    const aEl = a.nodeType === 1 ? a : a.parentElement;
+    const fEl = f.nodeType === 1 ? f : f.parentElement;
+    if (!aEl || !fEl) return false;
+    if (!doc.contains(aEl) || !doc.contains(fEl)) return false;
+    if (aEl.closest("[data-cmt-ui]") || fEl.closest("[data-cmt-ui]")) {
+      return false;
     }
+    return true;
+  }
+
+  document.addEventListener("mouseup", (e) => {
+    if (e.target.closest(UI_SEL)) return;
     const sel = window.getSelection();
     const text = sel && sel.toString().trim();
-    if (!text || sel.rangeCount === 0) {
+    if (!text || sel.rangeCount === 0 || !selectionInDoc(sel)) {
       addBtn.style.display = "none";
       pendingText = null;
       pendingRange = null;
@@ -335,6 +389,49 @@
     if (!pendingText || !pendingRange) return;
     openModal(pendingText, pendingRange);
     addBtn.style.display = "none";
+  });
+
+  // --- Mobile: selectionchange-driven creation -----------------------
+  // selectionchange fires for touch selection (mouseup does not). Debounce
+  // it (it fires rapidly while dragging handles). Only capture when the
+  // selection is non-empty AND inside main.doc AND outside any
+  // [data-cmt-ui] node. On collapse, hide the button but DEFER nulling
+  // pendingRange: iOS Safari collapses the selection the instant the user
+  // taps the button, so the captured range must outlive the collapse.
+  let selDebounce = null;
+  function onSelectionChange() {
+    if (isDesktop()) return; // desktop uses mouseup
+    if (selDebounce) clearTimeout(selDebounce);
+    selDebounce = setTimeout(() => {
+      const sel = window.getSelection();
+      const text = sel && sel.toString().trim();
+      if (!text || sel.rangeCount === 0 || !selectionInDoc(sel)) {
+        // Hide but keep pendingRange — a button tap may already be in
+        // flight after the OS collapsed the selection.
+        document.body.classList.remove("cmt-add-visible");
+        return;
+      }
+      pendingText = text;
+      pendingRange = sel.getRangeAt(0).cloneRange();
+      document.body.classList.add("cmt-add-visible");
+    }, 250);
+  }
+  document.addEventListener("selectionchange", onSelectionChange);
+
+  // pointerdown + mousedown + touchstart all preventDefault so pressing
+  // the button does NOT collapse the live selection before click fires.
+  // Older iOS Safari does not deliver a usable pointerdown for this, so
+  // bind all three; the actual open happens on click.
+  function guardPress(e) {
+    e.preventDefault();
+  }
+  addFixed.addEventListener("pointerdown", guardPress);
+  addFixed.addEventListener("mousedown", guardPress);
+  addFixed.addEventListener("touchstart", guardPress, { passive: false });
+  addFixed.addEventListener("click", () => {
+    if (!pendingText || !pendingRange) return;
+    document.body.classList.remove("cmt-add-visible");
+    openModal(pendingText, pendingRange);
   });
 
   // Map a Range boundary (node, offset) to an absolute index into the
@@ -496,19 +593,24 @@
   }
 
   // ===================================================================
-  // Comment panel (desktop, >=1024px)
+  // Desktop margin layer (>=1024px)
   // ===================================================================
-  const panel = el(
-    "aside",
-    "",
-    { id: "cmt-panel", cls: "cmt-panel", attrs: { "data-cmt-ui": "1" } }
-  );
-  const panelHead = el("div", "", { cls: "cmt-panel-head" });
-  panelHead.appendChild(el("span", "", { cls: "cmt-panel-title", text: "Comments" }));
-  const panelList = el("div", "", { cls: "cmt-panel-list" });
-  const panelFoot = el("div", "", { cls: "cmt-panel-foot" });
-  panel.append(panelHead, panelList, panelFoot);
-  document.body.appendChild(panel);
+  // INVARIANT: the margin layer is a DIRECT child of <body>. <body> has
+  // margin:0 (set in template.html) and no positioned / transformed /
+  // will-change / contain ancestor exists, so the layer's containing
+  // block is the initial containing block. The layer is
+  // position:absolute; top:0; height:0 (CSS), therefore a child card's
+  // `top` value equals its target Y in DOCUMENT coordinates 1:1
+  // (rect.top + window.scrollY). Do NOT reparent this layer under any
+  // positioned element or the cards will be offset. height:0 + absolute
+  // cards keep the layer out of flow so it never grows body scroll
+  // height.
+  const marginLayer = el("div", "", {
+    id: "cmt-margin-layer",
+    cls: "cmt-margin-layer",
+    attrs: { "data-cmt-ui": "1" },
+  });
+  document.body.appendChild(marginLayer);
 
   function quoteSnippet(s) {
     s = (s || "").replace(/\s+/g, " ").trim();
@@ -541,9 +643,17 @@
       attrs: { "data-cmt-id": c.id },
     });
 
+    // Card content top->bottom: quote -> relative time -> comment body.
+    // No name, no avatar (data model has none and the design forbids it).
     const q = el("div", "", { cls: "cmt-card-quote", text: quoteSnippet(c.quote) });
+    const children = [q];
+    const rel = relativeTime(c.ts);
+    if (rel) {
+      children.push(el("div", "", { cls: "cmt-card-time", text: rel }));
+    }
     const body = el("div", "", { cls: "cmt-card-body", text: c.comment });
-    cardEl.append(q, body);
+    children.push(body);
+    cardEl.append.apply(cardEl, children);
 
     if (detached) {
       cardEl.appendChild(
@@ -641,33 +751,109 @@
     announce("comment deleted");
   }
 
+  // renderPanel() keeps its name (every call site already invokes it on
+  // add/edit/delete) but now rebuilds the desktop margin layer and then
+  // funnels positioning through the single debounced scheduler. The
+  // mobile bottom sheet is rendered separately via buildCard().
   function renderPanel() {
-    if (!panelList) return;
-    panelList.textContent = "";
-    const ordered = orderedComments();
-    if (!ordered.length) {
-      panelList.appendChild(
-        el("div", "", { cls: "cmt-empty", text: "No comments yet." })
-      );
-    } else {
-      ordered.forEach((c) => panelList.appendChild(buildCard(c)));
+    if (marginLayer) {
+      marginLayer.textContent = "";
+      if (isDesktop()) {
+        orderedComments().forEach((c) => marginLayer.appendChild(buildCard(c)));
+      }
     }
     syncDesktopState();
+    scheduleLayout();
   }
 
-  // Click a marker -> open its card (panel on desktop, sheet on mobile).
+  // Position every margin card. Order by marker Y (orderedComments),
+  // walk top->bottom, place each at max(markerY, prevBottom + GAP) —
+  // cascading push so close markers never overlap. Detached cards (no
+  // marker) stack after all anchored cards at the column bottom.
+  //
+  // Layout-thrash guard: this is a strict write -> read -> write batch.
+  // (1) cards are already in the DOM from renderPanel() (write).
+  // (2) read ALL marker Ys and ALL card heights first (read phase).
+  // (3) set ALL `top` values last (write phase). No interleaved
+  // read/write per card.
+  function layoutCards() {
+    if (!marginLayer || !isDesktop()) return;
+    const cards = Array.prototype.slice.call(
+      marginLayer.querySelectorAll(".cmt-card")
+    );
+    if (!cards.length) return;
+
+    // READ phase: marker Y (document coords) + card height for each.
+    const measured = cards.map((card) => {
+      const id = card.getAttribute("data-cmt-id");
+      const m = document.querySelector(
+        '.cmt-mark[data-cmt-id="' + cssEsc(id) + '"]'
+      );
+      let markerY = null;
+      if (m) {
+        const r = m.getBoundingClientRect();
+        markerY = r.top + window.scrollY;
+      }
+      return { card: card, markerY: markerY, h: card.offsetHeight };
+    });
+
+    // COMPUTE phase: anchored cards cascade by marker Y; detached cards
+    // (markerY == null) stack after, keyed off the last bottom.
+    let prevBottom = -Infinity;
+    const tops = measured.map((mi) => {
+      let top;
+      if (mi.markerY != null) {
+        top = Math.max(mi.markerY, prevBottom + CARD_GAP);
+      } else {
+        top = prevBottom + CARD_GAP;
+        if (!isFinite(top)) top = 0;
+      }
+      prevBottom = top + mi.h;
+      return top;
+    });
+
+    // WRITE phase: apply all tops.
+    measured.forEach((mi, i) => {
+      mi.card.style.top = tops[i] + "px";
+    });
+  }
+
+  // Single debounced scheduler. Every recompute hook (load / resize /
+  // ResizeObserver / 600ms net / alpine:initialized) routes here so the
+  // layout pass runs at most once per burst, AFTER markers are placed.
+  // NEVER call layoutCards() synchronously from a ResizeObserver
+  // callback — that risks a resize-observer loop. The ~100ms setTimeout
+  // breaks that cycle and defers the read past the current task's
+  // style/layout flush; layoutCards() forces its own reflow via
+  // offsetHeight, so an extra rAF is unnecessary (and would stall when
+  // frames are starved, e.g. a background/headless tab).
+  let layoutTimer = null;
+  function scheduleLayout() {
+    if (layoutTimer) clearTimeout(layoutTimer);
+    layoutTimer = setTimeout(() => {
+      layoutTimer = null;
+      layoutCards();
+    }, 100);
+  }
+
+  // Click a marker -> flash its margin card (desktop) or open the sheet
+  // (mobile).
   document.addEventListener("click", (e) => {
     const m = e.target.closest(".cmt-mark");
     if (!m) return;
     const id = m.getAttribute("data-cmt-id");
     if (isDesktop()) {
-      const card = panelList.querySelector(
-        '.cmt-card[data-cmt-id="' + cssEsc(id) + '"]'
-      );
-      if (card) {
-        card.scrollIntoView({ behavior: prefersMotion() ? "smooth" : "auto", block: "center" });
-        flash(card);
-      }
+      // Click a marker -> scroll the page so the marker is visible, then
+      // flash its margin card. Cards are absolutely positioned in
+      // document coordinates so a plain page scroll already keeps the
+      // card paired with its text; we only need to flash it.
+      scrollToEl(m);
+      const card =
+        marginLayer &&
+        marginLayer.querySelector(
+          '.cmt-card[data-cmt-id="' + cssEsc(id) + '"]'
+        );
+      if (card) flash(card);
     } else {
       openSheetSingle(id);
     }
@@ -989,7 +1175,7 @@
   }
 
   // ===================================================================
-  // Diff / clean toggle (unchanged behavior; relocated for the panel)
+  // Diff / clean toggle (unchanged behavior; lives in the float cluster)
   // ===================================================================
   const DIFF_CLEAN_KEY = "preview_diff_clean_v1";
   const hasDiff = !!document.querySelector("del, ins");
@@ -1029,9 +1215,9 @@
   });
 
   // ===================================================================
-  // Tool button placement: inside the panel footer on desktop, floating
-  // bottom-right cluster on mobile. Keeps the 320px panel from hiding
-  // them and avoids a scattered fixed-button trio.
+  // Tool button placement: the desktop panel footer is gone, so Export +
+  // diff toggle live in the floating bottom-right cluster on EVERY
+  // viewport now. The mobile-only "comments (N)" FAB joins it on mobile.
   // ===================================================================
   const floatCluster = el("div", "", {
     id: "cmt-float-cluster",
@@ -1041,24 +1227,24 @@
   document.body.appendChild(floatCluster);
 
   function placeToolButtons() {
-    if (isDesktop()) {
-      panelFoot.appendChild(diffBtn);
-      panelFoot.appendChild(exportBtn);
-    } else {
-      floatCluster.appendChild(diffBtn);
-      floatCluster.appendChild(exportBtn);
-      floatCluster.appendChild(fab);
-    }
+    // Stable order in the cluster: diff toggle, export, then (mobile
+    // only) the list FAB. appendChild is idempotent — re-appending an
+    // existing child just reorders, it does not duplicate.
+    floatCluster.appendChild(diffBtn);
+    floatCluster.appendChild(exportBtn);
+    if (!isDesktop()) floatCluster.appendChild(fab);
   }
 
-  // Toggle desktop layout: dock the panel + shift body, or hide it and
-  // surface the mobile FAB/sheet path.
+  // Reserve the right gutter only when >=1 comment exists (full-width on
+  // a zero-comment first draft). Surface the margin layer on desktop, the
+  // FAB/sheet path on mobile.
   function syncDesktopState() {
     const desktop = isDesktop();
-    document.body.classList.toggle("cmt-has-panel", desktop);
-    panel.style.display = desktop ? "" : "none";
-    fab.style.display = desktop ? "none" : (comments.length ? "" : "none");
-    exportBtn.style.display = comments.length ? "" : "none";
+    const hasComments = comments.length > 0;
+    document.body.classList.toggle("cmt-has-margin", desktop && hasComments);
+    if (marginLayer) marginLayer.style.display = desktop ? "" : "none";
+    fab.style.display = desktop ? "none" : (hasComments ? "" : "none");
+    exportBtn.style.display = hasComments ? "" : "none";
     placeToolButtons();
     updateDiffBtn();
   }
@@ -1081,10 +1267,17 @@
     boot();
   }
   // Alpine dispatches alpine:initialized when ready; re-anchor after it.
+  // placeAllMarkers() ends in renderPanel() -> scheduleLayout(), so the
+  // margin pass is funneled through the single scheduler automatically.
   document.addEventListener("alpine:initialized", () => placeAllMarkers());
   // Safety net: re-anchor shortly after load in case Alpine re-rendered
-  // without the event (older builds) — idempotent.
+  // without the event (older builds) — idempotent, still scheduler-gated.
   setTimeout(() => placeAllMarkers(), 600);
+
+  // Late web-font / image reflow shifts marker Y after `load`. Just
+  // schedule a relayout (markers don't need re-anchoring, only
+  // repositioning) through the shared debounced scheduler.
+  window.addEventListener("load", scheduleLayout);
 
   let lastDesktop = isDesktop();
   window.addEventListener("resize", () => {
@@ -1092,7 +1285,24 @@
     if (now !== lastDesktop) {
       lastDesktop = now;
       if (now) closeSheet();
-      syncDesktopState();
+      // Crossing into desktop must (re)build the margin cards;
+      // renderPanel() rebuilds + reschedules layout. Crossing into
+      // mobile: renderPanel() clears the layer + syncs state.
+      renderPanel();
+    } else {
+      // Same breakpoint, width changed: prose wrap shifts marker Y.
+      scheduleLayout();
     }
   });
+
+  // Post-load reflow (lazy images, async content, font swaps) changes
+  // body height and marker Ys. A debounced ResizeObserver catches what
+  // `load` misses. CRITICAL: never relayout synchronously here — route
+  // through scheduleLayout() (setTimeout + rAF) so we don't trip a
+  // resize-observer loop. The margin layer is height:0 with absolute
+  // cards, so its own writes never feed back into body's box.
+  if (typeof ResizeObserver === "function") {
+    const ro = new ResizeObserver(() => scheduleLayout());
+    ro.observe(document.body);
+  }
 })();

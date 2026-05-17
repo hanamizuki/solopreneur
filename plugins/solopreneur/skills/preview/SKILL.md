@@ -254,35 +254,47 @@ what changed.
 
 ## The comment overlay (what the user sees)
 
-The overlay behaves like the comment feature the reviewer already knows
-from Google Docs / Notion / a GitHub PR review: a comment leaves a
-**visible mark** on the text and lives in a side panel they can revisit,
-edit, and delete — not a fire-and-forget toast.
+The overlay behaves like margin annotations the reviewer already knows
+from Google Docs / Medium / Substack: a comment leaves a **visible mark**
+on the text and a card sits in the right gutter next to the text it
+annotates — revisitable, editable, deletable, not a fire-and-forget
+toast.
 
-- They highlight any text on the page → a small `+ comment` button appears
-- They click it → a modal asks for their note
+- They highlight any text on the page → a `+ comment` button appears
+- They tap/click it → a modal asks for their note
 - They submit → the highlighted text gets a persistent yellow **marker**
-  (`<mark class="cmt-mark">`) and a card appears in the comment panel
+  (`<mark class="cmt-mark">`) and a card appears in the margin
   **immediately, with no reload**. The marker *is* the confirmation —
   there is no transient "comment added" toast. The comment is saved in
   `localStorage` (survives reload during the review session) and is
   re-anchored to the same text on every reload by its surrounding context,
   so it survives Alpine re-renders and the diff/clean toggle.
-- **Desktop (≥1024px):** a fixed comment panel docks on the right. Page
-  content is shifted left so the panel never covers it. Cards are ordered
-  by where their marker sits in the document. Clicking a marker scrolls the
-  panel to its card and flashes it; clicking a card scrolls the page to its
-  marker and flashes it. Each card has `Edit` (inline edit) and `Delete`
-  (delete — removes the marker and restores the original text). The export
-  button and the `Clean` / `Show edits` toggle live in a sticky bar inside
-  the panel.
-- **Mobile (<1024px):** no docked panel. Tapping a marker opens a bottom
-  sheet with just that comment (edit / delete). A floating `comments (N)`
-  button opens a full-list bottom sheet.
+- **Desktop (≥1024px):** comments render as **margin notes** in a
+  transparent right gutter — each card floats near the text it annotates,
+  not collected in a separate panel. There is no panel chrome (no border,
+  no `Comments` title, no scrolling list, no footer bar). Cards stack
+  top→bottom in marker order; when two markers are close the lower card is
+  pushed down so cards never overlap (cascading). The reading column only
+  reserves the gutter once at least one comment exists — a zero-comment
+  first draft renders **full-width**. Each card shows, top to bottom: the
+  quoted snippet, a **relative timestamp** (`now` / `5m ago` / `3h ago` /
+  dated for older), the comment body, and `Edit` / `Delete`. No name, no
+  avatar. Clicking a marker scrolls the page to it and flashes its card;
+  clicking a card scrolls the page to its marker and flashes it. Plain
+  scrolling moves the cards with the text (no recompute). The `export`
+  button and the `Clean` / `Show edits` toggle live in a floating
+  bottom-right cluster.
+- **Mobile (<1024px):** comment **creation now works** — selecting text
+  arms a fixed `+ comment` button parked at bottom-center (above the
+  cluster, not next to the selection, so it doesn't fight the OS selection
+  callout). Tapping it opens the same modal. Viewing is unchanged: tapping
+  a marker opens a bottom sheet with that one comment (edit / delete), and
+  a floating `comments (N)` button opens a full-list bottom sheet.
 - If a comment's anchor text can no longer be found on the page (it was
   edited away, or it's older data with no anchor), the comment is **not
-  lost** — it still shows in the panel marked *detached*; it just can't
-  scroll to a marker.
+  lost** — it still shows as a card marked *detached*, stacked after the
+  anchored cards at the bottom of the gutter; it just can't scroll to a
+  marker.
 - A floating `export comments (N)` button shows the count. Clicking it
   opens an export modal with the full markdown in an editable textarea,
   plus three buttons: Copy / Close / Clear. Nothing auto-clears — the user

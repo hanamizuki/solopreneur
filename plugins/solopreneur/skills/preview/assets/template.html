@@ -142,52 +142,31 @@
      restructure the diff tree (overlay wraps per text node). */
   body.diff-clean del mark.cmt-mark { display: none; }
 
-  /* --- Desktop docked comment panel (>=1024px) --- */
-  .cmt-panel {
-    position: fixed;
+  /* --- Desktop margin annotations (>=1024px) ---
+     No docked panel chrome. A transparent margin LAYER is appended as a
+     direct child of <body> by comment-overlay.js. It is
+     position:absolute; top:0; height:0 so it never grows the page's
+     scroll height, and its cards (also position:absolute) carry a `top`
+     equal to their marker's Y in DOCUMENT coordinates. The layer must
+     have NO positioned/transformed/will-change/contain ancestor (body
+     has margin:0 and is the offset parent), so a child's `top` maps 1:1
+     to document Y. See the matching invariant comment in the JS. */
+  .cmt-margin-layer {
+    position: absolute;
     top: 0;
-    right: 0;
-    width: 320px;
-    height: 100vh;
-    background: #fff;
-    border-left: 1px solid var(--rule);
-    box-shadow: -2px 0 12px rgba(0,0,0,.04);
-    display: none;
-    flex-direction: column;
+    width: 300px;
+    height: 0;            /* out of flow: never extends body scroll height */
     z-index: 9997;
+    display: none;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  body.cmt-has-panel .cmt-panel { display: flex; }
-  /* Shift the reading column so the panel never covers prose. margin
-     (not padding) so the page background doesn't bleed under the panel.
-     Re-center the column within the remaining space. */
-  body.cmt-has-panel main.doc {
-    margin-right: 320px;
+  body.cmt-has-margin .cmt-margin-layer { display: block; }
+  /* Reserve the right gutter ONLY when at least one comment exists, so a
+     zero-comment first draft renders full-width. margin (not padding)
+     keeps the page background clean; re-center within remaining space. */
+  body.cmt-has-margin main.doc {
+    margin-right: 332px;
     margin-left: auto;
-  }
-  .cmt-panel-head {
-    padding: 16px 18px 12px;
-    border-bottom: 1px solid var(--rule);
-  }
-  .cmt-panel-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: .02em;
-    text-transform: uppercase;
-  }
-  .cmt-panel-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
-  }
-  .cmt-panel-foot {
-    border-top: 1px solid var(--rule);
-    padding: 12px;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    background: #fafafa;
   }
   .cmt-empty {
     color: #9ca3af;
@@ -195,16 +174,23 @@
     padding: 18px 6px;
     text-align: center;
   }
+  /* Each card is absolutely positioned within the margin layer; the JS
+     layout pass sets its `top`. Cards scroll with the page naturally
+     (absolute in document flow, not fixed). */
   .cmt-card {
+    position: absolute;
+    left: 0;
+    width: 300px;
+    box-sizing: border-box;
     border: 1px solid var(--rule);
     border-radius: 10px;
     padding: 12px 13px;
-    margin-bottom: 10px;
     background: #fff;
     cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
     transition: border-color .15s, box-shadow .15s;
   }
-  .cmt-card:hover { border-color: #d1d5db; box-shadow: 0 1px 6px rgba(0,0,0,.05); }
+  .cmt-card:hover { border-color: #d1d5db; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
   .cmt-card.cmt-flash { animation: cmtFlash .7s ease-out; }
   .cmt-card-quote {
     font-size: 12px;
@@ -214,6 +200,11 @@
     padding-left: 8px;
     margin-bottom: 8px;
     line-height: 1.45;
+  }
+  .cmt-card-time {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-bottom: 6px;
   }
   .cmt-card-body {
     font-size: 13.5px;
@@ -269,8 +260,9 @@
     margin-top: 8px;
   }
 
-  /* Tool buttons (export + diff toggle) share one look in the panel
-     footer (desktop) and the floating cluster (mobile). */
+  /* Tool buttons (export + diff toggle) share one look. They always live
+     in the floating bottom-right cluster now (desktop + mobile) since the
+     desktop panel footer is gone. */
   .cmt-tool-btn {
     padding: 9px 14px;
     background: #1f2937;
@@ -283,18 +275,40 @@
   }
   .cmt-tool-btn:hover { background: #111827; }
 
-  /* Mobile floating cluster: one tidy stack bottom-right, not three
-     scattered fixed buttons fighting for the same corner. */
+  /* Floating cluster: one tidy stack bottom-right (desktop + mobile),
+     not scattered fixed buttons fighting for the same corner. Shown on
+     every viewport now that the desktop panel footer is gone. */
   .cmt-float-cluster {
     position: fixed;
     bottom: 18px;
     right: 18px;
     z-index: 9998;
-    display: none;
+    display: flex;
     flex-direction: column;
     align-items: flex-end;
     gap: 8px;
   }
+  /* Mobile-only fixed "+ comment" trigger: bottom center, above the
+     float cluster. NOT anchored to the selection (the OS selection
+     callout + handles would fight it). Hidden until a valid selection
+     inside the doc exists. */
+  .cmt-add-fixed {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 84px;
+    z-index: 9999;
+    display: none;
+    padding: 10px 20px;
+    background: #1f2937;
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    font: 600 14px ui-sans-serif, system-ui, sans-serif;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,.28);
+  }
+  body.cmt-add-visible .cmt-add-fixed { display: block; }
   .cmt-fab {
     padding: 10px 16px;
     background: #1f2937;
@@ -362,12 +376,12 @@
     padding: 4px 16px 24px;
   }
 
-  /* Breakpoint: below 1024px hide the docked panel and surface the
-     floating cluster + sheet path. Above it the panel docks. */
+  /* Breakpoint: below 1024px there is no margin layer (cards would not
+     fit beside the prose); the bottom-sheet viewing path and the fixed
+     "+ comment" creation trigger take over. The float cluster stays. */
   @media (max-width: 1023px) {
-    .cmt-panel { display: none !important; }
-    body.cmt-has-panel main.doc { margin-right: auto; }
-    .cmt-float-cluster { display: flex; }
+    .cmt-margin-layer { display: none !important; }
+    body.cmt-has-margin main.doc { margin-right: auto; }
   }
 </style>
 </head>
