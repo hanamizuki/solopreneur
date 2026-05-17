@@ -825,6 +825,18 @@
   // mobile bottom sheet is rendered separately via buildCard().
   function renderPanel() {
     if (marginLayer) {
+      // Don't wipe an open inline editor. placeAllMarkers() (600ms boot
+      // safety net, alpine:initialized re-anchor) calls renderPanel()
+      // unconditionally; rebuilding the layer here would destroy a
+      // `.cmt-edit-ta` the user is mid-typing in. Marker re-anchoring
+      // (in placeAllMarkers, on the prose) already ran and ids are
+      // stable, so keeping the current cards is safe — the rebuild is
+      // deferred until the edit finishes (finish() calls renderPanel()).
+      if (marginLayer.querySelector(".cmt-edit-ta")) {
+        syncDesktopState();
+        scheduleLayout();
+        return;
+      }
       marginLayer.textContent = "";
       if (isDesktop()) {
         orderedComments().forEach((c) => marginLayer.appendChild(buildCard(c)));
@@ -1218,7 +1230,17 @@
     ta.focus();
     ta.select();
 
-    const close = () => overlay.remove();
+    // Single teardown for every close path (✕ / Close / Clear / overlay
+    // click / Escape). Must also detach the document-level keydown
+    // listener — otherwise every open→close-without-Escape cycle leaks
+    // one listener holding a closure over the removed overlay.
+    const close = () => {
+      document.removeEventListener("keydown", onKeydown);
+      overlay.remove();
+    };
+    function onKeydown(e) {
+      if (e.key === "Escape") close();
+    }
     closeX.addEventListener("click", close);
     closeBtn.addEventListener("click", close);
 
@@ -1251,15 +1273,7 @@
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) close();
     });
-    document.addEventListener(
-      "keydown",
-      function esc(e) {
-        if (e.key === "Escape") {
-          close();
-          document.removeEventListener("keydown", esc);
-        }
-      }
-    );
+    document.addEventListener("keydown", onKeydown);
   }
 
   function updateBadge() {
