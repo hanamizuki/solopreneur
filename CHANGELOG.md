@@ -10,6 +10,30 @@ or updates that plugin.
 
 ## 2026-05-17
 
+### solopreneur 0.5.19 → 0.5.20
+
+- **`/preview` comments are now margin notes, not a docked side panel.**
+  On desktop, each comment sits in the right margin next to the text it
+  annotates (Google-Docs / Medium style) instead of one docked panel,
+  and shows a relative timestamp ("now", "5m ago"). Cards stack without
+  overlapping, stay reachable when they overflow, and a preview with no
+  comments renders full-width. This supersedes the docked-panel
+  behaviour described in the previous release. (#41)
+- **You can now leave `/preview` comments on a phone.** Selecting text
+  on mobile previously did nothing — comment creation only responded to
+  a mouse. Selecting text now surfaces a fixed "+ comment" button that
+  opens the comment dialog; the mobile bottom sheet for reading
+  comments is unchanged. (#41)
+- **The `/preview` skill and the page it generates are now fully
+  English.** Trigger phrases and the on-page comment buttons (Edit /
+  Delete / Save / Cancel / Clean / Show edits) were previously a
+  Chinese/English mix. (#40)
+- Fixes: the export dialog no longer leaks a keyboard listener each
+  time it is opened and closed, and a comment you are mid-editing is no
+  longer wiped by a background refresh pass. (#42)
+
+## 2026-05-17
+
 ### solopreneur 0.5.18 → 0.5.19
 
 - **`/mvp` now confirms the product with you before building it.** A new
