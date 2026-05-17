@@ -767,6 +767,18 @@
     row.append(saveB, cancelB);
     ta.after(row);
 
+    // The textarea + actions row make this card taller than its rendered
+    // body. Desktop cards are absolutely positioned via the cascade in
+    // layoutCards(), so without a relayout a lower card can overlap the
+    // open editor. Reuse the single debounced scheduler: once after the
+    // swap, and again on every keystroke as the textarea grows (the
+    // existing ~100ms debounce coalesces input bursts — no new timer).
+    // On mobile scheduleLayout()/layoutCards() early-returns, so this is
+    // inert there. Save/Cancel both run finish() -> renderPanel() ->
+    // scheduleLayout(), restoring the normal cascade.
+    scheduleLayout();
+    ta.addEventListener("input", scheduleLayout);
+
     const finish = () => {
       renderPanel();
       rerenderSheetIfOpen();
