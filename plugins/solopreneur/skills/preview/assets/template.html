@@ -182,13 +182,13 @@
     padding: 18px 6px;
     text-align: center;
   }
-  /* Each card is absolutely positioned within the margin layer; the JS
-     layout pass sets its `top`. Cards scroll with the page naturally
-     (absolute in document flow, not fixed). */
+  /* Base card: SHARED visual styling only. Rendered on TWO surfaces via
+     the same buildCard() — the desktop margin layer AND the mobile
+     bottom sheet. Positioning/geometry must NOT live here or the sheet
+     would inherit it (every sheet card would stack at one spot and the
+     sheet body would collapse). Layout geometry is scoped per surface
+     below. */
   .cmt-card {
-    position: absolute;
-    left: 0;
-    width: 300px;
     box-sizing: border-box;
     border: 1px solid var(--rule);
     border-radius: 10px;
@@ -197,6 +197,26 @@
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0,0,0,.04);
     transition: border-color .15s, box-shadow .15s;
+  }
+  /* DESKTOP margin layer ONLY: each card is absolutely positioned within
+     the margin layer; the JS layout pass sets its `top`. Cards scroll
+     with the page naturally (absolute in document flow, not fixed).
+     Scoped to .cmt-margin-layer so the mobile sheet never inherits it —
+     the JS layout engine only ever queries marginLayer.querySelectorAll
+     (".cmt-card") and writes `top` on those, so this keeps desktop
+     pixel-identical. */
+  .cmt-margin-layer .cmt-card {
+    position: absolute;
+    left: 0;
+    width: 300px;
+  }
+  /* MOBILE bottom sheet: cards render in normal flow so they stack
+     vertically and grow .cmt-sheet-body (which scrolls). Explicit reset
+     in case any future rule reintroduces absolute on the base card. */
+  .cmt-sheet-body .cmt-card {
+    position: static;
+    left: auto;
+    width: auto;
   }
   .cmt-card:hover { border-color: #d1d5db; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
   .cmt-card.cmt-flash { animation: cmtFlash .7s ease-out; }
