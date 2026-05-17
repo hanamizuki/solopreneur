@@ -557,8 +557,8 @@
     }
 
     const actions = el("div", "", { cls: "cmt-card-actions" });
-    const editBtn = el("button", "", { cls: "cmt-act", text: "編輯" });
-    const delBtn = el("button", "", { cls: "cmt-act cmt-act-del", text: "刪" });
+    const editBtn = el("button", "", { cls: "cmt-act", text: "Edit" });
+    const delBtn = el("button", "", { cls: "cmt-act cmt-act-del", text: "Delete" });
     actions.append(editBtn, delBtn);
     cardEl.appendChild(actions);
 
@@ -596,8 +596,8 @@
     ta.setSelectionRange(ta.value.length, ta.value.length);
 
     const row = el("div", "", { cls: "cmt-edit-row" });
-    const saveB = el("button", "", { cls: "cmt-act", text: "存" });
-    const cancelB = el("button", "", { cls: "cmt-act", text: "取消" });
+    const saveB = el("button", "", { cls: "cmt-act", text: "Save" });
+    const cancelB = el("button", "", { cls: "cmt-act", text: "Cancel" });
     row.append(saveB, cancelB);
     ta.after(row);
 
@@ -1011,8 +1011,8 @@
   function updateDiffBtn() {
     diffBtn.style.display = hasDiff ? "" : "none";
     diffBtn.textContent = document.body.classList.contains("diff-clean")
-      ? "顯示修改"
-      : "乾淨版";
+      ? "Show edits"
+      : "Clean";
   }
 
   diffBtn.addEventListener("click", () => {

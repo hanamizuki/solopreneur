@@ -1,6 +1,6 @@
 ---
 name: preview
-description: Create an interactive HTML preview of any proposal, plan, idea, doc, brief, or spec, deploy it to Vercel for an instant shareable URL, and embed an in-page comment overlay so the user can highlight text + annotate + one-click export feedback markdown back to the agent. Use this skill WHENEVER the user wants something visualized, made into a webpage, made interactive, shared for human review, or asks for charts / diagrams / calculators they can click through and try out. ALWAYS use this skill when the user says any of - 做個 preview / 給我 preview / 做成網頁 / 視覺化 / 可互動 / 做個 review / share for review / 做個試算的頁面 / 做圖表給我看 / 做 diagram / 用 HTML 呈現 / 把這個 idea 變成網頁 / make this reviewable / build a quick page / interactive proposal. This is the preferred way to share any work-in-progress thinking with a human, because it is faster for them to grok and respond to than a markdown wall of text.
+description: Create an interactive HTML preview of any proposal, plan, idea, doc, brief, or spec, deploy it to Vercel for an instant shareable URL, and embed an in-page comment overlay so the user can highlight text + annotate + one-click export feedback markdown back to the agent. Use this skill WHENEVER the user wants something visualized, made into a webpage, made interactive, shared for human review, or asks for charts / diagrams / calculators they can click through and try out. ALWAYS use this skill when the user says any of - make a preview / give me a preview / turn this into a webpage / visualize this / make it interactive / do a review / share for review / make a calculator page / make me a chart / make a diagram / render this as HTML / turn this idea into a webpage / make this reviewable / build a quick page / interactive proposal. This is the preferred way to share any work-in-progress thinking with a human, because it is faster for them to grok and respond to than a markdown wall of text.
 ---
 
 # preview
@@ -23,11 +23,11 @@ A link they can open in their browser, read or play with, and respond to with co
 
 1. Read the preflight stderr — it tells you exactly what's missing (CLI absent / not logged in / token expired) and which command fixes it.
 2. **Use AskUserQuestion** to ask the user whether to set up Vercel now. Frame it concretely:
-   - *Question*: "Vercel CLI 沒裝（or 沒登入 / token 過期）— 要現在設定嗎？這需要你在 terminal 跑一兩行指令。"
-   - Options: `現在設定` / `先看 HTML local 就好，之後再 deploy` / `取消`
-3. If they pick "現在設定" → print the exact commands they need (`npm i -g vercel` and/or `vercel login`), wait for them to confirm they're done, then re-run preflight. Loop until it passes.
-4. If they pick "先看 local" → resolve the proposal path exactly as in step 2 (config-backed, same probe + persistence), write the HTML there, `open` the local file in their browser. They can deploy later when they have time to install.
-5. If they pick "取消" → stop cleanly; don't write files they didn't ask for.
+   - *Question*: "Vercel CLI isn't installed (or not logged in / token expired) — set it up now? You'll need to run a line or two in your terminal."
+   - Options: `Set up now` / `Just view HTML locally, deploy later` / `Cancel`
+3. If they pick "Set up now" → print the exact commands they need (`npm i -g vercel` and/or `vercel login`), wait for them to confirm they're done, then re-run preflight. Loop until it passes.
+4. If they pick "Just view locally" → resolve the proposal path exactly as in step 2 (config-backed, same probe + persistence), write the HTML there, `open` the local file in their browser. They can deploy later when they have time to install.
+5. If they pick "Cancel" → stop cleanly; don't write files they didn't ask for.
 
 `deploy.sh` also runs preflight on every invocation as a safety net — you can't accidentally skip it.
 
@@ -114,9 +114,9 @@ write_solopreneur_config() {
      above the cwd), suggest a workspace-relative `docs/preview/`. Final
      fallback: `~/.claude/previews/`.
 4. **Confirm with `AskUserQuestion`** — present the suggested path:
-   - *Question*: "要把 preview 放在 `<suggested-path>` 嗎？"
-   - Options: `確認並記住` / `改別的路徑` / `每次都問（不記住）`
-5. On **`確認並記住`** (or **`改別的路徑`** after the user supplies a path):
+   - *Question*: "Put the preview in `<suggested-path>`?"
+   - Options: `Confirm and remember` / `Use a different path` / `Ask every time (don't remember)`
+5. On **`Confirm and remember`** (or **`Use a different path`** after the user supplies a path):
    re-read the existing `preview` subtree, set
    `.paths["<repo-key>"]` to the chosen `<path>` (relative to repo root if
    inside a git repo, absolute otherwise) **without clobbering other repos'
@@ -130,7 +130,7 @@ write_solopreneur_config() {
          '.paths = ((.paths // {}) | .[$k] = $p)')
    write_solopreneur_config preview "$MERGED"
    ```
-6. On **`每次都問（不記住）`**: do **not** persist; use the suggested path
+6. On **`Ask every time (don't remember)`**: do **not** persist; use the suggested path
    for this run only.
 
 The final proposal path is `<parent>/<YYYY-MM-DD>-<short-slug>/`. Each proposal lives in its own dir so its URL stays immutable. Don't reuse a dir across unrelated proposals; redeploying the same dir to iterate on the same proposal is fine (gives you a new URL each time, old ones remain).
@@ -154,7 +154,7 @@ Before writing the HTML, know exactly which deliverable the preview is
 
 - the session discussed **≥2 separable topics / deliverables** and the
   preview request didn't name which one;
-- the request is a bare "做個 preview" / "make a preview" arriving after a
+- the request is a bare "make a preview" arriving after a
   **wide-ranging discussion** with no single clear target;
 - **multiple candidate artifacts** plausibly exist (e.g. a plan *and* a
   pricing model *and* a roadmap).
@@ -203,7 +203,7 @@ The script prints the URL to stdout (progress goes to stderr). Show that URL to 
 
 The Vercel project name is derived per working context (basename of the proposal dir's enclosing repo + `-preview`, sanitized to a Vercel-legal name), so every preview for the same repo lands in one tidy project. Each deploy produces a unique immutable URL. When you know your workspace / agent identity, you MAY set `PREVIEW_PROJECT=<workspace-or-agent-name>-preview` (e.g. `PREVIEW_PROJECT=mojo-preview`) before invoking `deploy.sh` — it is then used verbatim.
 
-If the user chose "先看 local" at preflight, skip deploy entirely:
+If the user chose "Just view locally" at preflight, skip deploy entirely:
 ```
 open <path-to-proposal-dir>/index.html
 ```
@@ -243,7 +243,7 @@ a GitHub PR. Do this every revision round:
    text in place without wrapping it — the reader must be able to see
    exactly what moved.
 5. **The reader can toggle to a clean view.** The comment overlay shows a
-   `乾淨版` / `顯示修改` button (added by `comment-overlay.js`); the page
+   `Clean` / `Show edits` button (added by `comment-overlay.js`); the page
    **defaults to showing the diff** on load. You don't need to do anything
    for this — just produce correct `<del>` / `<ins>` markup and the toggle
    + CSS gate handle the rest.
@@ -272,9 +272,9 @@ edit, and delete — not a fire-and-forget toast.
   content is shifted left so the panel never covers it. Cards are ordered
   by where their marker sits in the document. Clicking a marker scrolls the
   panel to its card and flashes it; clicking a card scrolls the page to its
-  marker and flashes it. Each card has `編輯` (inline edit) and `刪`
+  marker and flashes it. Each card has `Edit` (inline edit) and `Delete`
   (delete — removes the marker and restores the original text). The export
-  button and the `乾淨版` / `顯示修改` toggle live in a sticky bar inside
+  button and the `Clean` / `Show edits` toggle live in a sticky bar inside
   the panel.
 - **Mobile (<1024px):** no docked panel. Tapping a marker opens a bottom
   sheet with just that comment (edit / delete). A floating `comments (N)`
@@ -291,7 +291,7 @@ edit, and delete — not a fire-and-forget toast.
   `exported: <iso>`, then `### comment N` / `> quote` / blank / comment /
   blank blocks.
 - On a revised page (one that contains `<del>` / `<ins>` diff markup) a
-  `乾淨版` / `顯示修改` toggle appears. It toggles between the GitHub-diff
+  `Clean` / `Show edits` toggle appears. It toggles between the GitHub-diff
   view (removed text struck through, added text highlighted) and a clean
   rendered view. **The page defaults to the diff view** so the reader
   immediately sees how their feedback was applied. The choice persists in
@@ -302,7 +302,7 @@ edit, and delete — not a fire-and-forget toast.
 Their workflow is: open URL, skim, highlight problem spots while reading
 (each becomes a visible marker + panel card they can revisit and edit),
 click export, edit if needed, click Copy, paste back. On a revision they
-land on the diff, see exactly what changed, and can flip to `乾淨版` to
+land on the diff, see exactly what changed, and can flip to `Clean` to
 read the clean result. Yours is to act on each `> quote` + comment pair.
 
 ## What not to do
