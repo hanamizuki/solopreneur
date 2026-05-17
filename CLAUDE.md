@@ -31,7 +31,10 @@ The skill:
 2. Asks per plugin for `patch` / `minor` / `skip`.
 3. Bumps `plugin.json` versions in one `chore(release): ...` commit.
 4. Creates double-dash annotated tags (`<plugin-name>--v<version>`).
-5. Pushes commit + tags atomically with `git push --follow-tags`.
+5. Updates `CHANGELOG.md` at the repo root with an outward, per-plugin
+   note for the release (what installing/updating that plugin gets the
+   user — not a commit-log restatement).
+6. Pushes commit + tags atomically with `git push --follow-tags`.
 
 Atomic push is mandatory — if the bump commit lands on `origin/main` before
 its matching tags, users installing in the gap hit `no-matching-tag` errors
@@ -65,6 +68,9 @@ consistency with installer commands.
   until the next `/release`.
 - **Docs-only changes at the repo root** (`README.md`, `MIGRATION.md`,
   `CLAUDE.md`, `LICENSE`, `.claude/`).
+- **`CHANGELOG.md`** — it is a release *output* written by `/release` to
+  describe a release, not an input that triggers one. Like the other
+  root docs above, changing it never bumps a plugin.
 
 ### `marketplace.json` changes
 

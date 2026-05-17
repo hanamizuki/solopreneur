@@ -21,6 +21,7 @@ Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
 **≥ v2.1.110** for plugin dependency resolution.
 
 > Migrating from a previous version? See [MIGRATION.md](./MIGRATION.md).
+> For per-release, per-plugin notes, see [CHANGELOG.md](./CHANGELOG.md).
 
 ## Install
 
