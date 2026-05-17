@@ -77,7 +77,7 @@ skills that wrap the lifecycle around your work.
 
 | Skill | What it does |
 |---|---|
-| `/mvp` | **PM.** Drives the full new-product flow end-to-end: brainstorming → template lookup (auto-discovers `*-app-templates` in installed plugins) → plan → execution. Use when starting from scratch |
+| `/mvp` | **PM.** Drives the full new-product flow end-to-end: brainstorming → PRD visual confirmation → template lookup (auto-discovers `*-app-templates` in installed plugins) → plan → execution. Use when starting from scratch |
 | `/second-opinion` | **Advisor.** Challenges your plan across 5 dimensions (completeness, consistency, clarity, scope, feasibility) using an independent reviewer |
 | `/tech-vetting` | **Tech Lead.** Vets your technical plan against the latest official docs and platform-specific best practices before you write a single line of code |
 | `/worktree-handoff` | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
@@ -116,7 +116,7 @@ Start them and walk away. They loop until the job is done.
 ```
 Idea
  │
- ├─ /mvp ────────────── Brand-new product? Start here. Brainstorm → template → plan → execute
+ ├─ /mvp ────────────── Brand-new product? Start here. Brainstorm → PRD → template → plan → execute
  │
  ├─ /second-opinion ── Challenge the spec
  ├─ /tech-vetting ──── Verify the technical approach
