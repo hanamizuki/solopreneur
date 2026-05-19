@@ -1216,11 +1216,21 @@
       : "";
     // Wrap each line of `exact` separately so multi-line selections still
     // render as bold per-line — CommonMark won't bold across a hard line
-    // break inside the same `**…**` pair. Empty interior lines are left
+    // break inside the same `**…**` pair. Lift each line's leading and
+    // trailing whitespace OUTSIDE the wrapper too: `** foo **` is not a
+    // valid CommonMark strong emphasis run (the opener can't be followed
+    // by whitespace, the closer can't be preceded by it), so wrapping a
+    // drag-selection that picked up edge whitespace would silently lose
+    // the highlight. Lines that are all whitespace or empty stay
     // unwrapped to avoid `****` runs.
     const exact = escapeEmphasisMarkers(a.exact)
       .split("\n")
-      .map((line) => (line ? `**${line}**` : line))
+      .map((line) => {
+        if (!line) return line;
+        const m = line.match(/^(\s*)([\s\S]*?)(\s*)$/);
+        if (!m || !m[2]) return line;
+        return `${m[1]}**${m[2]}**${m[3]}`;
+      })
       .join("\n");
     return `${prefix}${exact}${suffix}`;
   }
