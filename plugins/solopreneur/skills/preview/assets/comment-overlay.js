@@ -1178,11 +1178,19 @@
   function renderQuoteWithContext(c) {
     const a = c.anchor;
     if (!a || !a.exact) return c.quote;
+    // buildAnchor slices up to CTX chars into prefix/suffix and silently
+    // saturates at the document boundaries — so length < CTX means we
+    // hit a real start/end, not a truncation, and the outer `…` would
+    // lie about there being more text out there.
+    const prefixTruncated = a.prefix && a.prefix.length >= CTX;
+    const suffixTruncated = a.suffix && a.suffix.length >= CTX;
     const prefix = a.prefix
-      ? `…${flattenContextWindow(escapeEmphasisMarkers(a.prefix))}`
+      ? (prefixTruncated ? "…" : "") +
+        flattenContextWindow(escapeEmphasisMarkers(a.prefix))
       : "";
     const suffix = a.suffix
-      ? `${flattenContextWindow(escapeEmphasisMarkers(a.suffix))}…`
+      ? flattenContextWindow(escapeEmphasisMarkers(a.suffix)) +
+        (suffixTruncated ? "…" : "")
       : "";
     // Wrap each line of `exact` separately so multi-line selections still
     // render as bold per-line — CommonMark won't bold across a hard line

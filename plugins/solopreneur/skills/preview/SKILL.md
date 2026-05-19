@@ -303,9 +303,10 @@ toast.
   `### comment N` / `> quote` / blank / comment / blank blocks. The
   `> quote` includes the surrounding context (~32 chars on each side)
   captured at selection time, with the actually-selected span wrapped in
-  `**…**` and outer `…` marking truncation — this lets you locate which
-  occurrence the reader meant when the selected text repeats on the page.
-  Older v1 comments (no captured anchor) fall back to the bare quote.
+  bold (`**`) and outer `…` marking that the context was truncated by
+  the window — this lets you locate which occurrence the reader meant
+  when the selected text repeats on the page. Older v1 comments (no
+  captured anchor) fall back to the bare quote.
 - On a revised page (one that contains `<del>` / `<ins>` diff markup) a
   `Clean` / `Show edits` toggle appears. It toggles between the GitHub-diff
   view (removed text struck through, added text highlighted) and a clean
