@@ -1129,7 +1129,9 @@
   fab.addEventListener("click", openSheetAll);
 
   // ===================================================================
-  // Export (markdown) — format byte-for-byte unchanged
+  // Export (markdown) — v2 entries render the selected exact span with
+  // surrounding context (…prefix **exact** suffix…); v1 entries (no
+  // anchor) fall back to the bare quote and stay unchanged.
   // ===================================================================
   const exportBtn = el(
     "button",
@@ -1145,11 +1147,25 @@
     showExportModal(buildMarkdown());
   });
 
-  // Escape literal `**` so they don't collide with the bold markers we
-  // wrap around the selected `exact` span when rendering a quote with
-  // surrounding context.
-  function escapeBoldMarkers(s) {
-    return s.replace(/\*\*/g, "\\*\\*");
+  // Escape every `*` and `_` so neither prefix/suffix text nor the
+  // `exact` span can collide with the `**…**` wrappers we add around the
+  // selected span — including subtle boundary cases like a prefix ending
+  // in `*` (which would otherwise pair with the opening `**` and break
+  // the "this is the highlighted region" invariant) and source text that
+  // itself uses CommonMark `*italic*` / `__bold__` syntax.
+  function escapeEmphasisMarkers(s) {
+    return s.replace(/([*_])/g, "\\$1");
+  }
+
+  // Collapse internal whitespace runs (incl. newlines) in prefix / suffix
+  // to a single space. The anchor's prefix / suffix windows are sliced
+  // from raw DOM text-node concatenation and can include layout newlines
+  // and indentation whitespace; those leak into the exported blockquote
+  // as multi-line `>` blocks and (if a line happens to start with `>` or
+  // `#`) as nested-quote or heading artifacts. Single-line context is
+  // sufficient for disambiguating which occurrence the reader selected.
+  function flattenContextWindow(s) {
+    return s.replace(/\s+/g, " ");
   }
 
   // Build the markdown quote for a comment. When the entry carries an
@@ -1162,9 +1178,21 @@
   function renderQuoteWithContext(c) {
     const a = c.anchor;
     if (!a || !a.exact) return c.quote;
-    const prefix = a.prefix ? `…${escapeBoldMarkers(a.prefix)}` : "";
-    const suffix = a.suffix ? `${escapeBoldMarkers(a.suffix)}…` : "";
-    return `${prefix}**${escapeBoldMarkers(a.exact)}**${suffix}`;
+    const prefix = a.prefix
+      ? `…${flattenContextWindow(escapeEmphasisMarkers(a.prefix))}`
+      : "";
+    const suffix = a.suffix
+      ? `${flattenContextWindow(escapeEmphasisMarkers(a.suffix))}…`
+      : "";
+    // Wrap each line of `exact` separately so multi-line selections still
+    // render as bold per-line — CommonMark won't bold across a hard line
+    // break inside the same `**…**` pair. Empty interior lines are left
+    // unwrapped to avoid `****` runs.
+    const exact = escapeEmphasisMarkers(a.exact)
+      .split("\n")
+      .map((line) => (line ? `**${line}**` : line))
+      .join("\n");
+    return `${prefix}${exact}${suffix}`;
   }
 
   function buildMarkdown() {
