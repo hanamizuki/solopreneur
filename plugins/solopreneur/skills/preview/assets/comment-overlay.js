@@ -535,7 +535,18 @@
     if (!exact) return null;
     const prefix = text.slice(Math.max(0, start - CTX), start);
     const suffix = text.slice(end, end + CTX);
-    return { exact: exact, prefix: prefix, suffix: suffix };
+    // Record whether the captured window actually omitted any text upstream
+    // / downstream — checking `.length >= CTX` at render time can't tell the
+    // exact-boundary case (e.g. `start === CTX`, where `prefix.length === CTX`
+    // but the window spans the entire doc prefix with nothing truncated)
+    // apart from the truncating case (e.g. `start > CTX`).
+    return {
+      exact: exact,
+      prefix: prefix,
+      suffix: suffix,
+      prefixTruncated: start > CTX,
+      suffixTruncated: end + CTX < text.length,
+    };
   }
 
   function openModal(quoteText, range) {
@@ -1129,7 +1140,9 @@
   fab.addEventListener("click", openSheetAll);
 
   // ===================================================================
-  // Export (markdown) — format byte-for-byte unchanged
+  // Export (markdown) — v2 entries render the selected exact span with
+  // surrounding context (…prefix **exact** suffix…); v1 entries (no
+  // anchor) fall back to the bare quote and stay unchanged.
   // ===================================================================
   const exportBtn = el(
     "button",
@@ -1145,6 +1158,83 @@
     showExportModal(buildMarkdown());
   });
 
+  // Escape every `\`, `*`, and `_` so neither prefix/suffix text nor the
+  // `exact` span can collide with the `**…**` wrappers we add around the
+  // selected span. `*` / `_` handle the obvious emphasis-marker cases
+  // (`*italic*`, `__bold__`, prefix ending in `*`). `\` handles a subtler
+  // case: a trailing backslash in prefix (e.g. captured around a Windows
+  // path like `C:\`) would, after concatenation with `**`, become `\**`
+  // — CommonMark reads that as an escaped `*` plus a stray `*`, breaking
+  // the bold opener and dropping the highlight. Escape `\` first (by
+  // ordering it first in the alternation) so we don't double-escape the
+  // backslashes we ourselves introduce.
+  function escapeEmphasisMarkers(s) {
+    return s.replace(/([\\*_])/g, "\\$1");
+  }
+
+  // Collapse internal whitespace runs (incl. newlines) in prefix / suffix
+  // to a single space. The anchor's prefix / suffix windows are sliced
+  // from raw DOM text-node concatenation and can include layout newlines
+  // and indentation whitespace; those leak into the exported blockquote
+  // as multi-line `>` blocks and (if a line happens to start with `>` or
+  // `#`) as nested-quote or heading artifacts. Single-line context is
+  // sufficient for disambiguating which occurrence the reader selected.
+  function flattenContextWindow(s) {
+    return s.replace(/\s+/g, " ");
+  }
+
+  // Build the markdown quote for a comment. When the entry carries an
+  // anchor ({ exact, prefix, suffix } — captured at selection time with
+  // CTX chars on each side), wrap the selected span in **...** and prepend
+  // the prefix / append the suffix so an agent reading the exported
+  // markdown can disambiguate when the same text appears multiple times
+  // on the page. Outer `…` mark that the context window is truncated.
+  // v1 entries (no anchor) fall back to the bare quote.
+  function renderQuoteWithContext(c) {
+    const a = c.anchor;
+    if (!a || !a.exact) return c.quote;
+    // buildAnchor records prefixTruncated / suffixTruncated booleans so
+    // we can mark `…` only when text was actually omitted. Older entries
+    // (saved before those flags existed) fall back to a length heuristic
+    // — slightly off in the exact-CTX-boundary case, but correct enough
+    // for legacy data we can't recompute.
+    const prefixTruncated =
+      typeof a.prefixTruncated === "boolean"
+        ? a.prefixTruncated
+        : !!(a.prefix && a.prefix.length >= CTX);
+    const suffixTruncated =
+      typeof a.suffixTruncated === "boolean"
+        ? a.suffixTruncated
+        : !!(a.suffix && a.suffix.length >= CTX);
+    const prefix = a.prefix
+      ? (prefixTruncated ? "…" : "") +
+        flattenContextWindow(escapeEmphasisMarkers(a.prefix))
+      : "";
+    const suffix = a.suffix
+      ? flattenContextWindow(escapeEmphasisMarkers(a.suffix)) +
+        (suffixTruncated ? "…" : "")
+      : "";
+    // Wrap each line of `exact` separately so multi-line selections still
+    // render as bold per-line — CommonMark won't bold across a hard line
+    // break inside the same `**…**` pair. Lift each line's leading and
+    // trailing whitespace OUTSIDE the wrapper too: `** foo **` is not a
+    // valid CommonMark strong emphasis run (the opener can't be followed
+    // by whitespace, the closer can't be preceded by it), so wrapping a
+    // drag-selection that picked up edge whitespace would silently lose
+    // the highlight. Lines that are all whitespace or empty stay
+    // unwrapped to avoid `****` runs.
+    const exact = escapeEmphasisMarkers(a.exact)
+      .split("\n")
+      .map((line) => {
+        if (!line) return line;
+        const m = line.match(/^(\s*)([\s\S]*?)(\s*)$/);
+        if (!m || !m[2]) return line;
+        return `${m[1]}**${m[2]}**${m[3]}`;
+      })
+      .join("\n");
+    return `${prefix}${exact}${suffix}`;
+  }
+
   function buildMarkdown() {
     const title = document.title || "untitled";
     const url = window.location.href;
@@ -1156,7 +1246,9 @@
     ];
     comments.forEach((c, i) => {
       lines.push(`### comment ${i + 1}`);
-      c.quote.split("\n").forEach((q) => lines.push(`> ${q}`));
+      renderQuoteWithContext(c)
+        .split("\n")
+        .forEach((q) => lines.push(`> ${q}`));
       lines.push("");
       lines.push(c.comment);
       lines.push("");
