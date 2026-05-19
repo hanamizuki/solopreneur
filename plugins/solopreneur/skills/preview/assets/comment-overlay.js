@@ -1145,6 +1145,28 @@
     showExportModal(buildMarkdown());
   });
 
+  // Escape literal `**` so they don't collide with the bold markers we
+  // wrap around the selected `exact` span when rendering a quote with
+  // surrounding context.
+  function escapeBoldMarkers(s) {
+    return s.replace(/\*\*/g, "\\*\\*");
+  }
+
+  // Build the markdown quote for a comment. When the entry carries an
+  // anchor ({ exact, prefix, suffix } — captured at selection time with
+  // CTX chars on each side), wrap the selected span in **...** and prepend
+  // the prefix / append the suffix so an agent reading the exported
+  // markdown can disambiguate when the same text appears multiple times
+  // on the page. Outer `…` mark that the context window is truncated.
+  // v1 entries (no anchor) fall back to the bare quote.
+  function renderQuoteWithContext(c) {
+    const a = c.anchor;
+    if (!a || !a.exact) return c.quote;
+    const prefix = a.prefix ? `…${escapeBoldMarkers(a.prefix)}` : "";
+    const suffix = a.suffix ? `${escapeBoldMarkers(a.suffix)}…` : "";
+    return `${prefix}**${escapeBoldMarkers(a.exact)}**${suffix}`;
+  }
+
   function buildMarkdown() {
     const title = document.title || "untitled";
     const url = window.location.href;
@@ -1156,7 +1178,9 @@
     ];
     comments.forEach((c, i) => {
       lines.push(`### comment ${i + 1}`);
-      c.quote.split("\n").forEach((q) => lines.push(`> ${q}`));
+      renderQuoteWithContext(c)
+        .split("\n")
+        .forEach((q) => lines.push(`> ${q}`));
       lines.push("");
       lines.push(c.comment);
       lines.push("");
