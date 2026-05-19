@@ -535,7 +535,18 @@
     if (!exact) return null;
     const prefix = text.slice(Math.max(0, start - CTX), start);
     const suffix = text.slice(end, end + CTX);
-    return { exact: exact, prefix: prefix, suffix: suffix };
+    // Record whether the captured window actually omitted any text upstream
+    // / downstream — checking `.length >= CTX` at render time can't tell the
+    // exact-boundary case (e.g. `start === CTX`, where `prefix.length === CTX`
+    // but the window spans the entire doc prefix with nothing truncated)
+    // apart from the truncating case (e.g. `start > CTX`).
+    return {
+      exact: exact,
+      prefix: prefix,
+      suffix: suffix,
+      prefixTruncated: start > CTX,
+      suffixTruncated: end + CTX < text.length,
+    };
   }
 
   function openModal(quoteText, range) {
@@ -1178,12 +1189,19 @@
   function renderQuoteWithContext(c) {
     const a = c.anchor;
     if (!a || !a.exact) return c.quote;
-    // buildAnchor slices up to CTX chars into prefix/suffix and silently
-    // saturates at the document boundaries — so length < CTX means we
-    // hit a real start/end, not a truncation, and the outer `…` would
-    // lie about there being more text out there.
-    const prefixTruncated = a.prefix && a.prefix.length >= CTX;
-    const suffixTruncated = a.suffix && a.suffix.length >= CTX;
+    // buildAnchor records prefixTruncated / suffixTruncated booleans so
+    // we can mark `…` only when text was actually omitted. Older entries
+    // (saved before those flags existed) fall back to a length heuristic
+    // — slightly off in the exact-CTX-boundary case, but correct enough
+    // for legacy data we can't recompute.
+    const prefixTruncated =
+      typeof a.prefixTruncated === "boolean"
+        ? a.prefixTruncated
+        : !!(a.prefix && a.prefix.length >= CTX);
+    const suffixTruncated =
+      typeof a.suffixTruncated === "boolean"
+        ? a.suffixTruncated
+        : !!(a.suffix && a.suffix.length >= CTX);
     const prefix = a.prefix
       ? (prefixTruncated ? "…" : "") +
         flattenContextWindow(escapeEmphasisMarkers(a.prefix))
