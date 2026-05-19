@@ -1158,14 +1158,18 @@
     showExportModal(buildMarkdown());
   });
 
-  // Escape every `*` and `_` so neither prefix/suffix text nor the
+  // Escape every `\`, `*`, and `_` so neither prefix/suffix text nor the
   // `exact` span can collide with the `**…**` wrappers we add around the
-  // selected span — including subtle boundary cases like a prefix ending
-  // in `*` (which would otherwise pair with the opening `**` and break
-  // the "this is the highlighted region" invariant) and source text that
-  // itself uses CommonMark `*italic*` / `__bold__` syntax.
+  // selected span. `*` / `_` handle the obvious emphasis-marker cases
+  // (`*italic*`, `__bold__`, prefix ending in `*`). `\` handles a subtler
+  // case: a trailing backslash in prefix (e.g. captured around a Windows
+  // path like `C:\`) would, after concatenation with `**`, become `\**`
+  // — CommonMark reads that as an escaped `*` plus a stray `*`, breaking
+  // the bold opener and dropping the highlight. Escape `\` first (by
+  // ordering it first in the alternation) so we don't double-escape the
+  // backslashes we ourselves introduce.
   function escapeEmphasisMarkers(s) {
-    return s.replace(/([*_])/g, "\\$1");
+    return s.replace(/([\\*_])/g, "\\$1");
   }
 
   // Collapse internal whitespace runs (incl. newlines) in prefix / suffix
