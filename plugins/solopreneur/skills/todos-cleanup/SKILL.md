@@ -25,9 +25,22 @@ solopreneur_repo_key() {
   local url root
   url=$(git remote get-url origin 2>/dev/null || true)
   if [ -n "$url" ]; then
-    url="${url#https://}"; url="${url#http://}"; url="${url#git@}"
+    # Strip protocol schemes (https/http/ssh/git) and user prefixes (git@)
+    # in either order — origin URLs come in many shapes:
+    #   https://github.com/owner/repo.git
+    #   http://github.com/owner/repo.git
+    #   ssh://git@github.com/owner/repo.git
+    #   git://github.com/owner/repo.git
+    #   git@github.com:owner/repo.git
+    url="${url#https://}"; url="${url#http://}"
+    url="${url#ssh://}";   url="${url#git://}"
+    url="${url#git@}"
     url="${url%.git}"
-    url="${url/://}"   # only replaces first ':' — safe for git@host:owner/repo
+    # Replace the first `:` with `/` — the scp-style `git@host:owner/repo`
+    # form. Bash `${var/pattern/replacement}` parses the second `/` as the
+    # delimiter; the chars after it (`/` here) are the replacement, so this
+    # produces a single slash, not double. (Tested.)
+    url="${url/://}"
     printf '%s\n' "$url"
     return
   fi
@@ -93,7 +106,7 @@ write_solopreneur_config() {
   local tmp existing
   mkdir -p "$(dirname "$primary")"
   tmp=$(mktemp "${primary}.XXXXXX")
-  existing=$(cat "$primary" 2>/dev/null || echo '{}')
+  existing=$(cat "$primary" 2>/dev/null); [ -z "$existing" ] && existing='{}'
   printf '%s\n' "$existing" \
     | jq --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
         '.default = ((.default // {}) | .[$fk] = $v)' \
@@ -112,7 +125,7 @@ write_solopreneur_repo_config() {
   local tmp existing
   mkdir -p "$(dirname "$primary")"
   tmp=$(mktemp "${primary}.XXXXXX")
-  existing=$(cat "$primary" 2>/dev/null || echo '{}')
+  existing=$(cat "$primary" 2>/dev/null); [ -z "$existing" ] && existing='{}'
   printf '%s\n' "$existing" \
     | jq --arg rk "$repo_key" --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
         '.repos = ((.repos // {}) | .[$rk] = ((.[$rk] // {}) | .[$fk] = $v))' \
