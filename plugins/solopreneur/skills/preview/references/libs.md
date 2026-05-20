@@ -146,6 +146,35 @@ gantt
 </div>
 ```
 
+### Caveat: hidden parents break diagram layout
+
+Mermaid needs a visible parent to compute SVG layout. If you place
+`.mermaid` blocks inside Alpine `x-show` / `display:none` tabs (a
+natural pattern for organizing long previews), the default
+`startOnLoad: true` runs at DOMContentLoaded while non-active tabs
+are still hidden. Mermaid measures width=0 parents and either fails
+silently or emits broken SVG — CSS rules injected, geometry missing,
+diagrams appear as a blob of unstyled text.
+
+Two options, in order of preference:
+
+1. **Flat layout with anchor-scroll nav.** Skip toggle tabs entirely;
+   wrap each section in `<section id="…">` and use a sticky nav of
+   anchor links. All diagrams stay visible from page load. This is
+   what most long-form `/preview` outputs should do anyway — `cmd+F`
+   works across the whole page, and browser `back` returns to the
+   right section.
+
+2. **Always-visible region.** Put diagrams in a section that's never
+   hidden (the lead area above the tab nav, an executive summary
+   card, etc.). The cheapest fix, but limits where you can place them.
+
+Avoid `<br/>` inside Mermaid node labels — v10 does not reliably
+render HTML line breaks in labels regardless of `htmlLabels`
+configuration. Newlines silently collapse and the label text
+concatenates without spaces. Use `\n` (Mermaid's own newline escape)
+or split content across multiple nodes / edge labels.
+
 ## Conventions to follow
 
 - **One CDN load order**: Tailwind first, Alpine `defer`, Chart.js / Mermaid after. The template already gets this right.
