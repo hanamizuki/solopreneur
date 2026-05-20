@@ -79,14 +79,21 @@ Two writers; both write to the primary file only (fallback is never touched).
 Both helpers preserve sibling keys (atomic read-modify-write via `mktemp` +
 `mv`) and create the file + parent directory if missing.
 
-## Edge case: empty-string values
+## Edge case: null vs false vs empty string
 
-The cascade uses `// empty` to fall through on `null`, missing keys, **and**
-empty strings (`""`). This diverges subtly from the old `has(<key>)`-based
-check — a config that legitimately stores `""` will fall through to the next
-layer instead of returning `""`. In practice path/preference values are never
-empty, so this is acceptable; just don't rely on `""` as a "key is set but
-intentionally blank" sentinel.
+The cascade uses `| values` (jq's `select(. != null)`) to fall through on
+`null` and missing keys, while preserving `false`, `0`, `""`, and empty
+objects/arrays at the layer that owns them. That means a per-repo entry
+storing `false` (e.g. to explicitly disable a feature for that repo) wins
+over the default's truthy value — matching the documented "first non-null
+wins" semantics literally.
+
+Shell-side, the helper returns the stringified value via `jq -r`. An empty
+string value would be shell-empty after capture and would erroneously fall
+through; in practice feature values are objects so this case doesn't
+arise in current config schema. Future bool/string features should be
+stored under non-empty object wrappers (`{ "enabled": false }`) rather
+than as bare scalars to dodge that one ambiguity.
 
 ## Repo identity (`solopreneur_repo_key`)
 
@@ -191,28 +198,28 @@ read_solopreneur_config() {
 
   # Layer 1: primary .repos[<repo-key>].<feature>
   if [ -f "$primary" ]; then
-    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$primary" 2>/dev/null)
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] | values' "$primary" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
     # Layer 2: primary .default.<feature>
-    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$primary" 2>/dev/null)
+    out=$(jq -r --arg fk "$key" '.default[$fk] | values' "$primary" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
 
   # Layers 3 + 4: fallback file, only if different from primary
   if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$fallback" 2>/dev/null)
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] | values' "$fallback" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$fallback" 2>/dev/null)
+    out=$(jq -r --arg fk "$key" '.default[$fk] | values' "$fallback" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
 
   # Layer 5: legacy top-level — primary then fallback
   if [ -f "$primary" ]; then
-    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$primary" 2>/dev/null)
+    out=$(jq -r --arg fk "$key" '.[$fk] | values' "$primary" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
   if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$fallback" 2>/dev/null)
+    out=$(jq -r --arg fk "$key" '.[$fk] | values' "$fallback" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
 }

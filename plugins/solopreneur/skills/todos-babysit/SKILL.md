@@ -73,28 +73,28 @@ read_solopreneur_config() {
 
   # Layer 1: primary .repos[<repo-key>].<feature>
   if [ -f "$primary" ]; then
-    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$primary" 2>/dev/null)
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] | values' "$primary" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
     # Layer 2: primary .default.<feature>
-    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$primary" 2>/dev/null)
+    out=$(jq -r --arg fk "$key" '.default[$fk] | values' "$primary" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
 
   # Layers 3 + 4: fallback file, only if different from primary
   if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$fallback" 2>/dev/null)
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] | values' "$fallback" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$fallback" 2>/dev/null)
+    out=$(jq -r --arg fk "$key" '.default[$fk] | values' "$fallback" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
 
   # Layer 5: legacy top-level — primary then fallback
   if [ -f "$primary" ]; then
-    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$primary" 2>/dev/null)
+    out=$(jq -r --arg fk "$key" '.[$fk] | values' "$primary" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
   if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$fallback" 2>/dev/null)
+    out=$(jq -r --arg fk "$key" '.[$fk] | values' "$fallback" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
 }
