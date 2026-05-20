@@ -19,30 +19,103 @@ Before scanning, resolve the todo directory paths. Define the config helpers fir
 
 ```bash
 # --- solopreneur config helpers (inlined from _shared/config.md) ---
+# Compute the canonical repo identity used as the key under `.repos` in
+# solopreneur.json. Falls back to git toplevel path, then $PWD.
+solopreneur_repo_key() {
+  local url root
+  url=$(git remote get-url origin 2>/dev/null || true)
+  if [ -n "$url" ]; then
+    url="${url#https://}"; url="${url#http://}"; url="${url#git@}"
+    url="${url%.git}"
+    url="${url/://}"   # only replaces first ':' — safe for git@host:owner/repo
+    printf '%s\n' "$url"
+    return
+  fi
+  root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  if [ -n "$root" ]; then
+    printf '%s\n' "$root"
+    return
+  fi
+  printf '%s\n' "$PWD"
+}
+
+# Read a feature subtree from solopreneur.json with the 5-layer cascade:
+# 1. primary .repos[<repo-key>].<feature>
+# 2. primary .default.<feature>
+# 3. fallback .repos[<repo-key>].<feature>
+# 4. fallback .default.<feature>
+# 5. legacy top-level .<feature> (primary then fallback)
+# First non-null wins. Each layer is checked inline (no nested helper
+# function — bash function declarations are global, even nested ones, and
+# would pollute the user's shell namespace).
 read_solopreneur_config() {
   local key="$1"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
   local fallback="$HOME/.claude/solopreneur.json"
-  if [ -f "$primary" ] && jq -e "has(\"$key\")" "$primary" >/dev/null 2>&1; then
-    jq -r ".${key} // empty" "$primary"
-    return
+  local repo_key; repo_key=$(solopreneur_repo_key)
+  local out
+
+  # Layer 1: primary .repos[<repo-key>].<feature>
+  if [ -f "$primary" ]; then
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$primary" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+    # Layer 2: primary .default.<feature>
+    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$primary" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+  fi
+
+  # Layers 3 + 4: fallback file, only if different from primary
+  if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$fallback" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$fallback" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+  fi
+
+  # Layer 5: legacy top-level — primary then fallback
+  if [ -f "$primary" ]; then
+    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$primary" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
   if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    jq -r ".${key} // empty" "$fallback"
+    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$fallback" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
 }
 
+# Write a feature subtree to .default.<key> in the primary file.
+# Sibling keys are preserved (atomic read-modify-write).
+# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","gemini"]}'
 write_solopreneur_config() {
   local key="$1"
   local value_expr="$2"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
-  local tmp
+  local tmp existing
   mkdir -p "$(dirname "$primary")"
   tmp=$(mktemp "${primary}.XXXXXX")
-  local existing
   existing=$(cat "$primary" 2>/dev/null || echo '{}')
   printf '%s\n' "$existing" \
-    | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
+    | jq --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
+        '.default = ((.default // {}) | .[$fk] = $v)' \
+    > "$tmp" || { rm -f "$tmp"; return 1; }
+  mv "$tmp" "$primary"
+}
+
+# Write a feature subtree to .repos[<repo-key>].<key> in the primary file.
+# Sibling repos AND sibling features within the same repo are preserved.
+# Usage: write_solopreneur_repo_config preview '{path:"docs/preview"}'
+write_solopreneur_repo_config() {
+  local key="$1"
+  local value_expr="$2"
+  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local repo_key; repo_key=$(solopreneur_repo_key)
+  local tmp existing
+  mkdir -p "$(dirname "$primary")"
+  tmp=$(mktemp "${primary}.XXXXXX")
+  existing=$(cat "$primary" 2>/dev/null || echo '{}')
+  printf '%s\n' "$existing" \
+    | jq --arg rk "$repo_key" --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
+        '.repos = ((.repos // {}) | .[$rk] = ((.[$rk] // {}) | .[$fk] = $v))' \
     > "$tmp" || { rm -f "$tmp"; return 1; }
   mv "$tmp" "$primary"
 }
@@ -70,16 +143,20 @@ write_solopreneur_config() {
    Which is your backlog directory? (or enter a custom path)
    ```
 
-3. **Save to config** after user confirms:
+3. **Save to config** after user confirms. Discovered paths are
+   repo-relative (`todos/backlog` etc.), so the per-repo write helper
+   anchors them to this repo's entry:
    ```bash
-   write_solopreneur_config todos '{
+   write_solopreneur_repo_config todos '{
      "backlog": "todos/backlog",
      "done": "todos/done",
      "doing": "todos/doing",
      "later": "todos/later"
    }'
    ```
-   Substitute user-confirmed paths into the JSON.
+   Substitute user-confirmed paths into the JSON. Each repo gets its own
+   entry — running this skill in a different repo will not clobber this
+   one's setting.
 
 Use the resolved paths for all subsequent steps. Variables below:
 - `$BACKLOG` — backlog directory (e.g., `todos/backlog`)

@@ -39,30 +39,103 @@ Inline the cascade config helpers (copied verbatim from `_shared/config.md`) at 
 
 ```bash
 # --- solopreneur config helpers (inlined from _shared/config.md) ---
+# Compute the canonical repo identity used as the key under `.repos` in
+# solopreneur.json. Falls back to git toplevel path, then $PWD.
+solopreneur_repo_key() {
+  local url root
+  url=$(git remote get-url origin 2>/dev/null || true)
+  if [ -n "$url" ]; then
+    url="${url#https://}"; url="${url#http://}"; url="${url#git@}"
+    url="${url%.git}"
+    url="${url/://}"   # only replaces first ':' — safe for git@host:owner/repo
+    printf '%s\n' "$url"
+    return
+  fi
+  root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  if [ -n "$root" ]; then
+    printf '%s\n' "$root"
+    return
+  fi
+  printf '%s\n' "$PWD"
+}
+
+# Read a feature subtree from solopreneur.json with the 5-layer cascade:
+# 1. primary .repos[<repo-key>].<feature>
+# 2. primary .default.<feature>
+# 3. fallback .repos[<repo-key>].<feature>
+# 4. fallback .default.<feature>
+# 5. legacy top-level .<feature> (primary then fallback)
+# First non-null wins. Each layer is checked inline (no nested helper
+# function — bash function declarations are global, even nested ones, and
+# would pollute the user's shell namespace).
 read_solopreneur_config() {
   local key="$1"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
   local fallback="$HOME/.claude/solopreneur.json"
-  if [ -f "$primary" ] && jq -e "has(\"$key\")" "$primary" >/dev/null 2>&1; then
-    jq -r ".${key} // empty" "$primary"
-    return
+  local repo_key; repo_key=$(solopreneur_repo_key)
+  local out
+
+  # Layer 1: primary .repos[<repo-key>].<feature>
+  if [ -f "$primary" ]; then
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$primary" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+    # Layer 2: primary .default.<feature>
+    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$primary" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+  fi
+
+  # Layers 3 + 4: fallback file, only if different from primary
+  if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$fallback" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$fallback" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+  fi
+
+  # Layer 5: legacy top-level — primary then fallback
+  if [ -f "$primary" ]; then
+    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$primary" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
   if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    jq -r ".${key} // empty" "$fallback"
+    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$fallback" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
 }
 
+# Write a feature subtree to .default.<key> in the primary file.
+# Sibling keys are preserved (atomic read-modify-write).
+# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","gemini"]}'
 write_solopreneur_config() {
   local key="$1"
   local value_expr="$2"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
-  local tmp
+  local tmp existing
   mkdir -p "$(dirname "$primary")"
   tmp=$(mktemp "${primary}.XXXXXX")
-  local existing
   existing=$(cat "$primary" 2>/dev/null || echo '{}')
   printf '%s\n' "$existing" \
-    | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
+    | jq --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
+        '.default = ((.default // {}) | .[$fk] = $v)' \
+    > "$tmp" || { rm -f "$tmp"; return 1; }
+  mv "$tmp" "$primary"
+}
+
+# Write a feature subtree to .repos[<repo-key>].<key> in the primary file.
+# Sibling repos AND sibling features within the same repo are preserved.
+# Usage: write_solopreneur_repo_config preview '{path:"docs/preview"}'
+write_solopreneur_repo_config() {
+  local key="$1"
+  local value_expr="$2"
+  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local repo_key; repo_key=$(solopreneur_repo_key)
+  local tmp existing
+  mkdir -p "$(dirname "$primary")"
+  tmp=$(mktemp "${primary}.XXXXXX")
+  existing=$(cat "$primary" 2>/dev/null || echo '{}')
+  printf '%s\n' "$existing" \
+    | jq --arg rk "$repo_key" --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
+        '.repos = ((.repos // {}) | .[$rk] = ((.[$rk] // {}) | .[$fk] = $v))' \
     > "$tmp" || { rm -f "$tmp"; return 1; }
   mv "$tmp" "$primary"
 }
@@ -71,25 +144,42 @@ write_solopreneur_config() {
 
 **Config schema** — a top-level `preview` key in `solopreneur.json`:
 
-```json
-{ "preview": { "paths": { "<repo-key>": "<path>" } } }
+```jsonc
+// new layered schema
+{ "repos": { "<repo-key>": { "preview": { "path": "<path>" } } } }
 ```
 
-- `<repo-key>`: `git remote get-url origin` normalized — strip the scheme,
-  any trailing `.git`, and any `git@host:` prefix, yielding
-  `host/owner/repo`. If there is no `origin` remote, use the absolute git
-  toplevel path. If not in a git repo, use `$PWD`.
+- `<repo-key>` is computed by the shared `solopreneur_repo_key` helper
+  inlined above (`host/owner/repo` from the origin URL, or git toplevel
+  path, or `$PWD`).
 - `<path>`: stored **relative to the repo root** when the chosen path is
   inside a git repo; absolute otherwise.
+- Legacy reads: configs written by older versions of this skill kept the
+  per-repo paths at `preview.paths.<repo-key>` (a single shared `preview`
+  subtree). `read_solopreneur_config preview` will still return that older
+  subtree via the legacy fallback layer — handle both shapes when reading
+  (see step 2 below).
 
 **Resolution flow:**
 
-1. **Compute `<repo-key>`** per the rules above.
-2. **Read the stored path**: `read_solopreneur_config preview` and inspect
-   `.paths["<repo-key>"]`. If it is present and non-empty, resolve it
-   (relative → joined onto the git toplevel; absolute → used as-is) and use
-   that path. **Skip the probe and the question entirely** — go straight to
-   the per-proposal dir.
+1. **Compute the repo key**: `REPO_KEY=$(solopreneur_repo_key)`.
+2. **Read the stored path**: try the new shape first (per-repo, single
+   `path`), then fall back to the legacy shape (single `preview` subtree
+   with a `paths` map):
+   ```bash
+   STORED=$(read_solopreneur_config preview)
+   # New shape: when stored under repos[<rk>].preview, the cascade returned
+   # `{ "path": "..." }` directly. Legacy shape returns `{ "paths": {...} }`.
+   if [ -n "$STORED" ]; then
+     PATH_VAL=$(printf '%s' "$STORED" | jq -r '.path // empty')
+     if [ -z "$PATH_VAL" ]; then
+       PATH_VAL=$(printf '%s' "$STORED" | jq -r --arg k "$REPO_KEY" '.paths[$k] // empty')
+     fi
+   fi
+   ```
+   If `PATH_VAL` is non-empty, resolve it (relative → joined onto the git
+   toplevel; absolute → used as-is) and use that path. **Skip the probe and
+   the question entirely** — go straight to the per-proposal dir.
 3. **If absent, probe for a *suggested* path** (this is only a suggestion;
    the user confirms in step 4):
    - `git_root = $(git rev-parse --show-toplevel 2>/dev/null)`
@@ -117,19 +207,15 @@ write_solopreneur_config() {
    - *Question*: "Put the preview in `<suggested-path>`?"
    - Options: `Confirm and remember` / `Use a different path` / `Ask every time (don't remember)`
 5. On **`Confirm and remember`** (or **`Use a different path`** after the user supplies a path):
-   re-read the existing `preview` subtree, set
-   `.paths["<repo-key>"]` to the chosen `<path>` (relative to repo root if
-   inside a git repo, absolute otherwise) **without clobbering other repos'
-   entries**, and persist:
+   persist the chosen path under this repo's entry. The per-repo write
+   helper handles the `repos[<repo-key>].preview` nesting; sibling repos
+   are preserved automatically:
 
    ```bash
-   EXISTING_PREVIEW=$(read_solopreneur_config preview)
-   [ -z "$EXISTING_PREVIEW" ] && EXISTING_PREVIEW='{}'
-   MERGED=$(printf '%s' "$EXISTING_PREVIEW" \
-     | jq --arg k "$REPO_KEY" --arg p "$CHOSEN_PATH" \
-         '.paths = ((.paths // {}) | .[$k] = $p)')
-   write_solopreneur_config preview "$MERGED"
+   write_solopreneur_repo_config preview "$(jq -n --arg p "$CHOSEN_PATH" '{path: $p}')"
    ```
+   `$CHOSEN_PATH` is relative to repo root if inside a git repo, absolute
+   otherwise.
 6. On **`Ask every time (don't remember)`**: do **not** persist; use the suggested path
    for this run only.
 
