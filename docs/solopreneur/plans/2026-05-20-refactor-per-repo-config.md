@@ -2,7 +2,7 @@
 Plan-Branch: refactor/per-repo-config
 -->
 
-## Handoff Context (2026-05-20, branch: refactor/per-repo-config)
+## Final Progress (merged 2026-05-20, branch: refactor/per-repo-config)
 
 ### Problem Background
 
