@@ -1,142 +1,257 @@
 ---
 name: _shared/config
 description: |
-  Shared cascade config helper for solopreneur skills. Defines read_solopreneur_config
-  and write_solopreneur_config shell functions that read from $CLAUDE_CONFIG_DIR/solopreneur.json
-  with fallback to ~/.claude/solopreneur.json.
+  Shared cascade config helper for solopreneur skills. Defines the four shell
+  functions (solopreneur_repo_key, read_solopreneur_config,
+  write_solopreneur_config, write_solopreneur_repo_config) that read from and
+  write to solopreneur.json with per-repo override support.
 
-  This file is NOT a skill — it is a reference document. Skills that need config access
-  must inline these function definitions verbatim at the top of their bash blocks.
+  This file is NOT a skill — it is a reference document. Skills that need
+  config access must inline these function definitions verbatim at the top of
+  their bash blocks.
 ---
 
 # Solopreneur Config Cascade Helper
 
-All solopreneur skills that read or write `solopreneur.json` must use these helpers
-instead of hardcoding `~/.claude/solopreneur.json`. Inline both function definitions
-verbatim at the top of each bash block that touches config.
+All solopreneur skills that read or write `solopreneur.json` must use these
+helpers instead of hardcoding paths or recomputing repo identity. Inline the
+helper block verbatim at the top of each bash section that touches config.
 
-## Why cascade?
+## Schema
 
-Users with multiple Claude Code configs (`CLAUDE_CONFIG_DIR=...`) need per-config
-overrides. The cascade reads the per-config primary first; if the requested key is
-absent, it falls back to `~/.claude/solopreneur.json` as the shared baseline.
-Existing single-config setups see no behavior change — the fallback covers them.
+Solopreneur config has two top-level sections:
 
-## Read helper
-
-Reads a single top-level key from `solopreneur.json` using per-key cascade:
-primary file wins for any key it has; absent keys fall back to `~/.claude`.
-
-```bash
-# Reads a top-level key from solopreneur.json with cascade.
-# Usage: read_solopreneur_config <key>   # e.g. read_solopreneur_config todos
-read_solopreneur_config() {
-  local key="$1"
-  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
-  local fallback="$HOME/.claude/solopreneur.json"
-
-  # Primary exists AND has the key set → use primary
-  if [ -f "$primary" ] && jq -e "has(\"$key\")" "$primary" >/dev/null 2>&1; then
-    jq -r ".${key} // empty" "$primary"
-    return
-  fi
-  # Otherwise fall back to ~/.claude
-  if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    jq -r ".${key} // empty" "$fallback"
-  fi
+```jsonc
+{
+  "default": {
+    // settings that apply to every repo lacking an override
+    "greenlight": { "fallback_order": ["codex-bot", "gemini"] },
+    "plans":      { "dir": "docs/plans" }
+  },
+  "repos": {
+    // per-repo overrides, keyed by normalized repo identity
+    "github.com/owner/repo-a": {
+      "todos": { "backlog": "todos/backlog", "doing": "todos/doing", ... }
+    },
+    "github.com/owner/repo-b": {
+      "plans": { "dir": "docs/proposals" }
+    }
+  }
 }
 ```
 
-**Key semantics:**
+A repo key (`github.com/owner/repo` style) is computed from the working repo's
+`origin` remote — see `solopreneur_repo_key` below.
 
-- Cascade is **per-key**, not per-file. A primary file that only sets `.greenlight`
-  still falls back to `~/.claude` for `.todos`. Users override exactly what they want.
-- No deep merge. Whichever file wins for a key returns its full subtree as-is.
-- `CLAUDE_CONFIG_DIR` is inherited from the parent session's environment (same
-  mechanism as `rebuild-skill-index/SKILL.md:30`). The `:-$HOME/.claude` fallback
-  keeps the helper safe if the variable is unset.
+## Lookup order (read)
 
-## Write helper
+`read_solopreneur_config <feature>` walks five layers, first non-null wins.
+Each layer returns the **whole subtree** for `<feature>` (no merging across
+layers):
 
-Writes a top-level key to the primary config only. Re-reads before merging so
-concurrent sessions writing different keys don't clobber each other.
+| # | File                                                  | Path                                |
+|---|-------------------------------------------------------|-------------------------------------|
+| 1 | primary (`$CLAUDE_CONFIG_DIR/solopreneur.json`)       | `.repos[<repo-key>].<feature>`      |
+| 2 | primary                                               | `.default.<feature>`                |
+| 3 | fallback (`$HOME/.claude/solopreneur.json`) if differs| `.repos[<repo-key>].<feature>`      |
+| 4 | fallback                                              | `.default.<feature>`                |
+| 5 | primary, then fallback (legacy fallback)              | `.<feature>` at top level           |
 
-```bash
-# Writes a top-level key to the primary solopreneur.json.
-# Usage: write_solopreneur_config <key> <jq_expression_producing_value>
-# Example: write_solopreneur_config todos '{backlog:"todos/backlog",doing:"todos/doing"}'
-write_solopreneur_config() {
-  local key="$1"
-  local value_expr="$2"
-  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
-  local tmp
+Layer 5 keeps **pre-refactor configs working unchanged** — users do not need
+to migrate their JSON. New writes always use the new shape, but reads honor
+the old shape if that's all the file has.
 
-  mkdir -p "$(dirname "$primary")"
-  tmp=$(mktemp "${primary}.XXXXXX")
+`CLAUDE_CONFIG_DIR` is inherited from the parent session (see
+`rebuild-skill-index/SKILL.md:30`); `:-$HOME/.claude` makes the helper safe
+when the variable is unset.
 
-  # Re-read primary at write time (defends against races between concurrent
-  # sessions writing different keys). jq -n evaluates value_expr with no input,
-  # which correctly handles object literals, strings, and arrays alike.
-  local existing
-  existing=$(cat "$primary" 2>/dev/null || echo '{}')
-  printf '%s\n' "$existing" \
-    | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
-    > "$tmp" || { rm -f "$tmp"; return 1; }
+## Write API
 
-  # Atomic publish: rename is atomic on POSIX filesystems.
-  mv "$tmp" "$primary"
+Two writers; both write to the primary file only (fallback is never touched).
+
+- **`write_solopreneur_config <key> <jq_expr>`** — writes to
+  `.default.<key>` in primary. Use for user-global preferences (e.g.
+  `greenlight.fallback_order`).
+- **`write_solopreneur_repo_config <key> <jq_expr>`** — writes to
+  `.repos[<repo-key>].<key>` in primary. Use for repo-specific state (e.g.
+  `preview.path`, `todos`).
+
+Both helpers preserve sibling keys (atomic read-modify-write via `mktemp` +
+`mv`) and create the file + parent directory if missing.
+
+## Edge case: empty-string values
+
+The cascade uses `// empty` to fall through on `null`, missing keys, **and**
+empty strings (`""`). This diverges subtly from the old `has(<key>)`-based
+check — a config that legitimately stores `""` will fall through to the next
+layer instead of returning `""`. In practice path/preference values are never
+empty, so this is acceptable; just don't rely on `""` as a "key is set but
+intentionally blank" sentinel.
+
+## Repo identity (`solopreneur_repo_key`)
+
+The repo key is derived from the working directory at call time:
+
+1. `git remote get-url origin` → strip scheme (`https://`, `http://`),
+   strip trailing `.git`, strip `git@host:` prefix → normalized
+   `host/owner/repo`.
+2. No `origin` remote → absolute path of `git rev-parse --show-toplevel`.
+3. Not in a git repo → `$PWD`.
+
+The bash parameter expansion `${var/://}` only replaces the *first* `:` — so
+inputs like `git@github.com:owner/repo` correctly produce
+`github.com/owner/repo` even if the path contains additional colons.
+
+## Migration
+
+The legacy fallback layer means **no automatic migration is needed**. Old
+configs like:
+
+```jsonc
+{
+  "greenlight": { "fallback_order": ["codex-bot", "gemini"] },
+  "todos":      { "backlog": "/abs/path/backlog", ... },
+  "preview":    { "paths": { "github.com/owner/repo": "docs/preview" } }
 }
 ```
 
-**Key semantics:**
+…keep working as-is via layer 5.
 
-- Always writes to primary (`$CLAUDE_CONFIG_DIR/solopreneur.json`). The shared
-  `~/.claude/solopreneur.json` baseline is **never modified by writes** — it
-  remains the fallback for all keys the primary does not override.
-- `jq -n "$value_expr"` evaluates an arbitrary jq expression with no input,
-  which supports object literals (`{a:1,b:2}`), strings, arrays, etc.
-- Atomic `mv` means concurrent readers never see a half-written file.
-- Creates the primary file (and parent directory) if it does not exist yet.
+If you want to move into the new shape (e.g. so a per-repo override can sit
+above a default), hand-edit the JSON like this:
 
-## Usage in skills
+```jsonc
+{
+  "default": {
+    "greenlight": { "fallback_order": ["codex-bot", "gemini"] }
+  },
+  "repos": {
+    "github.com/owner/mojo-apps":  { "todos":  { "backlog": "todos/backlog", ... } },
+    "github.com/owner/some-repo":  { "preview": { "path": "docs/preview" } }
+  }
+}
+```
 
-Skills are LLM-interpreted markdown — there is no runtime `source` or `import`
-mechanism. Each skill that reads or writes config must copy both function bodies
-verbatim into a bash block near the top of its config-access section, like this:
+The `preview` skill's old `preview.paths.<repo-key>` subtree migrates to
+`repos[<repo-key>].preview.path` (note: singular `path`, plus the value is
+the path string directly, not wrapped in another object).
 
-Skills that only read config may inline only `read_solopreneur_config` and omit `write_solopreneur_config` — the write helper is only needed by skills that persist discovered config.
+## Helper block (copy verbatim into skills)
 
 ```bash
 # --- solopreneur config helpers (inlined from _shared/config.md) ---
+# Compute the canonical repo identity used as the key under `.repos` in
+# solopreneur.json. Falls back to git toplevel path, then $PWD.
+solopreneur_repo_key() {
+  local url root
+  url=$(git remote get-url origin 2>/dev/null || true)
+  if [ -n "$url" ]; then
+    url="${url#https://}"; url="${url#http://}"; url="${url#git@}"
+    url="${url%.git}"
+    url="${url/://}"   # only replaces first ':' — safe for git@host:owner/repo
+    printf '%s\n' "$url"
+    return
+  fi
+  root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  if [ -n "$root" ]; then
+    printf '%s\n' "$root"
+    return
+  fi
+  printf '%s\n' "$PWD"
+}
+
+# Read a feature subtree from solopreneur.json with the 5-layer cascade:
+# 1. primary .repos[<repo-key>].<feature>
+# 2. primary .default.<feature>
+# 3. fallback .repos[<repo-key>].<feature>
+# 4. fallback .default.<feature>
+# 5. legacy top-level .<feature> (primary then fallback)
+# First non-null wins. Each layer is checked inline (no nested helper
+# function — bash function declarations are global, even nested ones, and
+# would pollute the user's shell namespace).
 read_solopreneur_config() {
   local key="$1"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
   local fallback="$HOME/.claude/solopreneur.json"
-  if [ -f "$primary" ] && jq -e "has(\"$key\")" "$primary" >/dev/null 2>&1; then
-    jq -r ".${key} // empty" "$primary"
-    return
+  local repo_key; repo_key=$(solopreneur_repo_key)
+  local out
+
+  # Layer 1: primary .repos[<repo-key>].<feature>
+  if [ -f "$primary" ]; then
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$primary" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+    # Layer 2: primary .default.<feature>
+    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$primary" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+  fi
+
+  # Layers 3 + 4: fallback file, only if different from primary
+  if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] // empty' "$fallback" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+    out=$(jq -r --arg fk "$key" '.default[$fk] // empty' "$fallback" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
+  fi
+
+  # Layer 5: legacy top-level — primary then fallback
+  if [ -f "$primary" ]; then
+    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$primary" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
   if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    jq -r ".${key} // empty" "$fallback"
+    out=$(jq -r --arg fk "$key" '.[$fk] // empty' "$fallback" 2>/dev/null)
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
   fi
 }
 
+# Write a feature subtree to .default.<key> in the primary file.
+# Sibling keys are preserved (atomic read-modify-write).
+# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","gemini"]}'
 write_solopreneur_config() {
   local key="$1"
   local value_expr="$2"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
-  local tmp
+  local tmp existing
   mkdir -p "$(dirname "$primary")"
   tmp=$(mktemp "${primary}.XXXXXX")
-  local existing
   existing=$(cat "$primary" 2>/dev/null || echo '{}')
   printf '%s\n' "$existing" \
-    | jq --argjson v "$(jq -n "$value_expr")" ".${key} = \$v" \
+    | jq --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
+        '.default = ((.default // {}) | .[$fk] = $v)' \
+    > "$tmp" || { rm -f "$tmp"; return 1; }
+  mv "$tmp" "$primary"
+}
+
+# Write a feature subtree to .repos[<repo-key>].<key> in the primary file.
+# Sibling repos AND sibling features within the same repo are preserved.
+# Usage: write_solopreneur_repo_config preview '{path:"docs/preview"}'
+write_solopreneur_repo_config() {
+  local key="$1"
+  local value_expr="$2"
+  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local repo_key; repo_key=$(solopreneur_repo_key)
+  local tmp existing
+  mkdir -p "$(dirname "$primary")"
+  tmp=$(mktemp "${primary}.XXXXXX")
+  existing=$(cat "$primary" 2>/dev/null || echo '{}')
+  printf '%s\n' "$existing" \
+    | jq --arg rk "$repo_key" --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
+        '.repos = ((.repos // {}) | .[$rk] = ((.[$rk] // {}) | .[$fk] = $v))' \
     > "$tmp" || { rm -f "$tmp"; return 1; }
   mv "$tmp" "$primary"
 }
 # --- end solopreneur config helpers ---
 ```
 
-When the helper changes, all consuming skills must be re-synced manually from
-this file (grep for `# --- solopreneur config helpers` to find all sites).
+Skills that only read may omit the two write helpers and `solopreneur_repo_key`
+is still required because `read_solopreneur_config` calls it. The cleanest
+rule is: inline the **whole block** verbatim. The helper is small and
+duplication keeps each skill self-contained at install time (the marketplace
+ships each skill as a closed unit; there is no runtime `source` mechanism).
+
+When this file changes, all consuming skills must re-sync. Find the call
+sites with:
+
+```bash
+grep -rl "# --- solopreneur config helpers" plugins/solopreneur/skills/
+```
