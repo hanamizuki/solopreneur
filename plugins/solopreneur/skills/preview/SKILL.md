@@ -237,9 +237,10 @@ The final proposal path is `<parent>/<YYYY-MM-DD>-<short-slug>/`. Each proposal 
 **If the path lands inside a repo:**
 
 1. The proposal HTML enters git history alongside the user's work — useful for review trail and cross-machine access. Good. Just commit it as a normal repo doc, no special handling.
-2. `comment-overlay.js` is copied from this skill into every proposal dir. It would be wasteful to commit identical copies of it into every proposal and let stale versions linger. Append this line to the repo's `.gitignore` if not already there:
+2. `comment-overlay.js` and `comment-overlay.css` are copied from this skill into every proposal dir. It would be wasteful to commit identical copies of them into every proposal and let stale versions linger. Append these lines to the repo's `.gitignore` if not already there:
    ```
    **/comment-overlay.js
+   **/comment-overlay.css
    ```
    Tell the user you did this (one short line) so they don't see a phantom diff.
 
@@ -277,7 +278,7 @@ and only interrupts when the target genuinely isn't determinable.
 
 Start from `assets/template.html` (copy it in, replace the `{{TITLE}}` / `{{DATE}}` / `{{LEAD_PARAGRAPH}}` / `{{AUTHOR_OR_CONTEXT}}` placeholders, then build the body).
 
-**Also copy `assets/comment-overlay.js` into the same directory** — the template references it as `./comment-overlay.js`. Without this file the page works but has no comment functionality, defeating the point.
+**Also copy `assets/comment-overlay.js` AND `assets/comment-overlay.css` into the same directory** — the template references them as `./comment-overlay.js` and `./comment-overlay.css`. Without the JS file the page works but has no comment functionality. Without the CSS file the overlay injects elements (margin cards, edit/delete buttons, floating export cluster) but they render unstyled.
 
 The template already loads Tailwind + Alpine.js. To use Chart.js or Mermaid, uncomment the relevant `<script>` tag at the top of `template.html`.
 
@@ -436,4 +437,5 @@ read the clean result. Yours is to act on each `> quote` + comment pair.
 - `scripts/deploy.sh` — deploy a directory, print URL (runs preflight first)
 - `assets/template.html` — base template with typography + CDN libs
 - `assets/comment-overlay.js` — comment functionality + the diff/clean revision toggle (must be copied alongside `index.html`)
+- `assets/comment-overlay.css` — comment overlay visual styles (must be copied alongside `index.html`)
 - `references/libs.md` — Alpine / Chart.js / Mermaid recipes — **read before writing interactive UI**

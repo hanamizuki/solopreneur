@@ -1,0 +1,352 @@
+/* --- GitHub-diff-style revision markup ---
+   On a post-feedback revision the agent wraps removed text in <del>
+   (kept in place, struck through) and added/changed text in <ins>
+   (highlighted). Semantic tags, so they render meaningfully even
+   without CSS and are screen-reader friendly. Rules are intentionally
+   unscoped (not under .doc) so they apply wherever the agent injects
+   diff markup — inside paragraphs, tables, lists, or callouts. */
+del {
+  background: #ffebe9;
+  color: #82071e;
+  text-decoration: line-through;
+  text-decoration-color: rgba(130, 7, 30, .55);
+  border-radius: 3px;
+  padding: 0 .15em;
+}
+ins {
+  background: #e6ffec;
+  color: inherit;
+  text-decoration: none; /* background is the signal — keep prose readable */
+  border-radius: 3px;
+  padding: 0 .15em;
+}
+
+/* Clean view gate. Toggled by the comment overlay's Clean / Show edits
+   button. When body has .diff-clean: removed text is hidden entirely
+   and added text reads as ordinary prose (no highlight). The page
+   ships WITHOUT this class, so the diff is visible on load — the
+   reader sees how their feedback was applied first, like a GitHub PR
+   opening on the diff. */
+body.diff-clean del { display: none; }
+body.diff-clean ins { background: none; color: inherit; padding: 0; }
+
+/* --- Comment markers (Google Docs-style) ---
+   Injected by comment-overlay.js. A commented span gets
+   <mark class="cmt-mark">. Subtle amber fill so it reads as
+   "annotated" without shouting; the bottom border keeps the edge
+   visible against the near-white page background (color alone is a
+   weak signal there). .cmt-flash is the click-pairing pulse. These
+   rules are unscoped (not under .doc) so they apply wherever the
+   overlay wraps text — paragraphs, tables, lists, callouts, and
+   inside <del>/<ins> diff markup. */
+mark.cmt-mark {
+  background: #fef3c7;
+  color: inherit;
+  border-bottom: 1px solid #f0c869;
+  border-radius: 2px;
+  padding: 0 .05em;
+  cursor: pointer;
+}
+mark.cmt-mark:hover,
+mark.cmt-mark:focus-visible {
+  background: #fde68a;
+  outline: 2px solid #f0c869;
+  outline-offset: 1px;
+}
+@keyframes cmtFlash {
+  0%   { background: #fde68a; box-shadow: 0 0 0 4px rgba(240,200,105,.45); }
+  100% { background: #fef3c7; box-shadow: 0 0 0 0 rgba(240,200,105,0); }
+}
+.cmt-flash { animation: cmtFlash .7s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .cmt-flash { animation: none; background: #fde68a; }
+}
+
+/* Diff/clean coexistence: a marker inside removed text stays hidden
+   with its <del> in clean view; a marker inside <ins> reads as plain
+   prose in clean view but keeps its own amber signal. Markers never
+   restructure the diff tree (overlay wraps per text node). */
+body.diff-clean del mark.cmt-mark { display: none; }
+
+/* --- Desktop margin annotations (>=1024px) ---
+   No docked panel chrome. A transparent margin LAYER is appended as a
+   direct child of <body> by comment-overlay.js. It is
+   position:absolute; top:0 and starts at height:0; its cards (also
+   position:absolute) carry a `top` equal to their marker's Y in
+   DOCUMENT coordinates. layoutCards() then sets the layer's height to
+   the lowest laid-out card's bottom, so a card placed past the
+   natural end of main.doc still extends the page's scroll height and
+   stays reachable. Layout is idempotent (same markers -> same tops ->
+   same height) so the ResizeObserver refire this height write may
+   trigger converges immediately (its lastH dedupe halts it). The
+   layer must have NO positioned/transformed/will-change/contain
+   ancestor (body has margin:0 and is the offset parent), so a child's
+   `top` maps 1:1 to document Y. See the matching invariant comment in
+   the JS. */
+.cmt-margin-layer {
+  position: absolute;
+  top: 0;
+  /* Anchor to the right gutter. body has margin:0 so an absolute
+     `right` resolves against the initial containing block = the
+     reserved gutter edge. Without an explicit horizontal anchor
+     `left` resolves to static (~x:0) and cards render OVER the
+     prose while the reserved right gutter sits empty. 300+16 < the
+     332px reserve (body.cmt-has-margin main.doc { margin-right }). */
+  right: 16px;
+  left: auto;
+  width: 300px;
+  height: 0;            /* JS raises this to the lowest card's bottom so overflowed cards stay reachable */
+  z-index: 9997;
+  display: none;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+body.cmt-has-margin .cmt-margin-layer { display: block; }
+/* Reserve the right gutter ONLY when at least one comment exists, so a
+   zero-comment first draft renders full-width. margin (not padding)
+   keeps the page background clean; re-center within remaining space. */
+body.cmt-has-margin main.doc {
+  margin-right: 332px;
+  margin-left: auto;
+}
+.cmt-empty {
+  color: #9ca3af;
+  font-size: 13px;
+  padding: 18px 6px;
+  text-align: center;
+}
+/* Base card: SHARED visual styling only. Rendered on TWO surfaces via
+   the same buildCard() — the desktop margin layer AND the mobile
+   bottom sheet. Positioning/geometry must NOT live here or the sheet
+   would inherit it (every sheet card would stack at one spot and the
+   sheet body would collapse). Layout geometry is scoped per surface
+   below. */
+.cmt-card {
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 13px;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  transition: border-color .15s, box-shadow .15s;
+}
+/* DESKTOP margin layer ONLY: each card is absolutely positioned within
+   the margin layer; the JS layout pass sets its `top`. Cards scroll
+   with the page naturally (absolute in document flow, not fixed).
+   Scoped to .cmt-margin-layer so the mobile sheet never inherits it —
+   the JS layout engine only ever queries marginLayer.querySelectorAll
+   (".cmt-card") and writes `top` on those, so this keeps desktop
+   pixel-identical. */
+.cmt-margin-layer .cmt-card {
+  position: absolute;
+  left: 0;
+  width: 300px;
+}
+/* MOBILE bottom sheet: cards render in normal flow so they stack
+   vertically and grow .cmt-sheet-body (which scrolls). Explicit reset
+   in case any future rule reintroduces absolute on the base card. */
+.cmt-sheet-body .cmt-card {
+  position: static;
+  left: auto;
+  width: auto;
+}
+.cmt-card:hover { border-color: #d1d5db; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.cmt-card.cmt-flash { animation: cmtFlash .7s ease-out; }
+.cmt-card-quote {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+  border-left: 2px solid #f0c869;
+  padding-left: 8px;
+  margin-bottom: 8px;
+  line-height: 1.45;
+}
+.cmt-card-time {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+.cmt-card-body {
+  font-size: 13.5px;
+  color: #111827;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cmt-card.cmt-detached { opacity: .72; cursor: default; }
+.cmt-card-detached {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: #b45309;
+  background: #fffbeb;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.cmt-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+.cmt-act {
+  min-width: 44px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #4b5563;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.cmt-act:hover { background: #f3f4f6; }
+.cmt-act-del { color: #b91c1c; border-color: #fca5a5; }
+.cmt-edit-ta {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 70px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+.cmt-edit-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* Tool buttons (export + diff toggle) share one look. They always live
+   in the floating bottom-right cluster now (desktop + mobile) since the
+   desktop panel footer is gone. */
+.cmt-tool-btn {
+  padding: 9px 14px;
+  background: #1f2937;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font: 500 13px ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.14);
+}
+.cmt-tool-btn:hover { background: #111827; }
+
+/* Floating cluster: one tidy stack bottom-right (desktop + mobile),
+   not scattered fixed buttons fighting for the same corner. Shown on
+   every viewport now that the desktop panel footer is gone. */
+.cmt-float-cluster {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 9998;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+/* Mobile-only fixed "+ comment" trigger: bottom center, above the
+   float cluster. NOT anchored to the selection (the OS selection
+   callout + handles would fight it). Hidden until a valid selection
+   inside the doc exists. */
+.cmt-add-fixed {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 84px;
+  z-index: 9999;
+  display: none;
+  padding: 10px 20px;
+  background: #1f2937;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font: 600 14px ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.28);
+}
+body.cmt-add-visible .cmt-add-fixed { display: block; }
+.cmt-fab {
+  padding: 10px 16px;
+  background: #1f2937;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font: 500 14px ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,.2);
+}
+
+/* Mobile bottom sheet — reuses the modal vocabulary (radius, shadow,
+   ink). Scrim + body-scroll lock handled in JS. */
+.cmt-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 10005;
+}
+.cmt-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10006;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.2);
+  max-height: 80dvh;
+  display: flex;
+  flex-direction: column;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  animation: cmtSheetUp .24s cubic-bezier(.22,1,.36,1);
+}
+@keyframes cmtSheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmt-sheet { animation: none; }
+}
+.cmt-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d1d5db;
+  margin: 8px auto 4px;
+}
+.cmt-sheet-head {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 12px 0;
+}
+.cmt-sheet-close {
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  color: #6b7280;
+  cursor: pointer;
+}
+.cmt-sheet-body {
+  overflow-y: auto;
+  padding: 4px 16px 24px;
+}
+
+/* Breakpoint: below 1024px there is no margin layer (cards would not
+   fit beside the prose); the bottom-sheet viewing path and the fixed
+   "+ comment" creation trigger take over. The float cluster stays. */
+@media (max-width: 1023px) {
+  .cmt-margin-layer { display: none !important; }
+  body.cmt-has-margin main.doc { margin-right: auto; }
+}
+/* The fixed "+ comment" trigger is a mobile-only affordance. Gate it
+   so a mobile->desktop resize cannot leave it stranded on desktop
+   even if body.cmt-add-visible was not cleared in time (the JS resize
+   branch also clears the class — belt and suspenders). */
+@media (min-width: 1024px) {
+  .cmt-add-fixed { display: none !important; }
+}
