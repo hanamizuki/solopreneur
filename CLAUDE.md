@@ -16,6 +16,30 @@ Each plugin's directory name matches its marketplace `name` 1:1. The
 `Depends on` column shows the marketplace `name` declared in
 `plugins/<dir>/.claude-plugin/plugin.json` `dependencies`.
 
+## Config layering
+
+The `solopreneur` plugin's user config (`solopreneur.json`) supports
+per-repo overrides over a shared default. Skills read via
+`read_solopreneur_config <feature>` which walks five layers, first
+non-null wins:
+
+1. primary `repos[<repo-key>].<feature>` — per-repo override
+2. primary `default.<feature>` — user-global default
+3. fallback `repos[<repo-key>].<feature>` — shared per-repo (rare)
+4. fallback `default.<feature>` — shared default
+5. legacy top-level `<feature>` — old flat-schema compatibility
+
+`<repo-key>` is normalized from `git remote get-url origin`
+(`host/owner/repo`); the helper falls back to the git toplevel path or
+`$PWD` when no origin exists. Writes go through one of two helpers —
+`write_solopreneur_config` lands at `default.<key>`,
+`write_solopreneur_repo_config` lands at `repos[<repo-key>].<key>`.
+
+Existing configs on the old flat schema (`{ "todos": {...} }` at the
+top level) keep working via layer 5; migration is optional. See
+`plugins/solopreneur/skills/_shared/config.md` for the full helper
+definitions and a sample migrated config.
+
 ## Versioning & release
 
 **Regular commits don't bump versions.** Land work on `main` (direct or via
