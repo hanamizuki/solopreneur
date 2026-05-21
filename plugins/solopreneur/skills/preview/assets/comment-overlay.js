@@ -74,6 +74,28 @@
     renderPanel();
   };
 
+  // Tell password managers (1Password / LastPass / Bitwarden /
+  // browser-native) to skip any <textarea> these are applied to. Without
+  // these, autofill UI can steal focus from the visible textarea on some
+  // setups, which silently kills the manual ⌘C fallback. Reused on both
+  // the export modal textarea and the execCommand("copy") temp textarea
+  // so the two surfaces stay in sync.
+  //
+  // `data-form-type="other"` is Dashlane's semantic-form-annotation
+  // signal that this is a generic field, not a login/payment form.
+  // (Safari does NOT use data-form-type — its heuristics key off the
+  // `autocomplete` token set, which the prior entries already cover.)
+  const PM_IGNORE_ATTRS = {
+    autocomplete: "off",
+    autocorrect: "off",
+    autocapitalize: "off",
+    spellcheck: "false",
+    "data-1p-ignore": "true",
+    "data-lpignore": "true",
+    "data-bwignore": "true",
+    "data-form-type": "other",
+  };
+
   // small DOM helper
   function el(tag, styleStr, opts) {
     const node = document.createElement(tag);
@@ -1155,6 +1177,14 @@
   exportBtn.append(exportLabel, badge, exportTail);
 
   exportBtn.addEventListener("click", () => {
+    // Defense in depth: even though syncDesktopState() sets
+    // `exportBtn.disabled = true` when comments.length === 0 (which
+    // blocks click, Enter/Space, and JS-dispatched click at the
+    // browser level), keep an early-return guard here in case any
+    // future code path calls .click() programmatically before
+    // syncDesktopState() has run, or temporarily flips `.disabled`
+    // off without checking state.
+    if (!comments.length) return;
     showExportModal(buildMarkdown());
   });
 
@@ -1291,7 +1321,8 @@
 
     const ta = el(
       "textarea",
-      "width:100%;height:320px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;background:#fff;color:#111827"
+      "width:100%;height:320px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;background:#fff;color:#111827",
+      { attrs: { ...PM_IGNORE_ATTRS } }
     );
     ta.value = md;
 
@@ -1336,21 +1367,64 @@
     closeX.addEventListener("click", close);
     closeBtn.addEventListener("click", close);
 
+    // Three-tier copy chain. The async Clipboard API is the default;
+    // it requires a secure context (https) and an active permission, and
+    // password-manager autofill can intercept focus before the user
+    // hits ⌘C, so we keep a synchronous execCommand fallback in the
+    // middle. Manual ⌘C stays as the last-ditch path.
+    function execCopyFallback(text) {
+      // Offscreen-but-selectable. display:none / visibility:hidden
+      // block execCommand("copy") in some browsers, so use a 1px
+      // fixed-position hidden element instead. tabindex="-1" keeps the
+      // temp node out of the tab order (AT hygiene — it's invisible to
+      // sighted users, should be invisible to keyboard nav too).
+      const tmp = el(
+        "textarea",
+        "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1",
+        { attrs: { ...PM_IGNORE_ATTRS, readonly: "", tabindex: "-1" } }
+      );
+      tmp.value = text;
+      document.body.appendChild(tmp);
+      tmp.focus();
+      tmp.select();
+      tmp.setSelectionRange(0, text.length);
+      let ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch (_) {
+        ok = false;
+      }
+      document.body.removeChild(tmp);
+      return ok;
+    }
+    function showCopied() {
+      copyBtn.textContent = "Copied ✓";
+      copyBtn.style.background = "#10b981";
+      setTimeout(() => {
+        copyBtn.textContent = "Copy";
+        copyBtn.style.background = "#1f2937";
+      }, 1500);
+    }
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(ta.value);
-        copyBtn.textContent = "Copied ✓";
-        copyBtn.style.background = "#10b981";
-        setTimeout(() => {
-          copyBtn.textContent = "Copy";
-          copyBtn.style.background = "#1f2937";
-        }, 1500);
+        showCopied();
+        return;
       } catch (_) {
+        // fall through to execCommand
+      }
+      if (execCopyFallback(ta.value)) {
+        showCopied();
+        // Re-select the visible textarea so the user can re-press ⌘C
+        // to verify the copy landed (the temp textarea stole focus).
         ta.focus();
         ta.select();
-        copyBtn.textContent = "Press ⌘C";
-        setTimeout(() => (copyBtn.textContent = "Copy"), 1800);
+        return;
       }
+      ta.focus();
+      ta.select();
+      copyBtn.textContent = "Press ⌘C";
+      setTimeout(() => (copyBtn.textContent = "Copy"), 1800);
     });
 
     clearBtn.addEventListener("click", () => {
@@ -1445,7 +1519,26 @@
     document.body.classList.toggle("cmt-has-margin", desktop && hasComments);
     if (marginLayer) marginLayer.style.display = desktop ? "" : "none";
     fab.style.display = desktop ? "none" : (hasComments ? "" : "none");
-    exportBtn.style.display = hasComments ? "" : "none";
+    // Always show the export button — even with zero comments the user
+    // needs to see the affordance exists. Each /preview deploy gets a
+    // fresh Vercel subdomain (= fresh origin = empty localStorage), so
+    // gating on hasComments hid the button on every just-deployed URL
+    // and made users think the feature was broken. The badge `(0)`
+    // already signals "nothing to export"; we dim the button to ~0.55
+    // opacity so it reads as inactive but discoverable, and set the
+    // native `disabled` property so empty-state clicks don't open the
+    // export modal showing "Export 0 comments" with an empty textarea.
+    // `disabled` is the canonical signal: it blocks ALL activation
+    // paths (mouse click, keyboard Enter/Space, JS-dispatched click),
+    // removes the button from focus order, and announces correctly to
+    // assistive tech. We keep `aria-disabled` in sync as a belt-and-
+    // suspenders signal for AT, but drop the previous
+    // `pointer-events: none` override since `disabled` already
+    // suppresses pointer activation (and pointer-events alone failed
+    // to block keyboard activation — the bug this commit fixes).
+    exportBtn.style.opacity = hasComments ? "1" : "0.55";
+    exportBtn.disabled = !hasComments;
+    exportBtn.setAttribute("aria-disabled", hasComments ? "false" : "true");
     placeToolButtons();
     updateDiffBtn();
   }
