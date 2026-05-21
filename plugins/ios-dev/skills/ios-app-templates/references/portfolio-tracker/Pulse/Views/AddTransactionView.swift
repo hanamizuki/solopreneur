@@ -46,12 +46,18 @@ struct AddTransactionView: View {
     }
 
     private var canSave: Bool {
-        !ticker.isEmpty && Decimal(string: quantityText) != nil
+        // Match the validation in `save()`: trimmed ticker must be
+        // non-empty AND quantity must parse AND be strictly > 0
+        // (buy-only MVP — a 0-or-negative buy is meaningless and would
+        // produce nonsense PnL downstream).
+        guard let qty = Decimal(string: quantityText), qty > 0 else { return false }
+        let trimmedTicker = ticker.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmedTicker.isEmpty
     }
 
     @MainActor
     private func save() async {
-        guard let qty = Decimal(string: quantityText) else { return }
+        guard let qty = Decimal(string: quantityText), qty > 0 else { return }
         // Single source of truth for ticker normalization — all clients
         // and the Transaction model assume uppercase, so canonicalize
         // once at the form boundary.

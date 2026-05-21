@@ -4,10 +4,15 @@ import Charts
 struct AllocationPieChart: View {
     let positions: [Position]
 
-    private func color(for ticker: String, index: Int) -> Color {
-        // Stable palette per ticker; reuses 3-color rotation if >3 holdings.
+    private func color(for ticker: String) -> Color {
+        // Stable palette per ticker — same symbol always lands on the
+        // same color regardless of sort order. `String.hashValue` is
+        // process-randomized in Swift 5+, so sum the UTF-8 bytes
+        // ourselves for a deterministic index.
         let palette: [Color] = [.orange, .blue, .purple, .mint, .pink]
-        return palette[index % palette.count]
+        let normalized = ticker.uppercased()
+        let sum = normalized.utf8.reduce(0) { $0 &+ Int($1) }
+        return palette[abs(sum) % palette.count]
     }
 
     var body: some View {
@@ -15,22 +20,22 @@ struct AllocationPieChart: View {
         let totalDouble = NSDecimalNumber(decimal: totalValue).doubleValue
 
         HStack(spacing: 14) {
-            Chart(Array(positions.enumerated()), id: \.element.id) { idx, p in
+            Chart(positions, id: \.id) { p in
                 SectorMark(
                     angle: .value("Value", NSDecimalNumber(decimal: p.currentValue).doubleValue),
                     innerRadius: .ratio(0.55),
                     angularInset: 1.5
                 )
-                .foregroundStyle(color(for: p.ticker, index: idx))
+                .foregroundStyle(color(for: p.ticker))
             }
             .frame(width: 80, height: 80)
             .chartLegend(.hidden)
 
             VStack(spacing: 6) {
-                ForEach(Array(positions.enumerated()), id: \.element.id) { idx, p in
+                ForEach(positions, id: \.id) { p in
                     HStack {
                         Circle()
-                            .fill(color(for: p.ticker, index: idx))
+                            .fill(color(for: p.ticker))
                             .frame(width: 7, height: 7)
                         Text(p.ticker).foregroundStyle(.gray)
                         Spacer()

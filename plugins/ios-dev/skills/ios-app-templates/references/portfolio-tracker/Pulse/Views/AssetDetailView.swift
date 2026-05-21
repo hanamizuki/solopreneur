@@ -10,8 +10,11 @@ struct AssetDetailView: View {
     @State private var aiState: AICommentaryCard.State = .loading
 
     private var transactions: [Transaction] {
+        // Match Position's composite identity (ticker + assetType) — the
+        // same symbol like "X" can exist on both Crypto and Stock and
+        // those buys must NOT bleed into each other's transaction list.
         allTransactions
-            .filter { $0.ticker == position.ticker }
+            .filter { $0.ticker == position.ticker && $0.assetType == position.assetType }
             .sorted(by: { $0.date < $1.date })
     }
 
@@ -109,7 +112,9 @@ struct AssetDetailView: View {
     @MainActor
     private func load(force: Bool = false) async {
         let dayKey = Calendar.todayKey()
-        let cacheKey = "\(position.ticker)|\(dayKey)"
+        // Composite cache key — see Position.swift for why ticker alone
+        // collides between crypto and stock entries.
+        let cacheKey = "\(position.assetType.rawValue)|\(position.ticker)|\(dayKey)"
 
         // News (typed fetch — SwiftData #Predicate can't do type casts)
         let newsHit: NewsCache? = try? context.fetch(
@@ -158,24 +163,36 @@ struct AssetDetailView: View {
 
     private func upsertAICache(ticker: String, dayKey: String, commentary: String) {
         // Delete-then-insert keeps the unique constraint simple.
-        let key = "\(ticker)|\(dayKey)"
+        // Composite key (assetType|ticker|dayKey) must match the read key
+        // in `load(...)` — otherwise we'd cache-miss after writing.
+        let key = "\(position.assetType.rawValue)|\(ticker)|\(dayKey)"
         if let old = try? context.fetch(
             FetchDescriptor<AICache>(predicate: #Predicate { $0.key == key })
         ).first {
             context.delete(old)
         }
-        context.insert(AICache(ticker: ticker, dayKey: dayKey, commentary: commentary))
+        context.insert(AICache(
+            ticker: ticker,
+            assetType: position.assetType,
+            dayKey: dayKey,
+            commentary: commentary
+        ))
         try? context.save()
     }
 
     private func upsertNewsCache(ticker: String, dayKey: String, payload: Data) {
-        let key = "\(ticker)|\(dayKey)"
+        let key = "\(position.assetType.rawValue)|\(ticker)|\(dayKey)"
         if let old = try? context.fetch(
             FetchDescriptor<NewsCache>(predicate: #Predicate { $0.key == key })
         ).first {
             context.delete(old)
         }
-        context.insert(NewsCache(ticker: ticker, dayKey: dayKey, payload: payload))
+        context.insert(NewsCache(
+            ticker: ticker,
+            assetType: position.assetType,
+            dayKey: dayKey,
+            payload: payload
+        ))
         try? context.save()
     }
 

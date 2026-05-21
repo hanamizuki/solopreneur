@@ -19,8 +19,10 @@ struct NewsListItem: View {
     }
 
     private var relativeTime: String {
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .abbreviated
-        return f.localizedString(for: article.publishedAt, relativeTo: Date())
+        // Use the iOS 15+ `.formatted()` API instead of allocating a
+        // RelativeDateTimeFormatter on every list-row render.
+        article.publishedAt.formatted(
+            .relative(presentation: .numeric, unitsStyle: .abbreviated)
+        )
     }
 }

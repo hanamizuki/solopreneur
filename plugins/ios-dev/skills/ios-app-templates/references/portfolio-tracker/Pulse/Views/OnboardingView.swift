@@ -70,7 +70,12 @@ struct OnboardingView: View {
     }
 
     private var canSave: Bool {
-        !anthropic.isEmpty && !finnhub.isEmpty && !coingecko.isEmpty
+        // Match save()'s trim behavior — otherwise pasting whitespace
+        // enables the CTA, then save() trims to empty and writes blank
+        // keys, then the user lands in the app with every API call
+        // failing `missingKey`.
+        let trim: (String) -> String = { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return !trim(anthropic).isEmpty && !trim(finnhub).isEmpty && !trim(coingecko).isEmpty
     }
 
     private func keyField(_ label: String, hint: String, text: Binding<String>) -> some View {

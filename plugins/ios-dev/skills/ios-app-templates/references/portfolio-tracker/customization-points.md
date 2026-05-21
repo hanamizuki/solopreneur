@@ -17,7 +17,7 @@ starting points for unrelated iOS apps — copy them into any new project.
 | Bundle ID | `project.yml` | `PRODUCT_BUNDLE_IDENTIFIER` (e.g. `com.example.<demoname>`) |
 | AI voice (system prompt + card labels) | `Pulse/AIPersona.swift` | `systemPrompt`, `cardTitle`, `loadingText`, `failedText` |
 | AI model | `Pulse/AIPersona.swift` | `model` constant — swap Sonnet 4.6 for Haiku 4.5 (cheaper) or Opus 4.5 (higher quality) |
-| Accent color (green) | `Pulse/Views/Components/AICommentaryCard.swift` (glow + label), `OnboardingView.swift` (CTA), `DashboardView.swift` (`+` toolbar icon), `HoldingRow.swift` + `AssetDetailView.swift` (PnL up state) | Replace `Color.green` literals. **Do NOT** touch `Color.orange` or `Color.blue` — those are reserved as asset-type chip tints (orange = crypto, blue = stock) and a blind search-replace will recolor the badges. |
+| Accent color (green / red) | `Pulse/Views/Components/AICommentaryCard.swift` (glow + label), `OnboardingView.swift` (CTA), `DashboardView.swift` (`+` toolbar icon), `HoldingRow.swift` + `AssetDetailView.swift` (PnL up/down), `Pulse/Views/Components/TotalAssetsCard.swift` (total PnL up/down) | Replace `Color.green` for the up/positive state and `Color.red` for the down/negative state. **Do NOT** touch `Color.orange` or `Color.blue` — those are reserved as asset-type chip tints (orange = crypto, blue = stock) and a blind search-replace will recolor the badges. |
 | Supported tickers (Crypto) | `Pulse/Services/CoinGeckoClient.swift`, `GoogleNewsClient.swift` | `coinIds`, `queryByTicker` maps |
 
 Five-to-six files, well under ten minutes to customize.
