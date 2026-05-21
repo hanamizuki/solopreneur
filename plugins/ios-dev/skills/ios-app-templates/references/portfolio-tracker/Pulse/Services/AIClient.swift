@@ -71,7 +71,7 @@ struct AIClient {
         let priceStr = Formatting.usd(p.currentPrice)
         let pnlStr = "\(p.unrealizedPnL >= 0 ? "+" : "")\(Formatting.usd(p.unrealizedPnL))"
         let pctStr = String(format: "%+.1f%%", p.unrealizedPnLPct * 100)
-        let qtyStr = qtyText(p)
+        let qtyStr = Formatting.quantity(p.totalQuantity, type: p.assetType)
 
         var s = """
         標的：\(p.ticker)（\(p.assetType.label)）
@@ -87,12 +87,5 @@ struct AIClient {
             }
         }
         return s
-    }
-
-    private static func qtyText(_ p: Position) -> String {
-        let nf = NumberFormatter()
-        nf.maximumFractionDigits = p.assetType == .crypto ? 8 : 0
-        return (nf.string(from: p.totalQuantity as NSDecimalNumber) ?? "0")
-            + (p.assetType == .stock ? " 股" : " 顆")
     }
 }

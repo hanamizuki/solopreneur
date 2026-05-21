@@ -98,15 +98,10 @@ struct CoinGeckoClient {
             let body = String(data: data, encoding: .utf8) ?? ""
             throw CoinGeckoError.badResponse(code, body: body)
         }
-        struct Simple: Decodable {
-            let priceByCoin: [String: [String: Double]]
-            init(from decoder: Decoder) throws {
-                let single = try decoder.singleValueContainer()
-                priceByCoin = try single.decode([String: [String: Double]].self)
-            }
-        }
-        let payload = try JSONDecoder().decode(Simple.self, from: data)
-        guard let usd = payload.priceByCoin[coinId]?["usd"] else { throw CoinGeckoError.noData }
+        // CoinGecko /simple/price returns a flat dict: { "<coin>": { "usd": 12345.6 } }.
+        // No wrapper struct needed — decode straight into the shape.
+        let payload = try JSONDecoder().decode([String: [String: Double]].self, from: data)
+        guard let usd = payload[coinId]?["usd"] else { throw CoinGeckoError.noData }
         return Decimal(usd)
     }
 }

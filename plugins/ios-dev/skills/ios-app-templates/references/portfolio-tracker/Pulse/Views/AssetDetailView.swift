@@ -45,7 +45,7 @@ struct AssetDetailView: View {
                 // Summary grid
                 VStack(spacing: 10) {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        labelValue("持有", qtyText(position))
+                        labelValue("持有", Formatting.quantity(position.totalQuantity, type: position.assetType))
                         labelValue("平均成本", Formatting.usd(position.avgCost))
                         labelValue("投入", Formatting.usd(position.totalCostBasis))
                         labelValue("當前市值", Formatting.usd(position.currentValue))
@@ -59,7 +59,7 @@ struct AssetDetailView: View {
                         ForEach(transactions) { tx in
                             HStack {
                                 Text(Self.dateText(tx.date))
-                                Text("· \(qtyOnly(tx))")
+                                Text("· \(Formatting.quantity(tx.quantity, type: tx.assetType))")
                                 Spacer()
                                 Text("@ \(Formatting.usd(tx.purchasePrice))")
                             }
@@ -187,21 +187,15 @@ struct AssetDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func qtyText(_ p: Position) -> String {
-        let nf = NumberFormatter()
-        nf.maximumFractionDigits = p.assetType == .crypto ? 8 : 0
-        return (nf.string(from: p.totalQuantity as NSDecimalNumber) ?? "0") +
-            (p.assetType == .stock ? " 股" : " 顆")
-    }
-    private func qtyOnly(_ tx: Transaction) -> String {
-        let nf = NumberFormatter()
-        nf.maximumFractionDigits = tx.assetType == .crypto ? 8 : 0
-        return (nf.string(from: tx.quantity as NSDecimalNumber) ?? "0") +
-            (tx.assetType == .stock ? " 股" : " 顆")
-    }
-    static func dateText(_ d: Date) -> String {
+    /// Per-row date formatter. Cached so we don't allocate a
+    /// DateFormatter for every transaction render.
+    private static let dateFormatter: DateFormatter = {
         let df = DateFormatter()
         df.dateFormat = "MM/dd"
-        return df.string(from: d)
+        return df
+    }()
+
+    static func dateText(_ d: Date) -> String {
+        dateFormatter.string(from: d)
     }
 }

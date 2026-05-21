@@ -31,6 +31,17 @@ struct GoogleNewsClient {
 
 // XMLParser-based RSS parser. Google News RSS is stable; this handles
 // <item><title/><link/><pubDate/><source/></item>. Returns top 3.
+//
+// LIMITATIONS (acceptable for the demo; revisit if you change source):
+// - `foundCharacters` is concatenated rather than buffered with a
+//   start/end boundary, so a title fragmented by the parser across
+//   multiple callbacks still joins correctly. But raw HTML entities
+//   (`&amp;`, `&#39;`, etc.) come through verbatim — feeds with a lot
+//   of entities will look slightly wrong.
+// - We don't sniff the encoding; Google News RSS is UTF-8 in practice.
+//
+// Swap to FeedKit / XMLCoder if you need correct entity decoding or
+// non-trivial feeds.
 private final class RSSParser: NSObject, XMLParserDelegate {
     private var articles: [NewsArticle] = []
     private var element: String = ""

@@ -20,7 +20,7 @@ struct HoldingRow: View {
                         .foregroundStyle(position.assetType == .crypto ? Color.orange : Color.blue)
                         .clipShape(Capsule())
                 }
-                Text("\(qtyText) · 均 \(Formatting.usd(position.avgCost))")
+                Text("\(Formatting.quantity(position.totalQuantity, type: position.assetType)) · 均 \(Formatting.usd(position.avgCost))")
                     .font(.caption)
                     .foregroundStyle(.gray)
             }
@@ -35,13 +35,5 @@ struct HoldingRow: View {
             }
         }
         .padding(.vertical, 10)
-    }
-
-    private var qtyText: String {
-        let nf = NumberFormatter()
-        nf.maximumFractionDigits = position.assetType == .crypto ? 8 : 0
-        nf.minimumFractionDigits = 0
-        return (nf.string(from: position.totalQuantity as NSDecimalNumber) ?? "0") +
-            (position.assetType == .stock ? " 股" : " 顆")
     }
 }
