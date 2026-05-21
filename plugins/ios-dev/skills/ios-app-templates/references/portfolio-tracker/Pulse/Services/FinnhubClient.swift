@@ -102,10 +102,15 @@ struct FinnhubClient {
     /// Recent company headlines for a ticker. Free-tier accessible.
     static func companyNews(ticker: String, on date: Date) async throws -> [NewsArticle] {
         guard let key = KeychainService.load(.finnhub) else { throw FinnhubError.missingKey }
-        let cal = Calendar.current
+        let cal = Calendar(identifier: .gregorian)
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
-        let from = df.string(from: cal.date(byAdding: .day, value: -3, to: date)!)
+        // Pin to Gregorian + POSIX so non-Gregorian system calendars
+        // (Buddhist, Japanese, ROC) don't emit year 2569 etc — Finnhub
+        // expects strict YYYY-MM-DD Gregorian.
+        df.calendar = Calendar(identifier: .gregorian)
+        df.locale = Locale(identifier: "en_US_POSIX")
+        let from = df.string(from: cal.date(byAdding: .day, value: -3, to: date) ?? date)
         let to = df.string(from: date)
 
         var comps = URLComponents(string: "https://finnhub.io/api/v1/company-news")!
