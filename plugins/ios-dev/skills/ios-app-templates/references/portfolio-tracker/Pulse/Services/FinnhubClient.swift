@@ -40,8 +40,11 @@ struct FinnhubClient {
         guard let key = KeychainService.load(.finnhub) else { throw FinnhubError.missingKey }
 
         let cal = Calendar(identifier: .gregorian)
-        let from = cal.startOfDay(for: cal.date(byAdding: .day, value: -7, to: date)!)
-        let to = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: date))!
+        guard let fromRaw = cal.date(byAdding: .day, value: -7, to: date),
+              let to = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: date)) else {
+            throw FinnhubError.noData
+        }
+        let from = cal.startOfDay(for: fromRaw)
 
         var comps = URLComponents(string: "https://finnhub.io/api/v1/stock/candle")!
         comps.queryItems = [

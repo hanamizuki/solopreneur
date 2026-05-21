@@ -21,7 +21,8 @@ struct GoogleNewsClient {
             .init(name: "gl", value: "US"),
             .init(name: "ceid", value: "US:en")
         ]
-        let (data, response) = try await URLSession.shared.data(from: comps.url!)
+        guard let url = comps.url else { throw GoogleNewsError.badResponse }
+        let (data, response) = try await URLSession.shared.data(from: url)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw GoogleNewsError.badResponse
         }
@@ -43,6 +44,15 @@ struct GoogleNewsClient {
 // Swap to FeedKit / XMLCoder if you need correct entity decoding or
 // non-trivial feeds.
 private final class RSSParser: NSObject, XMLParserDelegate {
+    // Static formatter — `DateFormatter()` init is expensive; one
+    // shared instance is fine because all use is on a single thread.
+    private static let pubDateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        df.locale = Locale(identifier: "en_US_POSIX")
+        return df
+    }()
+
     private var articles: [NewsArticle] = []
     private var element: String = ""
     private var title = ""
@@ -91,10 +101,7 @@ private final class RSSParser: NSObject, XMLParserDelegate {
             if let dash = t.range(of: " - ", options: .backwards) {
                 t = String(t[..<dash.lowerBound])
             }
-            let df = DateFormatter()
-            df.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-            df.locale = Locale(identifier: "en_US_POSIX")
-            let date = df.date(from: pubDate.trimmingCharacters(in: .whitespacesAndNewlines)) ?? Date()
+            let date = Self.pubDateFormatter.date(from: pubDate.trimmingCharacters(in: .whitespacesAndNewlines)) ?? Date()
             let linkStr = link.trimmingCharacters(in: .whitespacesAndNewlines)
             articles.append(NewsArticle(
                 id: linkStr,
