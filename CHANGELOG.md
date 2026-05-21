@@ -8,6 +8,37 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-05-21
+
+### solopreneur 0.5.20 → 0.5.21
+
+- **`/preview` exported comments now carry their selected text.** When you
+  highlight a passage and leave a comment, the exported markdown quotes
+  the selected text alongside the comment body — the agent picking up
+  the export sees what you were actually pointing at, not just the
+  comment in isolation. (#43)
+- **Skills that read `solopreneur.json` now support per-repo overrides.**
+  A 5-layer cascade (per-repo → user-global default → fallbacks → legacy
+  top-level) lets you point `todos/` or other config keys at different
+  locations per project. Existing flat-schema configs keep working;
+  migration is optional. Affected: `/greenlight`, `/merge-pr`,
+  `/preview`, `/todos-babysit`, `/todos-cleanup`, `/worktree-handoff`.
+  (#45)
+
+### ios-dev 0.4.5 → 0.4.6
+
+- **`ios-app-templates` catalog gains `portfolio-tracker`.** New
+  "complete-clone" iOS app template — crypto + stock positions with
+  daily Anthropic commentary, prices via CoinGecko + Finnhub, news via
+  Google News RSS. Ships with `project.yml` so `xcodegen generate &&
+  xcodebuild` works as-is; `customization-points.md` flags the 5–6 files
+  to swap for re-brand. Reusable patterns inside: hardened Keychain
+  (no iCloud-eligible storage), AI client that surfaces HTTP error
+  bodies, SwiftData daily-cache, Gregorian-locale-pinned date formatters
+  (safe on Buddhist / Japanese / ROC calendars), Finnhub `/stock/candle`
+  premium-tier fallback. The existing `photo-analysis-app` (source-pack
+  shape) stays; the catalog now documents both shapes. (#48)
+
 ## 2026-05-17
 
 ### solopreneur 0.5.19 → 0.5.20
