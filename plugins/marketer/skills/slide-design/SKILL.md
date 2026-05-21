@@ -9,9 +9,39 @@ Create presentations with brand colors, typography, and assets baked in from the
 
 This skill wraps two engines. It adds a brand setup phase before handing off to the engine's own workflow.
 
-## Phase 0: Brand Setup
+## Phase 0: Source Discovery
 
-Before touching any engine, gather brand context. Ask these in a single AskUserQuestion call:
+**Read the full source markdown end-to-end before touching anything else** — brand setup included. This is the cheapest insurance against building the wrong deck. State explicitly in chat what you are treating as slide content vs. speaker notes vs. internal scaffolding, then confirm with the user via AskUserQuestion BEFORE generating any HTML. Even one round of "what's the source structure here?" beats a full rebuild.
+
+### 0.A — Detect multi-section structure
+
+Working drafts often split each slide into multiple sections by emoji or comment headers, and the LLM will cheerfully pull from all sections into the projected slide unless you intervene. This is the single most damaging silent failure for /slide-design — speaker notes get printed on the slide. Common patterns:
+
+- **4-emoji split** (very common in Chinese decks): `**📝 這頁要做什麼**` (meta description, NOT for slide) · `**💻 ...**` (live-demo state, NOT for slide) · `**🖥️ 簡報文案**` (THIS is slide content) · `**📢 講稿**` (speaker notes, NOT for slide)
+- **2-section split**: `## Slide` + `## Notes`, or `<!-- slide -->` + `<!-- notes -->`
+- **YAML frontmatter sections**: `slide:`, `notes:`
+- **Bracketed inline annotations**: `[looks at audience]`, `[pause here]`, `（停頓）`
+
+If detected, ask the user explicitly: "Which section(s) go on the slide? Other sections are speaker notes / internal scaffolding?" Default to the most slide-like section name (`🖥️`, `slide:`, etc.) but CONFIRM before building. If the source is plain markdown with no sectioning, treat all body content as slide-eligible — don't invent the structure.
+
+### 0.B — Strip internal scaffolding
+
+Working drafts often label slides with planning scaffolding the audience never sees. The LLM treats these as part of the slide title or eyebrow; they are NOT. Strip before generation:
+
+- [ ] **Story-arc / framework tags** — `Act N · 平凡世界`, `Hero's Journey: Crossing the Threshold`, narrative beats
+- [ ] **Slide IDs / version codes** — `v4-X`, `slide-42`, `r6-draft-3`
+- [ ] **Time estimates and pacing notes** — `· 1.5 min`, `· 30 sec`, `(2 min)`
+- [ ] **Speaker action meta** — "ask the room", "transition to next", "pause", "現場調查", "自我介紹", "情緒高峰 #1", "橋接到下一頁"
+- [ ] **Author comments / TODOs / revision tags** — `R6 c4`, `R5 c12`, `TODO:`, `<!-- ... -->`
+- [ ] **Section-divider intent** — section headings like `# Act 1` may be grouping markers in the source, not actual slides. Confirm with the user before auto-generating divider slides — those are a design choice, not source content.
+
+### 0.C — Single confirmation gate
+
+Before moving to Phase 1, package the above into one AskUserQuestion: (a) which section is slide content (if multi-section), (b) confirmation that the scaffolding above will be stripped, (c) whether section-divider slides should be auto-generated. One round is sufficient; skip entirely if the source is plain markdown with no structure.
+
+## Phase 1: Brand Setup
+
+After source scope is confirmed, gather brand context. Ask these in a single AskUserQuestion call:
 
 **Question 1 — Brand Colors** (header: "Brand"):
 How do you want to set定品牌色？
@@ -65,7 +95,7 @@ If you have a black / single-color SVG logo and want to match the brand primary 
 
 Use [codepen.io/sosuke/pen/Pjoqqp](https://codepen.io/sosuke/pen/Pjoqqp) or `hex-to-css-filter` to generate a chain for any target color.
 
-## Phase 0.5: Typography Scale
+## Phase 1.5: Typography Scale
 
 Apply a projection-optimized typography scale before writing any slide-specific CSS. See [references/typography-scale.md](references/typography-scale.md).
 
@@ -74,9 +104,9 @@ Key rules:
 - **`--fs-micro` is for decoration only** (slide numbers, step counters). Never for content.
 - **Define all 8 tokens in `:root`** so slides can reference them consistently.
 
-After brand colors + typography tokens are in place, move to Phase 1.
+After brand colors + typography tokens are in place, move to Phase 2.
 
-## Phase 1: Hand Off to Engine
+## Phase 2: Hand Off to Engine
 
 After brand + typography setup, invoke the appropriate skill:
 
@@ -85,7 +115,7 @@ After brand + typography setup, invoke the appropriate skill:
 
 In both cases, pass through all brand colors, typography tokens, and asset paths so the engine uses them from the start.
 
-## Phase 1.5: Icon System (Replace Emoji)
+## Phase 2.5: Icon System (Replace Emoji)
 
 If the deck uses emoji as functional pictograms (pipeline icons, status markers, stage glyphs), replace them with vector icons from an inline SVG sprite. Emoji render fuzzy on projectors and differ per OS. See [references/icon-system.md](references/icon-system.md).
 
@@ -96,7 +126,18 @@ Three things matter:
 
 Skip this phase if emoji only appear in casual speaker notes or decoration that won't project.
 
-## Phase 2: Live Presentation Features (Optional)
+## Phase 2.7: Comment-Review Compatibility
+
+If the deck will be deployed via `/preview` for in-page comment review, bake these 4 things into the output. Without them, the comment markers, margin layer, and export modal can render in subtly broken ways (cards pile up after the last slide, "+ comment" button never appears, mandatory scroll-snap traps the reader before they reach low-anchored cards). See [references/preview-overlay-css.md](references/preview-overlay-css.md) for the deck-specific overrides.
+
+1. **Wrap all slides in `<main class="doc"> ... </main>`** — `comment-overlay.js` gates selection capture on `document.querySelector("main.doc")`. Slides as direct children of `<body>` never trigger the "+ comment" affordance.
+2. **Set `<body class="cmt-full-bleed">`** on the deck. This is an opt-in mode in `/preview`'s `template.html` that switches the gutter reserve from `margin-right` to `width: calc(100% - 332px)`, so viewport-wide slides don't overflow under the reserved gutter when comments exist.
+3. **Use `scroll-snap-type: y proximity`** (not `mandatory`) on `html`. Mandatory snap traps the reader at slide boundaries and prevents scrolling past the last slide to read margin cards anchored low in the doc.
+4. **`.slide { width: 100% }`** (not `100vw`). With the gutter reserved, `main.doc` shrinks — slides should follow doc width, not the unreserved viewport.
+
+Skip this phase if the deck won't be deployed via `/preview` for review.
+
+## Phase 3: Live Presentation Features (Optional)
 
 If the deck is for a **live speaker** (not self-browsing), add a step-controlled reveal system so the speaker paces content with space / arrow keys. See [references/reveal-system.md](references/reveal-system.md).
 
@@ -113,7 +154,7 @@ Skip this phase if the deck is:
 - Being exported to PDF
 - Simple bullet slides without multi-beat per slide
 
-## Phase 3: Content Review (Chinese / CJK)
+## Phase 4: Content Review (Chinese / CJK)
 
 After writing all slide text, run:
 
