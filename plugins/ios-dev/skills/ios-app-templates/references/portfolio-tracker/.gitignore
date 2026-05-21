@@ -51,6 +51,3 @@ secrets/
 # logs / temp
 *.log
 tmp/
-
-# Preview comment overlay (copied per-preview, not committed identically)
-**/comment-overlay.js

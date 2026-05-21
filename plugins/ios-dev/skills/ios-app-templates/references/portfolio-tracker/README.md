@@ -59,9 +59,11 @@ Pulse/
 | **Google News RSS** | Crypto news | No |
 | **Anthropic Messages API** | Daily commentary per asset | Yes (paid) |
 
-All four are checked by `scripts/pre-stage-check.sh` before the demo
-starts. Keys are entered in-app on first launch and stored in iOS
-Keychain — no `.env` files, no committed secrets.
+Keys are entered in-app on first launch and stored in iOS Keychain —
+no `.env` files, no committed secrets. The orchestrating skill
+(`app-building-demo`) is responsible for any pre-flight verification
+before the demo starts; this template only needs the three keys to be
+present at runtime.
 
 ## How the template is used by the SKILL
 

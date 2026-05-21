@@ -1,13 +1,15 @@
 name: Pulse
 options:
-  bundleIdPrefix: com.hana
+  bundleIdPrefix: com.example
   deploymentTarget:
     iOS: "18.0"
   defaultConfig: Debug
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    DEVELOPMENT_TEAM: "Q9DF4CGJX3"
+    # DEVELOPMENT_TEAM intentionally omitted — with CODE_SIGN_STYLE: Automatic
+    # Xcode picks the developer's personal team on first open. The demo
+    # orchestrator can inject a specific team ID at copy-time if needed.
     CODE_SIGN_STYLE: Automatic
     ENABLE_PREVIEWS: YES
 targets:
@@ -25,6 +27,6 @@ targets:
         CFBundleDisplayName: Pulse
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.hana.pulse
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.pulse
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
