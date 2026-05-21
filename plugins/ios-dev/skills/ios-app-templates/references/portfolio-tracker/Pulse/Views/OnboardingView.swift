@@ -10,6 +10,7 @@ struct OnboardingView: View {
     @State private var anthropic: String = KeychainService.load(.anthropic) ?? ""
     @State private var finnhub: String = KeychainService.load(.finnhub) ?? ""
     @State private var coingecko: String = KeychainService.load(.coingecko) ?? ""
+    @State private var saveError: String?
 
     var body: some View {
         NavigationStack {
@@ -54,6 +55,12 @@ struct OnboardingView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .disabled(!canSave)
+
+                    if let saveError {
+                        Text(saveError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
                 }
                 .padding(24)
             }
@@ -84,9 +91,17 @@ struct OnboardingView: View {
         // Trim leading/trailing whitespace — paste from web often carries
         // invisible spaces or newlines that break header / query auth.
         let trim: (String) -> String = { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        KeychainService.save(trim(anthropic), slot: .anthropic)
-        KeychainService.save(trim(finnhub), slot: .finnhub)
-        KeychainService.save(trim(coingecko), slot: .coingecko)
+        let ok1 = KeychainService.save(trim(anthropic), slot: .anthropic)
+        let ok2 = KeychainService.save(trim(finnhub), slot: .finnhub)
+        let ok3 = KeychainService.save(trim(coingecko), slot: .coingecko)
+        // Only mark onboarded if all three writes succeeded — otherwise
+        // RootView would let the user past, then every API call would
+        // throw `missingKey` with no in-app explanation.
+        guard ok1 && ok2 && ok3 else {
+            saveError = "儲存失敗，請再試一次"
+            return
+        }
+        saveError = nil
         onboarded = true
         onComplete()
     }

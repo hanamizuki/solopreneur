@@ -1,9 +1,23 @@
 import Foundation
 
 struct AIClient {
-    enum AIError: Error { case missingKey, badResponse, emptyContent }
+    enum AIError: Error, CustomStringConvertible {
+        case missingKey
+        case badResponse(Int, body: String)
+        case emptyContent
 
-    private static let model = "claude-sonnet-4-6"
+        var description: String {
+            switch self {
+            case .missingKey: return "missingKey"
+            case let .badResponse(code, body):
+                // Truncated so error UIs / logs don't swallow the screen.
+                let trimmed = body.prefix(200).replacingOccurrences(of: "\n", with: " ")
+                return "badResponse(\(code)): \(trimmed)"
+            case .emptyContent: return "emptyContent"
+            }
+        }
+    }
+
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
     static func commentary(
@@ -28,7 +42,7 @@ struct AIClient {
             struct Message: Encodable { let role: String; let content: String }
         }
         let body = Body(
-            model: model,
+            model: AIPersona.model,
             max_tokens: 500,
             system: AIPersona.systemPrompt,
             messages: [.init(role: "user", content: userContent)]
@@ -37,7 +51,9 @@ struct AIClient {
 
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw AIError.badResponse
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let bodyText = String(data: data, encoding: .utf8) ?? ""
+            throw AIError.badResponse(code, body: bodyText)
         }
         struct Resp: Decodable {
             struct ContentBlock: Decodable { let type: String; let text: String? }

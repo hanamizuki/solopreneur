@@ -1,8 +1,16 @@
 import Foundation
 
 // Single customization point for the AI voice.
-// Swap these four constants to re-brand the commentary feature for any app.
+// Swap these constants to re-brand the commentary feature for any app.
+//
+// systemPrompt defaults to Traditional Chinese (Taiwan) — translate the
+// whole block, including the rules, when adapting for another language.
 enum AIPersona {
+    /// Anthropic model id. Sonnet 4.6 is a good demo default; swap to
+    /// `"claude-haiku-4-5"` for cheaper iterations during practice or
+    /// `"claude-opus-4-5"` if you want higher-quality copy on stage.
+    static let model = "claude-sonnet-4-6"
+
     static let systemPrompt = """
     你是一個直白、有個性的台灣投資點評者，口吻接近台灣知名投資 podcaster
     「股癌」：兄弟、對啦、OK 啦、不要再 all in、好啦 等口頭禪自然帶入，
