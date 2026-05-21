@@ -182,6 +182,27 @@
     margin-right: 332px;
     margin-left: auto;
   }
+  /* Full-bleed opt-in: deck / slideshow consumers (e.g. /slide-design)
+     set <body class="cmt-full-bleed"> so their viewport-wide slides keep
+     working when the gutter is reserved. Without this class the layout
+     above (768px centered column + margin-based gutter) stays exactly
+     as it was, so existing prose previews are unaffected.
+
+     Key differences in full-bleed mode:
+     - main.doc has no max-width and no padding, so slides own the layout
+     - When comments exist the gutter is reserved via width: calc(...),
+       not margin-right — slides anchored to main.doc edges (`width:100%`
+       inside) follow doc width instead of viewport width and don't
+       overflow under the gutter.
+     - Deck CSS should use `width: 100%` (not 100vw) on slides and
+       `scroll-snap-type: y proximity` (not mandatory) so the reader can
+       scroll past the last slide to reach margin cards anchored low. */
+  body.cmt-full-bleed main.doc { max-width: none; padding: 0; }
+  body.cmt-has-margin.cmt-full-bleed main.doc {
+    margin-right: 0;
+    margin-left: 0;
+    width: calc(100% - 332px);
+  }
   .cmt-empty {
     color: #9ca3af;
     font-size: 13px;
@@ -416,6 +437,10 @@
   @media (max-width: 1023px) {
     .cmt-margin-layer { display: none !important; }
     body.cmt-has-margin main.doc { margin-right: auto; }
+    /* Mobile: full-bleed decks reclaim the full viewport too. Override
+       the desktop width: calc(...) reserve so the sheet (not the
+       gutter) carries the cards. */
+    body.cmt-has-margin.cmt-full-bleed main.doc { width: auto; margin-right: 0; }
   }
   /* The fixed "+ comment" trigger is a mobile-only affordance. Gate it
      so a mobile->desktop resize cannot leave it stranded on desktop

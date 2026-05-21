@@ -281,6 +281,8 @@ Start from `assets/template.html` (copy it in, replace the `{{TITLE}}` / `{{DATE
 
 The template already loads Tailwind + Alpine.js. To use Chart.js or Mermaid, uncomment the relevant `<script>` tag at the top of `template.html`.
 
+**For viewport-wide slide decks** (e.g. content built with `/slide-design`): set `<body class="cmt-full-bleed">`. The template ships an opt-in mode that switches the gutter reserve from `margin-right: 332px` to `width: calc(100% - 332px)` on `main.doc`, so full-bleed slides don't overflow under the reserved gutter once comments exist. Pair with `scroll-snap-type: y proximity` (not `mandatory`) and `.slide { width: 100% }` (not `100vw`). The narrow-column default still applies to every prose page that doesn't set this class — no risk to existing previews.
+
 **Read `references/libs.md` before writing interactive components.** It has the working recipes for Alpine state, Chart.js neutral palette, and Mermaid diagrams — not knowing them means you'll fall back to plain HTML and lose the value of this skill.
 
 **Form follows content.** Don't impose a fixed template structure (calculator vs. dashboard vs. doc). Read the proposal and let the shape emerge:

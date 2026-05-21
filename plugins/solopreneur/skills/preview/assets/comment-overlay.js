@@ -1291,7 +1291,25 @@
 
     const ta = el(
       "textarea",
-      "width:100%;height:320px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;background:#fff;color:#111827"
+      "width:100%;height:320px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;background:#fff;color:#111827",
+      {
+        // Tell password managers (1Password / LastPass / Bitwarden /
+        // browser-native) to skip this textarea. Without these, the
+        // export modal's focus+select gets hijacked by autofill UI on
+        // some setups, which steals keyboard focus and silently kills
+        // the ⌘C manual-copy fallback. `data-form-type=other` also
+        // suppresses Safari's contact-form heuristics.
+        attrs: {
+          autocomplete: "off",
+          autocorrect: "off",
+          autocapitalize: "off",
+          spellcheck: "false",
+          "data-1p-ignore": "true",
+          "data-lpignore": "true",
+          "data-bwignore": "true",
+          "data-form-type": "other",
+        },
+      }
     );
     ta.value = md;
 
@@ -1336,21 +1354,65 @@
     closeX.addEventListener("click", close);
     closeBtn.addEventListener("click", close);
 
+    // Three-tier copy chain. The async Clipboard API is the default;
+    // it requires a secure context (https) and an active permission, and
+    // password-manager autofill can intercept focus before the user
+    // hits ⌘C, so we keep a synchronous execCommand fallback in the
+    // middle. Manual ⌘C stays as the last-ditch path.
+    function execCopyFallback(text) {
+      const tmp = document.createElement("textarea");
+      tmp.value = text;
+      tmp.setAttribute("readonly", "");
+      tmp.setAttribute("autocomplete", "off");
+      tmp.setAttribute("autocorrect", "off");
+      tmp.setAttribute("autocapitalize", "off");
+      tmp.setAttribute("spellcheck", "false");
+      tmp.setAttribute("data-1p-ignore", "true");
+      tmp.setAttribute("data-lpignore", "true");
+      tmp.setAttribute("data-bwignore", "true");
+      tmp.setAttribute("data-form-type", "other");
+      // Offscreen-but-selectable. display:none / visibility:hidden
+      // block execCommand("copy") in some browsers, so use a 1px
+      // fixed-position hidden element instead.
+      tmp.style.cssText =
+        "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1";
+      document.body.appendChild(tmp);
+      tmp.focus();
+      tmp.select();
+      tmp.setSelectionRange(0, text.length);
+      let ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch (_) {
+        ok = false;
+      }
+      document.body.removeChild(tmp);
+      return ok;
+    }
+    function showCopied() {
+      copyBtn.textContent = "Copied ✓";
+      copyBtn.style.background = "#10b981";
+      setTimeout(() => {
+        copyBtn.textContent = "Copy";
+        copyBtn.style.background = "#1f2937";
+      }, 1500);
+    }
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(ta.value);
-        copyBtn.textContent = "Copied ✓";
-        copyBtn.style.background = "#10b981";
-        setTimeout(() => {
-          copyBtn.textContent = "Copy";
-          copyBtn.style.background = "#1f2937";
-        }, 1500);
+        showCopied();
+        return;
       } catch (_) {
-        ta.focus();
-        ta.select();
-        copyBtn.textContent = "Press ⌘C";
-        setTimeout(() => (copyBtn.textContent = "Copy"), 1800);
+        // fall through to execCommand
       }
+      if (execCopyFallback(ta.value)) {
+        showCopied();
+        return;
+      }
+      ta.focus();
+      ta.select();
+      copyBtn.textContent = "Press ⌘C";
+      setTimeout(() => (copyBtn.textContent = "Copy"), 1800);
     });
 
     clearBtn.addEventListener("click", () => {
@@ -1445,7 +1507,15 @@
     document.body.classList.toggle("cmt-has-margin", desktop && hasComments);
     if (marginLayer) marginLayer.style.display = desktop ? "" : "none";
     fab.style.display = desktop ? "none" : (hasComments ? "" : "none");
-    exportBtn.style.display = hasComments ? "" : "none";
+    // Always show the export button — even with zero comments the user
+    // needs to see the affordance exists. Each /preview deploy gets a
+    // fresh Vercel subdomain (= fresh origin = empty localStorage), so
+    // gating on hasComments hid the button on every just-deployed URL
+    // and made users think the feature was broken. The badge `(0)`
+    // already signals "nothing to export"; we dim the button to ~0.55
+    // opacity so it reads as inactive but discoverable.
+    exportBtn.style.display = "";
+    exportBtn.style.opacity = hasComments ? "1" : "0.55";
     placeToolButtons();
     updateDiffBtn();
   }
