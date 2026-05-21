@@ -113,6 +113,7 @@
      rules are unscoped (not under .doc) so they apply wherever the
      overlay wraps text — paragraphs, tables, lists, callouts, and
      inside <del>/<ins> diff markup. */
+  /* OVERLAY-CSS:BEGIN — copy this block when porting overlay CSS to standalone decks. See plugins/marketer/skills/slide-design/references/preview-overlay-css.md */
   mark.cmt-mark {
     background: #fef3c7;
     color: inherit;
@@ -439,8 +440,12 @@
     body.cmt-has-margin main.doc { margin-right: auto; }
     /* Mobile: full-bleed decks reclaim the full viewport too. Override
        the desktop width: calc(...) reserve so the sheet (not the
-       gutter) carries the cards. */
-    body.cmt-has-margin.cmt-full-bleed main.doc { width: auto; margin-right: 0; }
+       gutter) carries the cards. margin-left:0 is defensive — covers
+       the brief window between the viewport-resize event and the JS
+       handler that clears `cmt-has-margin`; without it the desktop
+       cascade's `margin-left:auto` (line ~183) survives and pushes the
+       mobile slide right with empty space on the left. */
+    body.cmt-has-margin.cmt-full-bleed main.doc { width: auto; margin-right: 0; margin-left: 0; }
   }
   /* The fixed "+ comment" trigger is a mobile-only affordance. Gate it
      so a mobile->desktop resize cannot leave it stranded on desktop
@@ -449,6 +454,7 @@
   @media (min-width: 1024px) {
     .cmt-add-fixed { display: none !important; }
   }
+  /* OVERLAY-CSS:END */
 </style>
 </head>
 <body>

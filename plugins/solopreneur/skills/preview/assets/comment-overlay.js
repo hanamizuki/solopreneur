@@ -74,6 +74,28 @@
     renderPanel();
   };
 
+  // Tell password managers (1Password / LastPass / Bitwarden /
+  // browser-native) to skip any <textarea> these are applied to. Without
+  // these, autofill UI can steal focus from the visible textarea on some
+  // setups, which silently kills the manual ⌘C fallback. Reused on both
+  // the export modal textarea and the execCommand("copy") temp textarea
+  // so the two surfaces stay in sync.
+  //
+  // `data-form-type="other"` is Dashlane's semantic-form-annotation
+  // signal that this is a generic field, not a login/payment form.
+  // (Safari does NOT use data-form-type — its heuristics key off the
+  // `autocomplete` token set, which the prior entries already cover.)
+  const PM_IGNORE_ATTRS = {
+    autocomplete: "off",
+    autocorrect: "off",
+    autocapitalize: "off",
+    spellcheck: "false",
+    "data-1p-ignore": "true",
+    "data-lpignore": "true",
+    "data-bwignore": "true",
+    "data-form-type": "other",
+  };
+
   // small DOM helper
   function el(tag, styleStr, opts) {
     const node = document.createElement(tag);
@@ -1292,24 +1314,7 @@
     const ta = el(
       "textarea",
       "width:100%;height:320px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.55;padding:10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;background:#fff;color:#111827",
-      {
-        // Tell password managers (1Password / LastPass / Bitwarden /
-        // browser-native) to skip this textarea. Without these, the
-        // export modal's focus+select gets hijacked by autofill UI on
-        // some setups, which steals keyboard focus and silently kills
-        // the ⌘C manual-copy fallback. `data-form-type=other` also
-        // suppresses Safari's contact-form heuristics.
-        attrs: {
-          autocomplete: "off",
-          autocorrect: "off",
-          autocapitalize: "off",
-          spellcheck: "false",
-          "data-1p-ignore": "true",
-          "data-lpignore": "true",
-          "data-bwignore": "true",
-          "data-form-type": "other",
-        },
-      }
+      { attrs: { ...PM_IGNORE_ATTRS } }
     );
     ta.value = md;
 
@@ -1360,22 +1365,17 @@
     // hits ⌘C, so we keep a synchronous execCommand fallback in the
     // middle. Manual ⌘C stays as the last-ditch path.
     function execCopyFallback(text) {
-      const tmp = document.createElement("textarea");
-      tmp.value = text;
-      tmp.setAttribute("readonly", "");
-      tmp.setAttribute("autocomplete", "off");
-      tmp.setAttribute("autocorrect", "off");
-      tmp.setAttribute("autocapitalize", "off");
-      tmp.setAttribute("spellcheck", "false");
-      tmp.setAttribute("data-1p-ignore", "true");
-      tmp.setAttribute("data-lpignore", "true");
-      tmp.setAttribute("data-bwignore", "true");
-      tmp.setAttribute("data-form-type", "other");
       // Offscreen-but-selectable. display:none / visibility:hidden
       // block execCommand("copy") in some browsers, so use a 1px
-      // fixed-position hidden element instead.
-      tmp.style.cssText =
-        "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1";
+      // fixed-position hidden element instead. tabindex="-1" keeps the
+      // temp node out of the tab order (AT hygiene — it's invisible to
+      // sighted users, should be invisible to keyboard nav too).
+      const tmp = el(
+        "textarea",
+        "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1",
+        { attrs: { ...PM_IGNORE_ATTRS, readonly: "", tabindex: "-1" } }
+      );
+      tmp.value = text;
       document.body.appendChild(tmp);
       tmp.focus();
       tmp.select();
@@ -1407,6 +1407,10 @@
       }
       if (execCopyFallback(ta.value)) {
         showCopied();
+        // Re-select the visible textarea so the user can re-press ⌘C
+        // to verify the copy landed (the temp textarea stole focus).
+        ta.focus();
+        ta.select();
         return;
       }
       ta.focus();
@@ -1513,9 +1517,13 @@
     // gating on hasComments hid the button on every just-deployed URL
     // and made users think the feature was broken. The badge `(0)`
     // already signals "nothing to export"; we dim the button to ~0.55
-    // opacity so it reads as inactive but discoverable.
-    exportBtn.style.display = "";
+    // opacity so it reads as inactive but discoverable. We also block
+    // pointer events and mark it aria-disabled so a click on the dim
+    // button doesn't open the export modal showing "Export 0 comments"
+    // with an empty textarea (confusing empty state).
     exportBtn.style.opacity = hasComments ? "1" : "0.55";
+    exportBtn.style.pointerEvents = hasComments ? "" : "none";
+    exportBtn.setAttribute("aria-disabled", hasComments ? "false" : "true");
     placeToolButtons();
     updateDiffBtn();
   }

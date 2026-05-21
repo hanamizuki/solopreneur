@@ -10,10 +10,10 @@ already ships the overlay CSS — `.cmt-margin-layer`, `.cmt-card`,
 `<body class="cmt-full-bleed">`, and add the four deck-specific
 overrides below. This is what `/preview` SKILL.md step 2 recommends.
 
-The full overlay CSS lives in
-`plugins/solopreneur/skills/preview/assets/template.html`, lines
-116–426. Keep this reference in sync if those rules ever change
-materially.
+The full overlay CSS lives between the `OVERLAY-CSS:BEGIN` and
+`OVERLAY-CSS:END` marker comments in
+`plugins/solopreneur/skills/preview/assets/template.html`. Keep this
+reference in sync if those rules ever change materially.
 
 ---
 
@@ -124,12 +124,13 @@ If the deck bypasses `template.html` entirely (e.g. ships its own
 `<style>` block), it also needs to inline the overlay CSS so cards,
 markers, the float cluster, and the mobile sheet render correctly.
 
-Source of truth:
-`plugins/solopreneur/skills/preview/assets/template.html` lines 116–426
-— copy that block into the deck's `<style>` verbatim, then layer the
-four deck-specific rules above on top.
+Source of truth: copy the block between the `OVERLAY-CSS:BEGIN` and
+`OVERLAY-CSS:END` marker comments in
+`plugins/solopreneur/skills/preview/assets/template.html` verbatim into
+the deck's `<style>`, then layer the four deck-specific rules above on
+top.
 
-The overlay CSS is ~280 lines and covers:
+The overlay CSS block covers:
 
 - `mark.cmt-mark` (yellow highlight + hover + flash animation)
 - `.cmt-margin-layer` + `body.cmt-has-margin` rules (right-gutter positioning + reserve)
