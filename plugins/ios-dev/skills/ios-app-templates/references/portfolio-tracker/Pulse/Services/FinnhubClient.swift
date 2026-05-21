@@ -1,10 +1,41 @@
 import Foundation
 
+/// Finnhub client. Three endpoints in play:
+///
+/// - `/quote` — current price, **free tier**. Used for live dashboard
+///   pricing and as the buy-price fallback in AddTransactionView.
+/// - `/company-news` — recent headlines for a ticker, **free tier**.
+/// - `/stock/candle` — historical OHLC, **PREMIUM ONLY** since 2024.
+///   Free-tier API keys get 403 here. We still expose `closePrice` for
+///   completeness, but the caller must handle `premiumRequired` and
+///   fall back (currently AddTransactionView falls back to `/quote`).
 struct FinnhubClient {
-    enum FinnhubError: Error { case missingKey, badResponse, noData }
+    enum FinnhubError: Error, CustomStringConvertible {
+        case missingKey
+        case badResponse(Int, body: String)
+        case premiumRequired
+        case noData
 
-    // Stock close on a specific date (UTC). Falls back to nearest prior trading day.
-    // TODO: handle backfill failure (return nil for now if no data within 7 trading days back)
+        var description: String {
+            switch self {
+            case .missingKey: return "missingKey"
+            case let .badResponse(code, body):
+                let trimmed = body.prefix(120).replacingOccurrences(of: "\n", with: " ")
+                return "badResponse(\(code)): \(trimmed)"
+            case .premiumRequired: return "premiumRequired (free-tier 403 on /stock/candle)"
+            case .noData: return "noData"
+            }
+        }
+    }
+
+    /// Historical close on a date, in USD.
+    ///
+    /// WARNING: `/stock/candle` is a premium-only endpoint as of 2024;
+    /// free-tier keys get 403. The demo path in AddTransactionView is
+    /// already wired to swallow `premiumRequired` and fall back to
+    /// `currentPrice(ticker:)`. Keep this method around because a
+    /// paying customer's key DOES return useful data, and it doubles
+    /// as a "what does premium gate cost you" reference.
     static func closePrice(ticker: String, on date: Date) async throws -> Decimal {
         guard let key = KeychainService.load(.finnhub) else { throw FinnhubError.missingKey }
 
@@ -14,15 +45,21 @@ struct FinnhubClient {
 
         var comps = URLComponents(string: "https://finnhub.io/api/v1/stock/candle")!
         comps.queryItems = [
-            .init(name: "symbol", value: ticker),
+            .init(name: "symbol", value: ticker.uppercased()),
             .init(name: "resolution", value: "D"),
             .init(name: "from", value: String(Int(from.timeIntervalSince1970))),
             .init(name: "to", value: String(Int(to.timeIntervalSince1970))),
             .init(name: "token", value: key)
         ]
-        let (data, response) = try await URLSession.shared.data(from: comps.url!)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw FinnhubError.badResponse
+        guard let url = comps.url else { throw FinnhubError.noData }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse else {
+            throw FinnhubError.badResponse(-1, body: "")
+        }
+        if http.statusCode == 403 { throw FinnhubError.premiumRequired }
+        guard http.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw FinnhubError.badResponse(http.statusCode, body: body)
         }
 
         struct Candle: Decodable { let c: [Double]?; let t: [Int]?; let s: String }
@@ -40,27 +77,29 @@ struct FinnhubClient {
         guard let close = best else { throw FinnhubError.noData }
         return Decimal(close)
     }
-}
 
-extension FinnhubClient {
+    /// Current quote, in USD. Free-tier accessible.
     static func currentPrice(ticker: String) async throws -> Decimal {
         guard let key = KeychainService.load(.finnhub) else { throw FinnhubError.missingKey }
         var comps = URLComponents(string: "https://finnhub.io/api/v1/quote")!
         comps.queryItems = [
-            .init(name: "symbol", value: ticker),
+            .init(name: "symbol", value: ticker.uppercased()),
             .init(name: "token", value: key)
         ]
-        let (data, response) = try await URLSession.shared.data(from: comps.url!)
+        guard let url = comps.url else { throw FinnhubError.noData }
+        let (data, response) = try await URLSession.shared.data(from: url)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw FinnhubError.badResponse
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw FinnhubError.badResponse(code, body: body)
         }
         struct Quote: Decodable { let c: Double }
         let q = try JSONDecoder().decode(Quote.self, from: data)
+        guard q.c > 0 else { throw FinnhubError.noData }
         return Decimal(q.c)
     }
-}
 
-extension FinnhubClient {
+    /// Recent company headlines for a ticker. Free-tier accessible.
     static func companyNews(ticker: String, on date: Date) async throws -> [NewsArticle] {
         guard let key = KeychainService.load(.finnhub) else { throw FinnhubError.missingKey }
         let cal = Calendar.current
@@ -71,14 +110,17 @@ extension FinnhubClient {
 
         var comps = URLComponents(string: "https://finnhub.io/api/v1/company-news")!
         comps.queryItems = [
-            .init(name: "symbol", value: ticker),
+            .init(name: "symbol", value: ticker.uppercased()),
             .init(name: "from", value: from),
             .init(name: "to", value: to),
             .init(name: "token", value: key)
         ]
-        let (data, response) = try await URLSession.shared.data(from: comps.url!)
+        guard let url = comps.url else { throw FinnhubError.noData }
+        let (data, response) = try await URLSession.shared.data(from: url)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw FinnhubError.badResponse
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw FinnhubError.badResponse(code, body: body)
         }
         struct Item: Decodable {
             let id: Int

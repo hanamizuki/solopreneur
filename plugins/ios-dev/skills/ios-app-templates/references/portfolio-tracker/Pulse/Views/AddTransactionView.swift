@@ -52,6 +52,11 @@ struct AddTransactionView: View {
     @MainActor
     private func save() async {
         guard let qty = Decimal(string: quantityText) else { return }
+        // Single source of truth for ticker normalization — all clients
+        // and the Transaction model assume uppercase, so canonicalize
+        // once at the form boundary.
+        let normalizedTicker = ticker.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !normalizedTicker.isEmpty else { return }
         isSaving = true
         lastError = nil
         defer { isSaving = false }
@@ -59,12 +64,20 @@ struct AddTransactionView: View {
             let price: Decimal
             switch assetType {
             case .crypto:
-                price = try await CoinGeckoClient.closePrice(ticker: ticker, on: date)
+                price = try await CoinGeckoClient.closePrice(ticker: normalizedTicker, on: date)
             case .stock:
-                price = try await FinnhubClient.closePrice(ticker: ticker, on: date)
+                // Finnhub /stock/candle is premium-only since 2024, so a
+                // free-tier key 403s. Fall back to /quote (free) — the
+                // recorded purchase price will be "now" rather than the
+                // selected date, which is acceptable for the demo.
+                do {
+                    price = try await FinnhubClient.closePrice(ticker: normalizedTicker, on: date)
+                } catch FinnhubClient.FinnhubError.premiumRequired {
+                    price = try await FinnhubClient.currentPrice(ticker: normalizedTicker)
+                }
             }
             let tx = Transaction(
-                ticker: ticker,
+                ticker: normalizedTicker,
                 assetType: assetType,
                 quantity: qty,
                 date: date,

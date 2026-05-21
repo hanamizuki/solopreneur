@@ -2,20 +2,33 @@ import SwiftUI
 import SwiftData
 
 struct DashboardView: View {
-    @Environment(\.modelContext) private var context
     @Query(sort: \Transaction.createdAt) private var transactions: [Transaction]
 
+    // Keyed by "<assetType.rawValue>|<TICKER>" so the same symbol on
+    // different markets doesn't collide.
     @State private var prices: [String: Decimal] = [:]
     @State private var showAdd = false
 
     var body: some View {
-        NavigationStack {
+        // Compute once per body re-evaluation — `positions` derives from
+        // @Query'd transactions plus @State prices, so reading it four
+        // times in the same body would recompute the calculator four
+        // times. Bind first, then use the local copy.
+        let positions = PortfolioCalculator.positions(from: transactions, prices: prices)
+        let totalValue = positions.reduce(Decimal(0)) { $0 + $1.currentValue }
+        let totalPnL = positions.reduce(Decimal(0)) { $0 + $1.unrealizedPnL }
+        let totalCost = positions.reduce(Decimal(0)) { $0 + $1.totalCostBasis }
+        let totalPnLPct: Double = totalCost > 0
+            ? NSDecimalNumber(decimal: totalPnL / totalCost).doubleValue
+            : 0
+
+        return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     TotalAssetsCard(
-                        totalValue: positions.reduce(0) { $0 + $1.currentValue },
-                        totalPnL: positions.reduce(0) { $0 + $1.unrealizedPnL },
-                        totalPnLPct: pnlPct
+                        totalValue: totalValue,
+                        totalPnL: totalPnL,
+                        totalPnLPct: totalPnLPct
                     )
                     .padding(.horizontal, 16)
 
@@ -76,40 +89,32 @@ struct DashboardView: View {
         }
     }
 
-    private var positions: [Position] {
-        PortfolioCalculator.positions(from: transactions, prices: prices)
-    }
-
-    private var pnlPct: Double {
-        let cost = positions.reduce(Decimal(0)) { $0 + $1.totalCostBasis }
-        let pnl = positions.reduce(Decimal(0)) { $0 + $1.unrealizedPnL }
-        guard cost > 0 else { return 0 }
-        return NSDecimalNumber(decimal: pnl / cost).doubleValue
-    }
-
     @MainActor
     private func loadPrices() async {
-        // Dedupe by ticker; tuples aren't Hashable so use Dictionary keyed by ticker.
-        var tickerTypes: [String: AssetType] = [:]
-        for tx in transactions { tickerTypes[tx.ticker] = tx.assetType }
+        // Dedupe by (ticker, assetType) so crypto X and stock X each get
+        // their own fetch. Result key matches PortfolioCalculator's
+        // expected format: "<assetType.rawValue>|<TICKER>".
+        struct Key: Hashable { let ticker: String; let assetType: AssetType }
+        var keys: Set<Key> = []
+        for tx in transactions { keys.insert(.init(ticker: tx.ticker, assetType: tx.assetType)) }
         await withTaskGroup(of: (String, Decimal?).self) { group in
-            for (ticker, type) in tickerTypes {
+            for key in keys {
                 group.addTask {
                     do {
                         let p: Decimal
-                        switch type {
-                        case .crypto: p = try await CoinGeckoClient.currentPrice(ticker: ticker)
-                        case .stock:  p = try await FinnhubClient.currentPrice(ticker: ticker)
+                        switch key.assetType {
+                        case .crypto: p = try await CoinGeckoClient.currentPrice(ticker: key.ticker)
+                        case .stock:  p = try await FinnhubClient.currentPrice(ticker: key.ticker)
                         }
-                        return (ticker, p)
+                        return ("\(key.assetType.rawValue)|\(key.ticker)", p)
                     } catch {
                         // TODO: surface fetch failure per ticker (badge in row)
-                        return (ticker, nil)
+                        return ("\(key.assetType.rawValue)|\(key.ticker)", nil)
                     }
                 }
             }
-            for await (ticker, p) in group {
-                if let p { prices[ticker] = p }
+            for await (priceKey, p) in group {
+                if let p { prices[priceKey] = p }
             }
         }
     }
