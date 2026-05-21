@@ -86,6 +86,17 @@ struct DashboardView: View {
             }
             .task { await loadPrices() }
             .refreshable { await loadPrices() }
+            // PortfolioCalculator.positions skips any position whose
+            // price is missing from the `prices` dict (so we don't show
+            // misleading $0 / -100% PnL rows). That means a newly-added
+            // transaction would silently vanish from the dashboard until
+            // the user manually pulled to refresh, because the new
+            // ticker has no entry in `prices` yet. Reload prices whenever
+            // the @Query'd transactions array changes — covers add /
+            // edit / delete from AddTransactionView and AssetDetailView.
+            .onChange(of: transactions) { _, _ in
+                Task { await loadPrices() }
+            }
         }
     }
 

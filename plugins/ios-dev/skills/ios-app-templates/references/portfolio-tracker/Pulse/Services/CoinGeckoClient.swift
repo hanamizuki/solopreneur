@@ -53,10 +53,18 @@ struct CoinGeckoClient {
         guard let coinId = coinIds[ticker.uppercased()] else {
             throw CoinGeckoError.unsupportedTicker
         }
-        // CoinGecko /history uses dd-MM-yyyy
+        // CoinGecko /history uses dd-MM-yyyy.
+        // Pin calendar to Gregorian and locale to en_US_POSIX so devices
+        // running a non-Gregorian system calendar (Buddhist, Japanese,
+        // ROC, etc.) still emit the Gregorian year CoinGecko expects.
+        // Without this, a Buddhist-calendar device sends e.g. 2569
+        // instead of 2026 and /history silently returns no data, which
+        // would block crypto transaction saves for those users.
         let df = DateFormatter()
         df.dateFormat = "dd-MM-yyyy"
         df.timeZone = TimeZone(identifier: "UTC")
+        df.calendar = Calendar(identifier: .gregorian)
+        df.locale = Locale(identifier: "en_US_POSIX")
         let dateStr = df.string(from: date)
 
         var comps = URLComponents(string: "https://api.coingecko.com/api/v3/coins/\(coinId)/history")!
