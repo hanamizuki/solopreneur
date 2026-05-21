@@ -10,6 +10,48 @@ or updates that plugin.
 
 ## 2026-05-21
 
+### solopreneur 0.5.21 → 0.5.22
+
+- **`/preview` comment-export hardening.** Comment export now copies
+  reliably even when a password manager intercepts the modal textarea —
+  added a three-tier fallback (Clipboard API → `document.execCommand`
+  → manual ⌘C) and tagged the textarea so 1Password / LastPass /
+  Bitwarden / Dashlane stop autofilling it.
+- **Export button is always visible.** Each `/preview` deploy gets a
+  fresh Vercel URL with empty localStorage; previously the export
+  button was hidden until the first comment, which made fresh-URL
+  visitors think the feature was broken. The button now stays visible
+  (dimmed at zero comments) and is properly disabled so keyboard users
+  can't tab into an empty export.
+- **`/preview` can now host viewport-wide slide decks.** Opt-in
+  `<body class="cmt-full-bleed">` switches the comment-gutter reserve
+  from `margin-right: 332px` to `width: calc(100% - 332px)` on
+  `main.doc`, so full-bleed slides don't overflow under the gutter
+  once comments exist. Existing narrow-prose previews are unaffected.
+- **Overlay CSS is now tagged with `OVERLAY-CSS:BEGIN`/`END` markers**
+  in `template.html`, so other skills referencing the block (e.g.
+  `/slide-design`) point at markers instead of fragile line numbers.
+  (#49)
+
+### marketer 0.0.3 → 0.0.4
+
+- **`/slide-design` now reads the source markdown end-to-end and
+  confirms scope before generating.** New Phase 0 catches the most
+  damaging silent failure: when a working draft splits each slide into
+  multiple emoji-headed or YAML-headed sections (slide content vs.
+  speaker notes vs. internal scaffolding), the agent now detects the
+  split, asks which section is actually slide content, and strips
+  planning scaffolding (Act tags, slide IDs, time estimates, speaker
+  action meta) before generation.
+- **`/slide-design` plays nicely with `/preview` comment overlay.**
+  New Phase 2.7 documents the four things a deck needs to be
+  reviewable in `/preview` (`<main class="doc">` wrapper,
+  `<body class="cmt-full-bleed">`, `scroll-snap-type: y proximity`,
+  `width: 100%` slides). New `references/preview-overlay-css.md`
+  spells out the integration in detail.
+- Phase numbering shifted to make room: `Phase 0→1`, `0.5→1.5`,
+  `1→2`, `1.5→2.5`, `2→3`, `3→4`. (#49)
+
 ### solopreneur 0.5.20 → 0.5.21
 
 - **`/preview` exported comments now carry their selected text.** When you
