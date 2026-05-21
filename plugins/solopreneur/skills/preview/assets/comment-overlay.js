@@ -1177,6 +1177,14 @@
   exportBtn.append(exportLabel, badge, exportTail);
 
   exportBtn.addEventListener("click", () => {
+    // Defense in depth: even though syncDesktopState() sets
+    // `exportBtn.disabled = true` when comments.length === 0 (which
+    // blocks click, Enter/Space, and JS-dispatched click at the
+    // browser level), keep an early-return guard here in case any
+    // future code path calls .click() programmatically before
+    // syncDesktopState() has run, or temporarily flips `.disabled`
+    // off without checking state.
+    if (!comments.length) return;
     showExportModal(buildMarkdown());
   });
 
@@ -1517,12 +1525,19 @@
     // gating on hasComments hid the button on every just-deployed URL
     // and made users think the feature was broken. The badge `(0)`
     // already signals "nothing to export"; we dim the button to ~0.55
-    // opacity so it reads as inactive but discoverable. We also block
-    // pointer events and mark it aria-disabled so a click on the dim
-    // button doesn't open the export modal showing "Export 0 comments"
-    // with an empty textarea (confusing empty state).
+    // opacity so it reads as inactive but discoverable, and set the
+    // native `disabled` property so empty-state clicks don't open the
+    // export modal showing "Export 0 comments" with an empty textarea.
+    // `disabled` is the canonical signal: it blocks ALL activation
+    // paths (mouse click, keyboard Enter/Space, JS-dispatched click),
+    // removes the button from focus order, and announces correctly to
+    // assistive tech. We keep `aria-disabled` in sync as a belt-and-
+    // suspenders signal for AT, but drop the previous
+    // `pointer-events: none` override since `disabled` already
+    // suppresses pointer activation (and pointer-events alone failed
+    // to block keyboard activation — the bug this commit fixes).
     exportBtn.style.opacity = hasComments ? "1" : "0.55";
-    exportBtn.style.pointerEvents = hasComments ? "" : "none";
+    exportBtn.disabled = !hasComments;
     exportBtn.setAttribute("aria-disabled", hasComments ? "false" : "true");
     placeToolButtons();
     updateDiffBtn();

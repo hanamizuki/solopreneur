@@ -330,6 +330,14 @@
     box-shadow: 0 2px 8px rgba(0,0,0,.14);
   }
   .cmt-tool-btn:hover { background: #111827; }
+  /* Disabled state (set via `.disabled = true` in JS — currently used on
+     the export button when there are zero comments). Keep our explicit
+     palette so browsers don't apply UA default greyed-text on top of
+     `background:#1f2937;color:#fff`, which fights the dim-but-recognizable
+     look we want. Inline `opacity:0.55` from syncDesktopState() carries
+     the visual dim; we just suppress hover and switch the cursor. */
+  .cmt-tool-btn:disabled { cursor: not-allowed; }
+  .cmt-tool-btn:disabled:hover { background: #1f2937; }
 
   /* Floating cluster: one tidy stack bottom-right (desktop + mobile),
      not scattered fixed buttons fighting for the same corner. Shown on
