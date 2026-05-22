@@ -1,5 +1,39 @@
 This document contains release notes for the Google Play Billing Library.
 
+## Google Play Billing Library 9.0.0 Release (2026-05-19)
+
+Version 9.0.0 of the Google Play Billing Library and Kotlin extensions are
+now available. See the [PBL 9 migration guide](https://developer.android.com/google/play/billing/migrate-pbl-latest) if you want to migrate from
+the previous versions of PBL.
+
+### Summary of changes
+
+- **Updated error codes for blocked Play Store activity** : Error codes for
+  blocked Play Store apps have been updated. For instances where
+  the Play Store app is blocked by the system
+  (for example, in OEM-customized kids mode), the response code has
+  changed from `ERROR` to `BILLING_UNAVAILABLE`. Additionally, the
+  `BillingResult` for such cases now provides a *Play Store is blocked*
+  debug message.
+
+  > [!NOTE]
+  > **Note:** For this feature to work, you need [AndroidX.core library](https://developer.android.com/jetpack/androidx/releases/core#core_and_core-ktx_version_190_2) version 1.9 or later.
+
+- **Nullability update for developer-provided billing** : The
+  [`DeveloperProvidedBillingDetails.getLinkUri()`](https://developer.android.com/reference/com/android/billingclient/api/DeveloperProvidedBillingDetails#getLinkUri()) method has
+  been updated to be `@Nullable`. This change supports scenarios where
+  the direct link URI for external payments is unavailable during the
+  payment selection stage.
+
+  To handle this change safely, ensure your integration code handles both
+  `null` and empty string (`""`) values from the
+  [`DeveloperProvidedBillingDetails.getLinkUri()`](https://developer.android.com/reference/com/android/billingclient/api/DeveloperProvidedBillingDetails#getLinkUri()) method before parsing
+  or launching browser intents.
+- Updated `targetSdkVersion` to 35.
+
+- You can now use [in-app messaging](https://developer.android.com/google/play/billing/subscriptions#in-app-messaging) to notify users
+  of an upcoming opt-in price increase. This lets users confirm the price increase without leaving the app. The message for an outstanding opt-in price increase is shown starting on the first day the user can accept the price increase, and the message is shown a maximum of once every 7 days.
+
 ## Google Play Billing Library 8.3.0 Release (2025-12-23)
 
 Version 8.3.0 of the Google Play Billing Library and Kotlin extensions are now available.
