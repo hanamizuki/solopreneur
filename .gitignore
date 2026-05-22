@@ -71,8 +71,12 @@ htmlcov/
 # Git worktrees
 .worktrees/
 
-# Claude Code per-project state (sessions, settings.local.json, project-level skills)
-.claude/
+# Claude Code per-project state. Skills are tracked so they ship with the
+# repo (every maintainer machine gets the same `/release`, `/preview`, etc.);
+# everything else under .claude/ (settings.local.json, sessions, worktrees)
+# stays local.
+.claude/*
+!.claude/skills/
 
 # Personal backlog (not user-facing for this public marketplace repo)
 /todos
