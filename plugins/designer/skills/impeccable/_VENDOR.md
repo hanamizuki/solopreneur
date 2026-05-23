@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/pbakaus/impeccable
 - **Source path**: `.claude/skills/impeccable`
-- **Pinned commit**: 642f03d5a10eb3deb91bd511241e387e23b9aa39
-- **Synced at**: 2026-05-22T05:36:25Z
+- **Pinned commit**: 84135db0e6bdd58d22828f7bc8331cae7bde3e7f
+- **Synced at**: 2026-05-23T10:18:46Z
 - **License**: see `../_vendored/LICENSES/impeccable-LICENSE`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder
