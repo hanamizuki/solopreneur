@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/TheBushidoCollective/han
 - **Source path**: `plugins/specialized/android/skills/jetpack-compose`
 - **Pinned commit**: 3fc9880ee2be4b1275359bed910dbd1674134448
-- **Synced at**: 2026-05-22T05:36:20Z
+- **Synced at**: 2026-05-23T10:16:38Z
 - **License**: see `../_vendored/LICENSES/han-LICENSE`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder

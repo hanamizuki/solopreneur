@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/wshobson/agents
 - **Source path**: `plugins/ui-design/skills/mobile-android-design`
-- **Pinned commit**: 4bb47e9eeb4e8564642eb23384ec8f7bf1855417
-- **Synced at**: 2026-05-22T05:36:21Z
+- **Pinned commit**: cbcde3f1f4309f023095181d3e591f983ec7c95d
+- **Synced at**: 2026-05-23T10:16:38Z
 - **License**: see `../_vendored/LICENSES/wshobson-agents-LICENSE`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder
