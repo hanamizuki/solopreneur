@@ -8,6 +8,35 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-05-26
+
+### solopreneur 0.5.22 → 0.5.23
+- **`/preview` Mermaid-in-tabs caveat.** Documented that Mermaid diagrams
+  fail to render when they start inside a hidden Alpine (`x-show`) tab — the
+  container has zero width at init so Mermaid measures nothing — with guidance
+  to render on tab activation instead. (#47) — thanks @mailkentlee!
+
+### designer 0.1.4 → 0.1.5
+- Re-synced the vendored `taste-*` design family and `impeccable` from
+  upstream. Refreshed guidance; no skills added or removed. (#44, #52)
+
+### marketer 0.0.4 → 0.0.5
+- **Background music for `/slide-design`.** New recipe for a soft music bed
+  that fades in/out as tagged slides appear, with per-engine implementations
+  (IntersectionObserver for frontend-slides, `slidechanged` for reveal.js)
+  and the autoplay / venue-PA / licensing caveats that bite presenters. (#58)
+
+### android-dev 0.4.6 → 0.4.7
+- Re-synced the vendored Android skill set (Jetpack Compose, `gplay-*` Play
+  Console, Gradle, Kotlin concurrency, testing) from upstream. (#33, #53)
+
+### ai-engineer 0.3.10 → 0.3.11
+- Re-synced the vendored `senior-prompt-engineer` skill from upstream. (#38, #51)
+
+### neo4j-dev 0.0.4 → 0.0.5
+- Re-synced the vendored Neo4j skills (Cypher, Cypher guide, migration,
+  CLI tools) from upstream. (#32)
+
 ## 2026-05-21
 
 ### solopreneur 0.5.21 → 0.5.22
