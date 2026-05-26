@@ -25,6 +25,9 @@ const smoothstep = (x) => x * x * (3 - 2 * x);
 let rafId = null;
 function fadeTo(audio, target, dur, onDone) {
   cancelAnimationFrame(rafId);
+  // Guard dur <= 0 — (now - t0) / 0 is NaN/Infinity, and a non-finite
+  // audio.volume throws a TypeError. Snap straight to target instead.
+  if (dur <= 0) { audio.volume = Math.max(0, Math.min(1, target)); if (onDone) onDone(); return; }
   const from = audio.volume, t0 = performance.now();
   (function step(now) {
     const k = Math.min(1, (now - t0) / dur);
@@ -67,10 +70,11 @@ IntersectionObserver drive enter/leave:
   function leave(s) {
     if (current !== s) return;
     current = null;
-    // Skip a redundant fade-out if already paused, and guard currentTime — set
-    // on an element with no src it can throw InvalidStateError.
-    if (!audio.paused) fadeTo(audio, 0, 1600, () => { audio.pause(); if (audio.src) audio.currentTime = 0; });
-    else if (audio.src) audio.currentTime = 0;
+    // Skip a redundant fade-out if already paused. currentTime can throw
+    // InvalidStateError before metadata loads (mobile/webview), so try/catch it.
+    const resetTime = () => { try { if (audio.src) audio.currentTime = 0; } catch (_) {} };
+    if (!audio.paused) fadeTo(audio, 0, 1600, () => { audio.pause(); resetTime(); });
+    else resetTime();
   }
 
   const io = new IntersectionObserver(
@@ -106,8 +110,9 @@ function applyBgm(slide) {
     if (audio.paused) audio.play().then(() => fadeTo(audio, vol, 2200)).catch(() => {});
     else fadeTo(audio, vol, 2200);
   } else {
-    if (!audio.paused) fadeTo(audio, 0, 1600, () => { audio.pause(); if (audio.src) audio.currentTime = 0; });
-    else if (audio.src) audio.currentTime = 0;
+    const resetTime = () => { try { if (audio.src) audio.currentTime = 0; } catch (_) {} };
+    if (!audio.paused) fadeTo(audio, 0, 1600, () => { audio.pause(); resetTime(); });
+    else resetTime();
   }
 }
 
