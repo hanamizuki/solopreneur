@@ -28,7 +28,9 @@ function fadeTo(audio, target, dur, onDone) {
   const from = audio.volume, t0 = performance.now();
   (function step(now) {
     const k = Math.min(1, (now - t0) / dur);
-    audio.volume = from + (target - from) * smoothstep(k);
+    // Clamp — FP rounding can nudge the interpolated value a hair past [0,1],
+    // and audio.volume throws a DOMException outside that range.
+    audio.volume = Math.max(0, Math.min(1, from + (target - from) * smoothstep(k)));
     if (k < 1) rafId = requestAnimationFrame(step);
     else if (onDone) onDone();
   })(t0);
@@ -53,15 +55,22 @@ IntersectionObserver drive enter/leave:
   function enter(s) {
     const src = s.dataset.bgm;
     const vol = parseFloat(s.dataset.bgmVol || '0.3');
-    if (audio.dataset.src !== src) { audio.src = src; audio.dataset.src = src; }
+    // Only (re)load + reset volume when the track actually changes. Adjacent
+    // slides sharing one track keep playing — no restart-from-zero dip.
+    if (audio.dataset.src !== src) {
+      audio.src = src; audio.dataset.src = src; audio.volume = 0;
+    }
     current = s;
-    audio.volume = 0;
-    audio.play().then(() => fadeTo(audio, vol, 2200)).catch(() => {});
+    if (audio.paused) audio.play().then(() => fadeTo(audio, vol, 2200)).catch(() => {});
+    else fadeTo(audio, vol, 2200);
   }
   function leave(s) {
     if (current !== s) return;
     current = null;
-    fadeTo(audio, 0, 1600, () => { audio.pause(); audio.currentTime = 0; });
+    // Skip a redundant fade-out if already paused, and guard currentTime — set
+    // on an element with no src it can throw InvalidStateError.
+    if (!audio.paused) fadeTo(audio, 0, 1600, () => { audio.pause(); if (audio.src) audio.currentTime = 0; });
+    else if (audio.src) audio.currentTime = 0;
   }
 
   const io = new IntersectionObserver(
@@ -89,11 +98,16 @@ function applyBgm(slide) {
   const src = slide?.dataset.bgm;
   if (src) {
     const vol = parseFloat(slide.dataset.bgmVol || '0.3');
-    if (audio.dataset.src !== src) { audio.src = src; audio.dataset.src = src; }
-    audio.volume = 0;
-    audio.play().then(() => fadeTo(audio, vol, 2200)).catch(() => {});
+    // Same guards as the frontend-slides variant: only reset on a real track
+    // change (no same-track dip), and gate play/fade on audio.paused.
+    if (audio.dataset.src !== src) {
+      audio.src = src; audio.dataset.src = src; audio.volume = 0;
+    }
+    if (audio.paused) audio.play().then(() => fadeTo(audio, vol, 2200)).catch(() => {});
+    else fadeTo(audio, vol, 2200);
   } else {
-    fadeTo(audio, 0, 1600, () => { audio.pause(); audio.currentTime = 0; });
+    if (!audio.paused) fadeTo(audio, 0, 1600, () => { audio.pause(); if (audio.src) audio.currentTime = 0; });
+    else if (audio.src) audio.currentTime = 0;
   }
 }
 
