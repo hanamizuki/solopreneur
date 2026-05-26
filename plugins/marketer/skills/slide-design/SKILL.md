@@ -154,6 +154,17 @@ Skip this phase if the deck is:
 - Being exported to PDF
 - Simple bullet slides without multi-beat per slide
 
+### Background music (optional)
+
+For a live-speaker deck, you can add a soft music bed that fades in when a tagged
+slide appears and fades out when it leaves. One shared `Audio` element, a
+smoothstep `requestAnimationFrame` fade, target volume ~0.25–0.35 so it sits under
+the voice — triggered by an IntersectionObserver (frontend-slides) or
+`slidechanged` (reveal.js). See [references/background-music.md](references/background-music.md)
+for the per-engine recipe and the autoplay / venue-PA / licensing caveats. The
+deck-framework-specific `data-bgm` implementation and a CDP fade-verification
+harness live in the `hana-slides` skill.
+
 ## Phase 4: Content Review (Chinese / CJK)
 
 After writing all slide text, run:
@@ -230,3 +241,4 @@ qrencode -o assets/qr.png -s 20 -m 2 "https://example.com"
 | [references/chinese-guidelines.md](references/chinese-guidelines.md) | Chinese AI-slop avoidance + `/humanly` integration |
 | [references/components.md](references/components.md) | CSS / HTML for 13 reusable layout components |
 | [references/pdf-export.md](references/pdf-export.md) | Headless Chrome recipe + `@media print` block for landscape 16:9 PDF export (with `.bg-art` mask workaround) |
+| [references/background-music.md](references/background-music.md) | Fade-in/out background music — shared `Audio` + smoothstep ramp, per-engine triggers (IO / `slidechanged`) + autoplay / venue-PA / licensing caveats |
