@@ -245,18 +245,23 @@ For each plugin marked for bump, edit
 
 Stage all bumped plugin.json files **together with the `CHANGELOG.md`
 update from Step 2.5** and commit them in one commit, so the Step 4 tags
-point at a commit that already contains the changelog (zero gap):
+point at a commit that already contains the changelog (zero gap).
+
+Use the **subject + body two-`-m` form** below — NOT a
+`-m "$(cat <<EOF ...)"` heredoc. The product-repo worktree guard hook
+sanctions a release commit on `main` only when `chore(release):` appears
+immediately after the `-m` quote; a heredoc / command-substitution between
+`-m` and the message hides the prefix and the commit gets blocked. With the
+direct form the subject matches, and `CHANGELOG.md` (markdown) plus the
+`plugin.json` bumps land in one commit on `main`:
 
 ```bash
 git add plugins/*/.claude-plugin/plugin.json CHANGELOG.md
-git commit -m "$(cat <<EOF
-chore(release): <one-line summary of what's shipping>
-
-<plugin1> v<old>→v<new>: <reason>
+git commit \
+  -m "chore(release): <one-line summary of what's shipping>" \
+  -m "<plugin1> v<old>→v<new>: <reason>
 <plugin2> v<old>→v<new>: <reason>
-...
-EOF
-)"
+..."
 ```
 
 Commit subject convention: `chore(release): <summary>`. The body lists each
