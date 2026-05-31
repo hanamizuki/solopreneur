@@ -169,7 +169,14 @@ struct AddTransactionView: View {
 
     /// Manual value parsed from the 買入價 field (nil if blank / unparseable).
     private var manualCost: Decimal? {
-        guard let d = Decimal(string: priceText), d > 0 else { return nil }
+        // The decimalPad emits the device locale's decimal separator, but
+        // `Decimal(string:)` is POSIX/`.`-only and silently truncates at the
+        // first unparseable char — so on a comma-decimal locale "123,45" would
+        // parse as 123 and save the wrong cost. Normalize the locale separator
+        // to "." first so the cents survive.
+        let sep = Locale.current.decimalSeparator ?? "."
+        let normalized = priceText.replacingOccurrences(of: sep, with: ".")
+        guard let d = Decimal(string: normalized), d > 0 else { return nil }
         return d
     }
 
@@ -197,21 +204,25 @@ struct AddTransactionView: View {
         let myKey = lookupKey
 
         // Invalidate any prior resolved cost up front, BEFORE the debounce
-        // sleep. Otherwise a stale `fetchedCost` from the previous ticker/date
-        // stays live during the 500ms window + in-flight request, so a tap on
-        // 儲存 there would persist the wrong cost basis for the new asset —
-        // exactly the bug this view exists to prevent. canSave stays false
-        // until the new lookup settles.
+        // sleep. Otherwise a stale cost from the previous ticker/date stays
+        // live during the 500ms window + in-flight request, so a tap on 儲存
+        // there would persist the wrong cost basis for the new asset — exactly
+        // the bug this view exists to prevent. This covers BOTH the auto path
+        // (`fetchedCost`) and a manually-typed fallback price (`priceText`):
+        // a manual price entered for the previous ticker must not carry over
+        // as the new asset's cost. canSave stays false until the new lookup
+        // settles.
         fetchedCost = nil
         showManualField = false
         priceLookupHint = nil
+        priceText = ""
+        priceAutofilled = false
 
         try? await Task.sleep(for: .milliseconds(500))
         if Task.isCancelled || lookupKey != myKey { return }
 
         guard !normalizedTicker.isEmpty else {
             isFetchingCost = false
-            if priceAutofilled { priceText = "" }
             return
         }
 
@@ -245,15 +256,14 @@ struct AddTransactionView: View {
             priceLookupHint = buyDateFailureHint(for: error)
             // Only seed the field if the user hasn't typed their own value.
             if priceText.isEmpty || priceAutofilled, let hintPrice {
-                // Plain decimal string, no grouping, pinned to en_US_POSIX so
-                // the "." separator round-trips through `Decimal(string:)` on
-                // save regardless of the device locale (a comma-decimal locale
-                // would otherwise write "1234,56" and truncate the cents).
+                // Seed with the device-locale number format (no grouping) so
+                // it reads naturally against the user's decimalPad. `manualCost`
+                // normalizes the locale separator back to "." before parsing,
+                // so both this seed and a later user edit round-trip correctly.
                 // Direct assignment to the @State bypasses the TextField's
                 // Binding `set`, so `priceAutofilled` stays true.
                 priceText = hintPrice.formatted(
                     .number.grouping(.never).precision(.fractionLength(0...2))
-                        .locale(Locale(identifier: "en_US_POSIX"))
                 )
                 priceAutofilled = true
             }
