@@ -42,6 +42,12 @@ struct AddTransactionView: View {
     @State private var priceText: String = ""
     @State private var priceAutofilled: Bool = false
     @State private var priceLookupHint: String?
+    // The exact string the autofill last wrote into `priceText`. Assigning
+    // `priceText` programmatically fires the field's `.onChange`, which would
+    // otherwise immediately flip `priceAutofilled` to false and defeat the
+    // "don't clobber user typing" guard on the next re-fetch. We compare
+    // against this sentinel to tell a programmatic write from a real edit.
+    @State private var lastAutofillText: String = ""
 
     // True while save() persists the transaction.
     @State private var isSaving: Bool = false
@@ -79,11 +85,13 @@ struct AddTransactionView: View {
                             TextField("0.00", text: $priceText)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
-                                .onChange(of: priceText) { _, _ in
-                                    // User touched the field — stop treating it
+                                .onChange(of: priceText) { _, newValue in
+                                    // A real user edit stops treating the field
                                     // as an autofilled hint so later re-fetches
-                                    // don't overwrite their value.
-                                    priceAutofilled = false
+                                    // don't overwrite their value. Ignore the
+                                    // change when it matches our own autofill
+                                    // write (which also fires this onChange).
+                                    if newValue != lastAutofillText { priceAutofilled = false }
                                 }
                         }
                     } footer: {
@@ -178,59 +186,77 @@ struct AddTransactionView: View {
     /// failure, reveal the manual field and pre-fill it with the current price
     /// as a hint the user can overwrite. Never throws to the caller; never
     /// crashes — a total failure just leaves a blank manual field.
+    ///
+    /// `@MainActor`-isolated so every `@State` read/write is ordered with the
+    /// rest of the view (the `await`ed client calls still suspend off the main
+    /// actor via URLSession). This lets `defer` reset the spinner inline rather
+    /// than spawning an unstructured Task that escapes `.task(id:)` cancellation.
+    @MainActor
     private func resolveBuyDateCost() async {
+        // Snapshot the lookup identity so a superseded run never resets shared
+        // state a newer run owns (see the spinner defer below).
+        let myKey = lookupKey
+
+        // Invalidate any prior resolved cost up front, BEFORE the debounce
+        // sleep. Otherwise a stale `fetchedCost` from the previous ticker/date
+        // stays live during the 500ms window + in-flight request, so a tap on
+        // 儲存 there would persist the wrong cost basis for the new asset —
+        // exactly the bug this view exists to prevent. canSave stays false
+        // until the new lookup settles.
+        fetchedCost = nil
+        showManualField = false
+        priceLookupHint = nil
+
         try? await Task.sleep(for: .milliseconds(500))
-        if Task.isCancelled { return }
+        if Task.isCancelled || lookupKey != myKey { return }
 
         guard !normalizedTicker.isEmpty else {
-            await MainActor.run {
-                fetchedCost = nil
-                showManualField = false
-                priceLookupHint = nil
-                if priceAutofilled { priceText = "" }
-            }
+            isFetchingCost = false
+            if priceAutofilled { priceText = "" }
             return
         }
 
-        await MainActor.run { isFetchingCost = true; lastError = nil }
-        defer { Task { @MainActor in isFetchingCost = false } }
+        isFetchingCost = true
+        lastError = nil
+        // Reset the spinner inline at every exit, but only if this run still
+        // owns the current lookup — a superseded run must not clear a flag a
+        // newer run just set.
+        defer { if lookupKey == myKey { isFetchingCost = false } }
 
         do {
             let cost = try await fetchBuyDatePrice()
-            if Task.isCancelled { return }
+            if Task.isCancelled || lookupKey != myKey { return }
             guard cost > 0 else { throw CoinGeckoClient.CoinGeckoError.noData }
-            await MainActor.run {
-                fetchedCost = cost
-                showManualField = false
-                priceLookupHint = nil
-            }
+            fetchedCost = cost
+            showManualField = false
+            priceLookupHint = nil
         } catch {
-            if Task.isCancelled { return }
+            if Task.isCancelled || lookupKey != myKey { return }
             // Log the concrete error for future debugging — the user only sees
             // the friendly hint, but this captures the real cause.
             print("[AddTransaction] buy-date price fetch failed for \(normalizedTicker) (\(assetType)) on \(date): \(error)")
             // Buy-date fetch failed → fall back to the manual field, pre-filled
             // with today's price as a suggestion (best-effort; may be nil).
             let hintPrice = try? await fetchCurrentPriceHint()
-            if Task.isCancelled { return }
+            if Task.isCancelled || lookupKey != myKey { return }
+            fetchedCost = nil
+            showManualField = true
             // Build an honest, specific hint explaining WHY the auto-lookup
             // failed, branching on the concrete error and the situation.
-            let hint = buyDateFailureHint(for: error)
-            await MainActor.run {
-                fetchedCost = nil
-                showManualField = true
-                priceLookupHint = hint
-                // Only seed the field if the user hasn't typed their own value.
-                if priceText.isEmpty || priceAutofilled {
-                    if let hint = hintPrice {
-                        // Plain decimal string (no $ / grouping) so the field
-                        // round-trips through Decimal(string:) on save.
-                        priceText = hint.formatted(
-                            .number.grouping(.never).precision(.fractionLength(0...2))
-                        )
-                        priceAutofilled = true
-                    }
-                }
+            priceLookupHint = buyDateFailureHint(for: error)
+            // Only seed the field if the user hasn't typed their own value.
+            if priceText.isEmpty || priceAutofilled, let hintPrice {
+                // Plain decimal string, no grouping, pinned to en_US_POSIX so
+                // the "." separator round-trips through `Decimal(string:)` on
+                // save regardless of the device locale (a comma-decimal locale
+                // would otherwise write "1234,56" and truncate the cents).
+                let formatted = hintPrice.formatted(
+                    .number.grouping(.never).precision(.fractionLength(0...2))
+                        .locale(Locale(identifier: "en_US_POSIX"))
+                )
+                lastAutofillText = formatted
+                priceText = formatted
+                priceAutofilled = true
             }
         }
     }
@@ -264,13 +290,22 @@ struct AddTransactionView: View {
     /// Map the concrete fetch error + situation to an honest inline hint that
     /// tells the user exactly why the auto-lookup failed.
     private func buyDateFailureHint(for error: Error) -> String {
+        // Unsupported coin is decided by a guard before any network/date logic
+        // (CoinGeckoClient throws this immediately), so surface it FIRST —
+        // otherwise an out-of-range date on an unsupported ticker would get the
+        // misleading "1-year history window" message instead of the ticker
+        // list.
+        if case CoinGeckoClient.CoinGeckoError.unsupportedTicker = error {
+            return "目前內建支援 BTC / ETH / SOL / DOGE，其他幣請手動輸入買入價"
+        }
         // Crypto + buy date older than CoinGecko's free-tier ~1-year window.
+        // Out-of-range surfaces as `noData` (the /history endpoint returns 200
+        // with a null market_data), which the switch below would otherwise
+        // route to the generic message — so catch it here with the real cause.
         if assetType == .crypto, isCryptoOutOfHistoryRange {
             return "CoinGecko 免費版只提供近一年的歷史價，\(normalizedTicker) 這個日期請手動輸入買入價"
         }
         switch error {
-        case CoinGeckoClient.CoinGeckoError.unsupportedTicker:
-            return "目前內建支援 BTC / ETH / SOL / DOGE，其他幣請手動輸入買入價"
         case FinnhubClient.FinnhubError.premiumRequired:
             return "股票歷史價需付費 API，請手動輸入 \(normalizedTicker) 的買入價（已預帶今日市價）"
         case let CoinGeckoClient.CoinGeckoError.badResponse(code, _):
