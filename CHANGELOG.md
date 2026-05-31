@@ -8,6 +8,20 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-06-01
+
+### ios-dev 0.4.6 → 0.4.7
+- **Portfolio Tracker template — accurate buy-date cost basis.** The
+  `ios-app-templates` Portfolio Tracker reference now records a position's
+  cost from its price **on the buy date** rather than silently using today's
+  price (which gave wrong P&L for anything bought in the past). Future buy
+  dates are blocked; a failed price lookup now explains the real cause (crypto
+  older than CoinGecko's free ~1-year window, unsupported ticker, or stock
+  history behind a paid API) and surfaces a manual buy-price field —
+  pre-filled with today's quote — so you can enter the actual figure. Manual
+  prices parse correctly on comma-decimal locales, and rapidly changing the
+  ticker/date no longer leaves a stale price saveable. (#60)
+
 ## 2026-05-26
 
 ### solopreneur 0.5.22 → 0.5.23
