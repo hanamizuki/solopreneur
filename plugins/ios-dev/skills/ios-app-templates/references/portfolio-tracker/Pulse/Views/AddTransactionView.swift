@@ -42,12 +42,6 @@ struct AddTransactionView: View {
     @State private var priceText: String = ""
     @State private var priceAutofilled: Bool = false
     @State private var priceLookupHint: String?
-    // The exact string the autofill last wrote into `priceText`. Assigning
-    // `priceText` programmatically fires the field's `.onChange`, which would
-    // otherwise immediately flip `priceAutofilled` to false and defeat the
-    // "don't clobber user typing" guard on the next re-fetch. We compare
-    // against this sentinel to tell a programmatic write from a real edit.
-    @State private var lastAutofillText: String = ""
 
     // True while save() persists the transaction.
     @State private var isSaving: Bool = false
@@ -82,17 +76,22 @@ struct AddTransactionView: View {
                         HStack {
                             Text("買入價 (USD)")
                             Spacer()
-                            TextField("0.00", text: $priceText)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
-                                .onChange(of: priceText) { _, newValue in
-                                    // A real user edit stops treating the field
-                                    // as an autofilled hint so later re-fetches
-                                    // don't overwrite their value. Ignore the
-                                    // change when it matches our own autofill
-                                    // write (which also fires this onChange).
-                                    if newValue != lastAutofillText { priceAutofilled = false }
+                            // Custom Binding: a real user edit goes through
+                            // `set` and clears the autofill flag, while the
+                            // programmatic autofill write in resolveBuyDateCost
+                            // assigns `priceText` directly — bypassing `set`,
+                            // so the flag stays intact. More robust than
+                            // `.onChange`, which also fires on programmatic
+                            // updates and would defeat the re-fetch guard.
+                            TextField("0.00", text: Binding(
+                                get: { priceText },
+                                set: { newValue in
+                                    priceText = newValue
+                                    priceAutofilled = false
                                 }
+                            ))
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
                         }
                     } footer: {
                         if let hint = priceLookupHint {
@@ -250,12 +249,12 @@ struct AddTransactionView: View {
                 // the "." separator round-trips through `Decimal(string:)` on
                 // save regardless of the device locale (a comma-decimal locale
                 // would otherwise write "1234,56" and truncate the cents).
-                let formatted = hintPrice.formatted(
+                // Direct assignment to the @State bypasses the TextField's
+                // Binding `set`, so `priceAutofilled` stays true.
+                priceText = hintPrice.formatted(
                     .number.grouping(.never).precision(.fractionLength(0...2))
                         .locale(Locale(identifier: "en_US_POSIX"))
                 )
-                lastAutofillText = formatted
-                priceText = formatted
                 priceAutofilled = true
             }
         }
