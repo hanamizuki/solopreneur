@@ -127,7 +127,7 @@ SendUserFile to deliver it.
 
 ### 5. Stop
 
-The printed document plus the file path is the entire response. Do not add
+The printed document plus the file delivery is the entire response. Do not add
 a preamble before the markdown (no "Here's the handoff doc"), a closing line
 after it (no "ready, copy it"), a summary, or any commentary. The only
 post-doc output is the file delivery via SendUserFile.
