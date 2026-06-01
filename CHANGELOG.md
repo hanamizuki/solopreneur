@@ -8,6 +8,15 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-06-02
+
+### solopreneur 0.5.23 → 0.5.24
+- **Handoff skill now saves to file.** `/handoff` still prints the context
+  document inline, but also writes it to `/tmp/handoff/<date>_<slug>.md` and
+  delivers the file via SendUserFile — no more copying from the terminal for
+  cross-session handoffs.
+(#63)
+
 ## 2026-06-01
 
 ### ios-dev 0.4.6 → 0.4.7
