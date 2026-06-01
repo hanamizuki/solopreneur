@@ -6,9 +6,9 @@ description: |
   agent — a fresh Claude Code session, Codex, ChatGPT, or an agent on another
   machine. Use when the user says /handoff, "write context for the next
   session", "package this for handoff", "hand off to another agent", or wants
-  to capture the current session's state in a portable form. Output is
-  print-only — no file is written, no worktree created (use worktree-handoff
-  if a git worktree is needed).
+  to capture the current session's state in a portable form. Output is printed
+  inline AND written to `/tmp/handoff/<date>_<slug>.md`. No worktree is created (use
+  worktree-handoff if a git worktree is needed).
 ---
 
 # Handoff
@@ -18,8 +18,9 @@ so a fresh agent — in a new Claude Code session, Codex, ChatGPT, or running on
 another machine — can pick up the work without asking the user clarifying
 questions.
 
-The document is printed inline. The user copies it and pastes it wherever the
-next session lives. Do not save to disk.
+The document is printed inline AND saved to `/tmp/handoff/<date>_<slug>.md` (e.g.
+`/tmp/handoff/2026-06-01_fix-portfolio-cost-basis.md`). The user can copy from the
+terminal or grab the file directly.
 
 ## When this is the right tool
 
@@ -117,12 +118,19 @@ decision the user already made about it.>
 - `<doc / README / URL / related skill>` — <why it matters>
 ```
 
-### 4. Stop
+### 4. Write to file
 
-The printed document is the entire response. Do not add a preamble before
-it (no "Here's the handoff doc"), a closing line after it (no "ready, copy
-it"), a summary, or any commentary. The user already knows what to do with
-the output — extra text just gets in their way when they copy.
+Derive a slug from the task title (lowercase, hyphens, no special chars).
+Ensure the directory exists (`mkdir -p /tmp/handoff`), then write the document
+to `/tmp/handoff/<YYYY-MM-DD>_<slug>.md` using the Write tool. Then use
+SendUserFile to deliver it.
+
+### 5. Stop
+
+The printed document plus the file path is the entire response. Do not add
+a preamble before the markdown (no "Here's the handoff doc"), a closing line
+after it (no "ready, copy it"), a summary, or any commentary. The only
+post-doc output is the file delivery via SendUserFile.
 
 The only exception is step 1: if the next step is unclear, ask the focused
 question first and wait. After the answer, generate the doc and stop.
@@ -145,8 +153,9 @@ The output must pass these checks. Revise before printing if any fails.
    should be backed by a file path or command listed in the doc.
 7. **No secret values.** Env var names only. Never paste keys, tokens, or
    passwords.
-8. **Document is the entire response.** No text before the markdown block,
-   no text after it. No "Here it is", no "ready to copy", no summary.
+8. **Document + file delivery is the entire response.** No text before the
+   markdown block, no commentary after it. The only post-doc output is the
+   SendUserFile delivery.
 
 ## Anti-patterns
 
@@ -185,4 +194,5 @@ User: `/handoff`
    dead ends, env requirements.
 5. Compose the markdown using the template, filling only the meaningful
    sections.
-6. Print it. Nothing else — no preamble, no closing line, no commentary.
+6. Print it, write to `/tmp/handoff/<date>_<slug>.md`, and deliver via
+   SendUserFile. Nothing else — no preamble, no closing line, no commentary.
