@@ -7,7 +7,7 @@ description: |
   machine. Use when the user says /handoff, "write context for the next
   session", "package this for handoff", "hand off to another agent", or wants
   to capture the current session's state in a portable form. Output is printed
-  inline AND written to `/tmp/handoff/<date>_<slug>.md`. No worktree is created (use
+  inline AND written to `/tmp/handoff/<YYYY-MM-DD>_<slug>.md`. No worktree is created (use
   worktree-handoff if a git worktree is needed).
 ---
 
@@ -18,7 +18,7 @@ so a fresh agent — in a new Claude Code session, Codex, ChatGPT, or running on
 another machine — can pick up the work without asking the user clarifying
 questions.
 
-The document is printed inline AND saved to `/tmp/handoff/<date>_<slug>.md` (e.g.
+The document is printed inline AND saved to `/tmp/handoff/<YYYY-MM-DD>_<slug>.md` (e.g.
 `/tmp/handoff/2026-06-01_fix-portfolio-cost-basis.md`). The user can copy from the
 terminal or grab the file directly.
 
@@ -194,5 +194,5 @@ User: `/handoff`
    dead ends, env requirements.
 5. Compose the markdown using the template, filling only the meaningful
    sections.
-6. Print it, write to `/tmp/handoff/<date>_<slug>.md`, and deliver via
+6. Print it, write to `/tmp/handoff/<YYYY-MM-DD>_<slug>.md`, and deliver via
    SendUserFile. Nothing else — no preamble, no closing line, no commentary.
