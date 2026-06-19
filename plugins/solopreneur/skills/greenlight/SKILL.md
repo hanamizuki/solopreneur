@@ -952,12 +952,14 @@ codex review --base main 2>&1
 
 ```bash
 # Trigger and get comment URL (contains comment ID)
+TRIGGER_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 COMMENT_URL=$(gh pr comment <PR_NUMBER> --body "REVIEWER_CMD")
 TRIGGER_COMMENT_ID=$(echo "$COMMENT_URL" | sed 's/.*-//')  # macOS-compatible, extract from issuecomment-{id}
 ```
 
-> **`TRIGGER_COMMENT_ID` is the sole filter for subsequent polling.** GitHub issue comment IDs
-> are globally monotonically increasing — bot reply IDs are always > trigger ID. No timestamps needed.
+> **`TRIGGER_COMMENT_ID` is the primary filter for comment polling.** GitHub issue comment IDs
+> are globally monotonically increasing — bot reply IDs are always > trigger ID. `TRIGGER_TIME`
+> is used separately for reaction-based clean signal detection (see Step 2, check [C]).
 
 **Confirm trigger succeeded (Codex bot only):** Codex bot adds a 👀 emoji reaction upon receiving the trigger. Wait 30 seconds after triggering and check for the reaction:
 
@@ -982,7 +984,7 @@ Parse stdout:
 - No `[P*]` tags, only summary paragraphs → no suggestions, review loop ends
 - Has `[P*]` tags → extract all suggestions, enter Step 3
 
-**GitHub bot mode** — Each poll checks two things:
+**GitHub bot mode** — Each poll checks three things:
 
 ```bash
 # [A] Unresolved review thread count (detect inline feedback)
@@ -1003,14 +1005,21 @@ UNRESOLVED=$(gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int
 BOT_COMMENT_BODY=$(gh api repos/{owner}/{repo}/issues/{pr}/comments --paginate | \
   jq -r --arg bot "$BOT_LOGIN" --argjson tid "$TRIGGER_COMMENT_ID" \
      '[.[] | select((.user.login == $bot) and .id > $tid)] | last | .body // empty')
+
+# [C] 👍 reaction from current active reviewer on the PR (clean signal fallback)
+# Codex bot inconsistently skips the "Didn't find" comment and only reacts with 👍.
+THUMBSUP=$(gh api "repos/{owner}/{repo}/issues/{pr}/reactions" --paginate | \
+  jq --arg bot "$BOT_LOGIN" --arg since "$TRIGGER_TIME" \
+     '[.[] | select(.user.login == $bot and .content == "+1" and .created_at > $since)] | length')
 ```
 
-The two checks determine the next action:
+The three checks determine the next action:
 
 | Priority | Condition | Action |
 |----------|-----------|--------|
 | 1 | `BOT_COMMENT_BODY` contains "quota exceeded"/"rate limit"/"usage limit"/"too many requests" | Switch reviewer immediately |
 | 2 | `BOT_COMMENT_BODY` contains "Didn't find"/"no issues"/"looks good"/"LGTM" | **Clean pass → end loop** |
+| 2.5 | `THUMBSUP > 0` (created after trigger) | **Clean pass → end loop** |
 | 3 | `UNRESOLVED > 0` | Has inline feedback → **enter Step 3 immediately** |
 | 4 | None of the above | Continue waiting |
 
