@@ -47,7 +47,7 @@ Read these files (paths relative to this SKILL.md):
 
 | File | Purpose |
 |------|---------|
-| `references/patterns-{lang}.md` | 36 pattern categories with before/after examples |
+| `references/patterns-{lang}.md` | 37 pattern categories with before/after examples |
 | `references/word-table-{lang}.md` | 3-tier word replacement table |
 | `references/context-profiles.md` | Tolerance matrix by content type |
 
