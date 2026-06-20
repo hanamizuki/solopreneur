@@ -8,6 +8,16 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-06-20
+
+### marketer 0.0.5 → 0.0.6
+- **Humanly 新增第 37 個 pattern「做作選詞」。** 偵測 AI 把簡單動詞用比喻性動詞包裝的寫法（接不住→搞不來、餵給它→丟進去）。跟既有的精心設計比喻 (#18) 互補：擬人抓主詞不對，做作選詞抓動詞不對。附替換表、咖啡聊天測試法、與 #18 的區別比較。中文 word table 同步新增 Tier 1 禁用詞（硬撐、踩坑、爆了）和 Tier 2 做作動詞子分類。
+(#64, #65)
+
+### solopreneur 0.5.24 → 0.5.25
+- **Greenlight：GitHub bot 新增 👍 reaction 偵測。** 部分 reviewer bot 跳過文字回覆只留 👍 reaction，以前會卡在無限等待。現在 poll 增加第三道檢查，看到 trigger 後的 👍 即判定 clean pass。
+(#64)
+
 ## 2026-06-02
 
 ### solopreneur 0.5.23 → 0.5.24
