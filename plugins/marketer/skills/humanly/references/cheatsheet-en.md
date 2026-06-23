@@ -49,7 +49,7 @@ After: "Sixty people showed up on a Tuesday night. Nobody expected that."
 | due to the fact that | because |
 | commence | start, begin |
 
-## 10 Structural Anti-Patterns
+## 11 Structural Anti-Patterns
 
 1. **Significance inflation** — Don't promote routine events into historic milestones.
 2. **Promotional tone** — No tourism-brochure prose. Describe, don't sell.
@@ -61,6 +61,7 @@ After: "Sixty people showed up on a Tuesday night. Nobody expected that."
 8. **Formulaic resilience** — "Despite challenges, X continues to thrive." Cut it.
 9. **Chatbot artifacts** — "I hope this helps!" / "Great question!" Remove entirely.
 10. **"Let's" constructions** — "Let's explore..." Just start with the point.
+11. **Therapy-speak** (#37) — Don't certify feelings ("your anxiety is valid" → "of course you're anxious"). Cut absolving lines like "it's not your fault."
 
 ## Forbidden Formatting
 

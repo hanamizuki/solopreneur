@@ -66,6 +66,9 @@ Three tiers based on how reliably they signal AI-generated text.
 | keen (as intensifier) | interested, eager, enthusiastic (or cut) |
 | symphony (metaphor) | (describe the actual coordination or combination) |
 | embrace (metaphor) | adopt, accept, use, switch to |
+| your X is valid / your feelings are real (about emotion) | of course you feel X, it's normal (tactic: see patterns #37) |
+| it's not your fault / don't blame yourself | (cut, or "anyone would react that way") |
+| you deserve to be seen / your feelings matter | (cut, or state what you actually see) |
 
 ## Tier 2 — Flag When 2+ in Same Paragraph
 
