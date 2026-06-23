@@ -241,6 +241,9 @@ const STATIC_DEFAULT_STYLE = {
   borderBottomColor: 'rgb(0, 0, 0)',
   borderLeftColor: 'rgb(0, 0, 0)',
   borderRadius: '0px',
+  outlineWidth: '0px',
+  outlineColor: 'rgb(0, 0, 0)',
+  outlineStyle: 'none',
   boxShadow: 'none',
   fontFamily: '',
   fontSize: '16px',
@@ -264,8 +267,21 @@ const STATIC_DEFAULT_STYLE = {
   paddingRight: '0px',
   paddingBottom: '0px',
   paddingLeft: '0px',
+  marginTop: '0px',
+  marginRight: '0px',
+  marginBottom: '0px',
+  marginLeft: '0px',
   position: 'static',
+  visibility: 'visible',
+  top: 'auto',
+  right: 'auto',
+  bottom: 'auto',
+  left: 'auto',
+  inset: '',
   display: '',
+  overflow: 'visible',
+  overflowX: 'visible',
+  overflowY: 'visible',
 };
 
 const STATIC_PROP_MAP = {
@@ -282,6 +298,9 @@ const STATIC_PROP_MAP = {
   'border-right-color': 'borderRightColor',
   'border-bottom-color': 'borderBottomColor',
   'border-left-color': 'borderLeftColor',
+  'outline-width': 'outlineWidth',
+  'outline-color': 'outlineColor',
+  'outline-style': 'outlineStyle',
   'box-shadow': 'boxShadow',
   'font-family': 'fontFamily',
   'font-size': 'fontSize',
@@ -303,8 +322,21 @@ const STATIC_PROP_MAP = {
   'padding-right': 'paddingRight',
   'padding-bottom': 'paddingBottom',
   'padding-left': 'paddingLeft',
+  'margin-top': 'marginTop',
+  'margin-right': 'marginRight',
+  'margin-bottom': 'marginBottom',
+  'margin-left': 'marginLeft',
   'position': 'position',
+  'visibility': 'visibility',
+  'top': 'top',
+  'right': 'right',
+  'bottom': 'bottom',
+  'left': 'left',
+  'inset': 'inset',
   'display': 'display',
+  'overflow': 'overflow',
+  'overflow-x': 'overflowX',
+  'overflow-y': 'overflowY',
 };
 
 const STATIC_NAMED_COLORS = {
@@ -511,6 +543,26 @@ function expandStaticDeclaration(prop, value) {
     }
     return out;
   }
+  if (p === 'outline') {
+    // `outline` shorthand: width | style | color, in any order. Reuse the
+    // border parser for width + color, then sniff a style keyword from the
+    // tokens (solid|dashed|...). `outline: 0` (single-token zero) zeros
+    // the width and effectively hides the outline.
+    const tokens = splitCssTokens(v);
+    const parsed = parseStaticBorder(v);
+    const styleToken = tokens.find(t =>
+      /^(none|hidden|solid|dashed|dotted|double|groove|ridge|inset|outset)$/i.test(t)
+    );
+    const out = [];
+    if (parsed.width) out.push(['outlineWidth', parsed.width]);
+    if (parsed.color) out.push(['outlineColor', parsed.color]);
+    if (styleToken) out.push(['outlineStyle', styleToken.toLowerCase()]);
+    // `outline: 0` with no other tokens: explicit zero width.
+    if (!parsed.width && /^0(?:px|rem|em|%)?$/.test(v.trim())) {
+      out.push(['outlineWidth', '0px']);
+    }
+    return out;
+  }
   const sideMatch = p.match(/^border-(top|right|bottom|left)$/);
   if (sideMatch) {
     const parsed = parseStaticBorder(v);
@@ -545,6 +597,15 @@ function expandStaticDeclaration(prop, value) {
       ['paddingRight', vals[1]],
       ['paddingBottom', vals[2]],
       ['paddingLeft', vals[3]],
+    ];
+  }
+  if (p === 'margin') {
+    const vals = expandStaticBoxValues(splitCssTokens(v));
+    return [
+      ['marginTop', vals[0]],
+      ['marginRight', vals[1]],
+      ['marginBottom', vals[2]],
+      ['marginLeft', vals[3]],
     ];
   }
   if (p === 'font') return parseStaticFont(v);
