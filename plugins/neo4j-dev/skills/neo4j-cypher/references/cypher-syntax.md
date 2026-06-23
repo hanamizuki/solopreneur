@@ -302,6 +302,9 @@ replace(s, search, replacement)            // replace all occurrences
 size(s)                                     // character count (same as char_length)
 reverse(s)                                  // reverse string
 toString(x) / toStringOrNull(x)            // convert any type to STRING
+string.indexOf(input, value)                // index of first match, -1 if absent [2026.05, Cypher 25]
+string.join(list, delimiter)                // join LIST<STRING> with delimiter [2026.05, Cypher 25]
+string.regexReplace(original, regex, repl)  // regex replace all matches [2026.05, Cypher 25]
 ```
 
 All string functions return `null` when any argument is `null`.
@@ -547,6 +550,8 @@ Path selectors (immediately after `MATCH`, before the pattern):
 | `ALL SHORTEST` | All shortest paths of equal minimum length |
 | `ANY` | Any single path (no length guarantee) |
 | `SHORTEST k GROUPS` | All paths grouped by length up to k distinct lengths |
+
+Path modes combine with shortest selectors [2026.05]: `MATCH ANY SHORTEST ACYCLIC (a)-[:R]-+(b)` — `ACYCLIC` valid with `ANY SHORTEST`, `SHORTEST k`, `ALL SHORTEST`, `SHORTEST k GROUPS`.
 
 ```cypher
 CYPHER 25 MATCH SHORTEST 1 (a:Person {name:'Alice'})(()-[:KNOWS]->()){1,}(b:Person {name:'Bob'})
