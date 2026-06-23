@@ -534,6 +534,44 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ---
 
+### 37. Therapy-Speak (Emotional Validation)
+
+**Watch for:** your X is valid, your feelings are real, it's not your fault, you deserve to be seen, I see you, your feelings matter, it's okay to feel this way
+
+**Problem:** RLHF-tuned models are trained to be highly empathetic and to avoid contradicting the user, so they pick up two therapist moves: validating the emotion ("your feelings are real") and absolving guilt ("it's not your fault"). Both treat a feeling as something that needs external certification, and the tone talks down instead of across. A real person reassures as a peer. They treat the feeling as ordinary ("of course you're anxious") instead of certifying it ("your anxiety is valid").
+
+**Before:**
+> Parents' anxiety is real and valid, and they shouldn't be blamed.
+
+**After:**
+> Of course parents get anxious.
+
+**Transform tactics (change the move, not the synonym):**
+- Validate → normalize: "your X is valid / real" becomes "of course you feel X" or "it's normal to feel X"
+- Absolve → cut or get specific: "it's not your fault" usually just gets deleted, or becomes "anyone would react that way"
+- Witness → state the fact: "I see how hard you're working" becomes "you've shown up three months straight"
+
+**Examples:**
+
+| Therapy-speak | What a friend says |
+|---|---|
+| your anxiety is valid | of course you're anxious |
+| your feelings are completely valid | makes sense you'd feel that way |
+| none of this is your fault | this really isn't on you |
+| I see how hard you've worked | you've been at this every day |
+
+**Test:** Say it to a friend out loud. A friend doesn't certify your emotion. They say "yeah, of course," "who wouldn't," "same here." If the sentence is stamping a feeling as "real" or "valid," it's therapy-speak.
+
+**Distinguishing from #9 and #24:**
+
+| | #9 Negative Parallelism | #24 Generic Positive Conclusions | #37 Therapy-Speak |
+|---|---|---|---|
+| Trigger | overt syntax markers ("not X, but Y") | upbeat sign-off (bright future, keep going) | validating or absolving emotion ("your X is valid," "not your fault") |
+| Register | slogan symmetry | motivational close | therapist reassurance |
+| Fix | one clause, just state Y | replace with a concrete fact | normalize the feeling, say it plainly |
+
+---
+
 ## Reference
 
 This guide is based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup. The patterns documented there come from observations of thousands of instances of AI-generated text on Wikipedia.
