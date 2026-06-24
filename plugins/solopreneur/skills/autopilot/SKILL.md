@@ -254,7 +254,7 @@ Schedule for automatic execution? Tell me when you'd like it to run.
 
 ### Single-PR
 
-Present the plan and ask for execution mode:
+Present the plan summary, then directly ask「要現在跑嗎？」：
 
 ```text
 Plan: 1 PR
@@ -262,15 +262,8 @@ Plan: 1 PR
   Files: path/a.py, path/b.py
   Spec target: docs/loops/<YYYY-MM-DD>_<short-name>/pr1-<short>.md
 
-Execution mode?
-  (1) Run now — dispatch a worktree subagent in the current session and wait
-      for it to finish. Approximately 10-30 minutes; the session is occupied
-      while it runs.
-  (2) Schedule — hand off to CronCreate at a specified time. Session-independent.
+要現在跑嗎？（約 10-30 分鐘，session 會被佔用；不跑的話可以排程）
 ```
-
-The 10-30 minute estimate is intentional. The user should know that "run now"
-blocks the session.
 
 After the user picks, write the artifacts per Step 3's table, then proceed to Step 5.
 
