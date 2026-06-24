@@ -3,8 +3,28 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { finding } from '../../findings.mjs';
+import { filterByProviders } from '../../registry/antipatterns.mjs';
 import { profileFindingsAsync, profileStep, profileStepAsync } from '../../profile/profiler.mjs';
 import { captureVisualContrastCandidate } from '../visual/screenshot-contrast.mjs';
+
+function serializeDesignSystemForBrowser(designSystem) {
+  if (!designSystem?.present) return null;
+  return {
+    present: true,
+    hasFonts: designSystem.hasFonts === true,
+    allowedFonts: Array.from(designSystem.allowedFonts || []),
+    hasColors: designSystem.hasColors === true,
+    allowedColors: Array.from(designSystem.allowedColorKeys?.values?.() || [])
+      .map(entry => entry?.color)
+      .filter(color => color && Number.isFinite(color.r) && Number.isFinite(color.g) && Number.isFinite(color.b))
+      .map(color => ({ r: color.r, g: color.g, b: color.b })),
+    hasRadii: designSystem.hasRadii === true,
+    allowedRadii: (designSystem.allowedRadii || [])
+      .map(entry => Number(entry?.px))
+      .filter(px => Number.isFinite(px)),
+    hasPillRadius: designSystem.hasPillRadius === true,
+  };
+}
 
 async function runVisualContrastFallback(page, serializedGroups, options, profile, target) {
   if (options?.visualContrast === false) return [];
@@ -162,17 +182,19 @@ async function detectUrl(url, options = {}) {
     }
 
     // Inject the browser detection script and collect results
+    const browserDesignSystem = serializeDesignSystemForBrowser(options?.designSystem);
     await profileStepAsync(profile, {
       engine: 'browser',
       phase: 'scan',
       ruleId: 'configure-pure-detect',
       target: url,
-    }, () => page.evaluate(() => {
+    }, () => page.evaluate((designSystem) => {
       window.__IMPECCABLE_CONFIG__ = {
         ...(window.__IMPECCABLE_CONFIG__ || {}),
         autoScan: false,
+        ...(designSystem ? { designSystem } : {}),
       };
-    }));
+    }, browserDesignSystem));
     await profileStepAsync(profile, {
       engine: 'browser',
       phase: 'scan',
@@ -191,7 +213,7 @@ async function detectUrl(url, options = {}) {
         return window.impeccableDetect({ decorate: false, serialize: true });
       });
       return serializedGroups.flatMap(({ findings }) =>
-        findings.map(f => ({ id: f.type, snippet: f.detail }))
+        findings.map(f => ({ id: f.type, snippet: f.detail, ignoreValue: f.ignoreValue || '' }))
       );
     });
     const visualFindings = await runVisualContrastFallback(page, serializedGroups, options, profile, url);
@@ -212,7 +234,11 @@ async function detectUrl(url, options = {}) {
       }, () => browser.close());
     }
   }
-  return results.map(f => finding(f.id, url, f.snippet));
+  return filterByProviders(results.map(f => {
+    const item = finding(f.id, url, f.snippet);
+    if (f.ignoreValue) item.ignoreValue = f.ignoreValue;
+    return item;
+  }), options.providers);
 }
 
 async function createBrowserDetector(options = {}) {
