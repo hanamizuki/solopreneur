@@ -8,6 +8,32 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-06-25
+
+### solopreneur 0.5.25 → 0.5.26
+- **Autopilot：單 PR 確認步驟簡化。** 移除編號選單，直接問「要現在跑嗎？」，附時間估算和排程備選說明。
+(#67)
+
+### designer 0.1.5 → 0.1.6
+- Re-synced vendored skills from upstream — impeccable major update (hooks system, live browser manual-edit workflow, SvelteKit adapter, design-system detector, palette tool, inline ignores), taste-skill updated.
+(#68)
+
+### marketer 0.0.6 → 0.0.7
+- **Humanly 新增第 38 個 pattern「情緒驗證腔」。** 偵測 AI 替用戶認證情緒（「你的焦慮是真實的」→「會焦慮很正常」）和赦免句（「不是你的錯」→ 刪除）。中英文 pattern、cheatsheet、word table 同步更新。
+(#66)
+
+### ios-dev 0.4.7 → 0.4.8
+- Re-synced vendored skills from upstream (app-store-connect-cli-skills, iphone-apps).
+
+### android-dev 0.4.7 → 0.4.8
+- Re-synced vendored skills from upstream (awesome-android-agent-skills, wshobson-agents, gplay-cli-skills, android/skills).
+
+### ai-engineer 0.3.11 → 0.3.12
+- Re-synced vendored skill (senior-prompt-engineer) from upstream — rewritten around eval-driven iteration and stdlib Python tools.
+
+### neo4j-dev 0.0.5 → 0.0.6
+- Re-synced vendored skills from upstream (neo4j-skills, cypher-guide) — neo4j-cli-tools rewritten around the modern unified `neo4j-cli`, Cypher skill adds schema guardrail and import scripts.
+
 ## 2026-06-20
 
 ### marketer 0.0.5 → 0.0.6
