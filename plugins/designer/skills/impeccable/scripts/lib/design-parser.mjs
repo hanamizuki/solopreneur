@@ -62,8 +62,8 @@ function parseYamlSubset(yaml) {
       stack.pop();
     }
 
-    const key = content.slice(0, colonIdx).trim();
-    const rest = content.slice(colonIdx + 1).trim();
+    const key = unquoteYamlKey(content.slice(0, colonIdx).trim());
+    const rest = stripInlineYamlComment(content.slice(colonIdx + 1).trim());
     const parent = stack[stack.length - 1].obj;
 
     if (rest === '') {
@@ -91,6 +91,28 @@ function findTopLevelColon(s) {
     }
   }
   return -1;
+}
+
+function unquoteYamlKey(key) {
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    return key.slice(1, -1);
+  }
+  return key;
+}
+
+function stripInlineYamlComment(s) {
+  let inQuote = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQuote) {
+      if (ch === inQuote && s[i - 1] !== '\\') inQuote = null;
+    } else if (ch === '"' || ch === "'") {
+      inQuote = ch;
+    } else if (ch === '#' && i > 0 && /\s/.test(s[i - 1])) {
+      return s.slice(0, i).trimEnd();
+    }
+  }
+  return s;
 }
 
 function parseScalar(raw) {

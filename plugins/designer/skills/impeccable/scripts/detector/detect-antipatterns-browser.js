@@ -38,7 +38,7 @@ const OVERUSED_FONTS = new Set([
   // Older monoculture (still ubiquitous):
   'inter', 'roboto', 'open sans', 'lato', 'montserrat', 'arial', 'helvetica',
   // Newer monoculture (the Anthropic-skill / Vercel / GitHub default wave):
-  'fraunces', 'instrument sans',
+  'fraunces', 'instrument sans', 'instrument serif',
   'geist', 'geist sans', 'geist mono',
   'mona sans',
   'plus jakarta sans', 'space grotesk', 'recoleta',
@@ -166,6 +166,15 @@ const ANTIPATTERNS = [
     skillGuideline: 'AI color palette',
   },
   {
+    id: 'cream-palette',
+    category: 'slop',
+    name: 'Cream / beige palette',
+    description:
+      'A warm cream or beige page background has become the default "tasteful" AI surface, reached for by reflex. Choose a background that comes from a deliberate palette, not the safe warm off-white.',
+    skillSection: 'Color & Contrast',
+    skillGuideline: 'cream and beige as the default surface',
+  },
+  {
     id: 'nested-cards',
     category: 'slop',
     name: 'Nested cards',
@@ -182,15 +191,6 @@ const ANTIPATTERNS = [
       'The same spacing value used everywhere — no rhythm, no variation. Use tight groupings for related items and generous separations between sections.',
     skillSection: 'Layout & Space',
     skillGuideline: 'same spacing everywhere',
-  },
-  {
-    id: 'everything-centered',
-    category: 'slop',
-    name: 'Everything centered',
-    description:
-      'Every text element is center-aligned. Left-aligned text with asymmetric layouts feels more designed. Center only hero sections and CTAs.',
-    skillSection: 'Layout & Space',
-    skillGuideline: 'Center everything',
   },
   {
     id: 'bounce-easing',
@@ -247,17 +247,72 @@ const ANTIPATTERNS = [
     skillSection: 'Typography',
     skillGuideline: 'repeated eyebrow or kicker labels as section scaffolding',
   },
+  {
+    id: 'numbered-section-markers',
+    category: 'slop',
+    severity: 'advisory',
+    name: 'Numbered section markers (01 / 02 / 03)',
+    description:
+      'Numbered display markers as section labels (01, 02, 03) are the AI editorial scaffold one tier deeper than tracked eyebrow chips. If you find yourself reaching for them, choose a different section cadence.',
+    skillSection: 'Layout & Space',
+    skillGuideline: 'numbered section markers',
+  },
+  {
+    id: 'em-dash-overuse',
+    category: 'slop',
+    name: 'Em-dash overuse',
+    description:
+      'More than two em-dashes (— or --) in body copy is an AI cadence tell. Use commas, colons, periods, or parentheses instead.',
+    skillSection: 'Copy',
+    skillGuideline: 'no em dashes',
+  },
+  {
+    id: 'marketing-buzzword',
+    category: 'slop',
+    name: 'Marketing buzzword',
+    description:
+      'Generic SaaS phrases (streamline / empower / supercharge / world-class / enterprise-grade / next-generation / cutting-edge / etc) are instant AI tells. Pick a specific verb and noun that says what the product literally does.',
+    skillSection: 'Copy',
+    skillGuideline: 'marketing buzzwords',
+  },
+  {
+    id: 'aphoristic-cadence',
+    category: 'slop',
+    name: 'Aphoristic-cadence copy',
+    description:
+      'Three or more sections landing on a short rebuttal sentence ("X. No Y." / "X. Just Y.") or a manufactured-contrast aphorism ("Not a feature. A platform.") reads as AI cadence, not voice. Once is fine; the pattern is the tell.',
+    skillSection: 'Copy',
+    skillGuideline: 'aphoristic cadence',
+  },
+  {
+    id: 'oversized-h1',
+    category: 'slop',
+    name: 'Oversized hero headline',
+    description:
+      'A full-sentence headline set at display size ends up dominating the viewport, leaving no room for anything else above the fold. A punchy one- or two-word headline at that size is fine — the problem is a long headline blown up too large. Set long headlines smaller, or tighten the copy.',
+    skillSection: 'Typography',
+    skillGuideline: 'long headline set at display size',
+  },
+  {
+    id: 'extreme-negative-tracking',
+    category: 'slop',
+    name: 'Crushed letter spacing',
+    description:
+      'Letter-spacing pulled tighter than the point where characters keep their own shapes costs legibility. Tighten display type optically, not destructively.',
+    skillSection: 'Typography',
+    skillGuideline: 'letter spacing crushed past legibility',
+  },
+  {
+    id: 'broken-image',
+    category: 'quality',
+    name: 'Broken or placeholder image',
+    description:
+      '<img> tags with empty src, missing src, or placeholder values ship as broken-image boxes. Use real images, generated assets, or remove the tag.',
+    skillSection: 'Imagery',
+    skillGuideline: 'broken image references',
+  },
 
   // ── Quality: general design and accessibility issues ──
-  {
-    id: 'pure-black-white',
-    category: 'quality',
-    name: 'Pure black background',
-    description:
-      'Pure #000000 as a background color looks harsh and unnatural. Tint it slightly toward your brand hue (e.g., oklch(12% 0.01 250)) for a more refined feel.',
-    skillSection: 'Color & Contrast',
-    skillGuideline: 'pure black (#000)',
-  },
   {
     id: 'gray-on-color',
     category: 'quality',
@@ -297,7 +352,9 @@ const ANTIPATTERNS = [
     category: 'quality',
     name: 'Cramped padding',
     description:
-      'Text is too close to the edge of its container. Add at least 8px (ideally 12-16px) of padding inside bordered or colored containers.',
+      'Text is too close to the edge of its container. Two shapes: (1) an element with its own text where the padding is too low for the font size, and (2) a wrapper with text-bearing children and near-zero padding against a visible boundary (border, outline, or non-transparent background) — children land flush against the boundary line. Add at least 8px (ideally 12–16px) of padding inside bordered, outlined, or colored containers.',
+    skillSection: 'Layout & Space',
+    skillGuideline: 'inside bordered or colored containers',
   },
   {
     id: 'body-text-viewport-edge',
@@ -349,6 +406,99 @@ const ANTIPATTERNS = [
     name: 'Wide letter spacing on body text',
     description:
       'Letter spacing above 0.05em on body text disrupts natural character groupings and slows reading. Reserve wide tracking for short uppercase labels only.',
+  },
+  {
+    id: 'text-overflow',
+    category: 'quality',
+    name: 'Content overflowing its container',
+    description:
+      'Content renders wider than its container, spilling out or forcing a horizontal scrollbar. Let text wrap, constrain widths, or give the region a deliberate scroll affordance.',
+    skillSection: 'Layout & Space',
+    skillGuideline: 'content wider than its container',
+  },
+  {
+    id: 'clipped-overflow-container',
+    category: 'quality',
+    name: 'Positioned child clipped by overflow container',
+    description:
+      'A clipping container (overflow hidden or clip) wrapping an absolutely-positioned child cuts off tooltips, menus, and popovers that need to escape. Let the overflow be visible, or move the positioned layer out of the clip.',
+    skillSection: 'Layout & Space',
+    skillGuideline: 'overflow container clipping positioned children',
+  },
+  {
+    id: 'design-system-font',
+    category: 'quality',
+    name: 'Font outside DESIGN.md',
+    description:
+      'A font is used that is not declared in DESIGN.md typography. Use the documented type system or update DESIGN.md if this is an intentional brand addition.',
+    skillSection: 'Typography',
+    skillGuideline: 'font family outside the project design system',
+  },
+  {
+    id: 'design-system-color',
+    category: 'quality',
+    severity: 'advisory',
+    name: 'Color outside DESIGN.md',
+    description:
+      'A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.',
+    skillSection: 'Color & Contrast',
+    skillGuideline: 'literal color outside the project design system',
+  },
+  {
+    id: 'design-system-radius',
+    category: 'quality',
+    severity: 'advisory',
+    name: 'Radius outside DESIGN.md',
+    description:
+      'A border-radius value is outside the DESIGN.md rounded scale. Use a documented radius token or update the design system if the new shape is intentional.',
+    skillSection: 'Visual Details',
+    skillGuideline: 'border radius outside the project design system',
+  },
+
+  // ── Provider tells: opt-in via --gpt / --gemini (gated off by default) ──
+  {
+    id: 'gpt-thin-border-wide-shadow',
+    category: 'slop',
+    severity: 'advisory',
+    gated: 'gpt',
+    name: 'Hairline border with wide shadow',
+    description:
+      'A hairline border paired with a wide, diffuse shadow is a recurring generated-UI signature. Commit to one — a defined edge or a soft elevation — rather than both at once.',
+    skillSection: 'Visual Details',
+    skillGuideline: 'hairline border plus wide diffuse shadow',
+  },
+  {
+    id: 'repeating-stripes-gradient',
+    category: 'slop',
+    severity: 'advisory',
+    gated: 'gpt',
+    name: 'Repeating-gradient stripes',
+    description:
+      'Repeating-gradient stripes used as surface decoration are a recurring generated-UI signature. Reach for a deliberate texture or leave the surface plain.',
+    skillSection: 'Visual Details',
+    skillGuideline: 'repeating-gradient decorative stripes',
+  },
+  {
+    id: 'theater-slop-phrase',
+    category: 'slop',
+    severity: 'advisory',
+    gated: 'gpt',
+    name: 'Theater framing copy',
+    description:
+      'Dismissing something as "theater" is a recurring generated-copy tic. Say plainly what the thing does or does not do.',
+    skillSection: 'Copy',
+    skillGuideline: 'theater framing copy',
+  },
+  {
+    id: 'image-hover-transform',
+    category: 'slop',
+    severity: 'advisory',
+    gated: 'gemini',
+    name: 'Image hover transform',
+    description:
+      'Scaling or rotating an image on hover is a recurring generated-UI signature. Let imagery sit still, or use a subtler, purposeful interaction.',
+    skillSection: 'Motion',
+    skillGuideline: 'image scale or rotate on hover',
   },
 ];
 
@@ -527,11 +677,6 @@ function checkColors(opts) {
   }
   const findings = [];
 
-  // Pure black background (only solid or near-solid, not semi-transparent overlays)
-  if (bgColor && bgColor.a >= 0.9 && bgColor.r === 0 && bgColor.g === 0 && bgColor.b === 0) {
-    findings.push({ id: 'pure-black-white', snippet: '#000000 background' });
-  }
-
   if (hasDirectText && textColor && !isEmojiOnly) {
     // Run background-dependent checks against either a solid bg or, if the
     // ancestor is a gradient, against every gradient stop (use the worst case).
@@ -587,9 +732,6 @@ function checkColors(opts) {
   // Tailwind class checks
   if (classList) {
     const classStr = typeof classList === 'string' ? classList : Array.from(classList).join(' ');
-    if (/\bbg-black\b(?!\/)/.test(classStr)) {
-      findings.push({ id: 'pure-black-white', snippet: 'bg-black' });
-    }
 
     const grayMatch = classStr.match(/\btext-(?:gray|slate|zinc|neutral|stone)-\d+\b/);
     const colorBgMatch = classStr.match(/\bbg-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d+\b/);
@@ -905,12 +1047,6 @@ function checkHtmlPatterns(html) {
 
   // --- Color ---
 
-  // Pure black background
-  const pureBlackBgRe = /background(?:-color)?\s*:\s*(?:#000000|#000|rgb\(\s*0,\s*0,\s*0\s*\))\b/gi;
-  if (pureBlackBgRe.test(html)) {
-    findings.push({ id: 'pure-black-white', snippet: 'Pure #000 background' });
-  }
-
   // AI color palette: purple/violet
   const purpleHexRe = /#(?:7c3aed|8b5cf6|a855f7|9333ea|7e22ce|6d28d9|6366f1|764ba2|667eea)\b/gi;
   if (purpleHexRe.test(html)) {
@@ -977,9 +1113,13 @@ function checkHtmlPatterns(html) {
   // --- Motion ---
 
   // Bounce/elastic animation names
-  const bounceRe = /animation(?:-name)?\s*:\s*[^;]*\b(bounce|elastic|wobble|jiggle|spring)\b/gi;
-  if (bounceRe.test(html)) {
-    findings.push({ id: 'bounce-easing', snippet: 'Bounce/elastic animation in CSS' });
+  const bounceRe = /animation(?:-name)?\s*:\s*([^;{}]*(?:bounce|elastic|wobble|jiggle|spring)[^;{}]*)/gi;
+  const bounceMatch = bounceRe.exec(html);
+  if (bounceMatch) {
+    const animationToken = bounceMatch[1]
+      .split(/[,\s]+/)
+      .find((part) => /bounce|elastic|wobble|jiggle|spring/i.test(part));
+    findings.push({ id: 'bounce-easing', snippet: `animation: ${animationToken || bounceMatch[1].trim()}` });
   }
 
   // Overshoot cubic-bezier
@@ -1024,6 +1164,39 @@ function checkHtmlPatterns(html) {
         findings.push({ id: 'dark-glow', snippet: `Colored glow (rgb(${r},${g},${b})) on dark page` });
         break;
       }
+    }
+  }
+
+  // --- Provider tells (gated): repeating-gradient stripes (GPT) ---
+  if (/repeating-(?:linear|radial|conic)-gradient\s*\(/i.test(html)) {
+    findings.push({ id: 'repeating-stripes-gradient', snippet: 'repeating-gradient decorative stripes' });
+  }
+
+  // --- Provider tells (gated): "X theater" framing copy (GPT) ---
+  // Lives here (regex-on-HTML) rather than in the text-content analyzers so it
+  // runs in the bundled browser path too, not just the CLI/static path.
+  {
+    const bodyText = html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ');
+    const tm = /\b(\w+)\s+theater\b/i.exec(bodyText);
+    if (tm) findings.push({ id: 'theater-slop-phrase', snippet: `"${tm[0].trim()}"` });
+  }
+
+  // --- Provider tells (gated): image hover transform (Gemini) ---
+  // A CSS `img...:hover { transform: ... }` rule, or a Tailwind hover:scale /
+  // hover:rotate / hover:translate utility on an <img>. Each distinct
+  // mechanism is its own finding.
+  const imgHoverCss = /\bimg\b[^,{}]*:hover\b[^{}]*\{[^}]*\btransform\s*:\s*(?:scale|rotate|translate|matrix|skew)/i;
+  if (imgHoverCss.test(html)) {
+    findings.push({ id: 'image-hover-transform', snippet: 'img:hover { transform } rule' });
+  }
+  const imgTagRe = /<img\b[^>]*\bclass\s*=\s*"([^"]*)"/gi;
+  let im;
+  while ((im = imgTagRe.exec(html)) !== null) {
+    if (/\bhover:(?:scale|rotate|translate|skew)-/.test(im[1])) {
+      findings.push({ id: 'image-hover-transform', snippet: 'Tailwind hover transform on <img>' });
     }
   }
 
@@ -1404,11 +1577,16 @@ function parseAnyColor(s) {
   // OKLCH parser. Tailwind v4's CSS minifier squishes the space after
   // `%` ("21.5%.02 50"), so the separator between L and C may be absent.
   // Match L (with optional %), then C and H separated permissively.
-  m = str.match(/oklch\(\s*([\d.]+)(%?)\s*[\s,]*\s*([\d.]+)\s*[\s,]+\s*([-\d.]+)(?:deg)?\s*\)/i);
+  m = str.match(/oklch\(\s*([\d.]+)(%?)\s*[\s,]*\s*([\d.]+)\s*[\s,]+\s*([-\d.]+)(?:deg)?(?:\s*\/\s*([\d.]+)(%)?)?\s*\)/i);
   if (m) {
     const Lnum = parseFloat(m[1]);
     const L = m[2] === '%' ? Lnum / 100 : Lnum;
-    return oklchToRgb(L, parseFloat(m[3]), parseFloat(m[4]));
+    const rgb = oklchToRgb(L, parseFloat(m[3]), parseFloat(m[4]));
+    if (m[5] !== undefined) {
+      const alpha = parseFloat(m[5]);
+      rgb.a = m[6] === '%' ? alpha / 100 : alpha;
+    }
+    return rgb;
   }
   return null;
 }
@@ -1437,7 +1615,17 @@ const REPEATED_KICKER_SKIP_SELECTOR = [
   '[role="navigation"]',
   '[aria-label*="breadcrumb" i]',
   '[class*="breadcrumb" i]',
+  '[aria-hidden="true"]',
   '[data-impeccable-allow-kickers]',
+].join(',');
+
+const REPEATED_KICKER_CARD_CONTEXT_SELECTOR = [
+  'article',
+  'button',
+  'a',
+  'li',
+  '[role="listitem"]',
+  '[role="option"]',
 ].join(',');
 
 function cleanInlineText(el) {
@@ -1447,6 +1635,11 @@ function cleanInlineText(el) {
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function isRepeatedKickerCardContext(heading, kicker) {
+  const item = heading.closest?.(REPEATED_KICKER_CARD_CONTEXT_SELECTOR);
+  return Boolean(item && (!item.contains || item.contains(kicker)));
 }
 
 function isRepeatedKickerCandidate(opts) {
@@ -1462,6 +1655,7 @@ function isRepeatedKickerCandidate(opts) {
   } = opts;
   if (!['h2', 'h3', 'h4'].includes(headingTag)) return false;
   if (!headingText || headingText.length < 3) return false;
+  if (/^\/[\w-]+/i.test(headingText.replace(/^"|"$/g, '').trim())) return false;
   if (!(headingFontSize >= 20)) return false;
   if (!kickerTag || HEADING_TAGS.has(kickerTag)) return false;
   if (!['p', 'span', 'div', 'small'].includes(kickerTag)) return false;
@@ -1483,6 +1677,7 @@ function collectRepeatedSectionKickerCandidates(doc, getStyle, resolveLetterSpac
     if (heading.closest?.(REPEATED_KICKER_SKIP_SELECTOR)) continue;
     const kicker = heading.previousElementSibling;
     if (!kicker || kicker.closest?.(REPEATED_KICKER_SKIP_SELECTOR)) continue;
+    if (isRepeatedKickerCardContext(heading, kicker)) continue;
 
     const headingStyle = getStyle(heading);
     const kickerStyle = getStyle(kicker);
@@ -1665,6 +1860,84 @@ function resolveLengthPx(value, fontSizePx) {
   return num * fontSizePx;
 }
 
+function cssColorIsTransparent(value) {
+  if (!value) return true;
+  const str = String(value).trim().toLowerCase();
+  if (!str || str === 'transparent' || str === 'rgba(0, 0, 0, 0)') return true;
+  const parsed = parseAnyColor(str);
+  if (parsed) return (parsed.a ?? 1) <= 0.05;
+  return /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0(?:\.0+)?\s*\)$/.test(str);
+}
+
+function colorsNearlyMatch(a, b) {
+  const ca = parseAnyColor(a);
+  const cb = parseAnyColor(b);
+  if (!ca || !cb) return false;
+  const alphaDelta = Math.abs((ca.a ?? 1) - (cb.a ?? 1));
+  const channelDelta = Math.max(
+    Math.abs(ca.r - cb.r),
+    Math.abs(ca.g - cb.g),
+    Math.abs(ca.b - cb.b),
+  );
+  return alphaDelta <= 0.03 && channelDelta <= 3;
+}
+
+function getComputedStyleFor(win, el) {
+  if (win && typeof win.getComputedStyle === 'function') {
+    try { return win.getComputedStyle(el); } catch {}
+  }
+  if (typeof getComputedStyle === 'function') {
+    try { return getComputedStyle(el); } catch {}
+  }
+  return null;
+}
+
+function hasVisibleBackgroundBoundary(style, el, win) {
+  const bg = style?.backgroundColor || '';
+  if (cssColorIsTransparent(bg)) return false;
+
+  let parent = el?.parentElement || null;
+  while (parent) {
+    const parentStyle = getComputedStyleFor(win, parent);
+    const parentBg = parentStyle?.backgroundColor || '';
+    if (!cssColorIsTransparent(parentBg)) {
+      return !colorsNearlyMatch(bg, parentBg);
+    }
+    parent = parent.parentElement;
+  }
+
+  return true;
+}
+
+const TEXT_EDGE_TAGS = new Set(['A', 'BUTTON', 'CODE', 'DD', 'DT', 'FIGCAPTION', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'P', 'PRE', 'SPAN', 'TD', 'TH']);
+
+function hasMeaningfulDirectText(node) {
+  if (!node?.childNodes) return false;
+  for (const child of node.childNodes) {
+    if (child.nodeType === 3 && child.textContent.trim().length > 4) return true;
+  }
+  return false;
+}
+
+function textDescendantsFlushSides(el, rect) {
+  const flush = { top: false, right: false, bottom: false, left: false };
+  if (!rect || !el?.querySelectorAll) return flush;
+  const TEXT_EDGE_THRESHOLD = 4;
+  const candidates = el.querySelectorAll('a, button, code, dd, dt, figcaption, h1, h2, h3, h4, h5, h6, li, p, pre, span, td, th');
+  for (const node of candidates) {
+    if (!TEXT_EDGE_TAGS.has(node.tagName) || !hasMeaningfulDirectText(node)) continue;
+    let nodeRect = null;
+    try { nodeRect = node.getBoundingClientRect(); } catch {}
+    if (!nodeRect || nodeRect.width <= 0 || nodeRect.height <= 0) continue;
+    if (nodeRect.bottom < rect.top || nodeRect.top > rect.bottom || nodeRect.right < rect.left || nodeRect.left > rect.right) continue;
+    if (nodeRect.top - rect.top <= TEXT_EDGE_THRESHOLD) flush.top = true;
+    if (rect.right - nodeRect.right <= TEXT_EDGE_THRESHOLD) flush.right = true;
+    if (rect.bottom - nodeRect.bottom <= TEXT_EDGE_THRESHOLD) flush.bottom = true;
+    if (nodeRect.left - rect.left <= TEXT_EDGE_THRESHOLD) flush.left = true;
+  }
+  return flush;
+}
+
 // Pure quality checks. Most run on computed CSS and DOM-only inputs (work in
 // jsdom and the browser). Two checks (line-length, cramped-padding) gate on
 // element rect dimensions, which jsdom can't compute — pass `rect: null` from
@@ -1673,7 +1946,7 @@ function resolveLengthPx(value, fontSizePx) {
 // Both adapters resolve font-size, line-height and letter-spacing to pixels
 // before calling this so the pure function only deals with numbers.
 function checkQuality(opts) {
-  const { el, tag, style, hasDirectText, textLen, fontSize, lineHeightPx, letterSpacingPx, rect, lineMax = 80, viewportWidth = 0 } = opts;
+  const { el, tag, style, hasDirectText, textLen, fontSize, lineHeightPx, letterSpacingPx, rect, lineMax = 80, viewportWidth = 0, win = null } = opts;
   const findings = [];
   // Skip browser extension injected elements
   const elId = el.id || '';
@@ -1694,7 +1967,8 @@ function checkQuality(opts) {
   // font-size — bigger text demands proportionally more padding.
   //   vertical:   max(4px, fontSize × 0.3)
   //   horizontal: max(8px, fontSize × 0.5)
-  if (rect && hasDirectText && textLen > 20 && rect.width > 100 && rect.height > 30) {
+  const isInlineCode = tag === 'code' && !(el.closest && el.closest('pre'));
+  if (!isInlineCode && rect && hasDirectText && textLen > 20 && rect.width > 100 && rect.height > 30) {
     const borders = {
       top: parseFloat(style.borderTopWidth) || 0,
       right: parseFloat(style.borderRightWidth) || 0,
@@ -1702,7 +1976,7 @@ function checkQuality(opts) {
       left: parseFloat(style.borderLeftWidth) || 0,
     };
     const borderCount = Object.values(borders).filter(w => w > 0).length;
-    const hasBg = style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)';
+    const hasBg = hasVisibleBackgroundBoundary(style, el, win);
     if (borderCount >= 2 || hasBg) {
       const vPads = [], hPads = [];
       if (hasBg || borders.top > 0) vPads.push(parseFloat(style.paddingTop) || 0);
@@ -1720,6 +1994,167 @@ function checkQuality(opts) {
         findings.push({ id: 'cramped-padding', snippet: `${vMin}px vertical padding (need ≥${vThresh.toFixed(1)}px for ${fontSize}px text)` });
       } else if (hMin < hThresh) {
         findings.push({ id: 'cramped-padding', snippet: `${hMin}px horizontal padding (need ≥${hThresh.toFixed(1)}px for ${fontSize}px text)` });
+      }
+    }
+  }
+
+  // --- Flush against a visible boundary ---
+  // Fires when a container has a visible boundary (border, outline, OR a
+  // non-transparent background) AND near-zero padding on the bounded
+  // side(s) AND text-bearing children land flush against the boundary.
+  //
+  // Distinct from cramped-padding: that rule needs the element itself to
+  // have direct text (hasDirectText). This rule targets the OPPOSITE
+  // shape — a container with NO direct text, only children — which is
+  // exactly what cramped-padding misses (a section wrapping a label +
+  // list lands a free pass).
+  //
+  // The classic shape: agent writes `padding: 28px 0 0` shorthand on a
+  // section that also has a border, zeroing horizontal padding so the
+  // text-bearing children touch the side borders. Background and
+  // outline count too: a colored card with zero padding has the same
+  // visual failure mode.
+  {
+    const FLUSH_SKIP_TAGS = new Set(['HTML', 'BODY', 'MAIN', 'HEADER', 'FOOTER', 'NAV', 'ARTICLE', 'ASIDE', 'BUTTON', 'A', 'LABEL', 'SUMMARY', 'CODE', 'PRE', 'INPUT', 'TEXTAREA', 'SELECT', 'FORM', 'FIGURE', 'TABLE', 'TBODY', 'THEAD', 'TR', 'TD', 'TH']);
+    const upperTag = tag ? tag.toUpperCase() : '';
+    const elPosition = style.position || '';
+    if (
+      !FLUSH_SKIP_TAGS.has(upperTag) &&
+      !hasDirectText &&
+      !['fixed', 'absolute'].includes(elPosition) &&
+      el.children && el.children.length > 0
+    ) {
+      const borderW = {
+        top:    parseFloat(style.borderTopWidth)    || 0,
+        right:  parseFloat(style.borderRightWidth)  || 0,
+        bottom: parseFloat(style.borderBottomWidth) || 0,
+        left:   parseFloat(style.borderLeftWidth)   || 0,
+      };
+      const borderVisible = {
+        top:    borderW.top    > 0 && !cssColorIsTransparent(style.borderTopColor),
+        right:  borderW.right  > 0 && !cssColorIsTransparent(style.borderRightColor),
+        bottom: borderW.bottom > 0 && !cssColorIsTransparent(style.borderBottomColor),
+        left:   borderW.left   > 0 && !cssColorIsTransparent(style.borderLeftColor),
+      };
+      // Outline detection. jsdom decomposes `border` shorthand into
+      // border{Top,…}Width/Color but does NOT decompose `outline` —
+      // the longhands come back empty when the value was set via the
+      // shorthand. Fall back to parsing `style.outline` ourselves.
+      let outlineW = parseFloat(style.outlineWidth) || 0;
+      let outlineStyleVal = style.outlineStyle || '';
+      let outlineColorVal = style.outlineColor || '';
+      if (!outlineW && style.outline) {
+        const wMatch = style.outline.match(/(\d+(?:\.\d+)?)\s*px/);
+        if (wMatch) outlineW = parseFloat(wMatch[1]) || 0;
+        if (!outlineStyleVal) {
+          outlineStyleVal = /\b(solid|dashed|dotted|double|groove|ridge|inset|outset)\b/.test(style.outline) ? 'solid' : '';
+        }
+        if (!outlineColorVal) {
+          const cMatch = style.outline.match(/(rgba?\([^)]+\)|#[0-9a-fA-F]{3,8}|[a-zA-Z]+)\s*$/);
+          if (cMatch) outlineColorVal = cMatch[1];
+        }
+      }
+      const outlineVisible = outlineW > 0 && !cssColorIsTransparent(outlineColorVal) && outlineStyleVal && outlineStyleVal !== 'none';
+      const bgVisible = hasVisibleBackgroundBoundary(style, el, win);
+
+      const anyVisible = borderVisible.top || borderVisible.right || borderVisible.bottom || borderVisible.left || outlineVisible || bgVisible;
+      if (anyVisible) {
+        // Resolve padding to px (jsdom returns raw "1.5rem" etc., not the
+        // computed px value; parseFloat would strip the unit and treat
+        // 1.5rem as 1.5px, false-flagging legitimate insets).
+        const pad = {
+          top:    resolveLengthPx(style.paddingTop,    fontSize) ?? 0,
+          right:  resolveLengthPx(style.paddingRight,  fontSize) ?? 0,
+          bottom: resolveLengthPx(style.paddingBottom, fontSize) ?? 0,
+          left:   resolveLengthPx(style.paddingLeft,   fontSize) ?? 0,
+        };
+        const PAD_THRESHOLD = 2;
+        // Children-insulate-this-side: a side is insulated if ANY direct
+        // child has its own padding ≥ 4px on that side. Rationale: in
+        // typical flow, only the first/last (or leftmost/rightmost)
+        // children actually sit at the parent's edges. If even one of
+        // them has its own padding, the visual flush is broken on that
+        // side. Classic example: a column-flow card frame where the
+        // top child (header) has padding-top:12 and the bottom child
+        // (footer) has padding-bottom:8 — the parent's padding:0 doesn't
+        // matter; nothing is actually flush. The `any-child-insulates`
+        // heuristic accepts some false negatives (a card with one heavily
+        // padded middle child won't flag) for far fewer false positives.
+        const CHILD_INSULATE_THRESHOLD = 4;
+        const childrenInsulate = { top: false, right: false, bottom: false, left: false };
+        for (const child of el.children) {
+          let childStyle = getComputedStyleFor(win, child);
+          if (!childStyle) continue;
+          const childPad = {
+            top:    resolveLengthPx(childStyle.paddingTop,    fontSize) ?? 0,
+            right:  resolveLengthPx(childStyle.paddingRight,  fontSize) ?? 0,
+            bottom: resolveLengthPx(childStyle.paddingBottom, fontSize) ?? 0,
+            left:   resolveLengthPx(childStyle.paddingLeft,   fontSize) ?? 0,
+          };
+          const childMargin = {
+            top:    resolveLengthPx(childStyle.marginTop,    fontSize) ?? 0,
+            right:  resolveLengthPx(childStyle.marginRight,  fontSize) ?? 0,
+            bottom: resolveLengthPx(childStyle.marginBottom, fontSize) ?? 0,
+            left:   resolveLengthPx(childStyle.marginLeft,   fontSize) ?? 0,
+          };
+          if (rect && typeof child.getBoundingClientRect === 'function') {
+            try {
+              const childRect = child.getBoundingClientRect();
+              if (childRect && childRect.width > 0 && childRect.height > 0) {
+                if (childRect.top - rect.top >= CHILD_INSULATE_THRESHOLD) childrenInsulate.top = true;
+                if (rect.right - childRect.right >= CHILD_INSULATE_THRESHOLD) childrenInsulate.right = true;
+                if (rect.bottom - childRect.bottom >= CHILD_INSULATE_THRESHOLD) childrenInsulate.bottom = true;
+                if (childRect.left - rect.left >= CHILD_INSULATE_THRESHOLD) childrenInsulate.left = true;
+              }
+            } catch {}
+          }
+          for (const s of ['top', 'right', 'bottom', 'left']) {
+            if (childPad[s] >= CHILD_INSULATE_THRESHOLD || childMargin[s] >= CHILD_INSULATE_THRESHOLD) {
+              childrenInsulate[s] = true;
+            }
+          }
+        }
+
+        const textFlush = rect ? textDescendantsFlushSides(el, rect) : null;
+        const fullBleedBgBand = rect && viewportWidth > 0 && rect.width >= viewportWidth * 0.94 && bgVisible && !outlineVisible;
+        const flushSides = [];
+        for (const side of ['top', 'right', 'bottom', 'left']) {
+          const bgBoundsSide = bgVisible && !(fullBleedBgBand && (side === 'left' || side === 'right'));
+          const sideBounded = borderVisible[side] || outlineVisible || bgBoundsSide;
+          if (sideBounded && pad[side] <= PAD_THRESHOLD && !childrenInsulate[side] && (!textFlush || textFlush[side])) {
+            flushSides.push(side);
+          }
+        }
+
+        if (flushSides.length > 0) {
+          // Confirm at least one direct child has substantial text content
+          // (> 4 chars). Without this, the flush is harmless: e.g. an
+          // image-only card.
+          let hasTextChild = false;
+          for (const child of el.children) {
+            const childText = (child.textContent || '').trim();
+            if (childText.length > 4) { hasTextChild = true; break; }
+          }
+          if (hasTextChild) {
+            const cls = (typeof el.className === 'string' && el.className.trim())
+              ? el.className.trim().split(/\s+/)[0]
+              : '';
+            const boundaryParts = [];
+            const borderSidesVisible = ['top', 'right', 'bottom', 'left'].filter(s => borderVisible[s]);
+            if (borderSidesVisible.length === 4) boundaryParts.push('border');
+            else if (borderSidesVisible.length > 0) boundaryParts.push(`border-${borderSidesVisible.join('/')}`);
+            if (outlineVisible) boundaryParts.push('outline');
+            if (bgVisible) boundaryParts.push('bg');
+            const sidesLabel = flushSides.length === 4 ? 'all sides' : flushSides.join('/');
+            const ident = cls
+              ? `<${tag.toLowerCase()}> "${cls}"`
+              : `<${tag.toLowerCase()}>`;
+            findings.push({
+              id: 'cramped-padding',
+              snippet: `${ident}: children flush against ${boundaryParts.join('+')} on ${sidesLabel} (no inset)`,
+            });
+          }
+        }
       }
     }
   }
@@ -1780,7 +2215,7 @@ function checkQuality(opts) {
   // Only flag actual body content, not UI labels (buttons, tabs, badges, captions, footer text, etc.)
   if (hasDirectText && textLen > 20 && fontSize < 12) {
     const skipTags = ['sub', 'sup', 'code', 'kbd', 'samp', 'var', 'caption', 'figcaption'];
-    const inUIContext = el.closest && el.closest('button, a, label, summary, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="option"], nav, footer, [class*="badge" i], [class*="chip" i], [class*="pill" i], [class*="tag" i], [class*="label" i], [class*="caption" i]');
+    const inUIContext = el.closest && el.closest('button, a, label, summary, pre, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="option"], nav, footer, [aria-hidden="true"], [class*="badge" i], [class*="caption" i], [class*="chip" i], [class*="code" i], [class*="console" i], [class*="diff" i], [class*="label" i], [class*="meta" i], [class*="mock" i], [class*="pill" i], [class*="preview" i], [class*="tag" i], [class*="terminal" i], [class*="writes" i]');
     const isUppercase = style.textTransform === 'uppercase';
     if (!skipTags.includes(tag) && !inUIContext && !isUppercase) {
       findings.push({ id: 'tiny-text', snippet: `${fontSize}px body text` });
@@ -1804,6 +2239,20 @@ function checkQuality(opts) {
     }
   }
 
+  // --- Crushed letter spacing (mirror of wide-tracking) ---
+  // Tracking pulled tighter than ~-0.05em crushes characters into each other.
+  // Optical tightening that display type legitimately wants (around -0.02em)
+  // stays well above this floor.
+  if (hasDirectText && textLen > 20 && fontSize > 0) {
+    if (letterSpacingPx != null && letterSpacingPx < 0) {
+      const trackingEm = letterSpacingPx / fontSize;
+      if (trackingEm <= -0.05) {
+        const excerpt = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+        findings.push({ id: 'extreme-negative-tracking', snippet: `letter-spacing: ${trackingEm.toFixed(2)}em — "${excerpt}"` });
+      }
+    }
+  }
+
   return findings;
 }
 
@@ -1820,7 +2269,7 @@ function checkElementQualityDOM(el) {
   const rect = el.getBoundingClientRect();
   const lineMax = (typeof window !== 'undefined' && window.__IMPECCABLE_CONFIG__?.lineLengthMax) || 80;
   const viewportWidth = (typeof window !== 'undefined' ? window.innerWidth : 0) || 0;
-  return checkQuality({ el, tag, style, hasDirectText, textLen, fontSize, lineHeightPx, letterSpacingPx, rect, lineMax, viewportWidth });
+  return checkQuality({ el, tag, style, hasDirectText, textLen, fontSize, lineHeightPx, letterSpacingPx, rect, lineMax, viewportWidth, win: typeof window !== 'undefined' ? window : null });
 }
 
 // Pure page-level skipped-heading walk. Takes a Document so it works in both
@@ -1862,7 +2311,7 @@ function checkElementQuality(el, style, tag, window) {
   const fontSize = resolveFontSizePx(el, window);
   const lineHeightPx = resolveLengthPx(style.lineHeight, fontSize);
   const letterSpacingPx = resolveLengthPx(style.letterSpacing, fontSize);
-  return checkQuality({ el, tag, style, hasDirectText, textLen, fontSize, lineHeightPx, letterSpacingPx, rect: null });
+  return checkQuality({ el, tag, style, hasDirectText, textLen, fontSize, lineHeightPx, letterSpacingPx, rect: null, win: window });
 }
 
 function checkElementBorders(tag, style, overrides, resolvedRadius) {
@@ -2303,38 +2752,448 @@ function checkPageLayout(doc, win) {
     }
   }
 
-  // Everything centered
-  const textEls = doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, div, button');
-  let centeredCount = 0;
-  let totalText = 0;
-  for (const el of textEls) {
-    const hasDirectText = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length >= 3);
-    if (!hasDirectText) continue;
-    totalText++;
-
-    let cur = el;
-    let isCentered = false;
-    while (cur && cur.nodeType === 1) {
-      const rawStyle = cur.getAttribute?.('style') || '';
-      const cls = cur.getAttribute?.('class') || '';
-      if (/text-align\s*:\s*center/i.test(rawStyle) || /\btext-center\b/.test(cls)) {
-        isCentered = true;
-        break;
-      }
-      if (cur.tagName === 'BODY') break;
-      cur = cur.parentElement;
-    }
-    if (isCentered) centeredCount++;
-  }
-
-  if (totalText >= 5 && centeredCount / totalText > 0.7) {
-    findings.push({
-      id: 'everything-centered',
-      snippet: `${centeredCount}/${totalText} text elements centered (${Math.round(centeredCount / totalText * 100)}%)`,
-    });
-  }
-
   return findings;
+}
+
+// ─── Cream / beige palette (the default "tasteful" AI surface) ────────────────
+// A warm, lightly-tinted off-white page background — light, with R≥G≥B and a
+// small warm tint (not white, not a strong color). The current reflex surface.
+function isCreamColor(rgb) {
+  if (!rgb) return false;
+  const { r, g, b } = rgb;
+  if (Math.min(r, g, b) < 209) return false;   // must be light
+  if (!(r >= g && g >= b)) return false;        // warm ordering
+  const warmth = r - b;
+  return warmth >= 6 && warmth <= 48;           // tinted, not white, not strong
+}
+
+// Tailwind background utilities that render as a warm off-white surface. The
+// static engine doesn't fetch Tailwind's CSS, so a `bg-amber-50` on <body>
+// resolves to nothing in computed style — catch it from the class list
+// instead. Candidate tokens map to their actual Tailwind hex and are still
+// filtered through isCreamColor, so neutral grays (stone) and over-saturated
+// shades drop out on their own.
+const TAILWIND_BG_HEX = {
+  'bg-amber-50': '#fffbeb', 'bg-amber-100': '#fef3c7',
+  'bg-orange-50': '#fff7ed', 'bg-orange-100': '#ffedd5',
+  'bg-yellow-50': '#fefce8',
+  'bg-stone-50': '#fafaf9', 'bg-stone-100': '#f5f5f4', 'bg-stone-200': '#e7e5e4',
+};
+
+function creamFromClassList(cls) {
+  if (!cls) return null;
+  // Arbitrary value: bg-[#f5f0e6] / bg-[rgb(245_240_230)] (underscores = spaces).
+  const arb = cls.match(/\bbg-\[([^\]]+)\]/);
+  if (arb && isCreamColor(parseAnyColor(arb[1].replace(/_/g, ' ')))) return `bg-[${arb[1]}]`;
+  // Named warm-light utilities.
+  for (const [tok, hex] of Object.entries(TAILWIND_BG_HEX)) {
+    if (new RegExp(`(^|\\s)${tok}($|\\s)`).test(cls) && isCreamColor(parseAnyColor(hex))) return tok;
+  }
+  return null;
+}
+
+function checkCreamPalette(doc, win) {
+  const findings = [];
+  const body = doc.body || (doc.querySelector ? doc.querySelector('body') : null);
+  if (!body) return findings;
+  const html = doc.documentElement;
+  const getCS = (el) => (win ? win.getComputedStyle(el) : getComputedStyle(el));
+
+  // 1. Computed background — covers inline / <style> / linked CSS, and Tailwind
+  //    once it's actually rendered (browser path).
+  let bg = readOwnBackgroundColor(body, getCS(body));
+  if (!bg || bg.a === 0) {
+    if (html) bg = readOwnBackgroundColor(html, getCS(html));
+  }
+  if (isCreamColor(bg)) {
+    findings.push({ id: 'cream-palette', snippet: `cream/beige page background rgb(${bg.r}, ${bg.g}, ${bg.b})` });
+    return findings;
+  }
+
+  // 2. Tailwind class fallback — for the static path, where utility classes
+  //    never resolve to computed CSS.
+  for (const el of [body, html]) {
+    const tok = creamFromClassList(el && el.getAttribute ? el.getAttribute('class') : '');
+    if (tok) {
+      findings.push({ id: 'cream-palette', snippet: `cream/beige page background (Tailwind ${tok})` });
+      break;
+    }
+  }
+  return findings;
+}
+
+// ─── Oversized hero headline ────────────────────────────────────────────────
+// Fires when a *long* headline is set at display size and actually dominates
+// the viewport. A punchy one- or two-word headline at the same size is a
+// legitimate stylistic choice, and a large-but-contained two-line hero should
+// pass too — length and viewport share together are the tell.
+const OVERSIZED_H1_FONT_PX = 72;
+const OVERSIZED_H1_MIN_CHARS = 40;
+const OVERSIZED_H1_MIN_VIEWPORT_HEIGHT_RATIO = 0.28;
+const OVERSIZED_H1_MIN_VIEWPORT_AREA_RATIO = 0.25;
+function checkOversizedH1({ tag, fontSize, headingText, rect = null, viewportWidth = 0, viewportHeight = 0 }) {
+  if (tag !== 'h1') return [];
+  const textLen = headingText.length;
+  if (fontSize >= OVERSIZED_H1_FONT_PX && textLen >= OVERSIZED_H1_MIN_CHARS) {
+    let viewportDetail = '';
+    if (rect && viewportWidth > 0 && viewportHeight > 0) {
+      const heightRatio = rect.height / viewportHeight;
+      const areaRatio = (rect.width * rect.height) / (viewportWidth * viewportHeight);
+      const dominatesViewport = heightRatio >= OVERSIZED_H1_MIN_VIEWPORT_HEIGHT_RATIO
+        || areaRatio >= OVERSIZED_H1_MIN_VIEWPORT_AREA_RATIO;
+      if (!dominatesViewport) return [];
+      viewportDetail = `, ${Math.round(heightRatio * 100)}vh`;
+    }
+    return [{ id: 'oversized-h1', snippet: `${Math.round(fontSize)}px h1, ${textLen} chars${viewportDetail} "${headingText.slice(0, 60)}"` }];
+  }
+  return [];
+}
+
+function checkElementOversizedH1(el, style, tag, window) {
+  if (tag !== 'h1') return [];
+  const fontSize = resolveFontSizePx(el, window);
+  const headingText = (el.textContent || '').trim().replace(/\s+/g, ' ');
+  return checkOversizedH1({ tag, fontSize, headingText });
+}
+
+function checkElementOversizedH1DOM(el) {
+  const tag = el.tagName.toLowerCase();
+  if (tag !== 'h1') return [];
+  const style = getComputedStyle(el);
+  const fontSize = parseFloat(style.fontSize) || 0;
+  const headingText = (el.textContent || '').trim().replace(/\s+/g, ' ');
+  const rect = el.getBoundingClientRect();
+  const viewportWidth = (typeof window !== 'undefined' ? window.innerWidth : 0) || 0;
+  const viewportHeight = (typeof window !== 'undefined' ? window.innerHeight : 0) || 0;
+  return checkOversizedH1({ tag, fontSize, headingText, rect, viewportWidth, viewportHeight });
+}
+
+// ─── GPT tell: hairline border + wide diffuse shadow (gated --gpt) ────────────
+const CSS_COLOR_TOKEN_RE = /(?:rgba?|hsla?|oklch|oklab|lab|lch|color)\([^)]*\)|#[0-9a-fA-F]{3,8}\b|\b(?:black|white|transparent|currentcolor)\b/gi;
+
+function shadowLayerAlpha(layer) {
+  CSS_COLOR_TOKEN_RE.lastIndex = 0;
+  const match = CSS_COLOR_TOKEN_RE.exec(layer);
+  if (!match) return 1;
+  if (match[0].toLowerCase() === 'transparent') return 0;
+  const parsed = parseAnyColor(match[0]);
+  return parsed ? (parsed.a ?? 1) : 1;
+}
+
+function shadowMaxBlurPx(boxShadow, { minAlpha = 0 } = {}) {
+  if (!boxShadow || boxShadow === 'none') return 0;
+  let maxBlur = 0;
+  // Split into layers on commas not inside parentheses (rgba(...) etc.).
+  for (const layer of boxShadow.split(/,(?![^()]*\))/)) {
+    if (shadowLayerAlpha(layer) < minAlpha) continue;
+    // Strip colors and keywords (rgba()/hsl()/hex/named/inset/px), leaving the
+    // ordered length tokens: offsetX offsetY blur [spread]. Static jsdom keeps
+    // unitless zeros ("0 0 24px"); browsers normalize to px ("0px 0px 24px") —
+    // both reduce to the same numbers here.
+    const cleaned = layer.replace(CSS_COLOR_TOKEN_RE, ' ').replace(/\b[a-z]+\b/gi, ' ');
+    const nums = [...cleaned.matchAll(/-?\d*\.?\d+/g)].map(m => parseFloat(m[0]));
+    if (nums.length >= 3) maxBlur = Math.max(maxBlur, nums[2]);
+  }
+  return maxBlur;
+}
+
+function cssColorAlpha(value) {
+  if (cssColorIsTransparent(value)) return 0;
+  const parsed = parseAnyColor(value);
+  return parsed ? (parsed.a ?? 1) : 1;
+}
+
+function checkGptThinBorderWideShadow({ borderWidths, borderColors, boxShadow }) {
+  const visibleThinBorders = borderWidths
+    .map((width, index) => ({ width, alpha: cssColorAlpha(borderColors?.[index] || '') }))
+    .filter(({ width, alpha }) => width > 0 && width <= 1.5 && alpha >= 0.28);
+  const maxBorder = Math.max(0, ...visibleThinBorders.map(({ width }) => width));
+  const blur = shadowMaxBlurPx(boxShadow, { minAlpha: 0.12 });
+  if (visibleThinBorders.length >= 2 && blur >= 16) {
+    return [{ id: 'gpt-thin-border-wide-shadow', snippet: `${maxBorder}px border + ${Math.round(blur)}px shadow blur` }];
+  }
+  return [];
+}
+
+function borderWidthsFromStyle(style) {
+  return [
+    parseFloat(style.borderTopWidth) || 0,
+    parseFloat(style.borderRightWidth) || 0,
+    parseFloat(style.borderBottomWidth) || 0,
+    parseFloat(style.borderLeftWidth) || 0,
+  ];
+}
+
+function borderColorsFromStyle(style) {
+  return [
+    style.borderTopColor || '',
+    style.borderRightColor || '',
+    style.borderBottomColor || '',
+    style.borderLeftColor || '',
+  ];
+}
+
+function checkElementGptBorderShadow(el, style) {
+  return checkGptThinBorderWideShadow({ borderWidths: borderWidthsFromStyle(style), borderColors: borderColorsFromStyle(style), boxShadow: style.boxShadow || '' });
+}
+
+function checkElementGptBorderShadowDOM(el) {
+  const style = getComputedStyle(el);
+  return checkGptThinBorderWideShadow({ borderWidths: borderWidthsFromStyle(style), borderColors: borderColorsFromStyle(style), boxShadow: style.boxShadow || '' });
+}
+
+// ─── Clipped overflow container ───────────────────────────────────────────────
+// A clipping container (overflow hidden/clip, not a scroll region) wrapping an
+// absolutely/fixed-positioned descendant clips popovers/menus that must escape.
+function classSelector(el) {
+  const cls = (el.getAttribute ? el.getAttribute('class') : el.className) || '';
+  const tokens = String(cls).trim().split(/\s+/).filter(Boolean);
+  const tag = el.tagName ? el.tagName.toLowerCase() : 'el';
+  return tokens.length ? `${tag}.${tokens.join('.')}` : tag;
+}
+
+function positionedChildIsDecorative(child) {
+  if (!child || typeof child.getAttribute !== 'function') return false;
+  if (child.closest?.('[aria-hidden="true"]')) return true;
+  const role = (child.getAttribute('role') || '').toLowerCase();
+  if (role === 'none' || role === 'presentation') return true;
+  const tag = child.tagName ? child.tagName.toLowerCase() : '';
+  if (['img', 'svg', 'canvas', 'video'].includes(tag)) return true;
+  const ident = `${child.getAttribute('class') || ''} ${child.getAttribute('id') || ''}`;
+  if (
+    /\b(art|bg|background|badge|blob|crop|decor|dot|glow|grain|image|mask|ornament|overlay|photo|scrim|shadow|shine|texture)\b/i.test(ident) &&
+    !positionedChildHasSubstantiveContent(child)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+const POSITIONED_CHILD_INTERACTIVE_SELECTOR = [
+  'a[href]',
+  'button',
+  'input',
+  'select',
+  'summary',
+  'textarea',
+  '[tabindex]:not([tabindex="-1"])',
+  '[role="button"]',
+  '[role="dialog"]',
+  '[role="link"]',
+  '[role="listbox"]',
+  '[role="menu"]',
+  '[role="menuitem"]',
+  '[role="option"]',
+  '[role="tooltip"]',
+].join(',');
+
+function positionedChildHasSubstantiveContent(child) {
+  const text = (child.textContent || '').replace(/\s+/g, ' ').trim();
+  if (text.length > 0) return true;
+  if (typeof child.matches === 'function') {
+    try {
+      if (child.matches(POSITIONED_CHILD_INTERACTIVE_SELECTOR)) return true;
+    } catch {}
+  }
+  if (typeof child.querySelector === 'function') {
+    try {
+      if (child.querySelector(POSITIONED_CHILD_INTERACTIVE_SELECTOR)) return true;
+    } catch {}
+  }
+  return false;
+}
+
+function clippingContainerIsIntentionalViewport(el) {
+  if (!el || typeof el.getAttribute !== 'function') return false;
+  const roleDescription = (el.getAttribute('aria-roledescription') || '').toLowerCase();
+  if (/\b(carousel|slider)\b/.test(roleDescription)) return true;
+  const ident = `${el.getAttribute('class') || ''} ${el.getAttribute('id') || ''}`.toLowerCase();
+  return /\b(carousel|comparison|compare|fisheye|marquee|preview|scroller|slider|slideshow|split|viewport)\b/.test(ident) ||
+    /\b(demo-area|demo-stage|demo-viewport)\b/.test(ident);
+}
+
+function elementRect(el) {
+  if (!el || typeof el.getBoundingClientRect !== 'function') return null;
+  try {
+    const rect = el.getBoundingClientRect();
+    if (!rect) return null;
+    const values = [rect.top, rect.right, rect.bottom, rect.left, rect.width, rect.height];
+    if (!values.every(Number.isFinite)) return null;
+    if (rect.width <= 0 && rect.height <= 0) return null;
+    return rect;
+  } catch {
+    return null;
+  }
+}
+
+function positionedStyleImpliesEscape(style) {
+  const values = [
+    style.top,
+    style.right,
+    style.bottom,
+    style.left,
+    style.inset,
+    style.insetBlock,
+    style.insetInline,
+    style.insetBlockStart,
+    style.insetBlockEnd,
+    style.insetInlineStart,
+    style.insetInlineEnd,
+  ].filter(Boolean).map(value => String(value).trim().toLowerCase());
+  for (const value of values) {
+    if (/(^|[\s(])-+(?:\d|\.)/.test(value)) return true;
+    if (/(^|[\s(])100(?:\.0+)?%/.test(value)) return true;
+  }
+  return false;
+}
+
+function positionedChildEscapesClip(el, child, clipX, clipY) {
+  const parentRect = elementRect(el);
+  const childRect = elementRect(child);
+  if (!parentRect || !childRect) return null;
+  const threshold = 2;
+  return Boolean(
+    (clipX && (childRect.left < parentRect.left - threshold || childRect.right > parentRect.right + threshold)) ||
+    (clipY && (childRect.top < parentRect.top - threshold || childRect.bottom > parentRect.bottom + threshold))
+  );
+}
+
+function checkClippedOverflow(el, style, getStyle) {
+  const clips = (v) => v === 'hidden' || v === 'clip';
+  const scrolls = (v) => v === 'auto' || v === 'scroll';
+  const ox = style.overflowX || '', oy = style.overflowY || '', ov = style.overflow || '';
+  const clipX = clips(ox) || clips(ov);
+  const clipY = clips(oy) || clips(ov);
+  const anyClip = clipX || clipY;
+  const anyScroll = scrolls(ox) || scrolls(oy) || scrolls(ov);
+  if (!anyClip || anyScroll) return [];
+  if (clippingContainerIsIntentionalViewport(el)) return [];
+  if (!el.querySelectorAll) return [];
+  for (const child of el.querySelectorAll('*')) {
+    const childStyle = getStyle(child);
+    const pos = childStyle.position || '';
+    if (pos === 'absolute' || pos === 'fixed') {
+      if (positionedChildIsDecorative(child)) continue;
+      const escapes = positionedChildEscapesClip(el, child, clipX, clipY);
+      if (escapes === false) continue;
+      if (escapes === null && !positionedStyleImpliesEscape(childStyle)) continue;
+      return [{ id: 'clipped-overflow-container', snippet: `${classSelector(el)} clips a positioned child` }];
+    }
+  }
+  return [];
+}
+
+function checkElementClippedOverflow(el, style, tag, window) {
+  return checkClippedOverflow(el, style, (n) => window.getComputedStyle(n));
+}
+
+function checkElementClippedOverflowDOM(el) {
+  const style = getComputedStyle(el);
+  return checkClippedOverflow(el, style, (n) => getComputedStyle(n));
+}
+
+// ─── Text overflow (browser-only: needs scrollWidth/clientWidth) ──────────────
+const TEXT_OVERFLOW_SKIP_TAGS = new Set(['pre', 'code', 'textarea', 'svg', 'canvas', 'select', 'option', 'marquee']);
+
+function metricLengthPx(value, fontSizePx = 16) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string') return null;
+  return resolveLengthPx(value, fontSizePx);
+}
+
+function firstMetricLengthPx(fontSizePx, ...values) {
+  for (const value of values) {
+    const parsed = metricLengthPx(value, fontSizePx);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function expandBoxShorthand(parts) {
+  if (parts.length === 1) return [parts[0], parts[0], parts[0], parts[0]];
+  if (parts.length === 2) return [parts[0], parts[1], parts[0], parts[1]];
+  if (parts.length === 3) return [parts[0], parts[1], parts[2], parts[1]];
+  return [parts[0], parts[1], parts[2], parts[3]];
+}
+
+function clippedByInset(clipPath) {
+  const match = String(clipPath || '').trim().toLowerCase().match(/^inset\s*\(([^)]*)\)$/);
+  if (!match) return false;
+  const beforeRound = match[1].split(/\s+round\s+/)[0].trim();
+  if (!beforeRound) return false;
+  const values = expandBoxShorthand(beforeRound.split(/\s+/).slice(0, 4));
+  const percents = values.map(value => String(value).trim().match(/^(-?\d+(?:\.\d+)?)%$/));
+  if (percents.some(match => !match)) return false;
+  const [top, right, bottom, left] = percents.map(match => parseFloat(match[1]));
+  return top + bottom >= 100 || left + right >= 100;
+}
+
+function clippedByRect(clip) {
+  const match = String(clip || '').trim().toLowerCase().match(/^rect\s*\(([^)]*)\)$/);
+  if (!match) return false;
+  const values = match[1].split(/[,\s]+/).map(value => value.trim()).filter(Boolean);
+  if (values.length !== 4) return false;
+  const [top, right, bottom, left] = values.map(value => metricLengthPx(value, 16));
+  if ([top, right, bottom, left].some(value => value === null)) return false;
+  return bottom <= top || right <= left;
+}
+
+function isScreenReaderOnlyTextStyle(style, metrics = {}) {
+  if (!style) return false;
+  const overflowValues = [style.overflow, style.overflowX, style.overflowY]
+    .map(value => String(value || '').toLowerCase());
+  const clipsOverflow = overflowValues.some(value => value === 'hidden' || value === 'clip');
+
+  const fontSize = metricLengthPx(style.fontSize, 16) || 16;
+  const width = firstMetricLengthPx(fontSize, metrics.width, metrics.clientWidth, style.width, style.inlineSize);
+  const height = firstMetricLengthPx(fontSize, metrics.height, metrics.clientHeight, style.height, style.blockSize);
+  const isTiny = width !== null && height !== null && width <= 2 && height <= 2;
+  const isAbsolutelyHidden = String(style.position || '').toLowerCase() === 'absolute' && isTiny && clipsOverflow;
+
+  const clipPath = String(style.clipPath || style.webkitClipPath || '').trim();
+  const clip = String(style.clip || '').trim();
+  return isAbsolutelyHidden || clippedByInset(clipPath) || clippedByRect(clip);
+}
+
+function isRenderedForBrowserRule(el) {
+  for (let cur = el; cur && cur.nodeType === 1; cur = cur.parentElement) {
+    if (cur.getAttribute?.('aria-hidden') === 'true') return false;
+    const style = getComputedStyle(cur);
+    const visibility = String(style.visibility || '').toLowerCase();
+    if (style.display === 'none' || visibility === 'hidden' || visibility === 'collapse') return false;
+    if ((parseFloat(style.opacity) || 0) <= 0.01) return false;
+    if (String(style.contentVisibility || '').toLowerCase() === 'hidden') return false;
+  }
+  return true;
+}
+
+function checkElementTextOverflowDOM(el) {
+  const tag = el.tagName.toLowerCase();
+  if (TEXT_OVERFLOW_SKIP_TAGS.has(tag)) return [];
+  if (!isRenderedForBrowserRule(el)) return [];
+  // Only the element that actually owns overflowing text — not its ancestors,
+  // which inherit a wider scrollWidth from the spilling descendant.
+  const hasDirectText = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 0);
+  if (!hasDirectText) return [];
+  const style = getComputedStyle(el);
+  const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+  if (isScreenReaderOnlyTextStyle(style, {
+    width: rect?.width,
+    height: rect?.height,
+    clientWidth: el.clientWidth,
+    clientHeight: el.clientHeight,
+  })) return [];
+  const isScrollRegion = (s) => /(auto|scroll)/.test(s.overflowX || '') || /(auto|scroll)/.test(s.overflow || '');
+  if (isScrollRegion(style)) return [];
+  // A scrollable ancestor means this overflow is intentional and scrollable.
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    if (isScrollRegion(getComputedStyle(p))) return [];
+  }
+  const delta = el.scrollWidth - el.clientWidth;
+  if (el.clientWidth > 0 && delta >= 16) {
+    return [{ id: 'text-overflow', snippet: `${classSelector(el)} overflows its box by ${Math.round(delta)}px` }];
+  }
+  return [];
 }
 
 // --- cli/engine/browser/injected/index.mjs ---
@@ -2349,8 +3208,21 @@ if (IS_BROWSER) {
   const EXTENSION_MODE = (_myScript && _myScript.dataset.impeccableExtension === 'true')
     || document.documentElement.dataset.impeccableExtension === 'true';
 
-  const BRAND_COLOR = 'oklch(55% 0.25 350)';
-  const BRAND_COLOR_HOVER = 'oklch(45% 0.25 350)';
+  // Kinpaku gold — pinned to the site's brand token (see
+  // site/styles/kinpaku-tokens.css --ks-kinpaku). Keep this in sync with
+  // the picker's C.brand in skill/scripts/live-browser.js and the kit's
+  // picker section in site/styles/kinpaku-kit.css.
+  //
+  // One color across both light and dark host pages. The outline is a
+  // 2px gesture pointing at an element + a labeled tag — it's a marker,
+  // not body text, so it doesn't need WCAG AA against the page. The
+  // label text inside the gold tag is dark (LABEL_INK) which has ~16:1
+  // against the leaf gold, so reading the rule name is solid in both
+  // modes. Hover deepens the gold (preserves chroma — never drops it,
+  // dropping chroma washes the gold into a sand/olive tone).
+  const BRAND_COLOR = 'oklch(84% 0.19 80.46)';
+  const BRAND_COLOR_HOVER = 'oklch(74% 0.18 80)';
+  const LABEL_INK = 'oklch(4% 0.004 95)';
   const LABEL_BG = BRAND_COLOR;
   const OUTLINE_COLOR = BRAND_COLOR;
 
@@ -2618,7 +3490,7 @@ if (IS_BROWSER) {
       display: 'flex', alignItems: 'center',
       whiteSpace: 'nowrap',
       fontSize: '11px', fontWeight: '600', letterSpacing: '0.02em',
-      color: 'white', lineHeight: '14px',
+      color: LABEL_INK, lineHeight: '14px',
       background: LABEL_BG,
       fontFamily: 'system-ui, sans-serif',
       borderRadius: '4px 4px 0 0',
@@ -2738,7 +3610,7 @@ if (IS_BROWSER) {
     banner.className = 'impeccable-overlay impeccable-banner';
     Object.assign(banner.style, {
       position: 'fixed', top: '0', left: '0', right: '0', zIndex: '100000',
-      background: LABEL_BG, color: 'white',
+      background: LABEL_BG, color: LABEL_INK,
       fontFamily: 'system-ui, sans-serif', fontSize: '13px',
       display: 'flex', alignItems: 'center', pointerEvents: 'auto',
       height: '36px', overflow: 'hidden', maxWidth: '100vw',
@@ -2987,6 +3859,7 @@ if (IS_BROWSER) {
       if (el.closest('.impeccable-overlay, .impeccable-label, .impeccable-banner, .impeccable-tooltip')) continue;
       if (el.closest('[id^="impeccable-live-"]')) continue;
       if (el === document.body || el === document.documentElement) continue;
+      if (!isRenderedForBrowserRule(el)) continue;
 
       const tag = el.tagName.toLowerCase();
       const style = getComputedStyle(el);
@@ -3418,6 +4291,7 @@ if (IS_BROWSER) {
       return { ...candidate, status: 'unresolved', confidence: 'none', reason: 'stale selector' };
     }
     if (!el) return { ...candidate, status: 'unresolved', confidence: 'none', reason: 'missing element' };
+    if (!isRenderedForBrowserRule(el)) return { ...candidate, status: 'unresolved', confidence: 'none', reason: 'hidden element' };
 
     const blockingReason = (candidate.reasons || []).find(reason =>
       reason === 'background-clip text' ||
@@ -3549,6 +4423,7 @@ if (IS_BROWSER) {
           category: ap ? ap.category : 'quality',
           severity: ap?.severity || 'warning',
           detail: f.detail || f.snippet,
+          ignoreValue: f.ignoreValue || f.value || '',
           name: ap ? ap.name : (f.type || f.id),
           description: ap ? ap.description : '',
         };
@@ -3563,12 +4438,12 @@ if (IS_BROWSER) {
     }
     console.group(
       `%c[impeccable] ${allFindings.length} anti-pattern${allFindings.length === 1 ? '' : 's'} found`,
-      'color: oklch(60% 0.25 350); font-weight: bold'
+      'color: oklch(84% 0.19 80.46); font-weight: bold'
     );
     for (const { el, findings } of allFindings) {
       for (const f of findings) {
         console.log(`%c${f.type || f.id}%c ${f.detail || f.snippet}`,
-          'color: oklch(55% 0.25 350); font-weight: bold', 'color: inherit', el);
+          'color: oklch(84% 0.19 80.46); font-weight: bold', 'color: inherit', el);
       }
     }
     console.groupEnd();
@@ -3585,10 +4460,207 @@ if (IS_BROWSER) {
     return [...groupMap.entries()].map(([el, findings]) => ({ el, findings }));
   }
 
+  const DESIGN_COLOR_TOLERANCE = 6;
+  const DESIGN_RADIUS_TOLERANCE_PX = 0.5;
+  const DESIGN_SKIP_TAGS = new Set(['head', 'title', 'meta', 'link', 'style', 'script', 'noscript', 'template', 'source']);
+
+  function normalizeBrowserFontName(value) {
+    return String(value || '')
+      .trim()
+      .replace(/^["']|["']$/g, '')
+      .replace(/\+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  }
+
+  function browserPrimaryFont(stack) {
+    if (!stack || /var\(/i.test(stack)) return '';
+    return String(stack || '')
+      .split(',')
+      .map(normalizeBrowserFontName)
+      .find(font => font && !GENERIC_FONTS.has(font)) || '';
+  }
+
+  function browserDesignSystemConfig() {
+    const raw = window.__IMPECCABLE_CONFIG__?.designSystem;
+    if (!raw?.present) return null;
+    const allowedFonts = new Set((raw.allowedFonts || []).map(normalizeBrowserFontName).filter(Boolean));
+    const allowedColors = (raw.allowedColors || [])
+      .filter(color => color && Number.isFinite(color.r) && Number.isFinite(color.g) && Number.isFinite(color.b))
+      .map(color => ({ r: color.r, g: color.g, b: color.b }));
+    const allowedRadii = (raw.allowedRadii || [])
+      .map(Number)
+      .filter(px => Number.isFinite(px));
+    return {
+      present: true,
+      hasFonts: raw.hasFonts === true && allowedFonts.size > 0,
+      allowedFonts,
+      hasColors: raw.hasColors === true && allowedColors.length > 0,
+      allowedColors,
+      hasRadii: raw.hasRadii === true && allowedRadii.length > 0,
+      allowedRadii,
+      hasPillRadius: raw.hasPillRadius === true,
+    };
+  }
+
+  function browserColorsClose(a, b) {
+    if (!a || !b) return false;
+    return Math.max(
+      Math.abs(a.r - b.r),
+      Math.abs(a.g - b.g),
+      Math.abs(a.b - b.b),
+    ) <= DESIGN_COLOR_TOLERANCE;
+  }
+
+  function isBrowserDesignColorAllowed(raw, designSystem) {
+    if (!designSystem?.hasColors) return true;
+    const text = String(raw || '').trim().toLowerCase();
+    if (!text || text === 'transparent' || text === 'currentcolor' || text === 'inherit' || text === 'initial') return true;
+    if (text.includes('var(')) return true;
+    const parsed = parseAnyColor(text);
+    if (!parsed) return true;
+    if ((parsed.a ?? 1) <= 0.05) return true;
+    return designSystem.allowedColors.some(color => browserColorsClose(parsed, color));
+  }
+
+  function isBrowserTransparentCss(value) {
+    const text = String(value || '').trim().toLowerCase();
+    if (!text || text === 'transparent') return true;
+    const parsed = parseAnyColor(text);
+    return parsed ? (parsed.a ?? 1) <= 0.05 : false;
+  }
+
+  function isBrowserDesignRadiusAllowed(raw, designSystem) {
+    if (!designSystem?.hasRadii) return true;
+    const text = String(raw || '').trim().toLowerCase();
+    if (!text || text === '0' || text === 'none' || text === 'initial' || text === 'inherit') return true;
+    if (text.includes('var(') || text.includes('%')) return true;
+    const px = resolveLengthPx(text, 16);
+    if (px == null || !Number.isFinite(px) || px <= DESIGN_RADIUS_TOLERANCE_PX) return true;
+    if (designSystem.hasPillRadius && px >= 99) return true;
+    return designSystem.allowedRadii.some(allowed => Math.abs(allowed - px) <= DESIGN_RADIUS_TOLERANCE_PX);
+  }
+
+  function browserRadiusTokens(value) {
+    return String(value || '')
+      .replace(/\s*\/\s*/g, ' ')
+      .split(/\s+/)
+      .map(token => token.trim())
+      .filter(Boolean);
+  }
+
+  function browserHasDirectText(el) {
+    return [...(el.childNodes || [])].some(node => node.nodeType === 3 && node.textContent.trim().length > 0);
+  }
+
+  function browserSampleText(el) {
+    const text = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+    return text ? ` "${text.slice(0, 40)}"` : '';
+  }
+
+  function shouldSkipDesignElement(el) {
+    const tag = el.tagName?.toLowerCase?.() || '';
+    return DESIGN_SKIP_TAGS.has(tag) || isElementHidden(el);
+  }
+
+  function checkElementDesignSystemDOM(el, designSystem, seen) {
+    if (!designSystem?.present || shouldSkipDesignElement(el)) return [];
+    const findings = [];
+    const tag = el.tagName?.toLowerCase?.() || 'unknown';
+    const style = getComputedStyle(el);
+
+    if (designSystem.hasFonts && browserHasDirectText(el)) {
+      const font = browserPrimaryFont(style.fontFamily || '');
+      if (font && !designSystem.allowedFonts.has(font) && !seen.fonts.has(font)) {
+        seen.fonts.add(font);
+        findings.push({
+          type: 'design-system-font',
+          detail: `${tag}${browserSampleText(el)} uses ${font}; not declared in DESIGN.md typography`,
+          ignoreValue: font,
+        });
+      }
+    }
+
+    if (designSystem.hasColors) {
+      const colorChecks = [];
+      if (browserHasDirectText(el)) colorChecks.push(['text color', style.color]);
+      if (!isBrowserTransparentCss(style.backgroundColor)) colorChecks.push(['background', style.backgroundColor]);
+      for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+        if ((parseFloat(style[`border${side}Width`]) || 0) > 0) {
+          colorChecks.push([`border-${side.toLowerCase()}`, style[`border${side}Color`]]);
+        }
+      }
+      if ((parseFloat(style.outlineWidth) || 0) > 0) colorChecks.push(['outline', style.outlineColor]);
+
+      for (const [kind, raw] of colorChecks) {
+        const label = String(raw || '').trim().replace(/\s+/g, ' ');
+        if (isBrowserDesignColorAllowed(label, designSystem)) continue;
+        const key = `${kind}:${label}`;
+        if (seen.colors.has(key)) continue;
+        seen.colors.add(key);
+        findings.push({
+          type: 'design-system-color',
+          detail: `${kind} ${label} on ${tag}${browserSampleText(el)} is outside DESIGN.md colors`,
+          ignoreValue: label,
+        });
+      }
+    }
+
+    if (designSystem.hasRadii) {
+      for (const token of browserRadiusTokens(style.borderRadius || '')) {
+        if (isBrowserDesignRadiusAllowed(token, designSystem)) continue;
+        if (seen.radii.has(token)) continue;
+        seen.radii.add(token);
+        findings.push({
+          type: 'design-system-radius',
+          detail: `border-radius ${token} on ${tag}${browserSampleText(el)} is outside the DESIGN.md rounded scale`,
+          ignoreValue: token,
+        });
+      }
+    }
+
+    return findings;
+  }
+
+  function decodeBrowserGoogleFamily(value) {
+    const family = String(value || '').split(':')[0].replace(/\+/g, ' ');
+    try {
+      return decodeURIComponent(family);
+    } catch {
+      return family;
+    }
+  }
+
+  function checkBrowserDesignSystemSources(designSystem, seen) {
+    if (!designSystem?.hasFonts) return [];
+    const findings = [];
+    for (const link of document.querySelectorAll('link[href*="fonts.googleapis.com/css"]')) {
+      const href = link.getAttribute('href') || '';
+      for (const match of href.matchAll(/[?&]family=([^&]+)/g)) {
+        const display = decodeBrowserGoogleFamily(match[1]);
+        const font = normalizeBrowserFontName(display);
+        if (!font || designSystem.allowedFonts.has(font) || seen.fonts.has(font)) continue;
+        seen.fonts.add(font);
+        findings.push({
+          type: 'design-system-font',
+          detail: `Google Fonts: ${display} is not declared in DESIGN.md typography`,
+          ignoreValue: display,
+        });
+      }
+    }
+    return findings;
+  }
+
   function collectBrowserFindings() {
     const groupMap = new Map();
     const _disabled = EXTENSION_MODE ? (window.__IMPECCABLE_CONFIG__?.disabledRules || []) : [];
     const _ruleOk = (id) => !_disabled.length || !_disabled.includes(id);
+    const designSystem = browserDesignSystemConfig();
+    const designSeen = { fonts: new Set(), colors: new Set(), radii: new Set() };
+    // Note: provider-gated rules (--gpt / --gemini) are NOT filtered here. In a
+    // real browser env (detector page, live overlay, extension) running every
+    // check is free, so we always surface them; the gating is purely a CLI
+    // output concern, applied in the Node engines' detect* return paths.
 
     for (const el of document.querySelectorAll('*')) {
       // Skip impeccable's own elements and any descendants (overlays, labels, banner, nav buttons)
@@ -3610,14 +4682,34 @@ if (IS_BROWSER) {
         ...checkElementAIPaletteDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
         ...checkElementIconTileDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
         ...checkElementItalicSerifDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
-        ...checkElementHeroEyebrowDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
         ...checkElementQualityDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
+        ...checkElementOversizedH1DOM(el).map(f => ({ type: f.id, detail: f.snippet })),
+        ...checkElementClippedOverflowDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
+        ...checkElementGptBorderShadowDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
+        ...checkElementTextOverflowDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
+        ...checkElementDesignSystemDOM(el, designSystem, designSeen),
       ].filter(f => _ruleOk(f.type));
 
       addBrowserFindings(groupMap, el, findings);
+
+      // Hero eyebrow: the offending element is the eyebrow above the heading,
+      // not the heading itself — highlight the previous sibling instead.
+      const eyebrowFindings = checkElementHeroEyebrowDOM(el)
+        .map(f => ({ type: f.id, detail: f.snippet }))
+        .filter(f => _ruleOk(f.type));
+      if (eyebrowFindings.length > 0 && el.previousElementSibling) {
+        addBrowserFindings(groupMap, el.previousElementSibling, eyebrowFindings);
+      }
     }
 
     const pageLevelFindings = [];
+
+    const designSourceFindings = checkBrowserDesignSystemSources(designSystem, designSeen)
+      .filter(f => _ruleOk(f.type));
+    if (designSourceFindings.length > 0) {
+      pageLevelFindings.push(...designSourceFindings);
+      addBrowserFindings(groupMap, document.body, designSourceFindings);
+    }
 
     const typoFindings = checkTypography().filter(f => _ruleOk(f.type));
     if (typoFindings.length > 0) {
@@ -3644,6 +4736,14 @@ if (IS_BROWSER) {
     if (qualityFindings.length > 0) {
       pageLevelFindings.push(...qualityFindings);
       addBrowserFindings(groupMap, document.body, qualityFindings);
+    }
+
+    const creamFindings = checkCreamPalette(document)
+      .map(f => ({ type: f.id, detail: f.snippet }))
+      .filter(f => _ruleOk(f.type));
+    if (creamFindings.length > 0) {
+      pageLevelFindings.push(...creamFindings);
+      addBrowserFindings(groupMap, document.body, creamFindings);
     }
 
     // Regex-on-HTML checks (shared with Node)
@@ -3740,13 +4840,20 @@ if (IS_BROWSER) {
     return true;
   }
 
-  function postSerializedFindings(groupMap) {
+  function scanResultMeta(options = {}) {
+    const scanId = options.scanId;
+    if (typeof scanId !== 'string' && typeof scanId !== 'number') return {};
+    return { scanId: String(scanId) };
+  }
+
+  function postSerializedFindings(groupMap, options = {}) {
     if (!EXTENSION_MODE) return;
     const allFindings = browserFindingsFromMap(groupMap);
     window.postMessage({
       source: 'impeccable-results',
       findings: serializeFindings(allFindings),
       count: allFindings.length,
+      ...scanResultMeta(options),
     }, '*');
   }
 
@@ -3800,7 +4907,7 @@ if (IS_BROWSER) {
             rememberVisualContrastAnalysis(result);
             const added = addVisualContrastResult(groupMap, result, { decorate: true });
             if (added) {
-              postSerializedFindings(groupMap);
+              postSerializedFindings(groupMap, options);
               window.dispatchEvent(new CustomEvent('impeccable-visual-contrast-resolved', {
                 detail: {
                   selector: result.selector,
@@ -3868,7 +4975,7 @@ if (IS_BROWSER) {
     overlayIndex = 0;
   }
 
-  function renderBrowserFindings(collected) {
+  function renderBrowserFindings(collected, options = {}) {
     const { allFindings, pageLevelFindings } = collected;
 
     for (const { el, findings } of allFindings) {
@@ -3888,6 +4995,7 @@ if (IS_BROWSER) {
         source: 'impeccable-results',
         findings: serializeFindings(allFindings),
         count: allFindings.length,
+        ...scanResultMeta(options),
       }, '*');
     }
 
@@ -3902,11 +5010,11 @@ if (IS_BROWSER) {
     clearOverlays();
     const generation = scanGeneration;
     const collected = collectBrowserFindings();
-    const allFindings = renderBrowserFindings(collected);
+    const allFindings = renderBrowserFindings(collected, options);
     if (shouldRunVisualContrast(options)) {
       addVisualContrastFindings(collected.groupMap, options, { decorate: true, generation })
         .then(() => {
-          if (generation === scanGeneration) postSerializedFindings(collected.groupMap);
+          if (generation === scanGeneration) postSerializedFindings(collected.groupMap, options);
         })
         .catch(err => {
           reportVisualContrastError(err);
@@ -3921,10 +5029,10 @@ if (IS_BROWSER) {
     if (shouldRunVisualContrast(options)) {
       const collected = await collectBrowserFindingsAsync(options, { generation, scheduleLazy: true });
       if (generation !== scanGeneration) return [];
-      return renderBrowserFindings(collected);
+      return renderBrowserFindings(collected, options);
     }
     lastVisualContrastAnalyses = [];
-    return renderBrowserFindings(collectBrowserFindings());
+    return renderBrowserFindings(collectBrowserFindings(), options);
   };
 
   const detect = function(options = {}) {
