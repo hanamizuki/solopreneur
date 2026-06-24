@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/tomasonjo/blogs
 - **Source path**: `claude-skills/neo4j-cypher-guide/neo4j-cypher-guide`
 - **Pinned commit**: 11fd30bdf48c3d7d1f008276d2592a1a007e1c4f
-- **Synced at**: 2026-05-22T05:36:18Z
+- **Synced at**: 2026-06-24T13:44:43Z
 - **License**: (none — upstream has no LICENSE file as of sync)
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder

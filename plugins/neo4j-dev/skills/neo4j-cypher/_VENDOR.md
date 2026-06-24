@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/neo4j-contrib/neo4j-skills
 - **Source path**: `neo4j-cypher-skill`
-- **Pinned commit**: 3afa4c97c6ad66df5e3ad3874917e434421d6a5e
-- **Synced at**: 2026-05-22T05:36:18Z
+- **Pinned commit**: 6d44d3166bf888ac4fc294b88c72df6d1d83abcb
+- **Synced at**: 2026-06-24T13:44:42Z
 - **License**: see `../_vendored/LICENSES/neo4j-skills-LICENSE`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder
