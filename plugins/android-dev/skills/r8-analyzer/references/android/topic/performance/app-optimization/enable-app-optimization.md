@@ -104,6 +104,28 @@ android {
 }
 ```
 
+## Improve R8 optimization
+
+The performance benefits of R8 are directly correlated to how much of your
+codebase R8 is able to optimize. To get the maximum benefits out of R8, follow
+best practices:
+
+- Enable R8 in [full mode](https://developer.android.com/topic/performance/app-optimization/full-mode)
+- Enable [obfuscation, optimization, and shrinking](https://developer.android.com/topic/performance/app-optimization/adopt-optimizations-incrementally)
+- Enable resource shrinking and [optimized resource shrinking](https://developer.android.com/topic/performance/app-optimization/enable-app-optimization#optimize-resource-shrinking)
+- [Refine keep rules](https://developer.android.com/topic/performance/app-optimization/keep-rules-best-practices) to allow maximum optimization of classes, fields and methods.
+
+To help you refine keep rules, use the [R8 Configuration Analyzer](https://developer.android.com/topic/performance/app-optimization/r8-configuration-analyzer).
+
+The R8 Configuration Analyzer lets you do the following:
+
+- Track and improve the overall R8 configuration quality by monitoring the metrics provided by the R8 Configuration Analyzer report.
+- Find the broadest keep rules - those which prevent the most optimization
+- and understand what optimization they prevent to refine them.
+
+The R8 Configuration Analyzer is available in AGP version 9.3.0-alpha05 or from
+R8 version 9.3.7-dev. For more information, see [Analyze R8 configuration](https://developer.android.com/topic/performance/app-optimization/r8-configuration-analyzer).
+
 ## Optimize resource shrinking for even smaller apps
 
 The 8.12.0 version of Android Gradle Plugin (AGP) introduces optimized resource
@@ -160,23 +182,6 @@ fix them:
 
 If you are interested in optimizing your build speed, see [Configure how R8
 runs](https://developer.android.com/build/r8-execution-profiles) for information on how to configure R8 based on your environment.
-
-## Improve R8 optimization
-
-The performance benefits of R8 are directly correlated to how much of your
-codebase R8 is able to optimize. To get the maximum benefits out of R8, enable
-R8 in full mode and refine the keep rules to allow maximum optimization of
-classes, fields and methods.To help you with this, use the
-[R8 Configuration Analyzer](https://developer.android.com/topic/performance/app-optimization/r8-configuration-analyzer).
-
-The R8 Configuration Analyzer lets you do the following:
-
-- Track and improve the overall R8 configuration quality by monitoring the metrics provided by the R8 Configuration Analyzer report.
-- Find the broadest keep rules - those which prevent the most optimization
-- and understand what optimization they prevent to refine them.
-
-The R8 Configuration Analyzer is available in AGP version 9.3.0-alpha05 or from
-R8 version 9.3.7-dev. For more information, see [Analyze R8 configuration](https://developer.android.com/topic/performance/app-optimization/r8-configuration-analyzer).
 
 ## AGP and R8 version behavior changes
 

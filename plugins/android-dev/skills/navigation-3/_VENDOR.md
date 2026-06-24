@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `navigation/navigation-3`
-- **Pinned commit**: a8f3525d5a1f7fe250fecd0fca43a87755433c8f
-- **Synced at**: 2026-05-23T10:16:40Z
+- **Pinned commit**: fe95b6fdf002ece6c7340013623d41d8deec6f52
+- **Synced at**: 2026-06-23T08:36:48Z
 - **License**: see `../_vendored/LICENSES/android-skills-LICENSE.txt`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder
