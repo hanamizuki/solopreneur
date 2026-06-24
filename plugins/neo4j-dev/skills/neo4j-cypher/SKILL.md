@@ -7,6 +7,7 @@ description: Generates, optimizes, and validates Cypher 25 queries for Neo4j 202
   Does NOT handle driver migration or API changes — use neo4j-migration-skill.
   Does NOT cover DB administration or server ops — use neo4j-cli-tools-skill.
 compatibility: Neo4j >= 2025.01 (safe baseline); Cypher 25
+version: 1.0.1
 ---
 
 ## When to Use
@@ -27,7 +28,8 @@ GQL conformance note: `LET`, `FINISH`, `FILTER`, and `INSERT` are valid Cypher 2
 
 | ? | Known | Unknown |
 |---|---|---|
-| Schema | Use directly | Run Schema-First Protocol |
+| `<db-name>-schema.json` found in project | Use it directly — skip live inspection | — |
+| Schema (from context or live DB) | Use directly | Run Schema-First Protocol |
 | Neo4j version | Use version features | Default to 2025.01 safe set |
 | Executing (not generating)? | Use EXPLAIN + write gate | State query is unvalidated |
 
@@ -48,7 +50,7 @@ Never fill guessed names — realistic guesses get copied blindly.
 5. `LIMIT 25` default on all exploratory reads; push `WITH n LIMIT` before high-cardinality operations (variable-length traversals, fan-out MATCH, Cartesian products)
 6. Comments: `//` only — `--` is SQL, invalid
 7. `REPEATABLE ELEMENTS` / `DIFFERENT RELATIONSHIPS` go after `MATCH`, not end of pattern
-8. `SHOW` commands: `YIELD` before `WHERE`; no `UNION`
+8. `SHOW` commands: `YIELD` before `WHERE`; combinable with general Cypher clauses incl. `UNION`/`RETURN` [2026.05] — `SHOW DATABASES` still requires system db (use `USE system`)
 9. Inline node predicates `(:Label WHERE p=x)` — valid in `MATCH` only
 10. `WHERE` cannot follow bare `UNWIND` — use `WITH x WHERE`
 11. `(a)-[:R]-(b)` — undirected matches both directions, double-counts; use directed unless unknown
@@ -73,9 +75,19 @@ Never fill guessed names — realistic guesses get copied blindly.
 
 ## Schema-First Protocol
 
-Schema in context → use it, skip inspection.
+**Priority order:**
 
-Schema missing → run:
+1. `<db-name>-schema.json` anywhere in project → read directly, state file name + `schema_retrieved_at`, skip live inspection. If significantly outdated and DB reachable, offer re-fetch. Full rules: [references/schema-guardrail.md](references/schema-guardrail.md).
+   - **Existence** — labels/rel-types/properties must be in schema; try synonym resolution before asking
+   - **Property type** — reason about intent first (e.g. string vs INTEGER may be null check); ask only if unclear
+   - **Relationship direction** — wrong direction → correct silently and note
+   - **Synonym mapping** — unambiguous → resolve silently; ambiguous → pick most likely, note; ask if unresolvable
+
+   Scripts: `generate_schema.py` (live DB + APOC), `define_schema.py` (no DB), `import_neo4j_schema.py` (converts `neo4j-graphrag-python`, `graph-schema-introspector`, `graph-schema-json-js-utils`, `mcp-neo4j-data-modeling`).
+
+2. Schema in context → use it, skip inspection.
+
+3. Schema missing → run:
 ```cypher
 CALL db.schema.visualization() YIELD nodes, relationships RETURN nodes, relationships;
 SHOW INDEXES YIELD name, type, labelsOrTypes, properties, state WHERE state = 'ONLINE';
@@ -293,6 +305,7 @@ Default to 2025.01-safe features when version unknown.
 | `CONCURRENT TRANSACTIONS`, `REPORT STATUS` | 2025.01 | drop / omit |
 | `SEARCH` clause (vector/fulltext) | 2026.01 | `CALL db.index.vector.queryNodes(...)` (deprecated 2026.04) |
 | `ACYCLIC` path mode (no repeated nodes in path) | 2026.03 | post-filter with `size(nodes(p)) = size(apoc.coll.toSet(nodes(p)))` |
+| `string.indexOf()`, `string.join()`, `string.regexReplace()` | 2026.05 | `apoc.text.*` or app-side |
 | GQL aliases: `FOR`=`UNWIND`, `PROPERTY_EXISTS`=`IS NOT NULL`, `IS [NOT] LABELED`=`n:Label`; function aliases (`local_time`, `zoned_datetime`, `duration_between`, `collect_list`, etc.) | 2026.02–04 | GQL compliance only — use Cypher equivalents; full list → [references/cypher-syntax.md](references/cypher-syntax.md) |
 | **GRAPH TYPE** schema DDL (`ALTER CURRENT GRAPH TYPE SET`, `EXTEND GRAPH TYPE WITH`, `DROP GRAPH TYPE ELEMENTS`, `SHOW CURRENT GRAPH TYPE`) | **2026.02 — PREVIEW** | Use individual `CREATE CONSTRAINT` / `CREATE INDEX` |
 
