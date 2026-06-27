@@ -8,6 +8,12 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-06-28
+
+### solopreneur 0.5.26 → 0.5.27
+Greenlight's Phase 1 internal review now includes an optional over-engineering reviewer (`ponytail:ponytail-review`). If the ponytail plugin is installed, greenlight dispatches it alongside the existing four reviewers to flag dead code, hand-rolled stdlib, unused abstractions, and shrinkable logic. If not installed, a one-line install suggestion is printed and the review continues without it.
+(#72)
+
 ## 2026-06-25
 
 ### solopreneur 0.5.25 → 0.5.26
