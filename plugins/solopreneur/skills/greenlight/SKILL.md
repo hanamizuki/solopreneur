@@ -24,7 +24,7 @@ Automated review loop. Three modes:
 
 - **PR mode** (default, for open PRs on feature branches) — three phases:
   ```
-  Phase 1: Internal Review (up to 5 subagents review in parallel, report-only)
+  Phase 1: Internal Review (subagents review in parallel, report-only)
   Phase 2: Consolidate + Fix (merge reports → fix via /receiving-code-review → commit + push)
   Phase 3: External Review Loop (Codex/Gemini/CodeRabbit cycle until clean)
   ```
@@ -258,15 +258,6 @@ codex login status 2>/dev/null && echo "CODEX_AUTH=true" || echo "CODEX_AUTH=fal
 - **Uncommitted mode**: Required. If `CODEX_INSTALLED=false` or `CODEX_AUTH=false`, stop with install instructions:
   - Not installed → `npm install -g @openai/codex`
   - Not authenticated → `codex login`
-
-### Step 4: Optional plugin check
-
-Check whether `ponytail:ponytail-review` is in the available skills list.
-
-- **Available** → set `HAS_PONYTAIL=true`, log "ponytail-review: available"
-- **Not available** → set `HAS_PONYTAIL=false`, print one-line suggestion:
-  `💡 Install the ponytail plugin for over-engineering review: claude install-plugin github:DietrichGebert/ponytail`
-  Then continue — this is informational only, Phase 1 runs fine without it.
 
 ---
 
@@ -703,7 +694,7 @@ Post-commit review loop complete.
 > **⏭️ Skip entirely if `MODE=uncommitted`.**
 > **⏭️ If `external_only == true`, skip this phase — go to [Phase 3](#phase-3-external-review-loop).**
 
-**Dispatch up to 5 subagents in parallel (`run_in_background: true`), each running a review skill. All report-only — no code changes.**
+**Dispatch subagents in parallel (`run_in_background: true`), each running a review skill. All report-only — no code changes.**
 
 | Subagent | Skill | Source | Focus |
 |----------|-------|--------|-------|
@@ -713,7 +704,7 @@ Post-commit review loop complete.
 | 4 | `/specialist-review` | included | Tech-stack expert review — **report findings and specific fix suggestions only** |
 | 5 | `ponytail:ponytail-review` | ponytail plugin | Over-engineering review: dead code, hand-rolled stdlib, unused abstractions, shrinkable logic — **report only (tagged `delete`/`stdlib`/`native`/`yagni`/`shrink`)** |
 
-**All skills are optional.** If any subagent fails (skill not found, invocation error, or subagent error), log which skill was unavailable and why, skip that subagent, and continue waiting for others.
+**All skills are optional.** If any subagent fails (skill not found, invocation error, or subagent error), log which skill was unavailable and why, skip that subagent, and continue waiting for others. For external plugins (e.g. ponytail), print a one-line install suggestion when unavailable.
 
 - At least 1 subagent succeeds → proceed to Phase 2 (using completed reports)
 - All fail → notify user "Phase 1: all internal reviewers unavailable", skip Phase 1 + 2, proceed to Phase 3
