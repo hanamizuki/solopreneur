@@ -101,6 +101,36 @@ Result JSON:
   },
   "error": <failure reason string, null on success>
 }
+
+This result is validated against RESULT_SCHEMA (JSON Schema — kept identical to
+the copy in references/wave-workflow.md; if you change one, change both):
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "pr_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["success", "failed", "blocked"] },
+    "github_number": { "type": ["integer", "null"], "minimum": 1 },
+    "review_summary": {
+      "type": ["object", "null"],
+      "required": ["rounds", "fixed", "pushed_back"],
+      "properties": {
+        "rounds": { "type": "integer", "minimum": 0 },
+        "fixed": { "type": "integer", "minimum": 0 },
+        "pushed_back": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "error": { "type": ["string", "null"] }
+  },
+  "required": ["pr_id", "status", "github_number", "review_summary", "error"]
+}
+
+How you emit the result depends on how you were dispatched:
+- Workflow dispatch (spawned inside an autopilot wave-workflow): the result is
+  enforced as structured output against RESULT_SCHEMA. Your FINAL output MUST be
+  exactly the result object — no surrounding prose, no markdown, no code fence.
+- Legacy Agent dispatch (spawned directly via the Agent tool): print the same
+  JSON as today (the Result JSON block above), exactly as prior versions did.
 ```
 
 ---
