@@ -185,6 +185,9 @@ prs:
     subagent: ai-engineer
     depends_on: []
     spec: pr1-models.md
+    files:              # optional — used for the wave overlap check; omit to derive from spec
+      - path/to/new_file.py
+      - path/to/existing_file.py
 ```
 
 ### Spec Files
@@ -294,11 +297,25 @@ After the user picks, write the artifacts per Step 3's table, then proceed to St
    include the `## Standard Prefix` / `## Standard Suffix` markdown headers
    or the surrounding triple-backtick fences). Substitute the variables from
    step 3 into the result.
-5. Dispatch the Agent tool:
+5. Dispatch — branch on **Workflow tool availability** (check whether a
+   `Workflow` tool is present in this session's available tools):
+
+   **Workflow tool available**: dispatch via the wave-workflow template
+   (`references/wave-workflow.md`) as a single-PR batch:
+   - `args.prs` = one entry: `{ id: "pr1", branch, title, subagent, prompt, files }`,
+     where `prompt` is the assembled prompt and `files` is this PR's create/modify
+     list from the Step 2 descriptor. With one PR the overlap check trivially passes.
+   - `args.max_retries` = 2.
+   - Invoke the `Workflow` tool with the wave-workflow script and these args.
+   - The single element of the returned `results` array is the schema-validated
+     result (in-script retries already handled).
+
+   **Workflow tool unavailable** (fallback — unchanged): dispatch the Agent tool:
    - `subagent_type` = `<subagent declared in Step 2>`
    - `isolation`     = `"worktree"`
    - `prompt`        = the assembled prompt
-6. Wait for the subagent's result JSON.
+6. Get the result JSON: `results[0]` from the workflow (Workflow branch), or the
+   subagent's returned result JSON (Agent branch).
 7. Print a completion report inline (see "Completion Report" below).
 
 The full lifecycle still runs: Plan Mode → `/tech-vetting` → implement + test →

@@ -36,19 +36,70 @@ From state.json, find PRs with `status == "pending"` whose `depends_on` are all 
 - No executable PRs but `pending` PRs remain → blocked by a failed PR, mark as `skipped`
 - All PRs are `merged` or `blocked`/`skipped` → proceed to Phase 2
 
-**Before dispatching, verify parallel safety**: for each pair of parallel PRs, confirm
-file paths don't overlap:
-- Read each spec's "Files to Create/Modify" section
-- If paths overlap → don't parallelize, run sequentially instead
+**Before dispatching, resolve each PR's file list and verify parallel safety.**
+Every executable PR needs a create/modify path list:
+- If the PR has a `files` field in plan.yaml → use it directly.
+- If not → derive it by reading the spec's "Files to Create/Modify" section
+  (today's method).
 
-**Step 2: Dispatch PR subagents in parallel**
+How the overlap check runs depends on the dispatch branch (below):
+- **Workflow mode (Step 2a)**: pass every PR's file list in `args.prs[].files`.
+  The wave-workflow script runs the pairwise overlap check itself and refuses
+  the whole wave before dispatching anything if any two PRs share a path — no
+  manual check here.
+- **Fallback mode (Step 2b)**: check manually — for each pair of parallel PRs,
+  if paths overlap, don't parallelize; run them in separate sequential waves.
 
-For each executable PR:
+**Step 2: Dispatch PR subagents**
+
+First, for every executable PR, assemble its prompt — this prep is identical in
+both branches:
 
 1. Read `subagent` type and `spec` filename from plan.yaml
 2. Read the full content of `{PLAN_DIR}/{spec_file}`
 3. Read `references/pr-subagent-template.md` for the prompt template
 4. Assemble prompt: standard prefix + spec content + standard suffix
+
+Then branch on **Workflow tool availability** — check whether a `Workflow` tool
+is present in this session's available tools.
+
+#### Step 2a: Workflow tool is available (preferred)
+
+Dispatch the whole wave through ONE Workflow call:
+
+1. Read `references/wave-workflow.md` for the script + args contract.
+2. Build `args`: `prs` is one entry per executable PR —
+   `{ id, branch, title, subagent, prompt, files }`, where `prompt` is the
+   assembled prompt from above, `subagent` is the plan's subagent type, and
+   `files` is the PR's resolved file list (above). Set `max_retries: 2`.
+3. Update state.json: every dispatched PR status → `implementing`.
+4. Invoke the `Workflow` tool with the wave-workflow script and `args`. The
+   script runs the file-overlap check, dispatches every PR via `parallel()`
+   with a per-PR retry loop (up to `max_retries` extra attempts), enforces
+   `RESULT_SCHEMA` on each subagent's output, and returns `{ results: [...] }`.
+5. If the workflow instead returns `{ error: "file-overlap", pairs: [...] }`,
+   no agent ran — split the overlapping PRs into separate sequential waves (or
+   fall back to Step 2b for this wave), then retry.
+6. Otherwise proceed to Step 3 with the returned `results`.
+
+The per-PR retry loop and the overlap check are handled inside the script; the
+orchestrator does not manually wait on or re-dispatch individual PRs here.
+
+> **Workflow scripts have NO filesystem or git access.** The wave-workflow
+> script only spawns agents and shapes their results — it cannot touch
+> `state.json` or run `git`. So `state.json` writes (Step 2a.3 before the call,
+> Step 3 after) and the between-wave `git pull origin main --ff-only` remain the
+> orchestrator's responsibility. Crash recovery therefore stays at **wave
+> granularity**: `state.json` is the sole progress source, so a crash mid-wave
+> resumes by re-running the whole wave from the last persisted state. (A wave
+> re-run may re-dispatch a PR that already opened; Phase 0 worktree cleanup and
+> the subagent's branch-rename step mitigate this, but full idempotency is a
+> future improvement.)
+
+#### Step 2b: Workflow tool is unavailable (fallback — today's flow)
+
+For each executable PR:
+
 5. Dispatch Agent (subagent_type from plan, **use `isolation: "worktree"`** for isolation)
 6. Update state.json: PR status → `implementing`
 
@@ -59,6 +110,28 @@ to the correct branch name (see pr-subagent-template.md).
 **Wait for all subagents to complete.**
 
 **Step 3: Process results**
+
+The wave was dispatched by either Step 2a (Workflow) or Step 2b (fallback
+Agent) — process results accordingly.
+
+#### Workflow mode (dispatched via Step 2a)
+
+Consume the `results` array returned by the Workflow call. For each
+`{ pr_id, status, github_number, review_summary, error, attempts }`:
+
+- **`status == "success"`** → update state.json: status → `merged`, fill in
+  `number` (from `github_number`) and `review_summary`.
+- **any other `status`** (`failed` / `blocked`, or a null-synthesized failure)
+  → this is FINAL for the wave — the script already retried up to `max_retries`.
+  Update state.json: status → `blocked`, `retry_count` → `max(attempts - 1, 0)`,
+  fill in `error`. Do NOT re-queue to `pending` (in-script retries are
+  exhausted). Blocked PRs won't be retried, but PRs that don't depend on them
+  can continue.
+
+After applying every result, run `git pull origin main --ff-only` **once** to
+absorb all merges from this wave, then return to Step 1.
+
+#### Fallback mode (dispatched via Step 2b)
 
 For each completed subagent:
 

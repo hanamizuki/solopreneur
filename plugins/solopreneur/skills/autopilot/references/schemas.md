@@ -16,6 +16,9 @@ prs:
     subagent: ai-engineer              # Implementation subagent type
     depends_on: []                    # List of dependent PR ids (empty = no dependencies)
     spec: pr1-models.md              # Spec filename (in same directory)
+    files:                            # optional — for the wave overlap check; omit to derive from spec
+      - models/user.py
+      - models/__init__.py
 
   - id: pr2
     branch: feature/mining-pr2
@@ -48,6 +51,7 @@ prs:
 | `prs[].subagent` | ✅ | Implementation subagent type |
 | `prs[].depends_on` | ✅ | List of dependent PR ids; empty array = no dependencies |
 | `prs[].spec` | ✅ | Spec filename (relative to plan directory) |
+| `prs[].files` | ❌ | Repo-relative paths this PR creates/modifies. Used for the mechanical file-overlap check when a wave is dispatched via Workflow (`references/wave-workflow.md`). When absent, the orchestrator derives the list from the spec's "Files to Create/Modify" section. |
 
 > **Length:** `prs[]` typically holds 2+ entries, but a length of **1** is also
 > valid — for example, when `/autopilot` runs in single-PR + schedule mode. The
