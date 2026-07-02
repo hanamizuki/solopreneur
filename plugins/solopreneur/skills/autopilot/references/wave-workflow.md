@@ -314,6 +314,18 @@ return {
   orchestrator takes over (a blocked PR can still be finished by hand or by
   re-running `/greenlight` on it). The sandbox forbids `Date.now()` /
   `Math.random()`, so retries are back-to-back with no backoff.
+- **Retry can still collide with a half-created PR** (residual): the
+  terminal-on-PR-opened rule covers the common case, but a narrow window
+  remains — an attempt that pushed `{BRANCH}` and then failed *before* reporting
+  a `github_number` (e.g. `git push` succeeded but `gh pr create` failed, or the
+  agent died just after pushing) looks like a clean pre-PR failure, so the retry
+  re-runs the same branch rename/push and collides with the leftover remote
+  branch. Phase 0 cleans local worktrees but not remote branches. A full fix is
+  out of scope here — the script has no git access and `RESULT_SCHEMA` is fixed,
+  so the upgrade path is one of: make the subagent's push idempotent
+  (`--force-with-lease` / adopt an existing branch), or add a "branch pushed"
+  signal to the result so the script hands such an attempt to the orchestrator
+  instead of retrying.
 - **Hung agents block the barrier**: `parallel()` resolves only when every PR
   settles, so a stuck agent stalls the wave. This relies on the Workflow
   runtime's own per-agent lifecycle; the script adds no timeout.
