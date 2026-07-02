@@ -53,6 +53,36 @@ Automated review loop. Three modes:
 Arguments other than `post-commit` are ignored in **Uncommitted mode** and
 **Post-commit mode** — those modes have fixed flows.
 
+## Verification gate
+
+An **optional adversarial verification gate** can run between consolidating review
+findings and dispatching a fix subagent: each consolidated finding is independently
+challenged by 3 skeptic subagents inside one Claude Code
+[Workflow](https://code.claude.com/docs/en/workflows), and findings a majority of
+skeptics refute are dropped. Only survivors reach the fix subagent. Purpose: cut
+false-positive fix cycles — a wrongly "fixed" false positive costs a whole extra
+review round.
+
+**Availability check.** The gate runs ONLY when the `Workflow` tool is present in
+the current session (Claude Code v2.1.154+, paid plans). Before each gate, check
+whether `Workflow` is among your available tools:
+
+- **Present** → run the gate. The script, `VERDICT_SCHEMA`, args contract, verdict
+  rule, and result mapping are defined once in `references/adversarial-verify.md`.
+- **Absent** → **skip the gate entirely; the flow is exactly today's flow** — hand
+  every consolidated finding straight to the fix subagent. The gate is never a hard
+  dependency of greenlight.
+
+The gate applies at exactly three points, each carrying a short callout below:
+PR-mode Phase 2a→2b, Post-commit Phase 1→Phase 2, and Post-commit Phase 3
+Step 3→Step 4. It does NOT apply to **Uncommitted mode** or **PR-mode Phase 3**
+(external review threads carry GitHub resolve/reply obligations and are already
+evaluated per-thread through `receiving-code-review`).
+
+**Rejected findings still count.** Gate-rejected findings count as "items pushed
+back" in the final report, and their reasoning must be carried into later rounds'
+"prior push-backs" context so a repeat finding can push-back-exit.
+
 ## Pre-flight Checks
 
 ### Step 1: Mode detection
@@ -496,6 +526,16 @@ shell expression. Subagents are still report-only.
 
 After all subagents return, consolidate findings (merge + dedupe) → `PHASE1_FINDINGS`.
 
+> **Verification gate (optional).** If the `Workflow` tool is available, run the
+> adversarial verification gate on `PHASE1_FINDINGS` before Phase 2 — see
+> [Verification gate](#verification-gate) and `references/adversarial-verify.md`.
+> Pass `PHASE1_FINDINGS` as `findings` and the resolved range diff command from the
+> [Range resolution](#range-resolution-recap) table as `diff_cmd`. Replace
+> `PHASE1_FINDINGS` with the **confirmed (survivor)** list; record **rejected**
+> findings as pushed back. If every finding is rejected, `PHASE1_FINDINGS` is now
+> empty — follow the existing empty path (skip Phase 2, go to Phase 3). Tool
+> unavailable → skip the gate; `PHASE1_FINDINGS` is unchanged.
+
 ### Phase 2: Initial fix (Phase 1 findings only)
 
 If `PHASE1_FINDINGS` is non-empty, dispatch a fix subagent with the same evaluation
@@ -603,6 +643,16 @@ LOOP (max 5 rounds):
        same file, line within ±5, topic semantically similar → keep one (prefer the
        more specific description).
      - Result: deduped list of findings from both reviewers.
+
+  3b. VERIFICATION GATE (optional): if the Workflow tool is available, challenge
+     MERGED_FINDINGS with the adversarial gate before Step 4 (see the "Verification
+     gate" section and references/adversarial-verify.md). Pass MERGED_FINDINGS as
+     `findings` and this round's diff command (Range resolution table) as `diff_cmd`.
+     Replace MERGED_FINDINGS with the confirmed survivors; record rejected findings
+     as pushed back and carry their reasoning into prior-push-back context. If every
+     finding is rejected, MERGED_FINDINGS is empty and Step 4 treats it as a
+     push-back exit (findings existed but were all rejected), NOT a clean pass. Tool
+     unavailable → skip the gate; MERGED_FINDINGS unchanged.
 
   4. Parse `MERGED_FINDINGS`:
      - Empty → **clean pass, exit loop.**
@@ -729,6 +779,15 @@ After receiving all successful reports:
 1. **Merge and deduplicate**: same suggestion for the same file and line → keep only one
 2. **Group by file**: list all suggestions organized by file
 3. **Escalate ambiguity**: if suggestions contradict each other, or the orchestrator can't determine whether to fix, ask the user
+
+> **Verification gate (optional).** If the `Workflow` tool is available, run the
+> adversarial verification gate on the consolidated suggestion list before
+> dispatching 2b — see [Verification gate](#verification-gate) and
+> `references/adversarial-verify.md`. Pass the deduped suggestions as `findings`
+> and `git diff main...HEAD` as `diff_cmd`. Dispatch 2b with only the **confirmed
+> (survivor)** findings; record each **rejected** finding as pushed back (with the
+> skeptics' reasoning). If every finding is rejected, **skip 2b and proceed to
+> Phase 3**. Tool unavailable → skip the gate, pass the full list to 2b.
 
 ### 2b. Dispatch fix subagent
 
