@@ -8,6 +8,11 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-07-02
+
+### solopreneur 0.5.27 → 0.5.28
+`/merge-pr` no longer deletes real files before merging. A leftover "legacy cleanup" step ran `git rm -r docs/superpowers/` (and `docs/CONTEXT.md`) on the worktree before merge, assuming those were per-worktree scratch files. In any repo that actually tracks those paths on its main branch, the step deleted real content and pushed the deletion into the PR branch. The cleanup is removed; the independent refuse-on-uncommitted-changes guard stays.
+
 ## 2026-06-28
 
 ### solopreneur 0.5.26 → 0.5.27
