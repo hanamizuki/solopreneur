@@ -52,10 +52,14 @@ script as the global `args`:
 2. **(b) Dispatch all PRs via `parallel()`**, each through a per-PR retry helper
    that calls `agent(pr.prompt, { isolation: 'worktree', agentType: pr.subagent,
    schema: RESULT_SCHEMA, label: pr.id + ':' + pr.branch, phase: 'Implement' })`.
-3. **(c)** The retry helper re-dispatches on a `null` return (agent died or was
-   skipped) or any non-`success` result, up to `max_retries` extra attempts,
-   then finalizes. It keeps the last non-null result so a final-attempt null
-   cannot erase a richer earlier one.
+3. **(c)** The retry helper re-dispatches only on a *clean pre-PR failure* — a
+   `null` return (agent died or was skipped), or a non-`success` result that
+   opened no PR (`github_number` null) — up to `max_retries` extra attempts.
+   Any attempt that already opened a PR (non-null `github_number`) is terminal:
+   retrying would re-run the same branch push / `gh pr create` and collide with
+   the existing PR. A `success` missing its `github_number` is downgraded to
+   `blocked`. It keeps the last non-null result so a final-attempt null cannot
+   erase a richer earlier one.
 4. **(d) Return** `{ results: [{ pr_id, status, github_number, review_summary,
    error, attempts }] }`.
 
@@ -222,7 +226,12 @@ async function runPr(pr) {
     if (r !== null) {
       last = r;
     }
-    if (r && r.status === "success") {
+    // Stop once the outcome is terminal: a success, OR any attempt that already
+    // opened a PR (non-null github_number). Retrying a PR-opened attempt would
+    // re-run the same `git branch -m` / `gh pr create` and collide with the
+    // existing remote branch/PR. Only a clean pre-PR failure (null return, or a
+    // non-success with no PR) is worth another fresh-worktree attempt.
+    if (r && (r.status === "success" || r.github_number != null)) {
       break;
     }
   }
@@ -235,6 +244,19 @@ async function runPr(pr) {
       github_number: null,
       review_summary: null,
       error: "agent returned null (died or skipped) on all attempts",
+      attempts: attempts
+    };
+  }
+  // A success must identify its merged PR. A success with a null github_number
+  // means the subagent broke its contract — surface it as blocked (needs a
+  // human) rather than recording a numberless "merged" PR the report can't name.
+  if (last.status === "success" && last.github_number == null) {
+    return {
+      pr_id: pr.id,
+      status: "blocked",
+      github_number: null,
+      review_summary: last.review_summary,
+      error: "subagent reported success without a github_number",
       attempts: attempts
     };
   }
@@ -277,11 +299,13 @@ return {
 
 ## Notes and known limits
 
-- **Retry policy is intentional**: a `failed`/`blocked` result is retried the
-  same as a `null` one (per the args contract). A deterministic failure (e.g. a
-  test that cannot pass) will simply exhaust `max_retries` and finalize as
-  blocked. The sandbox forbids `Date.now()` / `Math.random()`, so retries are
-  back-to-back with no backoff.
+- **Retry only clean pre-PR failures**: a `null` return, or a non-success that
+  opened no PR, is retried up to `max_retries`; once an attempt opens a PR
+  (non-null `github_number`), the result is terminal — retrying would re-run the
+  same branch push / `gh pr create` and collide with the existing PR, so the
+  orchestrator takes over (a blocked PR can still be finished by hand or by
+  re-running `/greenlight` on it). The sandbox forbids `Date.now()` /
+  `Math.random()`, so retries are back-to-back with no backoff.
 - **Hung agents block the barrier**: `parallel()` resolves only when every PR
   settles, so a stuck agent stalls the wave. This relies on the Workflow
   runtime's own per-agent lifecycle; the script adds no timeout.
