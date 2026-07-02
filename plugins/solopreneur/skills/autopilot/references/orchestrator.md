@@ -22,7 +22,11 @@ Read `{PLAN_DIR}/plan.yaml` and `{PLAN_DIR}/state.json`, then follow the flow be
 2. Read state.json (current progress)
 3. `git fetch origin && git pull origin main --ff-only` (ensure main is up to date)
 4. Clean up leftover worktrees: `git worktree list` → remove any not belonging to active PRs
-5. Update state.json: `status` → `in_progress`, `started_at` → now
+5. Reset interrupted PRs: any PR left in `implementing` is from a crashed run — no
+   agent is in flight in this fresh session — so set it back to `pending` so Step 1
+   re-selects it (its leftover worktree was just removed in step 4). This is what
+   makes wave-granularity crash recovery actually resume the interrupted wave.
+6. Update state.json: `status` → `in_progress`, `started_at` → now
 
 ### Phase 1: Execution Loop
 
@@ -78,8 +82,10 @@ Dispatch the whole wave through ONE Workflow call:
    with a per-PR retry loop (up to `max_retries` extra attempts), enforces
    `RESULT_SCHEMA` on each subagent's output, and returns `{ results: [...] }`.
 5. If the workflow instead returns `{ error: "file-overlap", pairs: [...] }`,
-   no agent ran — split the overlapping PRs into separate sequential waves (or
-   fall back to Step 2b for this wave), then retry.
+   no agent ran — first roll the batch's PRs back from `implementing` to
+   `pending` in state.json (nothing was dispatched, so they must re-enter Step 1),
+   then split the overlapping PRs into separate sequential waves (or fall back to
+   Step 2b for this wave) and retry.
 6. Otherwise proceed to Step 3 with the returned `results`.
 
 The per-PR retry loop and the overlap check are handled inside the script; the

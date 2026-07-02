@@ -78,13 +78,14 @@ purpose (the script has no filesystem access and cannot read that file), so
   "properties": {
     "pr_id": { "type": "string" },
     "status": { "type": "string", "enum": ["success", "failed", "blocked"] },
-    "github_number": { "type": ["number", "null"] },
+    "github_number": { "type": ["integer", "null"], "minimum": 1 },
     "review_summary": {
       "type": ["object", "null"],
+      "required": ["rounds", "fixed", "pushed_back"],
       "properties": {
-        "rounds": { "type": "number" },
-        "fixed": { "type": "number" },
-        "pushed_back": { "type": "number" }
+        "rounds": { "type": "integer", "minimum": 0 },
+        "fixed": { "type": "integer", "minimum": 0 },
+        "pushed_back": { "type": "integer", "minimum": 0 }
       }
     },
     "error": { "type": ["string", "null"] }
@@ -151,16 +152,17 @@ const RESULT_SCHEMA = {
   properties: {
     pr_id: { type: "string" },
     status: { type: "string", enum: ["success", "failed", "blocked"] },
-    github_number: { type: ["number", "null"] },
-    // ponytail: nested object left open (no additionalProperties / required) so
-    // a subagent may enrich it (e.g. a `reviewer` key, per schemas.md) without
-    // tripping validation.
+    github_number: { type: ["integer", "null"], minimum: 1 },
+    // ponytail: additionalProperties stays open so a subagent may enrich this
+    // (e.g. a `reviewer` key, per schemas.md), but the three core counts are
+    // required + non-negative integers so a success result is always well-formed.
     review_summary: {
       type: ["object", "null"],
+      required: ["rounds", "fixed", "pushed_back"],
       properties: {
-        rounds: { type: "number" },
-        fixed: { type: "number" },
-        pushed_back: { type: "number" }
+        rounds: { type: "integer", minimum: 0 },
+        fixed: { type: "integer", minimum: 0 },
+        pushed_back: { type: "integer", minimum: 0 }
       }
     },
     error: { type: ["string", "null"] }

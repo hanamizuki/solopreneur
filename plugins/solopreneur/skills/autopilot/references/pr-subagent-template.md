@@ -110,13 +110,14 @@ the copy in references/wave-workflow.md; if you change one, change both):
   "properties": {
     "pr_id": { "type": "string" },
     "status": { "type": "string", "enum": ["success", "failed", "blocked"] },
-    "github_number": { "type": ["number", "null"] },
+    "github_number": { "type": ["integer", "null"], "minimum": 1 },
     "review_summary": {
       "type": ["object", "null"],
+      "required": ["rounds", "fixed", "pushed_back"],
       "properties": {
-        "rounds": { "type": "number" },
-        "fixed": { "type": "number" },
-        "pushed_back": { "type": "number" }
+        "rounds": { "type": "integer", "minimum": 0 },
+        "fixed": { "type": "integer", "minimum": 0 },
+        "pushed_back": { "type": "integer", "minimum": 0 }
       }
     },
     "error": { "type": ["string", "null"] }
