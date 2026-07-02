@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/glittercowboy/taches-cc-resources
 - **Source path**: `skills/expertise/iphone-apps`
 - **Pinned commit**: 1757615b99ab789a72ff2d02e9f6112af2a15c04
-- **Synced at**: 2026-06-24T13:44:42Z
+- **Synced at**: 2026-07-02T06:58:46Z
 - **License**: see `../_vendored/LICENSES/taches-cc-resources-LICENSE`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder
