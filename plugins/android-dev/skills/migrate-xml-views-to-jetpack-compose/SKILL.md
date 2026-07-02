@@ -9,7 +9,7 @@ description: Provides a structured workflow for migrating an Android XML View to
 license: Complete terms in LICENSE.txt
 metadata:
   author: Google LLC
-  last-updated: '2026-06-08'
+  last-updated: '2026-06-20'
   keywords:
   - Jetpack Compose
   - migration
@@ -56,7 +56,7 @@ following the logic in [references/identify-optimal-xml-candidate.md](references
 
 Analyze the identified XML View's structure, hierarchy, and implementation
 details.
-Use [references/analysis-of-the-project-and-layout.md](references/analysis-of-the-project-and-layout.md) to
+Use [references/analysis-of-the-project-and-layout.md](https://developer.android.com/agents/skills/jetpack-compose/migration/migrate-xml-views-to-jetpack-compose/references/analysis-of-the-project-and-layout) to
 guide your technical audit of the layout and surrounding project context.
 
 ### Step 3: Create a plan

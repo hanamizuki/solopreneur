@@ -1,7 +1,5 @@
-## Set up the Compose Compiler Gradle plugin
-
-For Gradle, use the Compose Compiler Gradle plugin to set
-up and configure Compose.
+For Gradle, use the Compose Compiler Gradle plugin to set up and configure
+Compose.
 
 > [!NOTE]
 > **Note:** The Compose Compiler Gradle Plugin is only available from Kotlin 2.0+. For migration instructions, see ["Jetpack Compose compiler moving to the Kotlin
@@ -14,28 +12,29 @@ Set up the Compose Compiler Gradle plugin:
 1. In the `libs.versions.toml` file, remove any reference to the Compose Compiler.
 2. In the `versions` and `plugins` sections, add the new dependency:
 
-    [versions]
-    kotlin = "2.3.21"
+       [versions]
+       kotlin = "2.3.21"
 
-    [plugins]
-    org-jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+       [plugins]
+       org-jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 
-    // Add this line
-    compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+       // Add this line
+       compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 
-1. In the project's root `build.gradle.kts` file, add the following to the `plugins` section.
+3. In the project's root `build.gradle.kts` file, add the following to the
+   `plugins` section.
 
-    plugins {
+       plugins {
        // Existing plugins
        alias(libs.plugins.compose.compiler) apply false
-    }
+       }
 
-1. In each module that uses Compose, apply the plugin:
+4. In each module that uses Compose, apply the plugin:
 
-    plugins {
+       plugins {
        // Existing plugins
        alias(libs.plugins.compose.compiler)
-    }
+       }
 
 The project should now build and compile if it was using the default set up. If
 it had configured custom options on the Compose compiler, follow the next
@@ -75,10 +74,10 @@ For the full list of available options, see the [documentation](https://www.jetb
 
 ## Set up Compose dependencies
 
-Always use the latest Compose BOM version: `2026.05.00`.
+Always use the latest Compose BOM version: `2026.06.00`.
 
-Set the `compose` flag to `true` inside the Android [`BuildFeatures`](https://developer.android.com/reference/tools/gradle-api/7.0/com/android/build/api/dsl/BuildFeatures)
-to enable [Compose functionality](https://developer.android.com/develop/ui/compose/tooling) in Android Studio.
+Set the `compose` flag to `true` inside the Android [`BuildFeatures`](https://developer.android.com/reference/tools/gradle-api/7.0/com/android/build/api/dsl/BuildFeatures) to
+enable [Compose functionality](https://developer.android.com/develop/ui/compose/tooling) in Android Studio.
 
 Add the following definition to your app's `build.gradle` file:
 
@@ -104,7 +103,7 @@ Add the Compose BOM and the subset of Compose library dependencies:
 
     dependencies {
 
-        def composeBom = platform('androidx.compose:compose-bom:2026.05.00')
+        def composeBom = platform('androidx.compose:compose-bom:2026.06.00')
         implementation composeBom
         androidTestImplementation composeBom
 
@@ -143,7 +142,7 @@ Add the Compose BOM and the subset of Compose library dependencies:
 
     dependencies {
 
-        val composeBom = platform("androidx.compose:compose-bom:2026.05.00")
+        val composeBom = platform("androidx.compose:compose-bom:2026.06.00")
         implementation(composeBom)
         androidTestImplementation(composeBom)
 
@@ -181,3 +180,18 @@ Add the Compose BOM and the subset of Compose library dependencies:
 > [!NOTE]
 > **Note:** Jetpack Compose is shipped using a Bill of Materials (BOM), to keep the versions of all library groups in sync. Read more about it in the [Bill of
 > Materials page](https://developer.android.com/develop/ui/compose/bom/bom).
+
+## `compileSdk` and Android Gradle Plugin compatibility
+
+Compose library releases continually adopt the latest `compileSdk` versions to
+provide access to the latest Android features. Newer `compileSdk` versions
+require newer versions of Android Gradle Plugin, so adopting new Compose
+releases also requires projects to adopt new versions of the Android Gradle
+Plugin. We recommend keeping your project's `compileSdk` up to date with the
+latest released versions. `compileSdk` is unrelated from `targetSdk`.
+
+For example, starting with Compose 1.12.0, projects are required to use
+`compileSdk 37` and Android Gradle Plugin (AGP) 9.
+
+To check which version of AGP is supported for different API levels, see the
+[Android Gradle plugin API level support](https://developer.android.com/build/releases/about-agp#api-level-support) documentation.
