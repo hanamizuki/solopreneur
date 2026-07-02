@@ -119,9 +119,9 @@ The script has **no filesystem, git, or Node.js API access** — it only spawns
 agents and shapes their results. So the orchestrator session still owns, around
 each Workflow call:
 
-- **state.json writes** — set every dispatched PR to `implementing` before the
-  call, then apply the returned `results` after. state.json is the sole source
-  of progress recovery.
+- **state.json writes** — set every dispatched PR to `implementing` only after
+  the workflow confirms launch (a `taskId`), then apply the returned `results`
+  once the wave completes. state.json is the sole source of progress recovery.
 - **`git pull origin main --ff-only`** once per wave, after applying results, to
   absorb the merges from this wave.
 - **Worktree cleanup** — leftover worktrees from failed/retried attempts are

@@ -80,22 +80,26 @@ task-completion event.
    `{ id, branch, title, subagent, prompt, files }`, where `prompt` is the
    assembled prompt from above, `subagent` is the plan's subagent type, and
    `files` is the PR's resolved file list (above). Set `max_retries: 2`.
-3. Update state.json: every dispatched PR status → `implementing`.
-4. Invoke the `Workflow` tool with the wave-workflow script and `args`, then
-   inspect the immediate `WorkflowOutput`:
-   - If `error` is set, the script failed its syntax check and **never
-     launched** — roll the batch's PRs back from `implementing` to `pending`,
-     then fall back to Step 2b for this wave (or fix the script). A `warning`
-     (e.g. git-state divergence) is non-blocking; note it and continue.
-   - Otherwise record `taskId`; the wave is now running in the background.
-5. Wait for the wave to finish: the runtime pushes a task-completion event
+3. Invoke the `Workflow` tool with the wave-workflow script and `args`, then
+   inspect the immediate `WorkflowOutput` — **before** touching state.json:
+   - `error` set → the script failed its syntax check and **never launched**;
+     fall back to Step 2b for this wave (or fix the script). No PR was marked
+     `implementing`, so there is nothing to roll back.
+   - No `taskId` / not `async_launched` → the launch did not start. Workflows
+     can require a per-run approval, and an unattended CronCreate session that
+     cannot auto-approve will not get a `taskId`. Fall back to Step 2b (the
+     Agent path needs no approval). See the unattended note below.
+   - `async_launched` + `taskId` → the wave is running. **Now** update
+     state.json: every dispatched PR status → `implementing`, and record
+     `taskId`. (`warning`, e.g. git-state divergence, is non-blocking — note it.)
+4. Wait for the wave to finish: the runtime pushes a task-completion event
    (`task_notification`) whose `task_id` matches `taskId`. On `status:
    "completed"`, read the workflow's returned value from the event's
    `output_file`. On `status: "failed"` / `"stopped"`, the wave did not
    complete — roll the batch back to `pending` and fall back to Step 2b (or
    re-dispatch); if the session died while waiting, the Phase 0 reset recovers
    the stuck `implementing` PRs on the next run.
-6. Branch on the payload read from `output_file`:
+5. Branch on the payload read from `output_file`:
    - `{ error: "file-overlap", pairs: [...] }` — no agent ran; roll the batch's
      PRs back from `implementing` to `pending` (they must re-enter Step 1), then
      split the overlapping PRs into separate sequential waves (or fall back to
@@ -108,11 +112,19 @@ with a per-PR retry loop (up to `max_retries` extra attempts), and enforces
 wait on or re-dispatch individual PRs — it only awaits the one wave-completion
 event.
 
+> **Unattended approval:** launching a workflow may prompt for per-run approval.
+> Because the orchestrator runs unattended via CronCreate, either the scheduled
+> session must be able to auto-approve the launch (permission mode) or the wave
+> falls back to Step 2b — the per-PR Agent path, which needs no approval and
+> preserves today's fully unattended behavior. `implementing` is set only after
+> a confirmed launch (a `taskId`), so an un-launched or denied workflow never
+> strands PRs.
+
 > **Workflow scripts have NO filesystem or git access.** The wave-workflow
 > script only spawns agents and shapes their results — it cannot touch
-> `state.json` or run `git`. So `state.json` writes (Step 2a.3 before the call,
-> Step 3 after) and the between-wave `git pull origin main --ff-only` remain the
-> orchestrator's responsibility. Crash recovery therefore stays at **wave
+> `state.json` or run `git`. So `state.json` writes (Step 2a after a confirmed
+> launch, Step 3 after the wave completes) and the between-wave
+> `git pull origin main --ff-only` remain the orchestrator's responsibility. Crash recovery therefore stays at **wave
 > granularity**: `state.json` is the sole progress source, so a crash mid-wave
 > resumes by re-running the whole wave from the last persisted state. (A wave
 > re-run may re-dispatch a PR that already opened; Phase 0 worktree cleanup and
@@ -143,7 +155,12 @@ Consume the `results` array returned by the Workflow call. For each
 `{ pr_id, status, github_number, review_summary, error, attempts }`:
 
 - **`status == "success"`** → update state.json: status → `merged`, fill in
-  `number` (from `github_number`) and `review_summary`.
+  `number` (from `github_number`) and `review_summary`. A success always carries
+  a `github_number` (the script downgrades a numberless one to `blocked`). If
+  `review_summary` is null on a success (anomalous — the subagent skipped its
+  summary), still record `merged` (the PR is real and identified) and show the
+  counts as unavailable in the completion report — do not fabricate counts, and
+  do not mislabel a genuine merge as blocked.
 - **any other `status`** (`failed` / `blocked`, or a null-synthesized failure)
   → this is FINAL for the wave — the script already retried up to `max_retries`.
   Update state.json: status → `blocked`, `retry_count` → `max(attempts - 1, 0)`,
