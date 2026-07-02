@@ -307,8 +307,9 @@ After the user picks, write the artifacts per Step 3's table, then proceed to St
      list from the Step 2 descriptor. With one PR the overlap check trivially passes.
    - `args.max_retries` = 2.
    - Invoke the `Workflow` tool with the wave-workflow script and these args.
-   - The single element of the returned `results` array is the schema-validated
-     result (in-script retries already handled).
+   - The single element of the returned `results` array is this PR's result: the
+     schema-validated agent output plus an `attempts` count (in-script retries
+     already handled).
 
    **Workflow tool unavailable** (fallback — unchanged): dispatch the Agent tool:
    - `subagent_type` = `<subagent declared in Step 2>`

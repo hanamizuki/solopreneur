@@ -124,9 +124,10 @@ Consume the `results` array returned by the Workflow call. For each
 - **any other `status`** (`failed` / `blocked`, or a null-synthesized failure)
   → this is FINAL for the wave — the script already retried up to `max_retries`.
   Update state.json: status → `blocked`, `retry_count` → `max(attempts - 1, 0)`,
-  fill in `error`. Do NOT re-queue to `pending` (in-script retries are
-  exhausted). Blocked PRs won't be retried, but PRs that don't depend on them
-  can continue.
+  fill in `error`, and fill in `number` from `github_number` (non-null when the
+  PR was opened before it got stuck — don't drop it). Do NOT re-queue to
+  `pending` (in-script retries are exhausted). Blocked PRs won't be retried, but
+  PRs that don't depend on them can continue.
 
 After applying every result, run `git pull origin main --ff-only` **once** to
 absorb all merges from this wave, then return to Step 1.

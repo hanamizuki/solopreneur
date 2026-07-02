@@ -37,7 +37,7 @@ script as the global `args`:
 |-------|---------|
 | `prs[].id` | Canonical plan id (used for labels and result keying). |
 | `prs[].branch` | Target branch name (the subagent renames its worktree to this). |
-| `prs[].title` | PR title (already baked into `prompt`; carried for the label). |
+| `prs[].title` | PR title; already baked into `prompt`. Part of the contract for parity with plan.yaml — the script itself does not read it (the label uses `id` + `branch`). |
 | `prs[].subagent` | Same string the Agent tool takes as `subagent_type`. |
 | `prs[].prompt` | The **fully assembled** prompt: Standard Prefix + spec + Standard Suffix, exactly as the orchestrator assembles it today (see `pr-subagent-template.md`). |
 | `prs[].files` | Repo-relative create/modify paths for the overlap check. From plan.yaml `prs[].files`, or derived from the spec's "Files to Create/Modify" section when absent. |
