@@ -1,8 +1,8 @@
 ---
 name: merge-pr
 description: |
-  Merge an open PR for the current branch. Handles pre-merge cleanup of
-  worktree-specific files, consolidates the branch's plan file (renaming
+  Merge an open PR for the current branch. Refuses to merge when the worktree
+  has uncommitted changes, consolidates the branch's plan file (renaming
   the latest Handoff Context section to Final Progress and moving the file
   to done/ in state-machine mode), merges via GitHub CLI, and reports status.
   Also cleans up stale merged-but-not-removed worktrees from prior sessions
@@ -91,27 +91,20 @@ fi
 echo "Ready to merge: branch=$BRANCH, PR=#$PR_NUMBER"
 ```
 
-### Step 2: Pre-merge worktree cleanup (only runs in a worktree)
+### Step 2: Pre-merge uncommitted-changes check (only runs in a worktree)
 
-Remove legacy per-worktree files that must not land in main, then refuse to
-proceed if any uncommitted changes remain after cleanup.
+Refuse to proceed if the worktree has any uncommitted changes. The new flow
+commits everything intentionally, so anything uncommitted here is a mistake
+that must be surfaced before merging.
 
 ```bash
 IS_WORKTREE=$([ "$(git rev-parse --git-common-dir)" != "$(git rev-parse --git-dir)" ] && echo yes || echo no)
 
 if [ "$IS_WORKTREE" = "yes" ]; then
-  # Legacy cleanup (kept for one release — remove next minor bump)
-  git rm docs/CONTEXT.md 2>/dev/null || true
-  git rm -r docs/superpowers/ 2>/dev/null || true
-  git diff --cached --quiet || {
-    git commit -m "chore: remove legacy worktree-specific files before merge"
-    git push
-  }
-
   # Refusal: the new flow commits everything intentionally, so anything
   # uncommitted at this point is unintentional and must be surfaced.
   if ! git diff --quiet HEAD; then
-    echo "Worktree has uncommitted changes after legacy cleanup — refusing to merge."
+    echo "Worktree has uncommitted changes — refusing to merge."
     echo "Commit or stash first, then re-run /merge-pr."
     exit 1
   fi
@@ -524,9 +517,6 @@ To clean up immediately, run /merge-pr from the main repo or another worktree se
 
 ### Worktree behaviour
 
-- `docs/CONTEXT.md` and `docs/superpowers/` are legacy per-worktree files;
-  Step 2 removes them before merge (kept for one release, to be dropped next
-  minor bump).
 - **Never delete the current session's own worktree** — it would make the
   session CWD unreachable and disable all further Bash calls.
 - Other sessions' worktrees are safe to remove (Step 0 does this).
