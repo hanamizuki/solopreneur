@@ -103,10 +103,9 @@ for this batch — see each caller's callout in SKILL.md for the exact exit path
 The script returns data only; all side effects (dispatching the fix subagent,
 committing, resolving threads, reporting) stay with the orchestrating agent.
 
-> Skeptics use the session's default agent (single provider). Routing each skeptic
-> to a different model (reusing greenlight's Codex/Gemini/Claude reviewers) would
-> decorrelate errors, but is deferred — hardcoded model ids risk `agent()` returning
-> `null` (silently counted as refuted, eroding recall). Keep it identical for now.
+> Skeptics share the session's default agent; per-model routing (error
+> decorrelation) is deferred — hardcoded model ids risk `agent()` nulls, which count
+> as refuted.
 
 ## Workflow script
 

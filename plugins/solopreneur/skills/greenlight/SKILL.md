@@ -655,7 +655,10 @@ LOOP (max 5 rounds):
      unavailable → skip the gate; MERGED_FINDINGS unchanged.
 
   4. Parse `MERGED_FINDINGS`:
-     - Empty → **clean pass, exit loop.**
+     - Empty because reviewers raised nothing this round → **clean pass, exit loop.**
+     - Empty because the verification gate (3b) rejected every finding this round →
+       **push-back exit, exit loop** (findings existed but were all refuted — not a
+       clean pass).
      - All findings repeat prior rounds with the same reasoning already pushed back
        → **push-back exit, exit loop.**
      - Otherwise → continue to Step 5.
