@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/new-silvermoon/awesome-android-agent-skills
 - **Source path**: `.github/skills/testing_and_automation/android-testing`
 - **Pinned commit**: e5d0275e9f28f4e5feb5939210d78ef39568c029
-- **Synced at**: 2026-06-23T08:36:44Z
+- **Synced at**: 2026-07-02T06:58:49Z
 - **License**: see `../_vendored/LICENSES/awesome-android-agent-skills-LICENSE`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder

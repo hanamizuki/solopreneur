@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/tamtom/gplay-cli-skills
 - **Source path**: `skills/gplay-signing-setup`
 - **Pinned commit**: d3983dd3e9ee794654c7739892f121321e049724
-- **Synced at**: 2026-06-23T08:36:47Z
+- **Synced at**: 2026-07-02T06:58:52Z
 - **License**: see `../_vendored/LICENSES/gplay-cli-skills-LICENSE`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder

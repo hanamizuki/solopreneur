@@ -51,7 +51,7 @@ If Hilt is used in the project, ensure it is on version 2.59.2 or higher.
 
 ### Step 2: Migrate to built-in Kotlin
 
-See [the guide](references/android/build/migrate-to-built-in-kotlin.md) for detailed information.
+See [the guide](https://developer.android.com/build/migrate-to-built-in-kotlin) for detailed information.
 
 ### Step 3. Migrate to the new AGP DSL
 
