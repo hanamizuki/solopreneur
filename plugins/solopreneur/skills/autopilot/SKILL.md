@@ -306,10 +306,14 @@ After the user picks, write the artifacts per Step 3's table, then proceed to St
      where `prompt` is the assembled prompt and `files` is this PR's create/modify
      list from the Step 2 descriptor. With one PR the overlap check trivially passes.
    - `args.max_retries` = 2.
-   - Invoke the `Workflow` tool with the wave-workflow script and these args.
-   - The single element of the returned `results` array is this PR's result: the
-     schema-validated agent output plus an `attempts` count (in-script retries
-     already handled).
+   - Invoke the `Workflow` tool with the wave-workflow script and these args. The
+     call is **async** (see orchestrator.md Step 2a): it returns a launcher
+     response (`{ status, taskId, error? }`); if `error` is set the script failed
+     its syntax check — fall back to the Agent path. Otherwise wait for the
+     matching `task_notification` completion event and read the workflow result
+     from its `output_file`.
+   - `results[0]` from that payload is this PR's result: the schema-validated
+     agent output plus an `attempts` count (in-script retries already handled).
 
    **Workflow tool unavailable** (fallback — unchanged): dispatch the Agent tool:
    - `subagent_type` = `<subagent declared in Step 2>`

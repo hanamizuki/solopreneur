@@ -69,7 +69,11 @@ is present in this session's available tools.
 
 #### Step 2a: Workflow tool is available (preferred)
 
-Dispatch the whole wave through ONE Workflow call:
+Dispatch the whole wave through ONE Workflow call. **The Workflow tool is
+asynchronous**: the call returns immediately with a launcher response
+(`WorkflowOutput`: `{ status: "async_launched", taskId, error?, warning? }`) and
+the wave runs in the background — the script's returned value arrives later as a
+task-completion event.
 
 1. Read `references/wave-workflow.md` for the script + args contract.
 2. Build `args`: `prs` is one entry per executable PR —
@@ -77,19 +81,32 @@ Dispatch the whole wave through ONE Workflow call:
    assembled prompt from above, `subagent` is the plan's subagent type, and
    `files` is the PR's resolved file list (above). Set `max_retries: 2`.
 3. Update state.json: every dispatched PR status → `implementing`.
-4. Invoke the `Workflow` tool with the wave-workflow script and `args`. The
-   script runs the file-overlap check, dispatches every PR via `parallel()`
-   with a per-PR retry loop (up to `max_retries` extra attempts), enforces
-   `RESULT_SCHEMA` on each subagent's output, and returns `{ results: [...] }`.
-5. If the workflow instead returns `{ error: "file-overlap", pairs: [...] }`,
-   no agent ran — first roll the batch's PRs back from `implementing` to
-   `pending` in state.json (nothing was dispatched, so they must re-enter Step 1),
-   then split the overlapping PRs into separate sequential waves (or fall back to
-   Step 2b for this wave) and retry.
-6. Otherwise proceed to Step 3 with the returned `results`.
+4. Invoke the `Workflow` tool with the wave-workflow script and `args`, then
+   inspect the immediate `WorkflowOutput`:
+   - If `error` is set, the script failed its syntax check and **never
+     launched** — roll the batch's PRs back from `implementing` to `pending`,
+     then fall back to Step 2b for this wave (or fix the script). A `warning`
+     (e.g. git-state divergence) is non-blocking; note it and continue.
+   - Otherwise record `taskId`; the wave is now running in the background.
+5. Wait for the wave to finish: the runtime pushes a task-completion event
+   (`task_notification`) whose `task_id` matches `taskId`. On `status:
+   "completed"`, read the workflow's returned value from the event's
+   `output_file`. On `status: "failed"` / `"stopped"`, the wave did not
+   complete — roll the batch back to `pending` and fall back to Step 2b (or
+   re-dispatch); if the session died while waiting, the Phase 0 reset recovers
+   the stuck `implementing` PRs on the next run.
+6. Branch on the payload read from `output_file`:
+   - `{ error: "file-overlap", pairs: [...] }` — no agent ran; roll the batch's
+     PRs back from `implementing` to `pending` (they must re-enter Step 1), then
+     split the overlapping PRs into separate sequential waves (or fall back to
+     Step 2b) and retry.
+   - `{ results: [...] }` — proceed to Step 3 with `results`.
 
-The per-PR retry loop and the overlap check are handled inside the script; the
-orchestrator does not manually wait on or re-dispatch individual PRs here.
+The script runs the file-overlap check, dispatches every PR via `parallel()`
+with a per-PR retry loop (up to `max_retries` extra attempts), and enforces
+`RESULT_SCHEMA` on each subagent's output. The orchestrator does not manually
+wait on or re-dispatch individual PRs — it only awaits the one wave-completion
+event.
 
 > **Workflow scripts have NO filesystem or git access.** The wave-workflow
 > script only spawns agents and shapes their results — it cannot touch

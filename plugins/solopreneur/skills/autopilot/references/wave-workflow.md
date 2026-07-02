@@ -127,6 +127,14 @@ each Workflow call:
 - **Worktree cleanup** — leftover worktrees from failed/retried attempts are
   handled by Phase 0 cleanup on the next run; the script adds no cleanup logic.
 
+The Workflow tool is **asynchronous**: the call returns a launcher response
+(`{ status: "async_launched", taskId, error? }`) immediately, and the value this
+script `return`s (`{ results }`, or `{ error: "file-overlap" }`) is delivered
+later as a task-completion event whose `output_file` the orchestrator reads —
+see `orchestrator.md` Step 2a. The script just returns the object; it never sees
+`taskId` or the event. A script syntax-check failure surfaces as `error` on the
+immediate launcher response, and the wave never launches.
+
 Because state.json is written only between waves, crash recovery is at **wave
 granularity**: a crash mid-wave resumes by re-running the whole wave from the
 last persisted state.
