@@ -1,0 +1,31 @@
+# Orchestration plan: adopt Claude Code Workflow orchestration in greenlight + autopilot
+name: "Workflow adoption for greenlight + autopilot"
+created_at: "2026-07-03"
+
+prs:
+  - id: pr1
+    branch: feature/greenlight-adversarial-verify
+    title: "feat(greenlight): adversarial finding verification via Workflow"
+    type: docs
+    subagent: ai-engineer
+    depends_on: []
+    spec: pr1-greenlight-verify.md
+    # files: forward-looking optional field (mechanical overlap check); the
+    # current orchestrator ignores it and reads the specs instead.
+    files:
+      - plugins/solopreneur/skills/greenlight/SKILL.md
+      - plugins/solopreneur/skills/greenlight/references/adversarial-verify.md
+
+  - id: pr2
+    branch: feature/autopilot-wave-workflow
+    title: "feat(autopilot): dispatch waves via Workflow with schema-validated results"
+    type: docs
+    subagent: ai-engineer
+    depends_on: []
+    spec: pr2-autopilot-wave.md
+    files:
+      - plugins/solopreneur/skills/autopilot/SKILL.md
+      - plugins/solopreneur/skills/autopilot/references/orchestrator.md
+      - plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md
+      - plugins/solopreneur/skills/autopilot/references/schemas.md
+      - plugins/solopreneur/skills/autopilot/references/wave-workflow.md
