@@ -8,6 +8,16 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-07-03
+
+### solopreneur 0.5.28 → 0.5.29
+`/autopilot` and `/greenlight` now use Claude Code's Workflow tool when available (v2.1.154+), falling back to the previous flow automatically when it isn't:
+
+- **`/greenlight` — adversarial verification gate.** Before findings reach a fix subagent, each consolidated internal-review finding is challenged by 3 independent skeptic subagents; findings a majority refutes are dropped and reported as push-backs instead of triggering a fix cycle. Applies in PR mode and post-commit mode — cuts wasted rounds on false-positive findings.
+- **`/autopilot` — wave dispatch via Workflow.** Each wave of PR subagents is dispatched as a single Workflow with schema-validated results and in-script retries; `plan.yaml` gains an optional per-PR `files:` field for the wave overlap check.
+
+(#75, #76)
+
 ## 2026-07-02
 
 ### solopreneur 0.5.27 → 0.5.28
