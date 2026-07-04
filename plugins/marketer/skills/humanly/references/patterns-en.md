@@ -1,6 +1,11 @@
 # English AI Writing Patterns
 
-A reference guide for identifying and removing AI-generated writing patterns in English text. Use this as a pre-writing guide to internalize the patterns, or as a reference during review.
+> **Role**: single source of truth for English patterns. Review / detect mode reads this file in full.
+> **Adding a pattern**: (1) append a full entry before the Reference section, taking the next number; (2) write a one-line `Summary: ...` under the title (feeds the pre-write appendix index); (3) append `| pre-write` to the summary of patterns writers most often commit — their full text gets extracted into the pre-write file; (4) related words go to `word-table-en.md`; (5) run `scripts/build-pre-write.py`.
+> **Numbering**: zh and en pattern numbers are independent (e.g. en#37 Therapy-Speak = zh#38). Prefix with the language when cross-referencing.
+> **Never hand-edit** `generated/pre-write-en.md` — the script builds it from this file and the word table.
+
+A reference guide for identifying and removing AI-generated writing patterns in English text. Used for comparison during review; before writing, read the generated `generated/pre-write-en.md` instead.
 
 Based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup.
 
@@ -50,11 +55,35 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ### After (has a pulse):
 > I genuinely don't know how to feel about this one. 3 million lines of code, generated while the humans presumably slept. Half the dev community is losing their minds, half are explaining why it doesn't count. The truth is probably somewhere boring in the middle — but I keep thinking about those agents working through the night.
 
+A second pair, community-post register:
+
+### Before (clean but soulless):
+> The community has come together in a truly remarkable way, showcasing the power of collaboration and demonstrating that when people unite, incredible things can happen.
+
+### After (has a pulse):
+> Sixty people showed up on a Tuesday night. Nobody expected that.
+
+---
+
+## Formatting and Rhythm Check
+
+Quick pass after writing:
+
+- **Em dashes** (— and --): replace with commas, periods, or parentheses. Target: zero.
+- **Bold**: for scanning, not emphasis on every third phrase.
+- **Emoji in headers**: remove entirely.
+- **Excessive bullets**: if a list has 3+ items that flow naturally, convert to prose.
+- Mix short sentences (3-8 words) with long ones (20+). Fragments are fine.
+- Vary paragraph length. Some paragraphs are one sentence. Others need room.
+- If text-to-speech could read it without pausing, it's too uniform.
+
 ---
 
 ## Content Patterns
 
 ### 1. Undue Emphasis on Significance, Legacy, and Broader Trends
+
+Summary: don't promote routine events into milestones or broader trends — state what happened | pre-write
 
 **Words to watch:** stands/serves as, is a testament/reminder, a vital/significant/crucial/pivotal/key role/moment, underscores/highlights its importance/significance, reflects broader, symbolizing its ongoing/enduring/lasting, contributing to the, setting the stage for, marking/shaping the, represents/marks a shift, key turning point, evolving landscape, focal point, indelible mark, deeply rooted
 
@@ -70,6 +99,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 2. Undue Emphasis on Notability and Media Coverage
 
+Summary: don't stack media mentions to prove notability; cite one specific source and what it said
+
 **Words to watch:** independent coverage, local/regional/national media outlets, written by a leading expert, active social media presence
 
 **Problem:** LLMs hit readers over the head with claims of notability, often listing sources without context.
@@ -83,6 +114,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 3. Superficial Analyses with -ing Endings
+
+Summary: don't tack "-ing" phrases (symbolizing, reflecting...) onto sentences for fake depth
 
 **Words to watch:** highlighting/underscoring/emphasizing..., ensuring..., reflecting/symbolizing..., contributing to..., cultivating/fostering..., encompassing..., showcasing...
 
@@ -98,6 +131,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 4. Promotional and Advertisement-like Language
 
+Summary: no tourism-brochure prose — describe, don't sell
+
 **Words to watch:** boasts a, vibrant, rich (figurative), profound, enhancing its, showcasing, exemplifies, commitment to, natural beauty, nestled, in the heart of, groundbreaking (figurative), renowned, breathtaking, must-visit, stunning
 
 **Problem:** LLMs have serious problems keeping a neutral tone, especially for "cultural heritage" topics.
@@ -112,6 +147,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 5. Vague Attributions and Weasel Words
 
+Summary: "experts argue" means nothing; name the source or drop the claim
+
 **Words to watch:** Industry reports, Observers have cited, Experts argue, Some critics argue, several sources/publications (when few cited)
 
 **Problem:** AI chatbots attribute opinions to vague authorities without specific sources.
@@ -125,6 +162,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 6. Outline-like "Challenges and Future Prospects" Sections
+
+Summary: don't write formulaic "despite challenges... continues to thrive" sections; report specific events
 
 **Words to watch:** Despite its... faces several challenges..., Despite these challenges, Challenges and Legacy, Future Outlook
 
@@ -142,6 +181,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 7. Overused "AI Vocabulary" Words
 
+Summary: swap high-frequency AI words (additionally, crucial, pivotal...) — full table in word-table-en.md
+
 **High-frequency AI words:** Additionally, align with, crucial, delve, emphasizing, enduring, enhance, fostering, garner, highlight (verb), interplay, intricate/intricacies, key (adjective), landscape (abstract noun), pivotal, showcase, tapestry (abstract noun), testament, underscore (verb), valuable, vibrant
 
 **Problem:** These words appear far more frequently in post-2023 text. They often co-occur.
@@ -155,6 +196,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 8. Avoidance of "is"/"are" (Copula Avoidance)
+
+Summary: prefer plain "is/has" over "serves as / boasts / features"
 
 **Words to watch:** serves as/stands as/marks/represents [a], boasts/features/offers [a]
 
@@ -170,6 +213,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 9. Negative Parallelisms
 
+Summary: "it's not X, it's Y" is a crutch — usually just state Y | pre-write
+
 **Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts.
 
 **Before:**
@@ -181,6 +226,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 10. Rule of Three Overuse
+
+Summary: don't force ideas into groups of three; two or four reads more natural
 
 **Problem:** LLMs force ideas into groups of three to appear comprehensive.
 
@@ -194,6 +241,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 11. Elegant Variation (Synonym Cycling)
 
+Summary: repeat the clear word instead of cycling synonyms
+
 **Problem:** AI has repetition-penalty code causing excessive synonym substitution.
 
 **Before:**
@@ -205,6 +254,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 12. False Ranges
+
+Summary: "from X to Y" needs a meaningful scale — otherwise just list the items
 
 **Problem:** LLMs use "from X to Y" constructions where X and Y aren't on a meaningful scale.
 
@@ -220,6 +271,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 13. Em Dash Overuse
 
+Summary: em dashes are an AI tell — target zero, use commas or periods
+
 **Problem:** LLMs use em dashes (—) more than humans, mimicking "punchy" sales writing.
 
 **Before:**
@@ -232,6 +285,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 14. Overuse of Boldface
 
+Summary: bold is for scanning, not for emphasizing every third phrase
+
 **Problem:** AI chatbots emphasize phrases in boldface mechanically.
 
 **Before:**
@@ -243,6 +298,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 15. Inline-Header Vertical Lists
+
+Summary: don't write "**Header:** explanation" bullet lists; fold into prose
 
 **Problem:** AI outputs lists where items start with bolded headers followed by colons.
 
@@ -258,6 +315,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 16. Title Case in Headings
 
+Summary: use sentence case in headings, not Title Case
+
 **Problem:** AI chatbots capitalize all main words in headings.
 
 **Before:**
@@ -269,6 +328,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 17. Emojis
+
+Summary: don't decorate headings or bullets with emojis
 
 **Problem:** AI chatbots often decorate headings or bullet points with emojis.
 
@@ -284,6 +345,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 18. Curly Quotation Marks
 
+Summary: use straight quotes, not curly quotes
+
 **Problem:** ChatGPT uses curly quotes ("\u201c...\u201d") instead of straight quotes ("...").
 
 **Before:**
@@ -297,6 +360,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ## Communication Patterns
 
 ### 19. Collaborative Communication Artifacts
+
+Summary: "I hope this helps!" is chatbot correspondence, not content — delete
 
 **Words to watch:** I hope this helps, Of course!, Certainly!, You're absolutely right!, Would you like..., let me know, here is a...
 
@@ -312,6 +377,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 20. Knowledge-Cutoff Disclaimers
 
+Summary: delete cutoff disclaimers ("as of my last update"); state the fact
+
 **Words to watch:** as of [date], Up to my last training update, While specific details are limited/scarce..., based on available information...
 
 **Problem:** AI disclaimers about incomplete information get left in text.
@@ -326,6 +393,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 21. Sycophantic/Servile Tone
 
+Summary: cut sycophantic openers ("Great question! You're absolutely right")
+
 **Problem:** Overly positive, people-pleasing language.
 
 **Before:**
@@ -337,6 +406,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 22. Filler Phrases
+
+Summary: openers, announcements, and restatements are filler — if cutting it changes nothing, cut it | pre-write
 
 **Before → After:**
 - "In order to achieve this goal" → "To achieve this"
@@ -350,6 +421,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 23. Excessive Hedging
 
+Summary: don't stack qualifiers ("could potentially possibly"); keep one
+
 **Problem:** Over-qualifying statements.
 
 **Before:**
@@ -362,6 +435,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 24. Generic Positive Conclusions
 
+Summary: don't wrap up with a neat upbeat conclusion — stop when the point is made | pre-write
+
 **Problem:** Vague upbeat endings. AI wraps up with a neat, unassailable conclusion. Real people just stop talking when they're done with the point at hand.
 
 **Before:**
@@ -372,27 +447,9 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ---
 
-## Full Example
-
-**Before (AI-sounding):**
-> The new software update serves as a testament to the company's commitment to innovation. Moreover, it provides a seamless, intuitive, and powerful user experience—ensuring that users can accomplish their goals efficiently. It's not just an update, it's a revolution in how we think about productivity. Industry experts believe this will have a lasting impact on the entire sector, highlighting the company's pivotal role in the evolving technological landscape.
-
-**After (Humanized):**
-> The software update adds batch processing, keyboard shortcuts, and offline mode. Early feedback from beta testers has been positive, with most reporting faster task completion.
-
-**Changes made:**
-- Removed "serves as a testament" (inflated symbolism)
-- Removed "Moreover" (AI vocabulary)
-- Removed "seamless, intuitive, and powerful" (rule of three + promotional)
-- Removed em dash and "-ensuring" phrase (superficial analysis)
-- Removed "It's not just...it's..." (negative parallelism)
-- Removed "Industry experts believe" (vague attribution)
-- Removed "pivotal role" and "evolving landscape" (AI vocabulary)
-- Added specific features and concrete feedback
-
----
-
 ### 25. Novelty Inflation
+
+Summary: don't present established concepts as brand-new discoveries
 
 **Problem:** AI treats established concepts as if the speaker invented them: "He introduced a term," "a concept nobody's naming."
 
@@ -406,6 +463,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 26. Emotional Flatline
 
+Summary: don't claim emotions ("what surprised me most") — convey them with concrete facts
+
 **Problem:** AI claims emotions as structural crutch without conveying them: "What surprised me most," "I was fascinated to discover."
 
 **Before:**
@@ -417,6 +476,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 27. False Concession
+
+Summary: "while X is impressive, Y remains a challenge" weighs nothing; give specifics
 
 **Problem:** AI uses "While X is impressive, Y remains" to sound balanced without weighing anything.
 
@@ -430,6 +491,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 28. Rhetorical Question Openers
 
+Summary: don't stall with rhetorical questions; lead with the point
+
 **Problem:** AI uses rhetorical questions to stall before the point: "But what does this mean for developers?"
 
 **Before:**
@@ -441,6 +504,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 29. Parenthetical Hedging
+
+Summary: parenthetical asides "(and, increasingly, Z)" are fake nuance — cut or inline
 
 **Problem:** AI inserts parenthetical asides to sound nuanced: "(and, increasingly, Z)."
 
@@ -454,6 +519,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 30. Numbered List Inflation
 
+Summary: don't default to "N reasons why" lists; tell one or two concrete things
+
 **Problem:** AI defaults to numbered lists because they're structurally safe: "Three key takeaways."
 
 **Before:**
@@ -465,6 +532,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 31. Reasoning Chain Artifacts
+
+Summary: "let me break this down" is reasoning scaffolding — keep it out of prose
 
 **Problem:** Chain-of-thought scaffolding leaks into prose: "Let me think step by step," "Breaking this down."
 
@@ -478,6 +547,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 32. Acknowledgment Loops
 
+Summary: don't restate the question before answering; just answer
+
 **Problem:** AI restates the prompt before answering: "You're asking about," "To answer your question."
 
 **Before:**
@@ -489,6 +560,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 33. "Let's" Constructions
+
+Summary: "let's explore..." is a false-collaborative opener — start with the point
 
 **Words to watch:** Let's explore, Let's take a look, Let's break this down, Let's examine
 
@@ -504,6 +577,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 34. Excessive Structure
 
+Summary: don't pack short text with headers; 3+ under 300 words is too many
+
 **Problem:** Too many headers in short text (3+ in under 300 words). Formulaic headers like "Overview," "Key Points," "Summary."
 
 **Before:**
@@ -515,6 +590,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 35. Rhythm and Uniformity
+
+Summary: uniform sentence and paragraph length is the #1 AI signal — break the meter | pre-write
 
 **Problem:** AI text is metronomic — uniform sentence length (15-25 words), uniform paragraphs, symmetrical phrasing. Structure is the #1 AI detection signal.
 
@@ -528,6 +605,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### 36. Rewrite-vs-Patch Threshold
 
+Summary: 5+ word flags, 3+ pattern categories, uniform rhythm → rewrite, don't patch
+
 **Problem:** When text has 5+ vocabulary flags across categories, 3+ pattern categories, and uniform rhythm, patching won't fix it — the structure itself is AI-generated.
 
 **Guidance:** Advise full rewrite: state the core point in one sentence, then rebuild.
@@ -535,6 +614,8 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ---
 
 ### 37. Therapy-Speak (Emotional Validation)
+
+Summary: don't certify feelings ("your anxiety is valid" → "of course you're anxious"); cut absolving lines | pre-write
 
 **Watch for:** your X is valid, your feelings are real, it's not your fault, you deserve to be seen, I see you, your feelings matter, it's okay to feel this way
 
@@ -569,6 +650,26 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 | Trigger | overt syntax markers ("not X, but Y") | upbeat sign-off (bright future, keep going) | validating or absolving emotion ("your X is valid," "not your fault") |
 | Register | slogan symmetry | motivational close | therapist reassurance |
 | Fix | one clause, just state Y | replace with a concrete fact | normalize the feeling, say it plainly |
+
+---
+
+## Full Example
+
+**Before (AI-sounding):**
+> The new software update serves as a testament to the company's commitment to innovation. Moreover, it provides a seamless, intuitive, and powerful user experience—ensuring that users can accomplish their goals efficiently. It's not just an update, it's a revolution in how we think about productivity. Industry experts believe this will have a lasting impact on the entire sector, highlighting the company's pivotal role in the evolving technological landscape.
+
+**After (Humanized):**
+> The software update adds batch processing, keyboard shortcuts, and offline mode. Early feedback from beta testers has been positive, with most reporting faster task completion.
+
+**Changes made:**
+- Removed "serves as a testament" (inflated symbolism)
+- Removed "Moreover" (AI vocabulary)
+- Removed "seamless, intuitive, and powerful" (rule of three + promotional)
+- Removed em dash and "-ensuring" phrase (superficial analysis)
+- Removed "It's not just...it's..." (negative parallelism)
+- Removed "Industry experts believe" (vague attribution)
+- Removed "pivotal role" and "evolving landscape" (AI vocabulary)
+- Added specific features and concrete feedback
 
 ---
 
