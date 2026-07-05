@@ -95,6 +95,7 @@ Run through these checks regardless of language:
 - Conjunctive adverbs (Additionally, However)? Consider removing
 - Rule of three? Use two items or four
 - Symmetrical slogans ("Not X, but Y")? Just say Y
+- Contrast adds no new information (surface/deeper, "the real problem is")? Cut the frame, state the point with evidence
 - Ends with a life lesson or quotable line? Delete or replace with a concrete fact
 - More than 1 quoted term? Keep only the most essential one
 - Announcement filler ("You won't believe...")? Just say the content
