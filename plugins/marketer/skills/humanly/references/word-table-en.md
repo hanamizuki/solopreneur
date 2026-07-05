@@ -27,7 +27,7 @@ Three tiers based on how reliably they signal AI-generated text.
 | cutting-edge | latest, newest, advanced |
 | leverage (verb) | use |
 | pivotal | important, key, critical |
-| underscores | highlights, shows |
+| underscores | shows, points to |
 | meticulous / meticulously | careful, detailed, precise |
 | seamless / seamlessly | smooth, easy, without friction |
 | game-changer / game-changing | describe what specifically changed and why it matters |
@@ -58,6 +58,8 @@ Three tiers based on how reliably they signal AI-generated text.
 | at its core | (cut — just state the thing) |
 | synergy / synergies | (describe the actual combined effect) |
 | interplay | relationship, connection, interaction |
+| additionally / moreover / furthermore | also, and, plus (or just start the sentence) |
+| garner | get, earn, attract |
 | in order to | to |
 | due to the fact that | because |
 | serves as | is |
@@ -116,6 +118,8 @@ Three tiers based on how reliably they signal AI-generated text.
 | quintessential | typical, classic, defining |
 | overarching | main, central, broad |
 | underpinning / underpinnings | basis, foundation, what supports |
+| align with | match, fit, support |
+| valuable (as filler praise) | useful, helpful (or say why it matters) |
 
 ## Tier 3 — Flag Only at High Density
 
