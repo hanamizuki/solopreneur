@@ -52,10 +52,10 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 A second pair, community-post register:
 
-### Before (clean but soulless):
+### Before (community post, soulless):
 > The community has come together in a truly remarkable way, showcasing the power of collaboration and demonstrating that when people unite, incredible things can happen.
 
-### After (has a pulse):
+### After (community post, has a pulse):
 > Sixty people showed up on a Tuesday night. Nobody expected that.
 
 ---

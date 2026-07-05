@@ -98,24 +98,36 @@ def rstrip_block(block):
     return block
 
 
+def find_heading(lines, heading, start=0):
+    """Index of the first line matching heading at or after start, else -1.
+
+    Both sides are compared stripped. An exact lines.index() would reject a
+    source heading that carries stray trailing whitespace and fail the build
+    with a confusing "heading not found" even though the heading is visibly
+    present; stripping keeps invisible whitespace from breaking the build.
+    """
+    target = heading.strip()
+    for i in range(start, len(lines)):
+        if lines[i].strip() == target:
+            return i
+    return -1
+
+
 def extract_block(lines, start_heading, end_heading, source):
     """Return the lines from start_heading (inclusive) to end_heading (exclusive)."""
-    try:
-        start = lines.index(start_heading)
-    except ValueError:
+    start = find_heading(lines, start_heading)
+    if start < 0:
         fail(f"{source}: heading not found: {start_heading!r}")
-    try:
-        end = lines.index(end_heading, start)
-    except ValueError:
+    end = find_heading(lines, end_heading, start)
+    if end < 0:
         fail(f"{source}: heading not found after {start_heading!r}: {end_heading!r}")
     return rstrip_block(lines[start:end])
 
 
 def extract_section(lines, heading, source):
     """Return the lines of one `## ` section, heading included."""
-    try:
-        start = lines.index(heading)
-    except ValueError:
+    start = find_heading(lines, heading)
+    if start < 0:
         fail(f"{source}: heading not found: {heading!r}")
     end = start + 1
     while end < len(lines) and not lines[end].startswith("## "):
@@ -127,7 +139,10 @@ def parse_patterns(path):
     """Parse pattern entries: number, title, summary, pre-write flag, body lines."""
     if not path.exists():
         fail(f"source file not found: {path}")
-    lines = path.read_text(encoding="utf-8").splitlines()
+    # utf-8-sig strips a leading BOM if a source was saved with one (identical
+    # to utf-8 otherwise), so a BOM can't sneak an invisible ﻿ onto the
+    # first line and break heading matching.
+    lines = path.read_text(encoding="utf-8-sig").splitlines()
     entries = []
     current = None
     for line in lines:
@@ -155,11 +170,13 @@ def parse_patterns(path):
         if sm and current["summary"] is None:
             # Peel only trailing parts that are KNOWN flags; rejoin the rest as
             # the summary. An ASCII "|" in EN prose thus survives instead of
-            # truncating the summary at the first bar.
+            # truncating the summary at the first bar. Flag matching is
+            # case-insensitive so a "Pre-Write"/"PRE-WRITE" typo still counts,
+            # while the summary keeps the original casing of its non-flag parts.
             parts = [p.strip() for p in FLAG_SPLIT_RE.split(sm.group(1))]
             flags = set()
-            while len(parts) > 1 and parts[-1] in KNOWN_FLAGS:
-                flags.add(parts.pop())
+            while len(parts) > 1 and parts[-1].lower() in KNOWN_FLAGS:
+                flags.add(parts.pop().lower())
             current["summary"] = " | ".join(parts)
             current["pre_write"] = "pre-write" in flags
             continue  # the summary line itself stays out of the body
@@ -196,7 +213,7 @@ def build(lang):
     )
     if not word_path.exists():
         fail(f"source file not found: {word_path}")
-    word_lines = word_path.read_text(encoding="utf-8").splitlines()
+    word_lines = word_path.read_text(encoding="utf-8-sig").splitlines()
     word_blocks = [
         extract_section(word_lines, h, cfg["word_table"]) for h in cfg["word_sections"]
     ]

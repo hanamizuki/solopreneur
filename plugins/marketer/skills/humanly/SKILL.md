@@ -154,7 +154,7 @@ Five source files, two generated files (built from four of them), one build scri
 
 To change anything: edit the source file, then run
 
-```
+```bash
 python3 plugins/marketer/skills/humanly/scripts/build-pre-write.py
 ```
 
