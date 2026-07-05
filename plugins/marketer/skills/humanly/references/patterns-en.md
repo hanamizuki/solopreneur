@@ -653,6 +653,35 @@ Summary: don't certify feelings ("your anxiety is valid" → "of course you're a
 
 ---
 
+### 38. Reframing as a Substitute for Reasoning
+
+Summary: "on the surface X, deeper down Y" / "the real problem is" fakes insight through tone escalation; cut the frame, add the reasoning | pre-write
+
+**Watch for:** on the surface... but at a deeper level; the real question/problem isn't X, it's Y; the key isn't X, it's Y; you think it's X, but it's actually Y; seemingly paradoxical; paradoxically; what looks like X is actually Y
+
+**Problem:** When asked to write "with a point of view," AI falls into one shape: state a common view, negate or correct it, then present a higher-level take. Contrast should serve analysis. Here contrast becomes the engine that moves the piece forward. No new information, just tone escalation, and the negated X is often a strawman nobody holds. Real thinking distinguishes, qualifies, rebuts, and derives, instead of restating the same thing one level up.
+
+**Before:**
+> On the surface, this is an efficiency problem; at a deeper level, it's really a trust problem. The real key isn't the tooling, it's whether the team dares to hand over decisions.
+
+**After:**
+> After the deploy pipeline went from three days to half a day, overtime didn't drop, because every PR still waits for the manager's personal sign-off. The bottleneck is the manager not delegating review, not the tooling.
+
+**Test:** Ask "what does Y say that X didn't?" If Y is just X restated one level up, or nobody actually holds X, delete the frame, state Y directly, and back it with a concrete example or causal chain. A contrast that lands after the reasoning is human. A contrast that replaces the reasoning is the tell. Legitimate contrasts stay: keep any distinction that gives a criterion, a qualifier, or can say exactly how the two sides differ.
+
+**Density rule:** At most one of these frames per piece. Two or more means the piece is advancing on tone pivots. Go to #36 and rewrite.
+
+**Distinguishing from #9 Negative Parallelisms:**
+
+| | #9 Negative Parallelisms | #38 Reframing as a Substitute for Reasoning |
+|---|---|---|
+| Catches | form (symmetry, slogan feel) | reasoning (the contrast adds no new information) |
+| Test | does it sound like a slogan? | what does Y say that X didn't? |
+| Example | "It's not luck, it's skill" | "On the surface it's efficiency, deeper down it's trust" |
+| Fix | one clause, just state Y | cut the frame, argue Y with examples and causation |
+
+---
+
 ## Full Example
 
 **Before (AI-sounding):**
