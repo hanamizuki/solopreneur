@@ -32,9 +32,9 @@ When invoked before writing:
 3. Internalize the principles and examples, then proceed with the writing task
 
 The pre-write file already bundles the core principles, the highest-frequency
-patterns with before/after examples, the Tier 1 word table, and a one-line
-index of every pattern. Do NOT additionally load the full patterns file —
-it is for review mode.
+patterns with before/after examples, the Tier 1 word table (plus banned
+sentence patterns for zh), and a one-line index of every pattern. Do NOT
+additionally load the full patterns file — it is for review mode.
 
 ---
 
@@ -143,7 +143,7 @@ When writing *about* AI patterns (blog posts, tutorials, documentation): quoted 
 
 ## Maintenance
 
-Five source files, two generated files, one build script:
+Five source files, two generated files (built from four of them), one build script:
 
 | File | Role |
 |------|------|

@@ -23,9 +23,11 @@ Usage:
     python3 build-pre-write.py --check   # exit 1 if generated files are stale
 """
 
+import argparse
 import re
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 REFERENCES = SKILL_DIR / "references"
@@ -35,6 +37,10 @@ SUMMARY_RE = re.compile(r"^(?:摘要：|Summary:)\s*(.+?)\s*$")
 # Summary lines end with an optional flag list, e.g. "…｜pre-write" (zh,
 # fullwidth bar) or "… | pre-write" (en, ASCII bar).
 FLAG_SPLIT_RE = re.compile(r"[｜|]")
+# The only recognized trailing flag. Anything after a bar that is NOT in this
+# set is treated as summary prose, so an ASCII "|" written inside an EN summary
+# survives instead of silently truncating the visible summary at the first bar.
+KNOWN_FLAGS = {"pre-write"}
 
 CONFIGS = {
     "zh": {
@@ -80,9 +86,16 @@ BANNER = (
 )
 
 
-def fail(msg):
+def fail(msg) -> NoReturn:
     print(f"build-pre-write: ERROR: {msg}", file=sys.stderr)
     sys.exit(1)
+
+
+def rstrip_block(block):
+    """Drop trailing blank lines and horizontal rules so joins stay clean."""
+    while block and block[-1].strip() in ("", "---"):
+        block.pop()
+    return block
 
 
 def extract_block(lines, start_heading, end_heading, source):
@@ -95,11 +108,7 @@ def extract_block(lines, start_heading, end_heading, source):
         end = lines.index(end_heading, start)
     except ValueError:
         fail(f"{source}: heading not found after {start_heading!r}: {end_heading!r}")
-    block = lines[start:end]
-    # Drop a trailing horizontal rule so joins stay clean.
-    while block and block[-1].strip() in ("", "---"):
-        block.pop()
-    return block
+    return rstrip_block(lines[start:end])
 
 
 def extract_section(lines, heading, source):
@@ -111,14 +120,13 @@ def extract_section(lines, heading, source):
     end = start + 1
     while end < len(lines) and not lines[end].startswith("## "):
         end += 1
-    block = lines[start:end]
-    while block and block[-1].strip() in ("", "---"):
-        block.pop()
-    return block
+    return rstrip_block(lines[start:end])
 
 
 def parse_patterns(path):
     """Parse pattern entries: number, title, summary, pre-write flag, body lines."""
+    if not path.exists():
+        fail(f"source file not found: {path}")
     lines = path.read_text(encoding="utf-8").splitlines()
     entries = []
     current = None
@@ -137,16 +145,23 @@ def parse_patterns(path):
             continue
         if current is None:
             continue
-        # A new `## ` chapter (Full Example, Reference) ends the entry list.
+        # Any `## ` heading (sub-category divider, Full Example, Reference)
+        # closes the current entry; the next `### N.` starts a fresh one.
         if line.startswith("## "):
             entries.append(current)
             current = None
             continue
         sm = SUMMARY_RE.match(line)
         if sm and current["summary"] is None:
-            parts = FLAG_SPLIT_RE.split(sm.group(1))
-            current["summary"] = parts[0].strip()
-            current["pre_write"] = any(p.strip() == "pre-write" for p in parts[1:])
+            # Peel only trailing parts that are KNOWN flags; rejoin the rest as
+            # the summary. An ASCII "|" in EN prose thus survives instead of
+            # truncating the summary at the first bar.
+            parts = [p.strip() for p in FLAG_SPLIT_RE.split(sm.group(1))]
+            flags = set()
+            while len(parts) > 1 and parts[-1] in KNOWN_FLAGS:
+                flags.add(parts.pop())
+            current["summary"] = " | ".join(parts)
+            current["pre_write"] = "pre-write" in flags
             continue  # the summary line itself stays out of the body
         current["body"].append(line)
     if current:
@@ -166,8 +181,7 @@ def render_entry(entry):
     body = list(entry["body"])
     while body and body[0].strip() == "":
         body.pop(0)
-    while body and body[-1].strip() in ("", "---"):
-        body.pop()
+    rstrip_block(body)
     return [f"### {entry['num']}. {entry['title']}", ""] + body
 
 
@@ -180,6 +194,8 @@ def build(lang):
     principles = extract_block(
         pattern_lines, cfg["principles_start"], cfg["principles_end"], cfg["patterns"]
     )
+    if not word_path.exists():
+        fail(f"source file not found: {word_path}")
     word_lines = word_path.read_text(encoding="utf-8").splitlines()
     word_blocks = [
         extract_section(word_lines, h, cfg["word_table"]) for h in cfg["word_sections"]
@@ -220,13 +236,32 @@ def build(lang):
     return "\n".join(out), len(entries), len(picked)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Build generated/pre-write-{zh,en}.md from the humanly sources."
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="exit 1 if the generated files are stale instead of writing them",
+    )
+    return parser.parse_args()
+
+
 def main():
-    check = "--check" in sys.argv[1:]
-    stale = []
+    args = parse_args()
+    # Build every language first. build() aborts via fail() on any validation
+    # error, so a failure in a later language can never leave an earlier one's
+    # file already written — the multi-language write is all-or-nothing.
+    built = []
     for lang in CONFIGS:
         content, total, picked = build(lang)
+        built.append((lang, content, total, picked))
+
+    stale = []
+    for lang, content, total, picked in built:
         out_path = REFERENCES / CONFIGS[lang]["out"]
-        if check:
+        if args.check:
             existing = out_path.read_text(encoding="utf-8") if out_path.exists() else None
             if existing != content:
                 stale.append(out_path)
