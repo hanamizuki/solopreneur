@@ -1,7 +1,7 @@
 # English AI Writing Patterns
 
 > **Role**: single source of truth for English patterns. Review / detect mode reads this file in full.
-> **Adding a pattern**: (1) append a full entry as the last numbered `###` entry, before the Full Example chapter, taking the next number; (2) write a one-line `Summary: ...` under the title (feeds the pre-write appendix index); (3) append `| pre-write` to the summary of patterns writers most often commit — their full text gets extracted into the pre-write file; (4) related words go to `word-table-en.md`; (5) run `scripts/build-pre-write.py`.
+> **Adding a pattern**: (1) append a full entry as the last numbered `###` entry, before the Full Example chapter, taking the next number; (2) write a one-line `Summary: ...` under the title (feeds the pre-write appendix index); (3) append `| pre-write` to the summary of patterns writers most often commit — their full text gets extracted into the pre-write file; (4) related words go to `word-table-en.md`; (5) run `python3 scripts/build-pre-write.py`.
 > **Numbering**: zh and en pattern numbers are independent (e.g. en#37 Therapy-Speak = zh#38). Prefix with the language when cross-referencing.
 > **Never hand-edit** `generated/pre-write-en.md` — the script builds it from this file and the word table.
 

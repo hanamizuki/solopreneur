@@ -1,7 +1,7 @@
 # 中文 AI 寫作模式
 
 > **角色**：中文 pattern 的唯一來源（source of truth）。review / detect mode 讀本檔全文。
-> **新增 pattern 的流程**：(1) 加完整條目，當作最後一個 `###` 編號條目、放在「完整示例」章之前，取下一個編號；(2) 標題下寫一行 `摘要：…`（生成 pre-write 附錄索引用）；(3) 寫作時最常犯的 pattern 在摘要行尾加 `｜pre-write`，全文會被抽進 pre-write 檔；(4) 有配套詞彙句型 → 加到 `word-table-zh.md`；(5) 跑 `scripts/build-pre-write.py`。
+> **新增 pattern 的流程**：(1) 加完整條目，當作最後一個 `###` 編號條目、放在「完整示例」章之前，取下一個編號；(2) 標題下寫一行 `摘要：…`（生成 pre-write 附錄索引用）；(3) 寫作時最常犯的 pattern 在摘要行尾加 `｜pre-write`，全文會被抽進 pre-write 檔；(4) 有配套詞彙句型 → 加到 `word-table-zh.md`；(5) 跑 `python3 scripts/build-pre-write.py`。
 > **編號**：zh 與 en 的 pattern 編號各自獨立（例如 zh#38 情緒驗證腔 = en#37 Therapy-Speak），跨語言引用時帶語言前綴。
 > **不要手動編輯** `generated/pre-write-zh.md`——它由腳本從本檔與 word-table 生成。
 
