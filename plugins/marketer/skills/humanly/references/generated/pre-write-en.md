@@ -166,7 +166,7 @@ Quick pass after writing:
 
 ### 38. Reframing as a Substitute for Reasoning
 
-**Watch for:** on the surface... but at a deeper level, the real question/problem isn't X, it's Y, the key isn't X, it's Y, you think it's X, but it's actually Y, seemingly paradoxical, paradoxically, what looks like X is actually Y
+**Watch for:** on the surface... but at a deeper level; the real question/problem isn't X, it's Y; the key isn't X, it's Y; you think it's X, but it's actually Y; seemingly paradoxical; paradoxically; what looks like X is actually Y
 
 **Problem:** When asked to write "with a point of view," AI falls into one shape: state a common view, negate or correct it, then present a higher-level take. Contrast should serve analysis. Here contrast becomes the engine that moves the piece forward. No new information, just tone escalation, and the negated X is often a strawman nobody holds. Real thinking distinguishes, qualifies, rebuts, and derives, instead of restating the same thing one level up.
 
