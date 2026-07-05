@@ -196,7 +196,7 @@ Quick pass after writing:
 | vibrant | (describe what makes it active, or cut) |
 | thriving | growing, active (or cite a number) |
 | despite challenges… continues to thrive | (name the challenge and the response, or cut) |
-| showcasing | showing, demonstrating (or cut the clause) |
+| showcase / showcasing | show, demonstrate (or cut the clause) |
 | deep dive / dive into | look at, examine, explore |
 | unpack / unpacking | explain, break down, walk through |
 | bustling | busy, active (or cite what makes it busy) |
