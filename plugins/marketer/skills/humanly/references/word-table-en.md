@@ -27,7 +27,7 @@ Three tiers based on how reliably they signal AI-generated text.
 | cutting-edge | latest, newest, advanced |
 | leverage (verb) | use |
 | pivotal | important, key, critical |
-| underscores | highlights, shows |
+| underscores | shows, points to |
 | meticulous / meticulously | careful, detailed, precise |
 | seamless / seamlessly | smooth, easy, without friction |
 | game-changer / game-changing | describe what specifically changed and why it matters |
@@ -40,7 +40,7 @@ Three tiers based on how reliably they signal AI-generated text.
 | vibrant | (describe what makes it active, or cut) |
 | thriving | growing, active (or cite a number) |
 | despite challenges… continues to thrive | (name the challenge and the response, or cut) |
-| showcasing | showing, demonstrating (or cut the clause) |
+| showcase / showcasing | show, demonstrate (or cut the clause) |
 | deep dive / dive into | look at, examine, explore |
 | unpack / unpacking | explain, break down, walk through |
 | bustling | busy, active (or cite what makes it busy) |
@@ -58,6 +58,8 @@ Three tiers based on how reliably they signal AI-generated text.
 | at its core | (cut — just state the thing) |
 | synergy / synergies | (describe the actual combined effect) |
 | interplay | relationship, connection, interaction |
+| additionally / moreover / furthermore | also, and, plus (or just start the sentence) |
+| garner | get, earn, attract |
 | in order to | to |
 | due to the fact that | because |
 | serves as | is |
@@ -116,6 +118,11 @@ Three tiers based on how reliably they signal AI-generated text.
 | quintessential | typical, classic, defining |
 | overarching | main, central, broad |
 | underpinning / underpinnings | basis, foundation, what supports |
+| align with | match, fit, support |
+| valuable (as filler praise) | useful, helpful (or say why it matters) |
+| enhance | improve, strengthen, add to |
+| emphasize / emphasizing | stress, point out (or cut the trailing clause) |
+| highlight (verb) | show, point to, call out |
 
 ## Tier 3 — Flag Only at High Density
 
@@ -133,6 +140,7 @@ Three tiers based on how reliably they signal AI-generated text.
 | sophisticated | Describe the sophistication |
 | instrumental | Say what role it played |
 | world-class / state-of-the-art / best-in-class | Cite a benchmark or comparison |
+| key (adjective) | Keep a few; past that, say why it matters or cut |
 
 ---
 

@@ -10,11 +10,11 @@ Read this one file before writing. The principles and examples are for internali
 
 5 principles to keep in mind:
 
-1. **Delete filler phrases** — remove openers and emphasis crutches
-2. **Break formulaic structure** — avoid binary contrasts, dramatic setups, rhetorical framing
-3. **Vary rhythm** — mix sentence lengths. Two items beat three. Vary paragraph endings
-4. **Trust the reader** — state facts directly, skip softening, justifying, and hand-holding
-5. **Delete quotable lines** — if it sounds like a pull quote, rewrite it
+1. **Delete filler phrases**: remove openers and emphasis crutches
+2. **Break formulaic structure**: avoid binary contrasts, dramatic setups, rhetorical framing
+3. **Vary rhythm**: mix sentence lengths. Two items beat three. Vary paragraph endings
+4. **Trust the reader**: state facts directly, skip softening, justifying, and hand-holding
+5. **Delete quotable lines**: if it sounds like a pull quote, rewrite it
 
 ---
 
@@ -32,23 +32,23 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### How to add voice:
 
-**Have opinions.** Don't just report facts — react to them. "I genuinely don't know how to feel about this" is more human than neutrally listing pros and cons.
+**Have opinions.** Don't just report facts. React to them. "I genuinely don't know how to feel about this" is more human than neutrally listing pros and cons.
 
 **Vary your rhythm.** Short punchy sentences. Then longer ones that take their time getting where they're going. Mix it up.
 
 **Acknowledge complexity.** Real humans have mixed feelings. "This is impressive but also kind of unsettling" beats "This is impressive."
 
-**Use "I" when it fits.** First person isn't unprofessional — it's honest. "I keep coming back to..." or "Here's what gets me..." signals a real person thinking.
+**Use "I" when it fits.** First person is honest, not unprofessional. "I keep coming back to..." or "Here's what gets me..." signals a real person thinking.
 
 **Let some mess in.** Perfect structure feels algorithmic. Tangents, asides, and half-formed thoughts are human.
 
-**Be specific about feelings.** Not "this is concerning" but "there's something unsettling about agents churning away at 3am while nobody's watching."
+**Be specific about feelings.** Instead of "this is concerning," write "there's something unsettling about agents churning away at 3am while nobody's watching."
 
 ### Before (clean but soulless):
 > The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.
 
 ### After (has a pulse):
-> I genuinely don't know how to feel about this one. 3 million lines of code, generated while the humans presumably slept. Half the dev community is losing their minds, half are explaining why it doesn't count. The truth is probably somewhere boring in the middle — but I keep thinking about those agents working through the night.
+> I genuinely don't know how to feel about this one. 3 million lines of code, generated while the humans presumably slept. Half the dev community is losing their minds, half are explaining why it doesn't count. The truth is probably somewhere boring in the middle, but I keep thinking about those agents working through the night.
 
 A second pair, community-post register:
 
@@ -120,7 +120,7 @@ Quick pass after writing:
 
 ### 35. Rhythm and Uniformity
 
-**Problem:** AI text is metronomic — uniform sentence length (15-25 words), uniform paragraphs, symmetrical phrasing. Structure is the #1 AI detection signal.
+**Problem:** AI text is metronomic: uniform sentence length (15-25 words), uniform paragraphs, symmetrical phrasing. Structure is the #1 AI detection signal.
 
 **Before:**
 > The platform processes data efficiently. The system handles requests reliably. The architecture scales horizontally. The team maintains quality consistently.
@@ -183,7 +183,7 @@ Quick pass after writing:
 | cutting-edge | latest, newest, advanced |
 | leverage (verb) | use |
 | pivotal | important, key, critical |
-| underscores | highlights, shows |
+| underscores | shows, points to |
 | meticulous / meticulously | careful, detailed, precise |
 | seamless / seamlessly | smooth, easy, without friction |
 | game-changer / game-changing | describe what specifically changed and why it matters |
@@ -196,7 +196,7 @@ Quick pass after writing:
 | vibrant | (describe what makes it active, or cut) |
 | thriving | growing, active (or cite a number) |
 | despite challenges… continues to thrive | (name the challenge and the response, or cut) |
-| showcasing | showing, demonstrating (or cut the clause) |
+| showcase / showcasing | show, demonstrate (or cut the clause) |
 | deep dive / dive into | look at, examine, explore |
 | unpack / unpacking | explain, break down, walk through |
 | bustling | busy, active (or cite what makes it busy) |
@@ -214,6 +214,8 @@ Quick pass after writing:
 | at its core | (cut — just state the thing) |
 | synergy / synergies | (describe the actual combined effect) |
 | interplay | relationship, connection, interaction |
+| additionally / moreover / furthermore | also, and, plus (or just start the sentence) |
+| garner | get, earn, attract |
 | in order to | to |
 | due to the fact that | because |
 | serves as | is |
@@ -236,40 +238,40 @@ Quick pass after writing:
 
 Full definitions and before/after examples: `../patterns-en.md`.
 
-- #1 Undue Emphasis on Significance, Legacy, and Broader Trends — don't promote routine events into milestones or broader trends — state what happened
+- #1 Undue Emphasis on Significance, Legacy, and Broader Trends — don't promote routine events into milestones or broader trends; state what happened
 - #2 Undue Emphasis on Notability and Media Coverage — don't stack media mentions to prove notability; cite one specific source and what it said
 - #3 Superficial Analyses with -ing Endings — don't tack "-ing" phrases (symbolizing, reflecting...) onto sentences for fake depth
-- #4 Promotional and Advertisement-like Language — no tourism-brochure prose — describe, don't sell
+- #4 Promotional and Advertisement-like Language — no tourism-brochure prose; describe, don't sell
 - #5 Vague Attributions and Weasel Words — "experts argue" means nothing; name the source or drop the claim
 - #6 Outline-like "Challenges and Future Prospects" Sections — don't write formulaic "despite challenges... continues to thrive" sections; report specific events
-- #7 Overused "AI Vocabulary" Words — swap high-frequency AI words (additionally, crucial, pivotal...) — full table in word-table-en.md
+- #7 Overused "AI Vocabulary" Words — swap high-frequency AI words (additionally, crucial, pivotal...); full table in word-table-en.md
 - #8 Avoidance of "is"/"are" (Copula Avoidance) — prefer plain "is/has" over "serves as / boasts / features"
-- #9 Negative Parallelisms — "it's not X, it's Y" is a crutch — usually just state Y
+- #9 Negative Parallelisms — "it's not X, it's Y" is a crutch; usually just state Y
 - #10 Rule of Three Overuse — don't force ideas into groups of three; two or four reads more natural
 - #11 Elegant Variation (Synonym Cycling) — repeat the clear word instead of cycling synonyms
-- #12 False Ranges — "from X to Y" needs a meaningful scale — otherwise just list the items
-- #13 Em Dash Overuse — em dashes are an AI tell — target zero, use commas or periods
+- #12 False Ranges — "from X to Y" needs a meaningful scale; otherwise just list the items
+- #13 Em Dash Overuse — em dashes are an AI tell; target zero, use commas or periods
 - #14 Overuse of Boldface — bold is for scanning, not for emphasizing every third phrase
 - #15 Inline-Header Vertical Lists — don't write "**Header:** explanation" bullet lists; fold into prose
 - #16 Title Case in Headings — use sentence case in headings, not Title Case
 - #17 Emojis — don't decorate headings or bullets with emojis
 - #18 Curly Quotation Marks — use straight quotes, not curly quotes
-- #19 Collaborative Communication Artifacts — "I hope this helps!" is chatbot correspondence, not content — delete
+- #19 Collaborative Communication Artifacts — "I hope this helps!" is chatbot correspondence, not content; delete
 - #20 Knowledge-Cutoff Disclaimers — delete cutoff disclaimers ("as of my last update"); state the fact
 - #21 Sycophantic/Servile Tone — cut sycophantic openers ("Great question! You're absolutely right")
-- #22 Filler Phrases — openers, announcements, and restatements are filler — if cutting it changes nothing, cut it
+- #22 Filler Phrases — openers, announcements, and restatements are filler; if cutting it changes nothing, cut it
 - #23 Excessive Hedging — don't stack qualifiers ("could potentially possibly"); keep one
-- #24 Generic Positive Conclusions — don't wrap up with a neat upbeat conclusion — stop when the point is made
+- #24 Generic Positive Conclusions — don't wrap up with a neat upbeat conclusion; stop when the point is made
 - #25 Novelty Inflation — don't present established concepts as brand-new discoveries
-- #26 Emotional Flatline — don't claim emotions ("what surprised me most") — convey them with concrete facts
+- #26 Emotional Flatline — don't claim emotions ("what surprised me most"); convey them with concrete facts
 - #27 False Concession — "while X is impressive, Y remains a challenge" weighs nothing; give specifics
 - #28 Rhetorical Question Openers — don't stall with rhetorical questions; lead with the point
-- #29 Parenthetical Hedging — parenthetical asides "(and, increasingly, Z)" are fake nuance — cut or inline
+- #29 Parenthetical Hedging — parenthetical asides "(and, increasingly, Z)" are fake nuance; cut or inline
 - #30 Numbered List Inflation — don't default to "N reasons why" lists; tell one or two concrete things
-- #31 Reasoning Chain Artifacts — "let me break this down" is reasoning scaffolding — keep it out of prose
+- #31 Reasoning Chain Artifacts — "let me break this down" is reasoning scaffolding; keep it out of prose
 - #32 Acknowledgment Loops — don't restate the question before answering; just answer
-- #33 "Let's" Constructions — "let's explore..." is a false-collaborative opener — start with the point
+- #33 "Let's" Constructions — "let's explore..." is a false-collaborative opener; start with the point
 - #34 Excessive Structure — don't pack short text with headers; 3+ under 300 words is too many
-- #35 Rhythm and Uniformity — uniform sentence and paragraph length is the #1 AI signal — break the meter
+- #35 Rhythm and Uniformity — uniform sentence and paragraph length is the #1 AI signal; break the meter
 - #36 Rewrite-vs-Patch Threshold — 5+ word flags, 3+ pattern categories, uniform rhythm → rewrite, don't patch
 - #37 Therapy-Speak (Emotional Validation) — don't certify feelings ("your anxiety is valid" → "of course you're anxious"); cut absolving lines

@@ -15,11 +15,11 @@ Based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia
 
 5 principles to keep in mind:
 
-1. **Delete filler phrases** — remove openers and emphasis crutches
-2. **Break formulaic structure** — avoid binary contrasts, dramatic setups, rhetorical framing
-3. **Vary rhythm** — mix sentence lengths. Two items beat three. Vary paragraph endings
-4. **Trust the reader** — state facts directly, skip softening, justifying, and hand-holding
-5. **Delete quotable lines** — if it sounds like a pull quote, rewrite it
+1. **Delete filler phrases**: remove openers and emphasis crutches
+2. **Break formulaic structure**: avoid binary contrasts, dramatic setups, rhetorical framing
+3. **Vary rhythm**: mix sentence lengths. Two items beat three. Vary paragraph endings
+4. **Trust the reader**: state facts directly, skip softening, justifying, and hand-holding
+5. **Delete quotable lines**: if it sounds like a pull quote, rewrite it
 
 ---
 
@@ -37,23 +37,23 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### How to add voice:
 
-**Have opinions.** Don't just report facts — react to them. "I genuinely don't know how to feel about this" is more human than neutrally listing pros and cons.
+**Have opinions.** Don't just report facts. React to them. "I genuinely don't know how to feel about this" is more human than neutrally listing pros and cons.
 
 **Vary your rhythm.** Short punchy sentences. Then longer ones that take their time getting where they're going. Mix it up.
 
 **Acknowledge complexity.** Real humans have mixed feelings. "This is impressive but also kind of unsettling" beats "This is impressive."
 
-**Use "I" when it fits.** First person isn't unprofessional — it's honest. "I keep coming back to..." or "Here's what gets me..." signals a real person thinking.
+**Use "I" when it fits.** First person is honest, not unprofessional. "I keep coming back to..." or "Here's what gets me..." signals a real person thinking.
 
 **Let some mess in.** Perfect structure feels algorithmic. Tangents, asides, and half-formed thoughts are human.
 
-**Be specific about feelings.** Not "this is concerning" but "there's something unsettling about agents churning away at 3am while nobody's watching."
+**Be specific about feelings.** Instead of "this is concerning," write "there's something unsettling about agents churning away at 3am while nobody's watching."
 
 ### Before (clean but soulless):
 > The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.
 
 ### After (has a pulse):
-> I genuinely don't know how to feel about this one. 3 million lines of code, generated while the humans presumably slept. Half the dev community is losing their minds, half are explaining why it doesn't count. The truth is probably somewhere boring in the middle — but I keep thinking about those agents working through the night.
+> I genuinely don't know how to feel about this one. 3 million lines of code, generated while the humans presumably slept. Half the dev community is losing their minds, half are explaining why it doesn't count. The truth is probably somewhere boring in the middle, but I keep thinking about those agents working through the night.
 
 A second pair, community-post register:
 
@@ -83,7 +83,7 @@ Quick pass after writing:
 
 ### 1. Undue Emphasis on Significance, Legacy, and Broader Trends
 
-Summary: don't promote routine events into milestones or broader trends — state what happened | pre-write
+Summary: don't promote routine events into milestones or broader trends; state what happened | pre-write
 
 **Words to watch:** stands/serves as, is a testament/reminder, a vital/significant/crucial/pivotal/key role/moment, underscores/highlights its importance/significance, reflects broader, symbolizing its ongoing/enduring/lasting, contributing to the, setting the stage for, marking/shaping the, represents/marks a shift, key turning point, evolving landscape, focal point, indelible mark, deeply rooted
 
@@ -131,7 +131,7 @@ Summary: don't tack "-ing" phrases (symbolizing, reflecting...) onto sentences f
 
 ### 4. Promotional and Advertisement-like Language
 
-Summary: no tourism-brochure prose — describe, don't sell
+Summary: no tourism-brochure prose; describe, don't sell
 
 **Words to watch:** boasts a, vibrant, rich (figurative), profound, enhancing its, showcasing, exemplifies, commitment to, natural beauty, nestled, in the heart of, groundbreaking (figurative), renowned, breathtaking, must-visit, stunning
 
@@ -181,7 +181,7 @@ Summary: don't write formulaic "despite challenges... continues to thrive" secti
 
 ### 7. Overused "AI Vocabulary" Words
 
-Summary: swap high-frequency AI words (additionally, crucial, pivotal...) — full table in word-table-en.md
+Summary: swap high-frequency AI words (additionally, crucial, pivotal...); full table in word-table-en.md
 
 **High-frequency AI words:** Additionally, align with, crucial, delve, emphasizing, enduring, enhance, fostering, garner, highlight (verb), interplay, intricate/intricacies, key (adjective), landscape (abstract noun), pivotal, showcase, tapestry (abstract noun), testament, underscore (verb), valuable, vibrant
 
@@ -213,7 +213,7 @@ Summary: prefer plain "is/has" over "serves as / boasts / features"
 
 ### 9. Negative Parallelisms
 
-Summary: "it's not X, it's Y" is a crutch — usually just state Y | pre-write
+Summary: "it's not X, it's Y" is a crutch; usually just state Y | pre-write
 
 **Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts.
 
@@ -255,7 +255,7 @@ Summary: repeat the clear word instead of cycling synonyms
 
 ### 12. False Ranges
 
-Summary: "from X to Y" needs a meaningful scale — otherwise just list the items
+Summary: "from X to Y" needs a meaningful scale; otherwise just list the items
 
 **Problem:** LLMs use "from X to Y" constructions where X and Y aren't on a meaningful scale.
 
@@ -271,7 +271,7 @@ Summary: "from X to Y" needs a meaningful scale — otherwise just list the item
 
 ### 13. Em Dash Overuse
 
-Summary: em dashes are an AI tell — target zero, use commas or periods
+Summary: em dashes are an AI tell; target zero, use commas or periods
 
 **Problem:** LLMs use em dashes (—) more than humans, mimicking "punchy" sales writing.
 
@@ -361,7 +361,7 @@ Summary: use straight quotes, not curly quotes
 
 ### 19. Collaborative Communication Artifacts
 
-Summary: "I hope this helps!" is chatbot correspondence, not content — delete
+Summary: "I hope this helps!" is chatbot correspondence, not content; delete
 
 **Words to watch:** I hope this helps, Of course!, Certainly!, You're absolutely right!, Would you like..., let me know, here is a...
 
@@ -407,7 +407,7 @@ Summary: cut sycophantic openers ("Great question! You're absolutely right")
 
 ### 22. Filler Phrases
 
-Summary: openers, announcements, and restatements are filler — if cutting it changes nothing, cut it | pre-write
+Summary: openers, announcements, and restatements are filler; if cutting it changes nothing, cut it | pre-write
 
 **Before → After:**
 - "In order to achieve this goal" → "To achieve this"
@@ -435,7 +435,7 @@ Summary: don't stack qualifiers ("could potentially possibly"); keep one
 
 ### 24. Generic Positive Conclusions
 
-Summary: don't wrap up with a neat upbeat conclusion — stop when the point is made | pre-write
+Summary: don't wrap up with a neat upbeat conclusion; stop when the point is made | pre-write
 
 **Problem:** Vague upbeat endings. AI wraps up with a neat, unassailable conclusion. Real people just stop talking when they're done with the point at hand.
 
@@ -463,7 +463,7 @@ Summary: don't present established concepts as brand-new discoveries
 
 ### 26. Emotional Flatline
 
-Summary: don't claim emotions ("what surprised me most") — convey them with concrete facts
+Summary: don't claim emotions ("what surprised me most"); convey them with concrete facts
 
 **Problem:** AI claims emotions as structural crutch without conveying them: "What surprised me most," "I was fascinated to discover."
 
@@ -471,7 +471,7 @@ Summary: don't claim emotions ("what surprised me most") — convey them with co
 > What surprised me most was how quickly adoption grew.
 
 **After:**
-> Adoption tripled in six months — faster than Slack's first year.
+> Adoption tripled in six months, faster than Slack's first year.
 
 ---
 
@@ -505,7 +505,7 @@ Summary: don't stall with rhetorical questions; lead with the point
 
 ### 29. Parenthetical Hedging
 
-Summary: parenthetical asides "(and, increasingly, Z)" are fake nuance — cut or inline
+Summary: parenthetical asides "(and, increasingly, Z)" are fake nuance; cut or inline
 
 **Problem:** AI inserts parenthetical asides to sound nuanced: "(and, increasingly, Z)."
 
@@ -533,7 +533,7 @@ Summary: don't default to "N reasons why" lists; tell one or two concrete things
 
 ### 31. Reasoning Chain Artifacts
 
-Summary: "let me break this down" is reasoning scaffolding — keep it out of prose
+Summary: "let me break this down" is reasoning scaffolding; keep it out of prose
 
 **Problem:** Chain-of-thought scaffolding leaks into prose: "Let me think step by step," "Breaking this down."
 
@@ -561,7 +561,7 @@ Summary: don't restate the question before answering; just answer
 
 ### 33. "Let's" Constructions
 
-Summary: "let's explore..." is a false-collaborative opener — start with the point
+Summary: "let's explore..." is a false-collaborative opener; start with the point
 
 **Words to watch:** Let's explore, Let's take a look, Let's break this down, Let's examine
 
@@ -591,9 +591,9 @@ Summary: don't pack short text with headers; 3+ under 300 words is too many
 
 ### 35. Rhythm and Uniformity
 
-Summary: uniform sentence and paragraph length is the #1 AI signal — break the meter | pre-write
+Summary: uniform sentence and paragraph length is the #1 AI signal; break the meter | pre-write
 
-**Problem:** AI text is metronomic — uniform sentence length (15-25 words), uniform paragraphs, symmetrical phrasing. Structure is the #1 AI detection signal.
+**Problem:** AI text is metronomic: uniform sentence length (15-25 words), uniform paragraphs, symmetrical phrasing. Structure is the #1 AI detection signal.
 
 **Before:**
 > The platform processes data efficiently. The system handles requests reliably. The architecture scales horizontally. The team maintains quality consistently.
