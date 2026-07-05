@@ -1,0 +1,40 @@
+name: Validate humanly generated files
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/marketer/skills/humanly/**'
+      - '.github/workflows/validate-humanly.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/marketer/skills/humanly/**'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: validate-humanly-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Check generated pre-write files are current
+        run: |
+          # build-pre-write.py is pure stdlib; ubuntu-latest ships python3.
+          # --check regenerates in-memory and exits 1 if either committed
+          # generated/pre-write-{zh,en}.md drifts from the current sources.
+          if ! python3 plugins/marketer/skills/humanly/scripts/build-pre-write.py --check; then
+            echo
+            echo "::error::humanly generated pre-write files are stale."
+            echo "::error::Run: python3 plugins/marketer/skills/humanly/scripts/build-pre-write.py and commit the result."
+            exit 1
+          fi

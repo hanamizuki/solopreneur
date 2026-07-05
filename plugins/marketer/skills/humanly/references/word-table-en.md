@@ -1,5 +1,9 @@
 # English AI Word Replacement Table
 
+> **Role**: single source of truth for English banned words and replacements.
+> **Adding or changing a word → edit this file only** (pick the tier first), then run `python3 scripts/build-pre-write.py` to regenerate the pre-write file.
+> **Who reads me**: review / detect mode reads this file in full; pre-write mode reads `generated/pre-write-en.md` (the script extracts Tier 1 from here automatically — never hand-copy entries elsewhere).
+
 Three tiers based on how reliably they signal AI-generated text.
 
 - **Tier 1 — Always flag.** 5-20x more frequent in AI text. Replace on sight.

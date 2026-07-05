@@ -15,7 +15,7 @@ Remove signs of AI-generated writing. Based on Wikipedia's "Signs of AI writing"
 
 | Mode | When | What to load |
 |------|------|-------------|
-| **pre-write** | Before writing — user says "use humanly before writing" or a skill references this file | Detect language → read `references/cheatsheet-{lang}.md` only |
+| **pre-write** | Before writing — user says "use humanly before writing" or a skill references this file | Detect language → read `references/generated/pre-write-{lang}.md` only |
 | **review** | Post-writing — user says "review", "rewrite", "clean up", "去 AI 味" | Full pipeline below |
 | **detect** | User says "detect", "flag only", "audit only", "scan" | Same as review but flag-only, no rewriting |
 
@@ -26,12 +26,15 @@ Remove signs of AI-generated writing. Based on Wikipedia's "Signs of AI writing"
 When invoked before writing:
 
 1. Detect target language from context
-2. Read the corresponding cheatsheet (path relative to this SKILL.md):
-   - 中文 → `references/cheatsheet-zh.md`
-   - English → `references/cheatsheet-en.md`
-3. Internalize the rules, then proceed with the writing task
+2. Read the corresponding generated pre-write file (path relative to this SKILL.md):
+   - 中文 → `references/generated/pre-write-zh.md`
+   - English → `references/generated/pre-write-en.md`
+3. Internalize the principles and examples, then proceed with the writing task
 
-Do NOT load the full patterns or word table — the cheatsheet is enough for pre-writing awareness.
+The pre-write file already bundles the core principles, the highest-frequency
+patterns with before/after examples, the Tier 1 word table (plus banned
+sentence patterns for zh), and a one-line index of every pattern. Do NOT
+additionally load the full patterns file — it is for review mode.
 
 ---
 
@@ -48,7 +51,7 @@ Read these files (paths relative to this SKILL.md):
 | File | Purpose |
 |------|---------|
 | `references/patterns-{lang}.md` | Pattern categories with before/after examples |
-| `references/word-table-{lang}.md` | 3-tier word replacement table |
+| `references/word-table-{lang}.md` | 3-tier word replacement table (+ banned sentence patterns for zh) |
 | `references/context-profiles.md` | Tolerance matrix by content type |
 
 ### Step 3: Detect Context Profile
@@ -135,6 +138,29 @@ Re-read the rewritten version:
 ## Self-Reference Escape Hatch
 
 When writing *about* AI patterns (blog posts, tutorials, documentation): quoted examples, code blocks, and text explicitly marked as illustrative are exempt from flagging. Only flag patterns in the author's own prose.
+
+---
+
+## Maintenance
+
+Five source files, two generated files (built from four of them), one build script:
+
+| File | Role |
+|------|------|
+| `references/patterns-{zh,en}.md` | **Source** — pattern catalog. Each entry has a one-line `摘要：` / `Summary:` under its title; a `pre-write` flag marks entries whose full text gets extracted into the pre-write file. zh/en numbering is independent. |
+| `references/word-table-{zh,en}.md` | **Source** — banned words (3 tiers); zh also holds banned sentence patterns. |
+| `references/context-profiles.md` | **Source** — tolerance matrix, shared across languages. |
+| `references/generated/pre-write-{zh,en}.md` | **Generated — never hand-edit.** Built from patterns + word-table. |
+
+To change anything: edit the source file, then run
+
+```bash
+python3 plugins/marketer/skills/humanly/scripts/build-pre-write.py
+```
+
+`--check` verifies the generated files are current (the script also fails on
+missing summary lines or non-contiguous numbering). Each source file's header
+comment says exactly where new content belongs.
 
 ---
 
