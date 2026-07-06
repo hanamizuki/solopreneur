@@ -199,7 +199,7 @@ If `MODE=post-commit`, skip PR-mode pre-flight Step 2 below; do Argument Parsing
    # function — bash function declarations are global, even nested ones, and
    # would pollute the user's shell namespace).
    read_solopreneur_config() {
-     local key="$1"
+     local key="\$1"
      local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
      local fallback="$HOME/.claude/solopreneur.json"
      local repo_key; repo_key=$(solopreneur_repo_key)
@@ -237,8 +237,8 @@ If `MODE=post-commit`, skip PR-mode pre-flight Step 2 below; do Argument Parsing
    # Sibling keys are preserved (atomic read-modify-write).
    # Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","gemini"]}'
    write_solopreneur_config() {
-     local key="$1"
-     local value_expr="$2"
+     local key="\$1"
+     local value_expr="\$2"
      local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
      local tmp existing
      mkdir -p "$(dirname "$primary")"
@@ -255,8 +255,8 @@ If `MODE=post-commit`, skip PR-mode pre-flight Step 2 below; do Argument Parsing
    # Sibling repos AND sibling features within the same repo are preserved.
    # Usage: write_solopreneur_repo_config preview '{path:"docs/preview"}'
    write_solopreneur_repo_config() {
-     local key="$1"
-     local value_expr="$2"
+     local key="\$1"
+     local value_expr="\$2"
      local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
      local repo_key; repo_key=$(solopreneur_repo_key)
      local tmp existing

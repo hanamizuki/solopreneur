@@ -42,9 +42,9 @@ MAIN_REPO=$(dirname "$(git rev-parse --git-common-dir)")
 
 # List all worktrees with their branch names, excluding current and main repo
 git worktree list --porcelain | awk '
-  /^worktree /{path=substr($0, index($0,$2))}
+  /^worktree /{path=substr(\$0, index(\$0,\$2))}
   /^branch refs\/heads\//{
-    br=$2; sub(/^refs\/heads\//, "", br)
+    br=\$2; sub(/^refs\/heads\//, "", br)
     print path "\t" br
   }
 ' | while IFS=$'\t' read -r wt br; do
@@ -165,7 +165,7 @@ solopreneur_repo_key() {
 # function — bash function declarations are global, even nested ones, and
 # would pollute the user's shell namespace).
 read_solopreneur_config() {
-  local key="$1"
+  local key="\$1"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
   local fallback="$HOME/.claude/solopreneur.json"
   local repo_key; repo_key=$(solopreneur_repo_key)
@@ -203,8 +203,8 @@ read_solopreneur_config() {
 # Sibling keys are preserved (atomic read-modify-write).
 # Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","gemini"]}'
 write_solopreneur_config() {
-  local key="$1"
-  local value_expr="$2"
+  local key="\$1"
+  local value_expr="\$2"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
   local tmp existing
   mkdir -p "$(dirname "$primary")"
@@ -221,8 +221,8 @@ write_solopreneur_config() {
 # Sibling repos AND sibling features within the same repo are preserved.
 # Usage: write_solopreneur_repo_config preview '{path:"docs/preview"}'
 write_solopreneur_repo_config() {
-  local key="$1"
-  local value_expr="$2"
+  local key="\$1"
+  local value_expr="\$2"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
   local repo_key; repo_key=$(solopreneur_repo_key)
   local tmp existing
@@ -277,7 +277,7 @@ Build the list of plan roots — union of `$BACKLOG`, `$DOING`, `$DONE_DIR`, and
    ```bash
    if [ -z "$PLAN_FILE" ]; then
      HANDOFF_SHA=$(git log --pretty=format:'%H %s' main..HEAD \
-       | grep -F "docs(handoff): context for ${BRANCH}" | head -1 | awk '{print $1}')
+       | grep -F "docs(handoff): context for ${BRANCH}" | head -1 | awk '{print \$1}')
      if [ -n "$HANDOFF_SHA" ]; then
        PLAN_FILE=$(git show --name-only --format='' "$HANDOFF_SHA" \
          | grep -E '\.md$' \
