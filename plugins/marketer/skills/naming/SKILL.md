@@ -787,7 +787,7 @@ Be explicit with the user about what it does NOT do:
   daily. The skill reports a snapshot; negotiate premium domains through
   a broker if needed.
 - **Not a naming firm.** Lexicon / Lunour / Siegel+Gale engagements run
-  $30K–$200K precisely because they add linguist panels, multi-country
+  \$30K–\$200K precisely because they add linguist panels, multi-country
   consumer research, brand-architecture strategy, and legal co-ordination
   this skill does not.
 - **Not qualified for multilingual naming.** Output is English-first;
