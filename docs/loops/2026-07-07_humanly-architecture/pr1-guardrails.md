@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Implement batch one from `/tmp/handoff/2026-07-07_humanly-construction-plan.md` after PR #91 has merged into `main`.
+- Implement batch one from `docs/loops/2026-07-07_humanly-architecture/source-handoff.md` after PR #91 has merged into `main`.
 - Add a central Guardrails section to `plugins/marketer/skills/humanly/SKILL.md` immediately after Mode Detection and before the mode sections. Translate the approved Chinese guardrail text into English without changing the decision order or semantics.
 - Add protected-span handling to the rewrite/review pipeline: insert Step 3.5 before Step 4, add protected-span and polarity checks to Step 7, and document the relationship to the Self-Reference Escape Hatch.
 - Replace the Step 7 repeat rule with the approved three-round convergence and rollback rule. Do not add a percentage-based edit cap.
@@ -14,7 +14,7 @@
 
 ## Files to Read
 
-- `/tmp/handoff/2026-07-07_humanly-construction-plan.md` — source of approved wording and decisions; do not redesign.
+- `docs/loops/2026-07-07_humanly-architecture/source-handoff.md` — source of approved wording and decisions; do not redesign.
 - `plugins/marketer/skills/humanly/SKILL.md` — mode table, rewrite/review pipeline, Guardrails insertion point, Step 3.5/7 edits.
 - `plugins/marketer/skills/humanly/references/patterns-zh.md` — Chinese principles chapter, pattern numbering, sterile-voice pattern insertion.
 - `plugins/marketer/skills/humanly/references/patterns-en.md` — English principles chapter, pattern numbering, sterile-voice pattern insertion.

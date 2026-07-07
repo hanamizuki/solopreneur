@@ -1,6 +1,6 @@
 # Orchestration plan: finish the humanly architecture adjustments after PR #91
 name: "Humanly architecture adjustments"
-source_todo: "/tmp/handoff/2026-07-07_humanly-construction-plan.md"
+source_todo: "docs/loops/2026-07-07_humanly-architecture/source-handoff.md"
 created_at: "2026-07-07"
 
 prs:

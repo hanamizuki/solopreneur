@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Implement batch two from `/tmp/handoff/2026-07-07_humanly-construction-plan.md` after PR1 has merged.
+- Implement batch two from `docs/loops/2026-07-07_humanly-architecture/source-handoff.md` after PR1 has merged.
 - Add one major syntax-level pattern for nominalization in both language catalogs.
 - Chinese pattern scope: constructions such as `進行` / `加以` / `做出` plus verbal nouns, stacked `的`, stacked passive `被` clauses, and accumulated `性` / `化` suffixes.
 - English pattern scope: nominalization chains such as `-tion` / `-ment`, Latinate verb substitutions such as `utilize -> use`, and sentence shapes where actions are hidden inside abstract nouns.
@@ -11,7 +11,7 @@
 
 ## Files to Read
 
-- `/tmp/handoff/2026-07-07_humanly-construction-plan.md` — batch two requirements and approved flag decision.
+- `docs/loops/2026-07-07_humanly-architecture/source-handoff.md` — batch two requirements and approved flag decision.
 - `plugins/marketer/skills/humanly/references/patterns-zh.md` — Chinese pattern style, numbering, examples, prewrite flag format.
 - `plugins/marketer/skills/humanly/references/patterns-en.md` — English pattern style, numbering, examples, prewrite flag format.
 - `plugins/marketer/skills/humanly/scripts/build-prewrite.py` — generated extraction behavior.

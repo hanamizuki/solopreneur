@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Implement batch four from `/tmp/handoff/2026-07-07_humanly-construction-plan.md` after PR3 has merged.
+- Implement batch four from `docs/loops/2026-07-07_humanly-architecture/source-handoff.md` after PR3 has merged.
 - Add `plugins/marketer/skills/humanly/scripts/slop-scan.py` using only Python standard library.
 - `slop-scan.py` must parse `word-table-{lang}.md` at runtime as the single source of truth for Tier 1 terms and banned sentence pattern sections. Do not duplicate those word lists in the script.
 - The scanner may hardcode structural checks from the handoff:
@@ -16,7 +16,7 @@
 
 ## Files to Read
 
-- `/tmp/handoff/2026-07-07_humanly-construction-plan.md` — batch four scanner and lint requirements.
+- `docs/loops/2026-07-07_humanly-architecture/source-handoff.md` — batch four scanner and lint requirements.
 - `plugins/marketer/skills/humanly/SKILL.md` — Step 4 insertion point.
 - `plugins/marketer/skills/humanly/references/word-table-zh.md` — runtime parse target.
 - `plugins/marketer/skills/humanly/references/word-table-en.md` — runtime parse target.

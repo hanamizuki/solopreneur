@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Implement batch three from `/tmp/handoff/2026-07-07_humanly-construction-plan.md` after PR2 has merged.
+- Implement batch three from `docs/loops/2026-07-07_humanly-architecture/source-handoff.md` after PR2 has merged.
 - Expand `word-table-zh.md` with the approved high-confidence banned sentence patterns and overclaiming terms:
   - summary cliches such as `綜上所述`, `總而言之`, `歸根結底`, `由此可見`, `不難看出`
   - era openers such as `在當今...的時代` and `隨著...快速發展`
@@ -25,7 +25,7 @@
 
 ## Files to Read
 
-- `/tmp/handoff/2026-07-07_humanly-construction-plan.md` — batch three requirements, strict filtering decisions, and approved exceptions.
+- `docs/loops/2026-07-07_humanly-architecture/source-handoff.md` — batch three requirements, strict filtering decisions, and approved exceptions.
 - `plugins/marketer/skills/humanly/references/word-table-zh.md` — Chinese tiers and banned sentence patterns.
 - `plugins/marketer/skills/humanly/references/word-table-en.md` — English tiers and the new banned sentence pattern section.
 - `plugins/marketer/skills/humanly/references/patterns-zh.md` — Chinese pattern style and existing related rules.
