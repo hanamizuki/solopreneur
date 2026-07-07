@@ -9,7 +9,7 @@
   - ordinal connective shells such as `首先...其次...最後`
   - overclaiming terms where the approved tiering applies: `毋庸置疑` / `顯而易見` as Tier 1; `眾所周知` as Tier 2
 - Expand `word-table-en.md` with the approved missing terms and a new banned sentence patterns section:
-  - terms such as `vital`, `milestone`, `indispensable`, `catalyst`, `pillar`, `bedrock`, `linchpin`, `mitigate`, `propel`, `transcend`, `thus`, `hence`, `seamlessly`, `meticulously`
+  - terms such as `vital`, `milestone`, `indispensable`, `catalyst`, `pillar`, `bedrock`, `linchpin`, `mitigate`, `propel`, `transcend`, `thus`, and `hence`
   - banned sentence patterns covering throat-clearing, era openers such as `In today's fast-paced world`, semicolon overuse, and absolute-word shells
 - Update `scripts/build-prewrite.py` so the new English banned sentence patterns section is extracted into generated English prewrite output.
 - Add source-header standards to the word tables: include only entries seen across three different sources, and document the model-era note that GPT-4-era word tells are weaker while structural tells are stronger in newer model output.
