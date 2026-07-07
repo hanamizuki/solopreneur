@@ -479,6 +479,17 @@ const ANTIPATTERNS = [
     skillGuideline: 'repeating-gradient decorative stripes',
   },
   {
+    id: 'codex-grid-background',
+    category: 'slop',
+    severity: 'advisory',
+    gated: 'gpt',
+    name: 'Decorative grid-line background',
+    description:
+      'A two-axis grid drawn with hairline linear-gradient layers ("1px, transparent 1px" on both axes) is a recurring generated-UI signature. Reserve grid overlays for actual canvas, map, blueprint, or measurement surfaces; elsewhere use product structure or a plain surface.',
+    skillSection: 'Visual Details',
+    skillGuideline: 'two-axis grid-line gradient background',
+  },
+  {
     id: 'theater-slop-phrase',
     category: 'slop',
     severity: 'advisory',
@@ -1170,6 +1181,42 @@ function checkHtmlPatterns(html) {
   // --- Provider tells (gated): repeating-gradient stripes (GPT) ---
   if (/repeating-(?:linear|radial|conic)-gradient\s*\(/i.test(html)) {
     findings.push({ id: 'repeating-stripes-gradient', snippet: 'repeating-gradient decorative stripes' });
+  }
+
+  // --- Provider tells (gated): two-axis grid-line background (Codex/GPT) ---
+  // The Codex grid tell is two hairline `linear-gradient(... <color> 1px,
+  // transparent 1px)` layers (one per axis) tiled by a repeating
+  // `background-size` cell. Both signals must co-occur in the SAME style block
+  // (a CSS rule body or one inline `style="..."`): two hairline stops WITHOUT a
+  // tiling background-size is a fixed crosshair, not a grid, and a single
+  // hairline is a legitimate ruled line. Scoping to one block also stops
+  // unrelated single-axis rules on separate elements from adding up across the
+  // page. Count hairlines only inside `background`/`background-image` values so
+  // a hairline in an unrelated property (mask-image, border-image) can't stand
+  // in for the second axis. Colors like `oklch(96% 0.012 82 / 0.055)` carry
+  // nested parens, so match the hairline stop directly rather than parsing
+  // whole gradient layers.
+  {
+    const hairlineRe = /\b\d{1,3}px\s*,\s*transparent\s+\d{1,3}px/gi;
+    const gridSizeRe = /background-size\s*:[^;{}"']*\b\d{1,3}px\b/i;
+    const bgDeclRe = /\bbackground(?:-image)?\s*:\s*([^;{}"']*)/gi;
+    const blockRe = /\{([^{}]*)\}|style\s*=\s*"([^"]*)"|style\s*=\s*'([^']*)'/gi;
+    let blk;
+    while ((blk = blockRe.exec(html)) !== null) {
+      const block = blk[1] || blk[2] || blk[3] || '';
+      if (!gridSizeRe.test(block)) continue;
+      let hairlineCount = 0;
+      let bm;
+      bgDeclRe.lastIndex = 0;
+      while ((bm = bgDeclRe.exec(block)) !== null) {
+        const stops = bm[1].match(hairlineRe);
+        if (stops) hairlineCount += stops.length;
+      }
+      if (hairlineCount >= 2) {
+        findings.push({ id: 'codex-grid-background', snippet: 'two-axis grid-line gradient background' });
+        break;
+      }
+    }
   }
 
   // --- Provider tells (gated): "X theater" framing copy (GPT) ---

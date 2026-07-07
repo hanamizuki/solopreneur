@@ -75,7 +75,6 @@ const HOOK_MANIFEST_TARGETS = [
     skillRel: '.agents/skills/impeccable',
     destRel: '.codex/hooks.json',
     manifest: () => ({
-      description: 'Impeccable design detector: runs after Edit/Write/apply_patch on UI files and surfaces findings as system reminders.',
       hooks: {
         PostToolUse: [
           {
@@ -83,7 +82,7 @@ const HOOK_MANIFEST_TARGETS = [
             hooks: [
               {
                 type: 'command',
-                command: 'node "$(git rev-parse --show-toplevel)/.agents/skills/impeccable/scripts/hook.mjs"',
+                command: 'node ".agents/skills/impeccable/scripts/hook.mjs"',
                 timeout: TIMEOUT_SECONDS,
                 statusMessage: STATUS_MESSAGE,
               },
