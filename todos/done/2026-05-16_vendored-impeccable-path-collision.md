@@ -112,17 +112,17 @@ the *user's* standalone install if one exists, or fails otherwise.
       `${CLAUDE_SKILL_DIR}` — documented to resolve correctly across
       personal / project / plugin installation levels (more skill-specific
       than `${CLAUDE_PLUGIN_ROOT}` which is per-plugin not per-skill).
-- [ ] Add a body-rewrite pass to `sync-vendored.sh` alongside the existing
+- [x] Add a body-rewrite pass to `sync-vendored.sh` alongside the existing
       frontmatter awk. For each skill in the manifest, rewrite the literal
       string `.claude/skills/<to>/` → `${CLAUDE_SKILL_DIR}/` in `SKILL.md`
       and every `reference/*.md` (and any other body file we end up
       including). Iterate the manifest entries so the rule generalizes for
       future vendored skills with the same upstream-layout assumption.
-- [ ] Run `cd plugins/designer && ./scripts/sync-vendored.sh --pinned` and
+- [x] Run `cd plugins/designer && ./scripts/sync-vendored.sh --pinned` and
       verify: (a) the 21 known impeccable paths are all rewritten, (b) no
       other unintended diff, (c) a second `--pinned` run produces zero diff
       (idempotency check).
-- [ ] Commit + push, open PR.
+- [x] Commit + push, open PR.
 
 ### Key Files
 
@@ -145,4 +145,5 @@ the *user's* standalone install if one exists, or fails otherwise.
 
 ### Current Progress
 
-Audit done. Worktree + branch created. Implementation pending.
+Merged in PR #35. Remaining design conflicts are intentionally out of scope:
+skill-list duplication and `pin.mjs` last-writer-wins behavior.

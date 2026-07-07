@@ -7,7 +7,7 @@
 `solopreneur` 目前混了兩種性質的 skill：
 
 1. **通用工作流自動化**（todos / autopilot / greenlight / worktree-handoff…）
-2. **元工具**（perspective / second-opinion / session-retro / preflight / specialist-review…）
+2. **元工具**（perspective / second-opinion / session-retro / tech-vetting / specialist-review…）
 
 「自動化工作流」這組對非開發者使用情境也有用，而且演化路徑不同（會持續加多 PR 編排、scheduling、cron 整合等），拆出去能：
 
@@ -28,7 +28,7 @@
 | `worktree-handoff` | auto-workflow（搭配 autopilot 用） |
 | `perspective` | solopreneur 留著 |
 | `post-mortem` | solopreneur 留著 |
-| `preflight` | solopreneur 留著 |
+| `tech-vetting` | solopreneur 留著 |
 | `second-opinion` | solopreneur 留著 |
 | `session-retro` | solopreneur 留著 |
 | `specialist-review` | solopreneur 留著 |
@@ -39,7 +39,7 @@
 1. `auto-workflow` 是否依賴 `solopreneur`？多數 skill 獨立，可能不需要 dependency
 2. `todos-review` 會 dispatch `specialist-review`（在 solopreneur）— 拆開後跨 plugin 呼叫的 UX
 3. `handoff` / `worktree-handoff` 兩者都偏 workflow，但 `handoff` 比較像通用 context export
-4. 是否一起把「PR 編排」相關的 skill 收進來（merge-pr 之類，目前在 user-level skills 裡）
+4. 是否一起把「PR 編排」相關的 skill 收進來（merge-pr 之類，目前在 `solopreneur` 裡）
 
 ## 順序
 

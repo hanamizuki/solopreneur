@@ -9,6 +9,8 @@ repo. It shows the file shape used by the `todos-*`, `worktree-handoff`, and
 - `backlog/` — open items that have not started yet.
 - `doing/` — active or partially completed items.
 - `done/` — completed items kept as examples and audit history.
+- `private/` — ignored local notes or archived drafts that should not be part
+  of the public dogfood backlog.
 
 ## Public Backlog Policy
 

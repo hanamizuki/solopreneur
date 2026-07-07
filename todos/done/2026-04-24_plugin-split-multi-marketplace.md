@@ -1,5 +1,14 @@
 # Plugin Split：拆成 6 個 sub-plugin
 
+## Final Status
+
+Completed and superseded by the current seven-plugin layout:
+`solopreneur`, `designer`, `marketer`, `ios-dev`, `android-dev`,
+`ai-engineer`, and `neo4j-dev`.
+
+This file is kept as historical dogfood output. The concrete plugin names and
+PR breakdown below reflect the April 2026 plan, not the current repo state.
+
 把 `solopreneur` 從單一 plugin（22 skills + 7 agents）拆成 6 個 sub-plugin，放在同一個 repo、同一個 `marketplace.json`。目的：使用者只載入需要的 tech stack，context 乾淨；plugin update / uninstall 顆粒更細。
 
 ## 動機

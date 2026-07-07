@@ -1,5 +1,10 @@
 # Skill Index Redesign (v2 — post codex review)
 
+## Final Status
+
+Implemented by PR #3 (`83dacb5`). The current repo has curated skill sections in
+the platform agents plus `/rebuild-skill-index` for extended per-machine indexes.
+
 Redesign the agent-skill-index mechanism so platform-specific subagents can
 discover relevant skills reliably across machines, with graceful degradation
 when optional dependencies (Axiom plugin, user-built skills) are absent.

@@ -77,3 +77,6 @@ htmlcov/
 # stays local.
 .claude/*
 !.claude/skills/
+
+# Local-only backlog notes that are not useful as public dogfood examples.
+/todos/private/

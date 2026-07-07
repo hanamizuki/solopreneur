@@ -24,4 +24,5 @@ Step 5 had no context-matching logic — it always listed all files unconditiona
 | `plugins/solopreneur/skills/worktree-handoff/SKILL.md` | The skill file — Step 5 was rewritten |
 
 ### Current Progress
-Step 5 rewritten in main. Worktree opened to build PR and run greenlight.
+Merged in PR #16 (`f5df440`). Kept as a concise example of a completed
+worktree-handoff todo.
