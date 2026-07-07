@@ -15,7 +15,7 @@ Remove signs of AI-generated writing. Based on Wikipedia's "Signs of AI writing"
 
 | Mode | Trigger | Behavior |
 |---|---|---|
-| **prewrite** | Before writing; other skills reference this skill | Read `generated/prewrite-{lang}.md`, internalize, do not run the pipeline |
+| **prewrite** | Before writing; other skills reference this skill | Read `references/generated/prewrite-{lang}.md`, internalize, do not run the pipeline |
 | **rewrite** | "rewrite", "clean up", "fix", "去 AI 味", "潤稿", "幫我改" | Full pipeline + rewrite; output 4 sections |
 | **review** | "review", "audit", "scan", "check", "檢查" | Same pipeline but flag-only; output 2 sections (Issues found / Assessment) |
 
