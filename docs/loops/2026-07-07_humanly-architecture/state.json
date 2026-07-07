@@ -1,0 +1,40 @@
+{
+  "status": "pending",
+  "plan_dir": "docs/loops/2026-07-07_humanly-architecture",
+  "started_at": null,
+  "completed_at": null,
+  "prs": {
+    "pr1": {
+      "number": null,
+      "status": "pending",
+      "worktree": null,
+      "error": null,
+      "retry_count": 0,
+      "review_summary": null
+    },
+    "pr2": {
+      "number": null,
+      "status": "pending",
+      "worktree": null,
+      "error": null,
+      "retry_count": 0,
+      "review_summary": null
+    },
+    "pr3": {
+      "number": null,
+      "status": "pending",
+      "worktree": null,
+      "error": null,
+      "retry_count": 0,
+      "review_summary": null
+    },
+    "pr4": {
+      "number": null,
+      "status": "pending",
+      "worktree": null,
+      "error": null,
+      "retry_count": 0,
+      "review_summary": null
+    }
+  }
+}

@@ -1,0 +1,68 @@
+# Orchestration plan: finish the humanly architecture adjustments after PR #91
+name: "Humanly architecture adjustments"
+source_todo: "docs/loops/2026-07-07_humanly-architecture/source-handoff.md"
+created_at: "2026-07-07"
+
+prs:
+  - id: pr1
+    branch: feat/humanly-guardrails
+    title: "feat(humanly): add rewrite guardrails and sterile-voice detection"
+    type: docs
+    subagent: marketer
+    depends_on: []
+    spec: pr1-guardrails.md
+    files:
+      - plugins/marketer/skills/humanly/SKILL.md
+      - plugins/marketer/skills/humanly/references/context-profiles.md
+      - plugins/marketer/skills/humanly/references/generated/prewrite-en.md
+      - plugins/marketer/skills/humanly/references/generated/prewrite-zh.md
+      - plugins/marketer/skills/humanly/references/patterns-en.md
+      - plugins/marketer/skills/humanly/references/patterns-zh.md
+      - plugins/marketer/skills/humanly/references/word-table-en.md
+      - plugins/marketer/skills/humanly/references/word-table-zh.md
+      - plugins/marketer/skills/humanly/scripts/build-prewrite.py
+
+  - id: pr2
+    branch: feat/humanly-nominalization-pattern
+    title: "feat(humanly): add nominalization syntax patterns"
+    type: docs
+    subagent: marketer
+    depends_on: [pr1]
+    spec: pr2-nominalization.md
+    files:
+      - plugins/marketer/skills/humanly/references/generated/prewrite-en.md
+      - plugins/marketer/skills/humanly/references/generated/prewrite-zh.md
+      - plugins/marketer/skills/humanly/references/patterns-en.md
+      - plugins/marketer/skills/humanly/references/patterns-zh.md
+
+  - id: pr3
+    branch: feat/humanly-word-table-patterns
+    title: "feat(humanly): expand word tables and review-only patterns"
+    type: docs
+    subagent: marketer
+    depends_on: [pr2]
+    spec: pr3-word-tables-patterns.md
+    files:
+      - plugins/marketer/skills/humanly/references/generated/prewrite-en.md
+      - plugins/marketer/skills/humanly/references/generated/prewrite-zh.md
+      - plugins/marketer/skills/humanly/references/patterns-en.md
+      - plugins/marketer/skills/humanly/references/patterns-zh.md
+      - plugins/marketer/skills/humanly/references/word-table-en.md
+      - plugins/marketer/skills/humanly/references/word-table-zh.md
+      - plugins/marketer/skills/humanly/scripts/build-prewrite.py
+
+  - id: pr4
+    branch: feat/humanly-slop-scan
+    title: "feat(humanly): add slop scan prefilter"
+    type: code
+    subagent: ai-engineer
+    depends_on: [pr3]
+    spec: pr4-slop-scan.md
+    files:
+      - plugins/marketer/skills/humanly/SKILL.md
+      - plugins/marketer/skills/humanly/references/generated/prewrite-en.md
+      - plugins/marketer/skills/humanly/references/generated/prewrite-zh.md
+      - plugins/marketer/skills/humanly/references/patterns-en.md
+      - plugins/marketer/skills/humanly/references/patterns-zh.md
+      - plugins/marketer/skills/humanly/scripts/build-prewrite.py
+      - plugins/marketer/skills/humanly/scripts/slop-scan.py
