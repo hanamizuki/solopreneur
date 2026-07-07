@@ -78,5 +78,5 @@ htmlcov/
 .claude/*
 !.claude/skills/
 
-# Personal backlog (not user-facing for this public marketplace repo)
-/todos
+# Local-only backlog notes that are not useful as public dogfood examples.
+/todos/private/
