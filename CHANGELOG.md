@@ -8,6 +8,16 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-07-07
+
+### solopreneur 0.5.29 → 0.5.30
+Native skills that embed shell snippets are safer to run through Claude Code's skill argument handling. Shared config helpers and worktree commands now preserve shell positional parameters and `awk` field references instead of letting `$1`, `$2`, or similar placeholders disappear before the shell sees them. This affects `/greenlight`, `/merge-pr`, `/preview`, `/todos-babysit`, `/todos-cleanup`, and `/worktree-handoff`.
+(#87)
+
+### marketer 0.0.7 → 0.0.8
+`/humanly` now has a generated prewrite system for English and Traditional Chinese, built from the same source pattern catalogs used by rewrite/review mode. Prewrite runs get a compact, current brief instead of hand-maintained cheatsheets, while maintainers get validation for missing summaries, stale generated files, and broken numbering. The catalog also adds new Chinese and English AI-writing patterns, expands word tables, and renames the modes to `prewrite`, `rewrite`, and `review` so the behavior is clearer.
+(#77, #78, #82, #83, #87, #91)
+
 ## 2026-07-03
 
 ### solopreneur 0.5.28 → 0.5.29
