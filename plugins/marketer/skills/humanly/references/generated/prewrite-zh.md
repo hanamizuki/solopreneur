@@ -1,10 +1,10 @@
 <!-- AUTO-GENERATED — DO NOT EDIT.
      Sources: ../patterns-zh.md + ../word-table-zh.md
-     Regenerate: python3 plugins/marketer/skills/humanly/scripts/build-pre-write.py -->
+     Regenerate: python3 plugins/marketer/skills/humanly/scripts/build-prewrite.py -->
 
-# 中文寫作 Pre-write（寫作前必讀）
+# 中文寫作 Prewrite（寫作前必讀）
 
-寫作前讀完這一份就好。原則與範例用來內化語感，詞表與句型看到就避開。完整 pattern 目錄（review 時載入）在 `../patterns-zh.md`。
+寫作前讀完這一份就好。原則與範例用來內化語感，詞表與句型看到就避開。完整 pattern 目錄（rewrite / review 時載入）在 `../patterns-zh.md`。
 
 ## 核心規則
 

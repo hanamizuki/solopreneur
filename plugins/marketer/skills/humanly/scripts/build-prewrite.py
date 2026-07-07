@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Build generated/pre-write-{zh,en}.md from the humanly source files.
+"""Build generated/prewrite-{zh,en}.md from the humanly source files.
 
-The pre-write files are what the humanly skill's pre-write mode loads before
+The prewrite files are what the humanly skill's prewrite mode loads before
 writing. They are DERIVED artifacts — never edit them by hand. This script
 extracts, per language:
 
   1. the principles chapters of patterns-{lang}.md (core rules, personality
      and soul, formatting/rhythm check),
   2. the full text of every pattern whose summary line carries a
-     "pre-write" flag (the patterns writers most often commit),
+     "prewrite" flag (the patterns writers most often commit),
   3. the Tier 1 section — and, for zh, the banned-sentence-patterns
      section — of word-table-{lang}.md,
   4. an appendix index of ALL patterns (number + title + one-line summary).
@@ -19,8 +19,8 @@ exist — a broken format fails the build instead of silently producing a
 bad file.
 
 Usage:
-    python3 build-pre-write.py           # regenerate both languages
-    python3 build-pre-write.py --check   # exit 1 if generated files are stale
+    python3 build-prewrite.py           # regenerate both languages
+    python3 build-prewrite.py --check   # exit 1 if generated files are stale
 """
 
 import argparse
@@ -34,26 +34,26 @@ REFERENCES = SKILL_DIR / "references"
 
 PATTERN_RE = re.compile(r"^### (\d+)\.\s*(.+?)\s*$")
 SUMMARY_RE = re.compile(r"^(?:摘要：|Summary:)\s*(.+?)\s*$")
-# Summary lines end with an optional flag list, e.g. "…｜pre-write" (zh,
-# fullwidth bar) or "… | pre-write" (en, ASCII bar).
+# Summary lines end with an optional flag list, e.g. "…｜prewrite" (zh,
+# fullwidth bar) or "… | prewrite" (en, ASCII bar).
 FLAG_SPLIT_RE = re.compile(r"[｜|]")
 # The only recognized trailing flag. Anything after a bar that is NOT in this
 # set is treated as summary prose, so an ASCII "|" written inside an EN summary
 # survives instead of silently truncating the visible summary at the first bar.
-KNOWN_FLAGS = {"pre-write"}
+KNOWN_FLAGS = {"prewrite"}
 
 CONFIGS = {
     "zh": {
         "patterns": "patterns-zh.md",
         "word_table": "word-table-zh.md",
-        "out": "generated/pre-write-zh.md",
+        "out": "generated/prewrite-zh.md",
         "principles_start": "## 核心規則",
         "principles_end": "## 內容模式",
         "word_sections": ["## Tier 1 — 必換", "## 禁用句型 — 看到就刪"],
-        "title": "# 中文寫作 Pre-write（寫作前必讀）",
+        "title": "# 中文寫作 Prewrite（寫作前必讀）",
         "intro": (
             "寫作前讀完這一份就好。原則與範例用來內化語感，詞表與句型看到就避開。"
-            "完整 pattern 目錄（review 時載入）在 `../patterns-zh.md`。"
+            "完整 pattern 目錄（rewrite / review 時載入）在 `../patterns-zh.md`。"
         ),
         "picked_heading": "## 寫作時最常犯的 Pattern（含範例）",
         "appendix_heading": "## 附錄：全部 pattern 一句話索引",
@@ -62,15 +62,15 @@ CONFIGS = {
     "en": {
         "patterns": "patterns-en.md",
         "word_table": "word-table-en.md",
-        "out": "generated/pre-write-en.md",
+        "out": "generated/prewrite-en.md",
         "principles_start": "## Core Rules",
         "principles_end": "## Content Patterns",
         "word_sections": ["## Tier 1 — Always Replace"],
-        "title": "# English Pre-write (read before writing)",
+        "title": "# English Prewrite (read before writing)",
         "intro": (
             "Read this one file before writing. The principles and examples are "
             "for internalizing; the word table lists traps to avoid on sight. "
-            "The full pattern catalog (loaded during review) lives in "
+            "The full pattern catalog (loaded during rewrite / review) lives in "
             "`../patterns-en.md`."
         ),
         "picked_heading": "## Patterns Writers Most Often Commit (with examples)",
@@ -82,12 +82,12 @@ CONFIGS = {
 BANNER = (
     "<!-- AUTO-GENERATED — DO NOT EDIT.\n"
     "     Sources: ../{patterns} + ../{word_table}\n"
-    "     Regenerate: python3 plugins/marketer/skills/humanly/scripts/build-pre-write.py -->\n"
+    "     Regenerate: python3 plugins/marketer/skills/humanly/scripts/build-prewrite.py -->\n"
 )
 
 
 def fail(msg) -> NoReturn:
-    print(f"build-pre-write: ERROR: {msg}", file=sys.stderr)
+    print(f"build-prewrite: ERROR: {msg}", file=sys.stderr)
     sys.exit(1)
 
 
@@ -136,7 +136,7 @@ def extract_section(lines, heading, source):
 
 
 def parse_patterns(path):
-    """Parse pattern entries: number, title, summary, pre-write flag, body lines."""
+    """Parse pattern entries: number, title, summary, prewrite flag, body lines."""
     if not path.exists():
         fail(f"source file not found: {path}")
     # utf-8-sig strips a leading BOM if a source was saved with one (identical
@@ -171,14 +171,14 @@ def parse_patterns(path):
             # Peel only trailing parts that are KNOWN flags; rejoin the rest as
             # the summary. An ASCII "|" in EN prose thus survives instead of
             # truncating the summary at the first bar. Flag matching is
-            # case-insensitive so a "Pre-Write"/"PRE-WRITE" typo still counts,
+            # case-insensitive so a "Prewrite"/"PREWRITE" typo still counts,
             # while the summary keeps the original casing of its non-flag parts.
             parts = [p.strip() for p in FLAG_SPLIT_RE.split(sm.group(1))]
             flags = set()
             while len(parts) > 1 and parts[-1].lower() in KNOWN_FLAGS:
                 flags.add(parts.pop().lower())
             current["summary"] = " | ".join(parts)
-            current["pre_write"] = "pre-write" in flags
+            current["pre_write"] = "prewrite" in flags
             continue  # the summary line itself stays out of the body
         current["body"].append(line)
     if current:
@@ -220,7 +220,7 @@ def build(lang):
 
     picked = [e for e in entries if e["pre_write"]]
     if not picked:
-        fail(f"{cfg['patterns']}: no pattern carries a pre-write flag")
+        fail(f"{cfg['patterns']}: no pattern carries a prewrite flag")
 
     out = [BANNER.format(patterns=cfg["patterns"], word_table=cfg["word_table"])]
     out.append(cfg["title"])
@@ -255,7 +255,7 @@ def build(lang):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Build generated/pre-write-{zh,en}.md from the humanly sources."
+        description="Build generated/prewrite-{zh,en}.md from the humanly sources."
     )
     parser.add_argument(
         "--check",
@@ -283,14 +283,14 @@ def main():
             if existing != content:
                 stale.append(out_path)
             else:
-                print(f"OK {out_path.relative_to(SKILL_DIR)} ({total} patterns, {picked} pre-write)")
+                print(f"OK {out_path.relative_to(SKILL_DIR)} ({total} patterns, {picked} prewrite)")
         else:
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(content, encoding="utf-8")
-            print(f"wrote {out_path.relative_to(SKILL_DIR)} ({total} patterns, {picked} pre-write)")
+            print(f"wrote {out_path.relative_to(SKILL_DIR)} ({total} patterns, {picked} prewrite)")
     if stale:
         for p in stale:
-            print(f"build-pre-write: STALE: {p.relative_to(SKILL_DIR)} — rerun this script", file=sys.stderr)
+            print(f"build-prewrite: STALE: {p.relative_to(SKILL_DIR)} — rerun this script", file=sys.stderr)
         sys.exit(1)
 
 

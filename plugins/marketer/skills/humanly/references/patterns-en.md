@@ -1,11 +1,11 @@
 # English AI Writing Patterns
 
-> **Role**: single source of truth for English patterns. Review / detect mode reads this file in full.
-> **Adding a pattern**: (1) append a full entry as the last numbered `###` entry, before the Full Example chapter, taking the next number; (2) write a one-line `Summary: ...` under the title (feeds the pre-write appendix index); (3) append `| pre-write` to the summary of patterns writers most often commit — their full text gets extracted into the pre-write file; (4) related words go to `word-table-en.md`; (5) run `python3 scripts/build-pre-write.py`.
+> **Role**: single source of truth for English patterns. Rewrite / review mode reads this file in full.
+> **Adding a pattern**: (1) append a full entry as the last numbered `###` entry, before the Full Example chapter, taking the next number; (2) write a one-line `Summary: ...` under the title (feeds the prewrite appendix index); (3) append `| prewrite` to the summary of patterns writers most often commit — their full text gets extracted into the prewrite file; (4) related words go to `word-table-en.md`; (5) run `python3 scripts/build-prewrite.py`.
 > **Numbering**: zh and en pattern numbers are independent (e.g. en#37 Therapy-Speak = zh#38). Prefix with the language when cross-referencing.
-> **Never hand-edit** `generated/pre-write-en.md` — the script builds it from this file and the word table.
+> **Never hand-edit** `generated/prewrite-en.md` — the script builds it from this file and the word table.
 
-A reference guide for identifying and removing AI-generated writing patterns in English text. Used for comparison during review; before writing, read the generated `generated/pre-write-en.md` instead.
+A reference guide for identifying and removing AI-generated writing patterns in English text. Used for comparison during rewrite / review; before writing, read the generated `generated/prewrite-en.md` instead.
 
 Based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup.
 
@@ -83,7 +83,7 @@ Quick pass after writing:
 
 ### 1. Undue Emphasis on Significance, Legacy, and Broader Trends
 
-Summary: don't promote routine events into milestones or broader trends; state what happened | pre-write
+Summary: don't promote routine events into milestones or broader trends; state what happened | prewrite
 
 **Words to watch:** stands/serves as, is a testament/reminder, a vital/significant/crucial/pivotal/key role/moment, underscores/highlights its importance/significance, reflects broader, symbolizing its ongoing/enduring/lasting, contributing to the, setting the stage for, marking/shaping the, represents/marks a shift, key turning point, evolving landscape, focal point, indelible mark, deeply rooted
 
@@ -213,7 +213,7 @@ Summary: prefer plain "is/has" over "serves as / boasts / features"
 
 ### 9. Negative Parallelisms
 
-Summary: "it's not X, it's Y" is a crutch; usually just state Y | pre-write
+Summary: "it's not X, it's Y" is a crutch; usually just state Y | prewrite
 
 **Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts.
 
@@ -407,7 +407,7 @@ Summary: cut sycophantic openers ("Great question! You're absolutely right")
 
 ### 22. Filler Phrases
 
-Summary: openers, announcements, and restatements are filler; if cutting it changes nothing, cut it | pre-write
+Summary: openers, announcements, and restatements are filler; if cutting it changes nothing, cut it | prewrite
 
 **Before → After:**
 - "In order to achieve this goal" → "To achieve this"
@@ -435,7 +435,7 @@ Summary: don't stack qualifiers ("could potentially possibly"); keep one
 
 ### 24. Generic Positive Conclusions
 
-Summary: don't wrap up with a neat upbeat conclusion; stop when the point is made | pre-write
+Summary: don't wrap up with a neat upbeat conclusion; stop when the point is made | prewrite
 
 **Problem:** Vague upbeat endings. AI wraps up with a neat, unassailable conclusion. Real people just stop talking when they're done with the point at hand.
 
@@ -591,7 +591,7 @@ Summary: don't pack short text with headers; 3+ under 300 words is too many
 
 ### 35. Rhythm and Uniformity
 
-Summary: uniform sentence and paragraph length is the #1 AI signal; break the meter | pre-write
+Summary: uniform sentence and paragraph length is the #1 AI signal; break the meter | prewrite
 
 **Problem:** AI text is metronomic: uniform sentence length (15-25 words), uniform paragraphs, symmetrical phrasing. Structure is the #1 AI detection signal.
 
@@ -615,7 +615,7 @@ Summary: 5+ word flags, 3+ pattern categories, uniform rhythm → rewrite, don't
 
 ### 37. Therapy-Speak (Emotional Validation)
 
-Summary: don't certify feelings ("your anxiety is valid" → "of course you're anxious"); cut absolving lines | pre-write
+Summary: don't certify feelings ("your anxiety is valid" → "of course you're anxious"); cut absolving lines | prewrite
 
 **Watch for:** your X is valid, your feelings are real, it's not your fault, you deserve to be seen, I see you, your feelings matter, it's okay to feel this way
 
@@ -655,7 +655,7 @@ Summary: don't certify feelings ("your anxiety is valid" → "of course you're a
 
 ### 38. Reframing as a Substitute for Reasoning
 
-Summary: "on the surface X, deeper down Y" / "the real problem is" fakes insight through tone escalation; cut the frame, add the reasoning | pre-write
+Summary: "on the surface X, deeper down Y" / "the real problem is" fakes insight through tone escalation; cut the frame, add the reasoning | prewrite
 
 **Watch for:** on the surface... but at a deeper level; the real question/problem isn't X, it's Y; the key isn't X, it's Y; you think it's X, but it's actually Y; seemingly paradoxical; paradoxically; what looks like X is actually Y
 

@@ -1,6 +1,6 @@
 ---
 name: humanly
-description: "Remove AI writing patterns from text. Three modes: (1) pre-write — read before writing to internalize anti-AI-slop rules, (2) review — full post-writing audit with severity tiers and two-pass rewrite, (3) detect — flag-only audit without rewriting. Use when: editing drafts for AI tells, cleaning up AI writing, auditing copy, making text sound human, 去 AI 味, 潤稿, 檢查 AI 味. Also use as a pre-write reference before composing any public-facing text."
+description: "Remove AI writing patterns from text. Three modes: (1) prewrite — read before writing to internalize anti-AI-slop rules, (2) rewrite — full post-writing audit with severity tiers and two-pass rewrite, (3) review — flag-only audit without rewriting. Use when: editing drafts for AI tells, cleaning up AI writing, auditing copy, making text sound human, 去 AI 味, 潤稿, 檢查 AI 味. Also use as a prewrite reference before composing any public-facing text."
 ---
 
 # Humanly — AI Writing Pattern Removal
@@ -13,32 +13,32 @@ Remove signs of AI-generated writing. Based on Wikipedia's "Signs of AI writing"
 
 ## Mode Detection
 
-| Mode | When | What to load |
-|------|------|-------------|
-| **pre-write** | Before writing — user says "use humanly before writing" or a skill references this file | Detect language → read `references/generated/pre-write-{lang}.md` only |
-| **review** | Post-writing — user says "review", "rewrite", "clean up", "去 AI 味" | Full pipeline below |
-| **detect** | User says "detect", "flag only", "audit only", "scan" | Same as review but flag-only, no rewriting |
+| Mode | Trigger | Behavior |
+|---|---|---|
+| **prewrite** | Before writing; other skills reference this skill | Read `generated/prewrite-{lang}.md`, internalize, do not run the pipeline |
+| **rewrite** | "rewrite", "clean up", "fix", "去 AI 味", "潤稿", "幫我改" | Full pipeline + rewrite; output 4 sections |
+| **review** | "review", "audit", "scan", "check", "檢查" | Same pipeline but flag-only; output 2 sections (Issues found / Assessment) |
 
 ---
 
-## Pre-write Mode
+## Prewrite Mode
 
 When invoked before writing:
 
 1. Detect target language from context
-2. Read the corresponding generated pre-write file (path relative to this SKILL.md):
-   - 中文 → `references/generated/pre-write-zh.md`
-   - English → `references/generated/pre-write-en.md`
+2. Read the corresponding generated prewrite file (path relative to this SKILL.md):
+   - 中文 → `references/generated/prewrite-zh.md`
+   - English → `references/generated/prewrite-en.md`
 3. Internalize the principles and examples, then proceed with the writing task
 
-The pre-write file already bundles the core principles, the highest-frequency
+The prewrite file already bundles the core principles, the highest-frequency
 patterns with before/after examples, the Tier 1 word table (plus banned
 sentence patterns for zh), and a one-line index of every pattern. Do NOT
-additionally load the full patterns file — it is for review mode.
+additionally load the full patterns file — it is for rewrite / review mode.
 
 ---
 
-## Review / Detect Mode Pipeline
+## Rewrite / Review Mode Pipeline
 
 ### Step 1: Detect Language
 
@@ -124,13 +124,13 @@ Re-read the rewritten version:
 
 ### Step 8: Output
 
-**Review mode** — return 4 sections:
+**Rewrite mode** — return 4 sections:
 1. **Issues found**: every AI-ism identified, quoted, with severity (P0/P1/P2)
 2. **Rewritten version**: clean version
 3. **What changed**: brief summary of major edits
 4. **Second-pass audit**: surviving tells fixed, or "clean"
 
-**Detect mode** — return 2 sections:
+**Review mode** — return 2 sections:
 1. **Issues found**: grouped by severity (P0/P1/P2)
 2. **Assessment**: which flags are clear problems vs. judgment calls
 
@@ -148,15 +148,15 @@ Five source files, two generated files (built from four of them), one build scri
 
 | File | Role |
 |------|------|
-| `references/patterns-{zh,en}.md` | **Source** — pattern catalog. Each entry has a one-line `摘要：` / `Summary:` under its title; a `pre-write` flag marks entries whose full text gets extracted into the pre-write file. zh/en numbering is independent. |
+| `references/patterns-{zh,en}.md` | **Source** — pattern catalog. Each entry has a one-line `摘要：` / `Summary:` under its title; a `prewrite` flag marks entries whose full text gets extracted into the prewrite file. zh/en numbering is independent. |
 | `references/word-table-{zh,en}.md` | **Source** — banned words (3 tiers); zh also holds banned sentence patterns. |
 | `references/context-profiles.md` | **Source** — tolerance matrix, shared across languages. |
-| `references/generated/pre-write-{zh,en}.md` | **Generated — never hand-edit.** Built from patterns + word-table. |
+| `references/generated/prewrite-{zh,en}.md` | **Generated — never hand-edit.** Built from patterns + word-table. |
 
 To change anything: edit the source file, then run
 
 ```bash
-python3 plugins/marketer/skills/humanly/scripts/build-pre-write.py
+python3 plugins/marketer/skills/humanly/scripts/build-prewrite.py
 ```
 
 `--check` verifies the generated files are current (the script also fails on

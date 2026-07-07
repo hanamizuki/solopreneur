@@ -101,7 +101,7 @@ Expect it to flag:
 
 **Apply all P1 findings. P2 is judgment call — apply if you have time.**
 
-## Pre-write cheatsheet
+## Prewrite cheatsheet
 
 When drafting new slide text:
 

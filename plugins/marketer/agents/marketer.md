@@ -34,9 +34,9 @@ Strategy & brand:
 Writing & content:
 
 - `marketer:humanly` — Remove AI writing patterns from text. Three modes:
-  pre-write (internalize anti-slop rules), review (post-writing audit with
-  severity tiers and two-pass rewrite), detect (flag-only audit). Use as a
-  pre-write reference before composing any public-facing text.
+  prewrite (internalize anti-slop rules), rewrite (post-writing audit with
+  severity tiers and two-pass rewrite), review (flag-only audit). Use as a
+  prewrite reference before composing any public-facing text.
 - `marketer:x-writing` — X/Twitter writing coach for tweets, threads, and
   long-form. Generates hooks, suggests topics, reviews drafts. Grounded in
   Aesthetic Writing, RARE hooks, and the algorithmic reality of X.
