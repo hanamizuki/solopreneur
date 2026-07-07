@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/rudrankriyam/app-store-connect-cli-skills
 - **Source path**: `skills/asc-revenuecat-catalog-sync`
-- **Pinned commit**: ed0049a59ebbe68743019922c7150c4f5bb29db2
-- **Synced at**: 2026-06-24T13:44:41Z
+- **Pinned commit**: 9f9dd2bfc10ba7a1c52d89d076919061e955fa76
+- **Synced at**: 2026-07-07T15:42:21Z
 - **License**: see `../_vendored/LICENSES/app-store-connect-cli-skills-LICENSE`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder
