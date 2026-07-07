@@ -63,6 +63,9 @@ skills that wrap the lifecycle around your work.
 
 #### Backlog Management
 
+This repo dogfoods the backlog workflow with public task files under
+[`todos/`](./todos/README.md).
+
 | Skill | What it does |
 |---|---|
 | [`/todos-review`](./plugins/solopreneur/skills/todos-review/SKILL.md) | **Backlog Reviewer.** Deep-reviews a single todo/spec for feasibility, best practices, and priority. Dispatches platform-specific expert agents and outputs a readiness rating |
