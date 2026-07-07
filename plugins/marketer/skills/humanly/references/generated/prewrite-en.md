@@ -1,10 +1,10 @@
 <!-- AUTO-GENERATED — DO NOT EDIT.
      Sources: ../patterns-en.md + ../word-table-en.md
-     Regenerate: python3 plugins/marketer/skills/humanly/scripts/build-pre-write.py -->
+     Regenerate: python3 plugins/marketer/skills/humanly/scripts/build-prewrite.py -->
 
-# English Pre-write (read before writing)
+# English Prewrite (read before writing)
 
-Read this one file before writing. The principles and examples are for internalizing; the word table lists traps to avoid on sight. The full pattern catalog (loaded during review) lives in `../patterns-en.md`.
+Read this one file before writing. The principles and examples are for internalizing; the word table lists traps to avoid on sight. The full pattern catalog (loaded during rewrite / review) lives in `../patterns-en.md`.
 
 ## Core Rules
 

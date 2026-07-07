@@ -1,7 +1,7 @@
 # Context Profiles
 
 > **Role**: single source of truth for per-content-type rule strictness. Deliberately one file shared by zh and en — the matrix is language-neutral; language-specific behavior is expressed as profiles (e.g. `social-zh`), not separate files.
-> **Adding a profile or adjusting tolerance → edit this file only.** Read by review / detect mode; not part of the generated pre-write files.
+> **Adding a profile or adjusting tolerance → edit this file only.** Read by rewrite / review mode; not part of the generated prewrite files.
 
 Pass an optional context hint to adjust rule strictness. If none specified, auto-detect from content cues.
 

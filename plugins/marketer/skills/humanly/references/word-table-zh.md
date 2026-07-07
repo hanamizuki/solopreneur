@@ -1,8 +1,8 @@
 # 中文 AI 廢話替換表（詞彙與句型）
 
 > **角色**：中文禁用詞彙與禁用句型的唯一來源（source of truth）。
-> **新增或修改詞彙、句型 → 只改這個檔**（先判斷 Tier），改完跑 `python3 scripts/build-pre-write.py` 重新生成 pre-write 檔。
-> **誰讀我**：review / detect mode 直接讀本檔全文；pre-write mode 讀 `generated/pre-write-zh.md`（由腳本自動抽取本檔的 Tier 1 與禁用句型段，不要手動複製到別處）。
+> **新增或修改詞彙、句型 → 只改這個檔**（先判斷 Tier），改完跑 `python3 scripts/build-prewrite.py` 重新生成 prewrite 檔。
+> **誰讀我**：rewrite / review mode 直接讀本檔全文；prewrite mode 讀 `generated/prewrite-zh.md`（由腳本自動抽取本檔的 Tier 1 與禁用句型段，不要手動複製到別處）。
 
 三級分類，依 AI 生成文本中的出現頻率判斷。
 
