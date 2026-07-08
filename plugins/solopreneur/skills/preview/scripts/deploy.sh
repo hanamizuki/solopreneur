@@ -9,26 +9,29 @@
 # - Always runs preflight first (vercel CLI + auth check).
 # - The Vercel project name resolves in this order:
 #     1. $PREVIEW_PROJECT (if set) — used verbatim, highest priority.
-#     2. --bucket keep|public -> the configured project for that bucket
-#        (solopreneur.json: default.preview.projects.<bucket>). Fail closed:
-#        if the bucket has no configured project, exit with an error — an
-#        explicit bucket must never silently fall back (a public-bucket
-#        fallback would deploy to the wrong project AND skip protection).
-#     3. The configured default bucket (default.preview.projects.default).
+#     2. --bucket keep|public -> the configured project for that bucket.
+#        Fail closed: if neither a per-repo nor a user-global project is
+#        configured for the bucket, exit with an error — an explicit bucket
+#        must never silently fall back (a public-bucket fallback would deploy
+#        to the wrong project AND skip protection).
+#     3. The configured default bucket (projects.default).
 #     4. Legacy derivation: basename of the proposal dir's enclosing git
 #        repo (or the dir's parent outside a repo) + "-preview", sanitized.
-#   Config is read directly at default.preview.* in
-#   $CLAUDE_CONFIG_DIR/solopreneur.json, falling back to
-#   ~/.claude/solopreneur.json. The per-repo cascade deliberately does NOT
-#   apply: repos[<rk>].preview.path would shadow these user-global keys.
+#   Config keys (projects.<bucket>, autoProtect) are read per key, each with a
+#   per-repo override on top of the user-global default:
+#     repos[<rk>].preview.<key>  >  default.preview.<key>
+#   in $CLAUDE_CONFIG_DIR/solopreneur.json, falling back to
+#   ~/.claude/solopreneur.json. Reading per key (not the whole `preview`
+#   subtree) is what lets a repo's preview.path coexist with these keys
+#   instead of shadowing them.
 # - Re-linking: a dir that deployed before carries .vercel/project.json and
 #   normally keeps using that project. When the caller names a project
 #   explicitly ($PREVIEW_PROJECT, or --bucket with a configured project),
 #   the dir is re-linked — explicit intent beats the cache. The configured
 #   default bucket does NOT force a re-link, so a dir promoted to the keep
 #   bucket keeps iterating there on later flag-less deploys.
-# - After a successful deploy, if default.preview.autoProtect is not
-#   "false" and the target bucket is not "public", the project's
+# - After a successful deploy, if autoProtect (per-repo or user-global) is
+#   not "false" and the target bucket is not "public", the project's
 #   ssoProtection is enabled via the Vercel API so preview URLs are not
 #   world-readable (safe by default; prints a notice). Requires jq +
 #   readable CLI auth token; degrades to a warning, never blocks the
@@ -64,9 +67,39 @@ case "$BUCKET" in
   *) echo "deploy.sh: invalid --bucket '$BUCKET' (expected default|keep|public)" >&2; exit 1 ;;
 esac
 
-# --- read user-global preview config (NOT the per-repo cascade) ---
+# --- repo identity for per-repo preview overrides ---
+# Anchored at $DIR, NOT cwd: deploy.sh's target dir is separate from the
+# directory it is invoked from, so the repo key must follow the proposal dir.
+# Mirrors _shared/config.md's solopreneur_repo_key (origin URL normalized to
+# host/owner/repo; else git toplevel path; else $PWD).
+_preview_repo_key() {
+  local url root
+  url=$(git -C "$DIR" remote get-url origin 2>/dev/null || true)
+  if [ -n "$url" ]; then
+    url="${url#https://}"; url="${url#http://}"; url="${url#ssh://}"; url="${url#git://}"
+    url="${url#git@}"; url="${url%.git}"; url="${url/://}"
+    printf '%s' "$url"; return
+  fi
+  root=$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null || true)
+  [ -n "$root" ] && { printf '%s' "$root"; return; }
+  printf '%s' "$PWD"
+}
+REPO_KEY="$(_preview_repo_key)"
+
+# --- read a preview config value: per-repo override -> user-global default ---
+# Cascade (first non-null wins), mirroring _shared/config.md layers 1-4:
+#   1. primary  .repos[<rk>].preview.<key>
+#   2. primary  .default.preview.<key>
+#   3. fallback .repos[<rk>].preview.<key>
+#   4. fallback .default.preview.<key>
+# Uses `| values` (NOT `// empty`) so a literal `false` (autoProtect:false) is
+# preserved rather than dropped as if unset — keep this value-semantics in
+# sync with _shared/config.md's reader. Reading per key (not the whole
+# `preview` subtree) is deliberate: it lets repos[<rk>].preview.path coexist
+# with these keys instead of shadowing them. No legacy top-level layer —
+# projects/autoProtect have no flat form.
 # Returns empty when unset, file missing, or jq unavailable.
-read_preview_global() {
+read_preview_config() {
   local key="$1"
   local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
   local fallback="$HOME/.claude/solopreneur.json"
@@ -74,7 +107,9 @@ read_preview_global() {
   command -v jq >/dev/null 2>&1 || return 0
   for f in "$primary" "$fallback"; do
     if [ -f "$f" ]; then
-      out=$(jq -r ".default.preview.${key} // empty" "$f" 2>/dev/null || true)
+      out=$(jq -r --arg rk "$REPO_KEY" ".repos[\$rk].preview.${key} | values" "$f" 2>/dev/null || true)
+      if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
+      out=$(jq -r ".default.preview.${key} | values" "$f" 2>/dev/null || true)
       if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
     fi
     # primary 與 fallback 同檔時只讀一次
@@ -93,18 +128,18 @@ if [ -n "${PREVIEW_PROJECT:-}" ]; then
 else
   PROJECT_NAME=""
   if [ "$BUCKET" != "default" ]; then
-    PROJECT_NAME="$(read_preview_global "projects.${BUCKET}")"
+    PROJECT_NAME="$(read_preview_config "projects.${BUCKET}")"
     if [ -z "$PROJECT_NAME" ]; then
       # Fail closed: an explicit bucket must resolve to its configured
       # project. A silent fallback would deploy to the wrong project — and
       # for --bucket public, skip ssoProtection on it too.
-      echo "deploy.sh: error — --bucket $BUCKET requested but default.preview.projects.${BUCKET} is not configured (solopreneur.json)" >&2
+      echo "deploy.sh: error — --bucket $BUCKET requested but no project is configured for it (set repos[$REPO_KEY].preview.projects.${BUCKET} or default.preview.projects.${BUCKET} in solopreneur.json)" >&2
       exit 1
     fi
     FORCE_RELINK=true
   fi
   if [ -z "$PROJECT_NAME" ]; then
-    PROJECT_NAME="$(read_preview_global "projects.default")"
+    PROJECT_NAME="$(read_preview_config "projects.default")"
   fi
   if [ -z "$PROJECT_NAME" ]; then
     if base_dir=$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null) && [ -n "$base_dir" ]; then
@@ -174,7 +209,7 @@ if [ -z "$URL" ]; then
 fi
 
 # --- auto-protect: make sure the project is not world-readable ---
-AUTO_PROTECT="$(read_preview_global "autoProtect")"
+AUTO_PROTECT="$(read_preview_config "autoProtect")"
 AUTO_PROTECT="${AUTO_PROTECT:-true}"   # safe by default
 if [ "$AUTO_PROTECT" != "false" ] && [ "$BUCKET" != "public" ]; then
   if ! command -v jq >/dev/null 2>&1; then

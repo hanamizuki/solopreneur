@@ -302,9 +302,9 @@ scripts/deploy.sh <path-to-proposal-dir>
 ```
 The script prints the URL to stdout (progress goes to stderr). Show that URL to the user prominently — that's the deliverable.
 
-The Vercel project resolves in this order: `PREVIEW_PROJECT` env (verbatim, highest priority) -> `--bucket keep|public` (configured project for that bucket) -> the configured default bucket -> legacy per-repo derivation (basename of the enclosing repo + `-preview`, sanitized). Buckets are configured at `default.preview.projects.{default,keep,public}` in `solopreneur.json`; without config the legacy behavior is unchanged. Each deploy produces a unique immutable URL either way.
+The Vercel project resolves in this order: `PREVIEW_PROJECT` env (verbatim, highest priority) -> `--bucket keep|public` (configured project for that bucket) -> the configured default bucket -> legacy per-repo derivation (basename of the enclosing repo + `-preview`, sanitized). Buckets are configured at `default.preview.projects.{default,keep,public}` in `solopreneur.json`, and a single repo can override any bucket at `repos.<repo-key>.preview.projects.<bucket>` (per-repo wins over the user-global default). Without config the legacy behavior is unchanged. Each deploy produces a unique immutable URL either way.
 
-Unless the target bucket is `public` (or `default.preview.autoProtect` is `false`), deploy.sh enables Vercel ssoProtection on the project after deploying — the URL is then only viewable by logged-in members of the Vercel account, and a notice is printed. This is the safe default for work-in-progress previews.
+Unless the target bucket is `public` (or `autoProtect` is `false` — set it at `default.preview.autoProtect`, or per-repo at `repos.<repo-key>.preview.autoProtect`), deploy.sh enables Vercel ssoProtection on the project after deploying — the URL is then only viewable by logged-in members of the Vercel account, and a notice is printed. This is the safe default for work-in-progress previews.
 
 If the user chose "Just view locally" at preflight, skip deploy entirely:
 ```
@@ -357,7 +357,7 @@ what changed.
 
 ## Preview lifecycle (buckets)
 
-When bucket config exists (`default.preview.projects.*` in `solopreneur.json`), every preview has a lifecycle:
+When bucket config exists (`default.preview.projects.*` in `solopreneur.json`, optionally overridden per-repo at `repos.<repo-key>.preview.projects.*`), every preview has a lifecycle:
 
 - **default bucket (scratch)** — where every preview lands unless told otherwise. URLs are not guaranteed to stay alive; the owner may periodically wipe and recreate this project. Treat scratch URLs as disposable: the durable artifact is the proposal dir in git, which can be redeployed anytime.
 - **keep bucket** — for previews the user explicitly wants to revisit long-term. When the user says "keep this one" (or equivalent), **promote** it: `scripts/deploy.sh --bucket keep <proposal-dir>`. This re-links the dir and produces a new URL in the keep project — share the new URL. Later flag-less redeploys of that dir keep iterating in the keep bucket (the dir stays linked).
