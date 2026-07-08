@@ -78,8 +78,10 @@ fi
 # --- repo identity for per-repo preview overrides ---
 # Anchored at $DIR, NOT cwd: deploy.sh's target dir is separate from the
 # directory it is invoked from, so the repo key must follow the proposal dir.
-# Mirrors _shared/config.md's solopreneur_repo_key (origin URL normalized to
-# host/owner/repo; else git toplevel path; else $PWD).
+# Mirrors _shared/config.md's solopreneur_repo_key but stays $DIR-anchored in
+# the fallback too (origin URL normalized to host/owner/repo; else git toplevel
+# path; else $DIR's absolute path — NOT $PWD, which would be cwd-anchored and
+# contradict the anchoring above).
 _preview_repo_key() {
   local url root
   url=$(git -C "$DIR" remote get-url origin 2>/dev/null || true)
@@ -90,7 +92,8 @@ _preview_repo_key() {
   fi
   root=$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null || true)
   [ -n "$root" ] && { printf '%s' "$root"; return; }
-  printf '%s' "$PWD"
+  # non-git $DIR: its own absolute path, still $DIR-anchored (never $PWD)
+  (cd "$DIR" 2>/dev/null && pwd) || printf '%s' "$DIR"
 }
 REPO_KEY="$(_preview_repo_key)"
 
