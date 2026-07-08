@@ -8,6 +8,12 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-07-09
+
+### solopreneur 0.5.30 → 0.5.31
+`/preview` deploys now land in configurable buckets — **scratch** (disposable, the default), **keep** (long-lived), or **public** (external-facing, no access restriction). Previews are protected by default: unless the target is the public bucket or `autoProtect` is explicitly disabled, Vercel SSO protection is enabled automatically so URLs are only viewable by team members. Bucket-to-project mappings are set per user (and optionally per repo) in `solopreneur.json`.
+(#101)
+
 ## 2026-07-07
 
 ### solopreneur 0.5.29 → 0.5.30
