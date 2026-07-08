@@ -127,7 +127,7 @@ read_preview_config() {
       out=$(jq -r ".default.preview.${key} | values" "$f" 2>/dev/null || true)
       if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
     fi
-    # primary 與 fallback 同檔時只讀一次
+    # read once when primary and fallback resolve to the same file
     if [ "$primary" = "$fallback" ]; then break; fi
   done
   return 0
