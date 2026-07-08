@@ -108,9 +108,12 @@ local dry runs):
 | `docs/skills-catalog.md` | docs | **generated** |
 
 Generated files are committed (installers read the repo, there is no
-build step at install time). One generator script owns all four generated
-surfaces; CI re-runs it and fails on any diff, mirroring the existing
-`validate-vendored` drift-check pattern.
+build step at install time). One generator script owns the three
+Codex-install surfaces (plugin manifests, marketplace file, agent
+copies); CI re-runs it and fails on any diff, mirroring the existing
+`validate-vendored` drift-check pattern. `docs/skills-catalog.md` keeps
+its own script and staleness check (decision 8) and stays out of the
+Codex gate — it is documentation, not an installability surface.
 
 ## Codex manifest shape
 
@@ -138,14 +141,23 @@ Generated `plugins/<n>/.codex-plugin/plugin.json`:
 - `"hooks": {}` is a guard against Codex loading Claude-format hook
   files (superpowers precedent). Our plugins ship no hooks today; the
   guard is cheap insurance.
+- Descriptions copy verbatim; the "install `solopreneur` first" guidance
+  (decision 2) lives in the README install section and each `using-*`
+  skill body, not in manifest metadata.
 
 ## Codex marketplace shape
 
 Generated `.agents/plugins/marketplace.json` lists all seven plugins with
 `./plugins/<name>` sources, mirroring `.claude-plugin/marketplace.json`
-entries (name, description, source). Local development installs from the
-working tree via this file; end users add the GitHub repo (optionally
-pinned `@<plugin>--v<version>`).
+entries (name, description, license, source). Local development installs
+from the working tree via this file; end users add the GitHub repo,
+optionally pinned `@<plugin>--v<version>`.
+
+Pinning caveat: a marketplace ref freezes the **whole repo snapshot** at
+that commit, so pinning one plugin's tag also freezes the other six at
+whatever version `main` carried then. README documents this: pin the tag
+of the plugin you are installing; mixed-version pinning requires separate
+marketplace adds.
 
 ## Directory moves
 
@@ -158,9 +170,12 @@ metadata/helper directories that Codex's validator rejects as skills.
 One PR updates, atomically: `plugins/solopreneur/scripts/sync-vendored.sh`,
 `.github/workflows/sync-vendored.yml`,
 `.github/workflows/validate-vendored.yml`, five `agents/*.md` references,
-and seven `_shared/config.md` references. `_VENDOR.md` markers regenerate
-on the next sync. This PR lands **after** the `$N`-escape todo — both
-touch `sync-vendored.sh`.
+and seven `_shared/config.md` references. The same PR re-runs
+`sync-vendored.sh --pinned` so `_VENDOR.md` sidecars (which embed
+`../_vendored/` paths) regenerate immediately — CI's drift check excludes
+`_VENDOR.md`, so deferring to "the next sync" would leave stale paths in
+the repo indefinitely. This PR lands **after** the `$N`-escape todo —
+both touch `sync-vendored.sh`.
 
 ## Agents and delegation
 
@@ -174,7 +189,7 @@ Each `plugins/<n>/agents/<n>.md` gains a sibling `<n>.toml`:
 | `description` frontmatter | `description` |
 | body (system prompt) | `developer_instructions` |
 | `tools` allowlist | *(not portable — omit; Codex uses `sandbox_mode`)* |
-| `model` | `model` (only when explicitly pinned) |
+| `model` | *(not portable — all six agents pin `opus`, which is not a Codex model slug; omit so agents inherit the parent session, with per-agent overrides in the overlay if ever needed)* |
 
 Claude Code documents `agents/` as containing markdown files, so a
 `.toml` sibling should be inert there — **verify at implementation** that
@@ -189,9 +204,16 @@ from the shared helper (see Vocabulary).
 - **In-repo dev:** the generator copies agent TOMLs into
   `.codex/agents/`, which Codex reads natively for this repository.
 - **Plugin users:** Codex plugins cannot ship agents, so `solopreneur`
-  ships a bootstrap skill that copies the agent TOMLs of every installed
-  plugin from the plugin cache into `~/.codex/agents/`. Requiring
-  `solopreneur` for this matches decision 2's documented soft dependency.
+  ships a bootstrap skill that installs agent TOMLs into
+  `~/.codex/agents/`. Requiring `solopreneur` for this matches
+  decision 2's documented soft dependency. Mechanics to pin in PR 5a:
+  discover installed plugins via `codex plugin list` (fall back to
+  enumerating the plugin cache directory — the exact path is
+  undocumented and must be confirmed on a real install); copy each
+  plugin's `agents/*.toml`; only overwrite files carrying the
+  generator's marker comment, never hand-edited ones; report what was
+  installed, skipped, or orphaned (plugin uninstalled but TOML still
+  present).
 
 ### Router skills
 
@@ -228,15 +250,20 @@ practices). For a quick reference lookup, invoke the matching
   vocabulary for Codex (`Skill tool` ⇒ read and follow that SKILL.md;
   `Agent tool` ⇒ spawn the corresponding agent; `CLAUDE_CONFIG_DIR` ⇒
   `$CODEX_HOME`). The bootstrap and `using-*` skills point to it.
-- **Config paths:** `shared/config.md` helper resolves the config root
-  per harness (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}` on Claude,
-  `$CODEX_HOME` on Codex); the skill-index path in agents and
-  `rebuild-skill-index` resolves the same way.
+- **Config paths:** extend the `shared/config.md` helper to resolve the
+  config root per harness (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}` on
+  Claude, `$CODEX_HOME` on Codex). Today this resolution exists nowhere
+  else — `rebuild-skill-index` and every agent's Extended Discovery
+  block hardcode the Claude path — so the vocabulary PR updates those
+  callsites to go through the helper's resolution.
+- **Inventory:** the native/vendored split (~20/~13 files) comes from
+  `grep -rlE 'Skill tool|Agent tool|subagent_type|CLAUDE_CONFIG_DIR|AskUserQuestion|TodoWrite' plugins --include='*.md'`;
+  re-run it at implementation time rather than trusting the counts.
 
 ## Dependency audit matrix
 
-Maintained as a table in this spec's companion doc once filled (migration
-task). Columns:
+Filled into this section of the spec by rollout PR 4 (no companion doc).
+Columns:
 
 | plugin | marketplace deps | cross-plugin refs | agents | MCP/apps | external CLIs | env vars | sandbox/network |
 
@@ -252,17 +279,24 @@ Three gates, wired into CI and runnable locally:
 
 1. **Drift check** — re-run the generator; fail on diff in
    `.codex-plugin/plugin.json` ×7, `.agents/plugins/marketplace.json`,
-   `.codex/agents/`, `docs/skills-catalog.md`.
+   `.codex/agents/`.
 2. **Structure check** — every directory under `plugins/*/skills/`
    contains a `SKILL.md` (holds after the directory moves).
-3. **Install smoke** — add the working tree as a local Codex marketplace
-   and `codex plugin add marketer@<marketplace>`; exact commands pinned
-   during implementation.
+3. **Install smoke** — run with an isolated, throwaway `CODEX_HOME` so
+   CI and local runs never pollute a real config or cache: add the
+   working tree as a local Codex marketplace, then
+   `codex plugin add marketer@<marketplace>`; exact commands pinned
+   during implementation. PR 4's hard gate: all seven generated
+   manifests pass the Codex validator, not just `marketer`.
 
 ## Versioning and release
 
 - `/release` gains one step: run the generator inside the bump commit so
-  both manifests carry the new version atomically.
+  both manifests carry the new version atomically. The skill's staging
+  list currently adds only `plugins/*/.claude-plugin/plugin.json` and
+  `CHANGELOG.md`; it must also stage the generated surfaces
+  (`plugins/*/.codex-plugin/plugin.json`,
+  `.agents/plugins/marketplace.json`, `.codex/agents/`).
 - Tags remain `<plugin>--v<version>` (double-dash, Claude resolver
   format). Codex users pin the same tags via `@ref`; no new namespace.
 - Single `CHANGELOG.md`; platform-specific notes are line items within
@@ -274,22 +308,33 @@ Three gates, wired into CI and runnable locally:
 | --- | --- | --- |
 | 1 | Spec | this document |
 | 2 | `$N` escape | existing backlog todo (prerequisite for 3) |
-| 3 | Directory moves | `vendor/` + `shared/` + coupled script/CI/reference updates |
-| 4 | Generator | manifests ×7, marketplace file, validation script, catalog |
-| 5 | Agents | 6 TOMLs, `.codex/agents/` copies, bootstrap skill, 7 `using-*` skills |
-| 6 | Vocabulary | native rewrites + `harness-map.md` |
-| 7 | Release + docs | `/release` generator step, README install docs (`@tag` pinning) |
+| 3 | Directory moves | `vendor/` + `shared/` + coupled script/CI/reference updates + same-PR sync re-run |
+| 4 | Generator | manifests ×7 (hard gate: all seven pass the validator), marketplace file, validation script, dependency matrix fill |
+| 5a | Marketer vertical slice | marketer agent TOML + `.codex/agents/` copy, bootstrap skill, `using-marketer`; **pilot gate runs here** |
+| 5b | Remaining agents | 5 remaining TOMLs + 6 remaining `using-*` skills (`using-solopreneur` orients workflow skills — no agent to dispatch) |
+| 6 | Vocabulary | native rewrites + `harness-map.md` + helper path resolution |
+| 7 | Release + docs | `/release` generator step + staging list, README install docs (`@tag` pinning caveat) |
 
-**Pilot gate (after PR 5):** install `marketer` via local marketplace and
-via git `@ref`; confirm `using-marketer` actually causes Codex to spawn
-the marketer agent — skill-triggered spawning is the one mechanism the
-official docs do not guarantee. If it fails, decisions 4/9 fall back to
-router skills carrying inline guidance instead of delegation, and the
-spec gets amended before PR 6.
+The skills catalog (decision 8) is platform-independent and can land any
+time outside this sequence.
+
+**Pilot gate (inside PR 5a, before 5b starts):** install `marketer` via
+local marketplace and via git `@ref`; confirm `using-marketer` actually
+causes Codex to spawn the marketer agent — skill-triggered spawning is
+the one mechanism the official docs do not guarantee. Before adding the
+TOML, verify with a throwaway fixture that Claude Code's loader ignores
+non-markdown files in `agents/`. If spawning fails, decisions 4/9 fall
+back to router skills carrying inline guidance instead of delegation,
+and the spec gets amended before 5b.
 
 ## Assumptions to verify at implementation
 
-- Claude Code's agent loader ignores non-markdown files in `agents/`.
+- Claude Code's agent loader ignores non-markdown files in `agents/`
+  (fixture-tested at the start of PR 5a).
 - Codex's validator accepts the generated manifest shape for all seven
-  plugins, not just `marketer` (only `marketer` was dry-run tested).
-- Skill-triggered agent spawning works on Codex (pilot gate above).
+  plugins, not just `marketer` (hard gate in PR 4).
+- Skill-triggered agent spawning works on Codex (pilot gate in PR 5a).
+- The Codex plugin cache location and a scriptable way to enumerate
+  installed plugins exist (`codex plugin list` is the candidate;
+  confirmed against a real install in PR 5a before the bootstrap skill
+  is finalized).
