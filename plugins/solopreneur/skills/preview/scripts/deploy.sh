@@ -67,6 +67,14 @@ case "$BUCKET" in
   *) echo "deploy.sh: invalid --bucket '$BUCKET' (expected default|keep|public)" >&2; exit 1 ;;
 esac
 
+# --- target dir must exist before we derive its repo key or resolve config ---
+# (checked here, not after preflight, so REPO_KEY is derived from a real dir and
+# --print-project fails on a bad dir instead of resolving against $PWD)
+if [ ! -d "$DIR" ]; then
+  echo "deploy.sh: directory not found: $DIR" >&2
+  exit 1
+fi
+
 # --- repo identity for per-repo preview overrides ---
 # Anchored at $DIR, NOT cwd: deploy.sh's target dir is separate from the
 # directory it is invoked from, so the repo key must follow the proposal dir.
@@ -98,6 +106,10 @@ REPO_KEY="$(_preview_repo_key)"
 # `preview` subtree) is deliberate: it lets repos[<rk>].preview.path coexist
 # with these keys instead of shadowing them. No legacy top-level layer —
 # projects/autoProtect have no flat form.
+# The <key> arg is spliced into the jq path as program text (not --arg-bound,
+# since it's a nested path), so callers MUST pass only trusted script-controlled
+# keys — projects.<bucket> (BUCKET validated above) or the literal autoProtect,
+# never user input.
 # Returns empty when unset, file missing, or jq unavailable.
 read_preview_config() {
   local key="$1"
@@ -169,11 +181,8 @@ fi
 # --- preflight (CLI installed, logged in, token valid) ---
 bash "$SCRIPT_DIR/preflight.sh"
 
-# --- sanity check the target dir ---
-if [ ! -d "$DIR" ]; then
-  echo "deploy.sh: directory not found: $DIR" >&2
-  exit 1
-fi
+# --- sanity check the target dir has something to deploy ---
+# (existence already verified up front, right after arg parsing)
 if [ -z "$(find "$DIR" -maxdepth 1 -type f -name '*.html' -print -quit)" ]; then
   echo "deploy.sh: warning — no .html file in $DIR" >&2
 fi
@@ -237,7 +246,7 @@ if [ "$AUTO_PROTECT" != "false" ] && [ "$BUCKET" != "public" ]; then
           | jq -r '.ssoProtection.deploymentType // "FAILED"' || echo "FAILED")
         if [ "$RESULT" = "all_except_custom_domains" ]; then
           echo "locked: ssoProtection enabled on '$PROJECT_NAME' — only logged-in Vercel members can view" >&2
-          echo "        to share publicly use --bucket public, or set default.preview.autoProtect=false" >&2
+          echo "        to share publicly use --bucket public, or set autoProtect=false (default.preview, or repos[$REPO_KEY].preview)" >&2
         else
           echo "deploy.sh: warning — could not enable ssoProtection on '$PROJECT_NAME'; URL may be world-readable" >&2
         fi

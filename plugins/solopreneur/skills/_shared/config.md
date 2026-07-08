@@ -269,9 +269,20 @@ rule is: inline the **whole block** verbatim. The helper is small and
 duplication keeps each skill self-contained at install time (the marketplace
 ships each skill as a closed unit; there is no runtime `source` mechanism).
 
-When this file changes, all consuming skills must re-sync. Find the call
-sites with:
+When this file changes, all consuming skills must re-sync. Find the
+marker-tagged verbatim copies with:
 
 ```bash
 grep -rl "# --- solopreneur config helpers" plugins/solopreneur/skills/
+```
+
+One consumer carries a bespoke derivative WITHOUT the marker —
+`preview/scripts/deploy.sh`'s `_preview_repo_key`, which re-copies only the
+repo-key URL normalization (it anchors at `$DIR` instead of cwd, so it cannot
+inline the block verbatim). The marker grep above misses it. List every
+normalization copy that lacks the marker (currently just deploy.sh) with
+`-F` fixed-string match — a BRE pattern silently matches nothing on BSD grep:
+
+```bash
+grep -rlF 'url="${url#git@}"' plugins/solopreneur/skills/ | xargs grep -LF '# --- solopreneur config helpers'
 ```
