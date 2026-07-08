@@ -302,7 +302,9 @@ scripts/deploy.sh <path-to-proposal-dir>
 ```
 The script prints the URL to stdout (progress goes to stderr). Show that URL to the user prominently — that's the deliverable.
 
-The Vercel project name is derived per working context (basename of the proposal dir's enclosing repo + `-preview`, sanitized to a Vercel-legal name), so every preview for the same repo lands in one tidy project. Each deploy produces a unique immutable URL. When you know your workspace / agent identity, you MAY set `PREVIEW_PROJECT=<workspace-or-agent-name>-preview` (e.g. `PREVIEW_PROJECT=mojo-preview`) before invoking `deploy.sh` — it is then used verbatim.
+The Vercel project resolves in this order: `PREVIEW_PROJECT` env (verbatim, highest priority) -> `--bucket keep|public` (configured project for that bucket) -> the configured default bucket -> legacy per-repo derivation (basename of the enclosing repo + `-preview`, sanitized). Buckets are configured at `default.preview.projects.{default,keep,public}` in `solopreneur.json`; without config the legacy behavior is unchanged. Each deploy produces a unique immutable URL either way.
+
+Unless the target bucket is `public` (or `default.preview.autoProtect` is `false`), deploy.sh enables Vercel ssoProtection on the project after deploying — the URL is then only viewable by logged-in members of the Vercel account, and a notice is printed. This is the safe default for work-in-progress previews.
 
 If the user chose "Just view locally" at preflight, skip deploy entirely:
 ```
@@ -352,6 +354,16 @@ a GitHub PR. Do this every revision round:
 Then redeploy. Each redeploy is a new URL — share the new one. The
 `revision-log` callout (not a free-floating note) is where you summarize
 what changed.
+
+## Preview lifecycle (buckets)
+
+When bucket config exists (`default.preview.projects.*` in `solopreneur.json`), every preview has a lifecycle:
+
+- **default bucket (scratch)** — where every preview lands unless told otherwise. URLs are not guaranteed to stay alive; the owner may periodically wipe and recreate this project. Treat scratch URLs as disposable: the durable artifact is the proposal dir in git, which can be redeployed anytime.
+- **keep bucket** — for previews the user explicitly wants to revisit long-term. When the user says "keep this one" (or equivalent), **promote** it: `scripts/deploy.sh --bucket keep <proposal-dir>`. This re-links the dir and produces a new URL in the keep project — share the new URL. Later flag-less redeploys of that dir keep iterating in the keep bucket (the dir stays linked).
+- **public bucket** — ONLY for pages meant for external readers. `--bucket public` skips ssoProtection. **Gate before deploying:** re-read the page and confirm it contains no internal information (infrastructure topology, IPs, credentials, internal URLs, unreleased plans). If in doubt, ask the user before deploying to public.
+
+If the user asks to "keep" or "share publicly" a preview that was already deployed to scratch, redeploy the same dir with the appropriate `--bucket` — content needs no changes, only the target project differs.
 
 ## The comment overlay (what the user sees)
 
