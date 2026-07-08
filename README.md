@@ -55,7 +55,7 @@ skills that wrap the lifecycle around your work.
 | [`/tech-vetting`](./plugins/solopreneur/skills/tech-vetting/SKILL.md) | **Tech Lead.** Vets your technical plan against the latest official docs and platform-specific best practices before you write a single line of code |
 | [`/worktree-handoff`](./plugins/solopreneur/skills/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
 | [`/handoff`](./plugins/solopreneur/skills/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). No worktree, no file save |
-| [`/preview`](./plugins/solopreneur/skills/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into an interactive HTML page, deploys it to Vercel for a shareable URL, with an in-page comment overlay so reviewers can highlight text and leave in-context feedback you can act on directly |
+| [`/preview`](./plugins/solopreneur/skills/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into an interactive HTML page, deploys it to Vercel for a protected-by-default review URL (or a public bucket when explicitly requested), with an in-page comment overlay so reviewers can highlight text and leave in-context feedback you can act on directly |
 | [`/specialist-review`](./plugins/solopreneur/skills/specialist-review/SKILL.md) | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
 | [`/post-mortem`](./plugins/solopreneur/skills/post-mortem/SKILL.md) | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
 | [`/session-retro`](./plugins/solopreneur/skills/session-retro/SKILL.md) | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
@@ -97,7 +97,7 @@ Start them and walk away. They loop until the job is done.
 - **[Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector)**: recommended. `/greenlight` PR mode default reviewer (`@codex review`).
 - **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR mode alternative reviewer (`/gemini review`).
 - **[CodeRabbit](https://coderabbit.ai)**: optional. `/greenlight` passive reviewer (auto-triggered on push).
-- **[Vercel CLI](https://vercel.com/docs/cli)**: optional. `/preview` deploys previews to a shareable URL when present, and gracefully degrades to a local `open` of the HTML when absent.
+- **[Vercel CLI](https://vercel.com/docs/cli)**: optional. `/preview` deploys previews to a protected Vercel review URL when present, can target a public bucket for external sharing, and gracefully degrades to a local `open` of the HTML when absent.
 
 ---
 
