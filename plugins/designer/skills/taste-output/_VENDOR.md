@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/Leonxlnx/taste-skill
 - **Source path**: `skills/output-skill`
-- **Pinned commit**: 06d6028b5c623016c59ce8536f578e5a1127b499
-- **Synced at**: 2026-06-24T13:51:15Z
+- **Pinned commit**: b17742737e796305d829b3ad39eda3add0d79060
+- **Synced at**: 2026-07-08T16:03:50Z
 - **License**: (none — upstream has no LICENSE file as of sync)
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder
