@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/alirezarezvani/claude-skills
 - **Source path**: `engineering-team/skills/senior-prompt-engineer`
-- **Pinned commit**: 4a3c05b69e64f4925f7fc65c88890f614f79caf0
-- **Synced at**: 2026-06-23T08:36:39Z
+- **Pinned commit**: 0241f43765572f15146fcef692defbf96d473f37
+- **Synced at**: 2026-07-08T16:03:53Z
 - **License**: see `../_vendored/LICENSES/claude-skills-LICENSE`
 
 **Path rewrite**: during sync, bundled-script paths under the skill folder
