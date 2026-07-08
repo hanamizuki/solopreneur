@@ -93,7 +93,7 @@ _preview_repo_key() {
   root=$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null || true)
   [ -n "$root" ] && { printf '%s' "$root"; return; }
   # non-git $DIR: its own absolute path, still $DIR-anchored (never $PWD)
-  (cd "$DIR" 2>/dev/null && pwd) || printf '%s' "$DIR"
+  (cd -- "$DIR" 2>/dev/null && pwd) || printf '%s' "$DIR"
 }
 REPO_KEY="$(_preview_repo_key)"
 
@@ -109,10 +109,10 @@ REPO_KEY="$(_preview_repo_key)"
 # `preview` subtree) is deliberate: it lets repos[<rk>].preview.path coexist
 # with these keys instead of shadowing them. No legacy top-level layer —
 # projects/autoProtect have no flat form.
-# The <key> arg is spliced into the jq path as program text (not --arg-bound,
-# since it's a nested path), so callers MUST pass only trusted script-controlled
-# keys — projects.<bucket> (BUCKET validated above) or the literal autoProtect,
-# never user input.
+# The <key> is a dotted path (projects.<bucket> or autoProtect). It is bound via
+# --arg and resolved with getpath($key | split(".")), so it is data, never
+# spliced into the jq program — a key with special characters cannot alter the
+# query.
 # Returns empty when unset, file missing, or jq unavailable.
 read_preview_config() {
   local key="$1"
@@ -122,9 +122,9 @@ read_preview_config() {
   command -v jq >/dev/null 2>&1 || return 0
   for f in "$primary" "$fallback"; do
     if [ -f "$f" ]; then
-      out=$(jq -r --arg rk "$REPO_KEY" ".repos[\$rk].preview.${key} | values" "$f" 2>/dev/null || true)
+      out=$(jq -r --arg rk "$REPO_KEY" --arg key "$key" '.repos[$rk].preview | getpath($key | split(".")) | values' "$f" 2>/dev/null || true)
       if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
-      out=$(jq -r ".default.preview.${key} | values" "$f" 2>/dev/null || true)
+      out=$(jq -r --arg key "$key" '.default.preview | getpath($key | split(".")) | values' "$f" 2>/dev/null || true)
       if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
     fi
     # read once when primary and fallback resolve to the same file
@@ -190,7 +190,7 @@ if [ -z "$(find "$DIR" -maxdepth 1 -type f -name '*.html' -print -quit)" ]; then
   echo "deploy.sh: warning — no .html file in $DIR" >&2
 fi
 
-cd "$DIR"
+cd -- "$DIR"
 
 # --- link to the resolved project ---
 if [ "$FORCE_RELINK" = "true" ] && [ -f .vercel/project.json ]; then
