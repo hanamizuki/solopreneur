@@ -65,6 +65,9 @@
 5. **語彙：混合式**。native ~20 檔改寫平台中立（寫動作不寫工具名）；vendored ~13 檔不動、用 per-harness mapping reference（掛 bootstrap／router skill 的 references）；`CLAUDE_CONFIG_DIR` 等 config path 收斂到 shared helper 單點解析。
 6. **Local dev：`.agents/plugins/marketplace.json` local marketplace 直裝**，不做 package artifact（Codex 安裝模型即 marketplace snapshot，無 package 格式）；發佈驗證於 pilot 時用 git `@ref` 實裝一次。
 7. **Release：同號同 commit**。`.codex-plugin/plugin.json` 由 generator 從 `.claude-plugin/plugin.json` 生成（含 `interface` overlay），`/release` 加跑 generator、CI 加 drift check（仿 validate-vendored 模式）；tag 沿用 `<plugin>--v<version>` double-dash（Codex 使用者可 `@tag` pin）；CHANGELOG 維持單一份。
+8. **Skills 檔案結構：不搬**。skills 留在 `plugins/<name>/skills/`——雙平台共用同一份內容已由「兩平台 manifest 同住 plugin 目錄」達成；安裝單位即 plugin 目錄（外部路徑裝不進去）；跨 plugin 零重名、無去重收益。「好找」問題以生成式總覽解決：script 產 `docs/skills-catalog.md` + CI 防過期。
+9. **Router skill 形態：router + 使用指引、建議式委派**。實作／多步驟 → 派 agent；快查 → 直接用該 plugin 的 skill；不內嵌 skill 清單（清單同步交給 skill-index 機制）。
+10. **Router skill 命名：`using-<plugin>`**（如 `ios-dev:using-ios-dev`），沿 superpowers `using-superpowers` 先例，7 個 plugin 一致。
 
 ## 建議第一個 PR
 
@@ -84,7 +87,8 @@
 - [ ] Add Codex validation script for plugin manifests and skill directories.
 - [ ] Add dependency matrix for plugin deps, skill deps, agents/subagents, MCP/apps, external CLIs, env vars, sandbox/network assumptions.
 - [ ] Convert 6 Claude agents into Codex custom agent TOML (in-repo `.codex/agents/`) plus a bootstrap skill that installs them into `~/.codex/agents/`.
-- [ ] Add one platform-neutral router/entrypoint skill per plugin (creates proactive delegation on Codex; aligns with `description` routing on Claude).
+- [ ] Add one platform-neutral `using-<plugin>` router skill per plugin — router + usage guide, advisory delegation (implementation/multi-step → dispatch the agent; quick lookup → invoke the skill directly), no embedded skill list.
+- [ ] Add a generated `docs/skills-catalog.md` (script + CI staleness check) listing every skill across plugins — platform-independent, can land before any Codex work.
 - [ ] Pilot with `marketer`: install via local marketplace, then via git `@ref`; verify skill-triggered agent spawning actually works on Codex.
 - [ ] Rewrite Claude-specific vocabulary in ~20 native skill files (actions, not tool names); add a per-harness mapping reference covering the ~13 vendored files.
 - [ ] Extend `/release`: run the manifest generator inside the bump commit; keep a single CHANGELOG; no new tag namespace.
