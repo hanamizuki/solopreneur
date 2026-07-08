@@ -284,5 +284,5 @@ normalization copy that lacks the marker (currently just deploy.sh) with
 `-F` fixed-string match — a BRE pattern silently matches nothing on BSD grep:
 
 ```bash
-grep -rlF 'url="${url#git@}"' plugins/solopreneur/skills/ | xargs grep -LF '# --- solopreneur config helpers'
+grep -rlF 'url="${url#git@}"' plugins/solopreneur/skills/ | xargs -r grep -LF '# --- solopreneur config helpers'
 ```
