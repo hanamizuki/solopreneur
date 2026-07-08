@@ -23,6 +23,12 @@
   - 76 個 skill-local script files
   - 222 個 reference files
 - 大部分 skill 內容可以共用；需要分平台 adapter 的是 manifest、marketplace、agents、config path、tool vocabulary。
+- 2026-07-08 補充查證（官方文件 + 本地實測）：
+  - Codex subagents 已 GA：custom agent 為 TOML（user `~/.codex/agents/`、project `.codex/agents/`），必填 `name` / `description` / `developer_instructions`，可選 `model`、`sandbox_mode`、`mcp_servers`、`skills.config` 等；內建 `default` / `worker` / `explorer`
+  - Codex **不會**依 description 主動委派 subagent（官方明言 only spawns when explicitly asked）；skills 則自動進初始 context（上限 2% context window 或 8000 字元）並依 description 觸發 → 主動路由要靠 skill 補
+  - Codex plugin 只能帶 skills / apps / MCP servers，**不能帶 custom agents** → agent TOML 需另行落地（bootstrap）
+  - Claude 端機制修正：plugin 安裝後 skills 一律進主 session（無綁定 subagent／對主 session 隱藏的機制；agent frontmatter `skills` 是 preload 非 restrict）；主動委派靠 agent `description`
+  - Claude 專屬語彙散布面：33 檔提及 `Skill tool` / `Agent tool` / `CLAUDE_CONFIG_DIR` / `AskUserQuestion` 等（~13 檔 vendored 手改會被 sync 蓋掉、~20 檔 native 可直接改寫）
 
 ## dry-run 發現
 
@@ -50,15 +56,15 @@
 - 要小心 hooks：superpowers 在 Codex manifest 設 `"hooks": {}`，避免 Codex 誤載 Claude/Cursor 用的 `hooks/hooks.json`。
 - 寫 packaging / sync / validation script，避免多平台 manifest drift。
 
-## 下次先討論的決策
+## 已拍板決策（2026-07-08）
 
-- [ ] Codex 是否也保留 7 個 sub-plugin，還是做成一個 `solopreneur-suite` Codex plugin？
-- [ ] Claude plugin-level `dependencies` 在 Codex 沒有 1:1 schema，Codex 要用文件要求、suite plugin、還是讓每個 plugin 自足？
-- [ ] `skills/_vendored` / `skills/_shared` 要搬到哪個非 `skills/` 直層路徑？候選：`support/`、`vendor/`、`shared/`
-- [ ] Claude `agents/*.md` 要轉成 Codex custom agent TOML、entrypoint skills，還是兩者都做？
-- [ ] shared skills 裡的 `Skill tool` / `Agent tool` / `CLAUDE_CONFIG_DIR` 要改成平台中立語彙，還是用平台 mapping reference 隔離？
-- [ ] Codex local dev 要直接用 `.agents/plugins/marketplace.json` 安裝，還是產生 package artifact 測試？
-- [ ] Release / versioning 整合：本 repo 發佈由 `/release` skill + `<plugin>--v<version>` double-dash tag 驅動（Claude Code resolver 專用）；Codex 走 marketplace snapshot + `--ref` 的 git-ref 模型，且 `.codex-plugin/plugin.json` 自帶 `version` 欄位。`/release` 要不要同步 bump Codex manifest？tag 策略如何對應？CHANGELOG 是否分平台？
+1. **Codex 結構：鏡像 7 個 sub-plugin**（不做 suite）。rollout 先拿 `marketer` 當 pilot（dry-run 已過 validator），驗證安裝 UX 再鋪滿。
+2. **Dependencies：文件要求**。README／描述註明「建議先裝 solopreneur（skill-index / workflow 基座）」；保持現有軟依賴 + graceful degradation（實際耦合僅 5 個 agent 對 skill-index artifact 的可選讀取），Codex 出 dependency schema 再補宣告。
+3. **非 skill 目錄：`skills/_vendored` → `plugins/<n>/vendor/`、`skills/_shared` → `plugins/solopreneur/shared/`**。同 PR 連動 `sync-vendored.sh`、兩個 vendored workflow、5 個 agent 引用、7 個 config.md 引用；排在 backlog 的 `$N escape` todo 之後（共用 sync-vendored.sh）。
+4. **Agents：TOML + router skill 都做**。6 個 agent 轉 Codex TOML（repo 放 `.codex/agents/`；另做 bootstrap skill 幫安裝者複製到 `~/.codex/agents/`，因 Codex plugin 帶不了 agents）；每個 plugin 加一個平台中立措辭的 router/entrypoint skill 放 `skills/`（Codex 端創造主動路由、Claude 端與 description 路由同向）。pilot 必測：skill 指示 spawn agent 在 Codex 是否真的觸發委派。
+5. **語彙：混合式**。native ~20 檔改寫平台中立（寫動作不寫工具名）；vendored ~13 檔不動、用 per-harness mapping reference（掛 bootstrap／router skill 的 references）；`CLAUDE_CONFIG_DIR` 等 config path 收斂到 shared helper 單點解析。
+6. **Local dev：`.agents/plugins/marketplace.json` local marketplace 直裝**，不做 package artifact（Codex 安裝模型即 marketplace snapshot，無 package 格式）；發佈驗證於 pilot 時用 git `@ref` 實裝一次。
+7. **Release：同號同 commit**。`.codex-plugin/plugin.json` 由 generator 從 `.claude-plugin/plugin.json` 生成（含 `interface` overlay），`/release` 加跑 generator、CI 加 drift check（仿 validate-vendored 模式）；tag 沿用 `<plugin>--v<version>` double-dash（Codex 使用者可 `@tag` pin）；CHANGELOG 維持單一份。
 
 ## 建議第一個 PR
 
@@ -70,17 +76,20 @@
 - [ ] 定義 dependency audit matrix
 - [ ] 定義 validation commands
 
-## 後續 migration tasks
+## 後續 migration tasks（依拍板決策更新）
 
-- [ ] Add `.codex-plugin/plugin.json` for each of the 7 plugin directories.
+- [ ] Write the `.codex-plugin/plugin.json` generator (from `.claude-plugin/plugin.json` + `interface` overlay), generate all 7 manifests, and wire a CI drift check (mirror the validate-vendored pattern).
 - [ ] Add `.agents/plugins/marketplace.json` for Codex local/dev marketplace installation.
-- [ ] Move or hide non-skill helper dirs currently under `skills/` (`_vendored`, `_shared`) — must update `plugins/solopreneur/scripts/sync-vendored.sh` and `.github/workflows/{sync,validate}-vendored.yml` in the same change.
+- [ ] Move `skills/_vendored` → `plugins/<n>/vendor/` and `skills/_shared` → `plugins/solopreneur/shared/` — update `plugins/solopreneur/scripts/sync-vendored.sh`, `.github/workflows/{sync,validate}-vendored.yml`, 5 agent references, and 7 config.md references in the same change. Land AFTER the `$N escape` backlog todo (both touch sync-vendored.sh).
 - [ ] Add Codex validation script for plugin manifests and skill directories.
 - [ ] Add dependency matrix for plugin deps, skill deps, agents/subagents, MCP/apps, external CLIs, env vars, sandbox/network assumptions.
-- [ ] Convert or template 6 Claude agents into Codex-compatible custom agent TOML files if install path is acceptable.
+- [ ] Convert 6 Claude agents into Codex custom agent TOML (in-repo `.codex/agents/`) plus a bootstrap skill that installs them into `~/.codex/agents/`.
+- [ ] Add one platform-neutral router/entrypoint skill per plugin (creates proactive delegation on Codex; aligns with `description` routing on Claude).
+- [ ] Pilot with `marketer`: install via local marketplace, then via git `@ref`; verify skill-triggered agent spawning actually works on Codex.
+- [ ] Rewrite Claude-specific vocabulary in ~20 native skill files (actions, not tool names); add a per-harness mapping reference covering the ~13 vendored files.
+- [ ] Extend `/release`: run the manifest generator inside the bump commit; keep a single CHANGELOG; no new tag namespace.
 - [ ] Audit high-level workflow skills: `autopilot`, `greenlight`, `preview`, `mvp`, `tech-vetting`, `todos-*`.
-- [ ] Add README install instructions for both Claude Code and Codex.
-- [ ] Consider package/sync script modeled after superpowers.
+- [ ] Add README install instructions for both Claude Code and Codex (document `@tag` pinning for Codex).
 
 ## 下次優先讀的檔案
 
@@ -93,9 +102,3 @@
 | `plugins/solopreneur/skills/_shared/config.md` | Claude config helper that needs Codex strategy |
 | `plugins/solopreneur/skills/rebuild-skill-index/SKILL.md` | Claude-specific skill discovery/indexing behavior |
 | `plugins/solopreneur/skills/preview/SKILL.md` | Deep Claude workflow assumptions and deployment behavior |
-
-## 相關 handoff
-
-Tracked handoff also exists on branch `docs/codex-dual-publish-todos`:
-
-`docs/loops/2026-07-07_codex-dual-publish-research/source-handoff.md`
