@@ -73,11 +73,11 @@
 
 先做 docs/spec，不動大量 skill：
 
-- [ ] 新增 `docs/spec/2026-07-07-codex-dual-publish.md`
-- [ ] 定義 shared vs platform-specific file ownership
-- [ ] 定義 Codex manifest / marketplace shape（含 `interface` 區塊：displayName / category / capabilities / logo 等 Claude manifest 沒有的欄位，superpowers 的 `.codex-plugin/plugin.json` 有完整範例）
-- [ ] 定義 dependency audit matrix
-- [ ] 定義 validation commands
+- [x] 新增 `docs/spec/2026-07-08-codex-dual-publish.md`
+- [x] 定義 shared vs platform-specific file ownership
+- [x] 定義 Codex manifest / marketplace shape（含 `interface` 區塊：displayName / category / capabilities / logo 等 Claude manifest 沒有的欄位，superpowers 的 `.codex-plugin/plugin.json` 有完整範例）
+- [x] 定義 dependency audit matrix（欄位定義 + 已驗證 seed rows；完整盤點仍在 migration tasks）
+- [x] 定義 validation commands（三道 gate；確切指令實作時釘死）
 
 ## 後續 migration tasks（依拍板決策更新）
 
