@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/pbakaus/impeccable
 - **Source path**: `.claude/skills/impeccable`
 - **Pinned commit**: d2ab4ddee6fa63002fae680652b5fbd31735e280
-- **Synced at**: 2026-07-11T18:48:42Z
+- **Synced at**: 2026-07-11T18:57:21Z
 - **License**: see `../_vendored/LICENSES/impeccable-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied

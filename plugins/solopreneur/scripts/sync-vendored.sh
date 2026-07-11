@@ -22,7 +22,9 @@
 # Optional manifest fields per source:
 #   disable_model_invocation: true  # inject `disable-model-invocation: true` into each synced SKILL.md
 #
-# Requires: git, jq
+# Requires: git, jq, perl (perl ships with macOS and is Essential on Debian/Ubuntu,
+# so unlike jq it needs no install; the argument-token escape below needs its
+# lookbehind, which POSIX sed and awk do not have)
 
 set -euo pipefail
 
@@ -43,6 +45,11 @@ fi
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "error: jq is required (brew install jq)" >&2
+  exit 1
+fi
+
+if ! command -v perl >/dev/null 2>&1; then
+  echo "error: perl is required (the argument-token escape needs a regex lookbehind)" >&2
   exit 1
 fi
 
@@ -255,45 +262,52 @@ for i in $(seq 0 $((source_count - 1))); do
     # drift, and the next sync would clobber the edit — so the sync has to produce
     # the escape itself.
     #
-    # Rule, verbatim from https://code.claude.com/docs/en/skills :
-    #   "To include a literal `$` before a digit, `ARGUMENTS`, or a declared
-    #    argument name [...] escape it with a backslash [...] Only a single
-    #    backslash directly before the token escapes it. A doubled backslash such
-    #    as `\\$1` leaves both backslashes in place, and `$1` still expands to the
-    #    argument value."
+    # The rule, verbatim from https://code.claude.com/docs/en/skills :
+    #   "Only a single backslash directly before the token escapes it. A doubled
+    #    backslash such as `\\$1` leaves both backslashes in place, and `$1` still
+    #    expands to the argument value."
+    #
+    # So the backslash run already sitting in front of a token decides everything:
+    #
+    #   run 0   `$1`      token is substituted        -> escape it (add one)
+    #   run 1   `\$1`     renders as `$1`             -> leave alone; upstream is
+    #                                                    already shipping the exact
+    #                                                    bytes we would have written
+    #   run >=2 `\\$1`    every backslash survives
+    #                     AND `$1` still expands      -> UNREPRESENTABLE, refuse
+    #
+    # A run of two or more cannot be fixed by adding backslashes: protecting the
+    # `$` requires its preceding backslash to have nothing before it, so a longer
+    # run only plants another stray backslash and the token expands anyway. Refuse
+    # rather than guess — nothing upstream trips it today (0 of 77 vendored
+    # SKILL.md), and if something ever does, a maintainer is standing right here
+    # and a loud failure beats a quiet corruption.
     #
     # SKILL.md only. Sibling references/*.md are pulled in with the Read tool at
     # runtime, which returns raw bytes and never substitutes, so escaping them
     # would only plant a stray backslash in text the model is meant to copy.
-    #
-    # Refuse upstream text that cannot survive the round trip. Per the rule above,
-    # a backslash already in front of a token makes the original unrepresentable:
-    # `\$1` renders as `$1` (the backslash is eaten) and `\\$1` keeps both
-    # backslashes AND still expands `$1`. No escape we could emit reproduces
-    # either, so silently passing them through would ship exactly the corruption
-    # this pass exists to prevent. Nothing upstream trips this today (0 of 77
-    # vendored SKILL.md); if something ever does, a maintainer is standing right
-    # here, and a loud failure beats a quiet one.
-    if grep -qE '\\\$([0-9]|ARGUMENTS)' "$dst_path/SKILL.md"; then
-      echo "    error: upstream $to/SKILL.md has a backslash before an argument token." >&2
-      echo "           Claude Code's escape cannot round-trip that (see the" >&2
-      echo "           argument-token comment in scripts/sync-vendored.sh)." >&2
+    if grep -qE '\\\\\$([0-9]|ARGUMENTS)' "$dst_path/SKILL.md"; then
+      echo "    error: upstream $to/SKILL.md has two or more backslashes before an" >&2
+      echo "           argument token. Claude Code cannot render that text — see the" >&2
+      echo "           argument-token comment in scripts/sync-vendored.sh. Fix by hand." >&2
       exit 1
     fi
 
-    # With no backslash in front of any token, the escape is an unconditional
-    # insert — no left-context group, so adjacent tokens (`$1$2`) both get one.
+    # `(?<!\\)\$(?=[0-9]|ARGUMENTS)` is the mirror image of the regex the loader
+    # itself uses to FIND escapes — `(?<!\\)\\\$(?=\d|ARGUMENTS)` — so we insert
+    # exactly what it looks for, and only where it is missing. Both assertions are
+    # zero-width: the `$` is the whole match, so nothing between two adjacent
+    # tokens is consumed and `$1$2` escapes both. (A `sed` left-context group,
+    # having no lookbehind, would eat the boundary and miss the second.)
     #
     # What keeps the drift check green is determinism, not idempotency: `rm -rf` +
     # `cp -R` above re-copies pristine upstream on every run, so this pass never
     # sees its own output. Same pinned input, same bytes out.
     #
-    # The grep guard mirrors rewrite_pass: a file with no token at all is left
-    # byte-for-byte as upstream wrote it. That is load-bearing, not cosmetic —
-    # ai-engineer/langgraph/SKILL.md ships without a trailing newline, and sed
-    # would add one.
+    # The grep guard mirrors rewrite_pass: a file with no token at all is not
+    # rewritten at all, so it stays byte-for-byte as upstream wrote it.
     if grep -qE '\$([0-9]|ARGUMENTS)' "$dst_path/SKILL.md"; then
-      sed -E 's/\$([0-9]|ARGUMENTS)/\\$\1/g' "$dst_path/SKILL.md" > "$dst_path/SKILL.md.tmp" \
+      perl -pe 's/(?<!\\)\$(?=[0-9]|ARGUMENTS)/\\\$/g' "$dst_path/SKILL.md" > "$dst_path/SKILL.md.tmp" \
         || { echo "    error: token escape failed for $dst_path/SKILL.md" >&2; rm -f "$dst_path/SKILL.md.tmp"; exit 1; }
       mv "$dst_path/SKILL.md.tmp" "$dst_path/SKILL.md" \
         || { echo "    error: mv failed for $dst_path/SKILL.md" >&2; rm -f "$dst_path/SKILL.md.tmp"; exit 1; }

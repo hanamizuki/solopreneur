@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/neo4j-contrib/neo4j-skills
 - **Source path**: `neo4j-cli-tools-skill`
 - **Pinned commit**: 6d44d3166bf888ac4fc294b88c72df6d1d83abcb
-- **Synced at**: 2026-07-11T18:48:52Z
+- **Synced at**: 2026-07-11T18:57:29Z
 - **License**: see `../_vendored/LICENSES/neo4j-skills-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied

@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `performance/r8-analyzer`
 - **Pinned commit**: fe95b6fdf002ece6c7340013623d41d8deec6f52
-- **Synced at**: 2026-07-11T18:48:33Z
+- **Synced at**: 2026-07-11T18:57:15Z
 - **License**: see `../_vendored/LICENSES/android-skills-LICENSE.txt`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied

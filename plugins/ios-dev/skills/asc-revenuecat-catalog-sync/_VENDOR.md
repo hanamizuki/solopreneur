@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/rudrankriyam/app-store-connect-cli-skills
 - **Source path**: `skills/asc-revenuecat-catalog-sync`
 - **Pinned commit**: ed0049a59ebbe68743019922c7150c4f5bb29db2
-- **Synced at**: 2026-07-11T18:48:47Z
+- **Synced at**: 2026-07-11T18:57:24Z
 - **License**: see `../_vendored/LICENSES/app-store-connect-cli-skills-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied

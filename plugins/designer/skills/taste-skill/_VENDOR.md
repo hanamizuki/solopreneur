@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/Leonxlnx/taste-skill
 - **Source path**: `skills/taste-skill`
 - **Pinned commit**: 06d6028b5c623016c59ce8536f578e5a1127b499
-- **Synced at**: 2026-07-11T18:48:36Z
+- **Synced at**: 2026-07-11T18:57:18Z
 - **License**: (none — upstream has no LICENSE file as of sync)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
