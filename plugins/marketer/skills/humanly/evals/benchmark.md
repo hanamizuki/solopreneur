@@ -1,6 +1,6 @@
 # Humanly Benchmark
 
-30 cases guarding the parts of the skill that are easy to break. Run per
+31 cases guarding the parts of the skill that are easy to break. Run per
 [run-eval.md](run-eval.md) after changing any source file under `references/`, or
 `scripts/build-prewrite.py`.
 
@@ -11,7 +11,7 @@ ask whether it *breaks* things, and those matter more.
 |---|---|---|
 | `NEW-*` (10) | does the catalog catch it? | the pattern goes unflagged |
 | `TW-*` (5) | is the Taiwan layer applied? | an **unprotected** mainland term survives, or Chinese sentence punctuation stays half-width. Proper nouns (TW-03) and text inside quotations (TW-04) are *supposed* to survive — changing them is the failure |
-| `FID-*` (9) | is the protected list held — and not over-reaching? | a fact, price, name, quoted speech, commitment or code string moved (FID-01…08), **or** the protected list shielded something it shouldn't (FID-09) |
+| `FID-*` (10) | is the protected list held — and not over-reaching? | a fact, price, name, quoted speech, commitment or code string moved (FID-01…08, FID-10), **or** the protected list shielded something it shouldn't (FID-09) |
 | `OVER-*` (5) | did the rewrite add its own slop? | fake candor, staccato drama, aphorisms, or an **invented** number, source or memory appears |
 | `PRE-*` (1) | does prewrite mode compose correctly? | the model writes mainland vocabulary or half-width punctuation *from scratch* |
 
@@ -200,6 +200,19 @@ Protected: `python3 build-prewrite.py --check`, `gpt-5.4-mini`, `/v1/users` —
 all verbatim. The significance inflation (「工程效率的里程碑」) should go. Fails if
 the command is paraphrased into prose ("跑檢查模式"), or if the version or route
 drifts. A command is the one part of a doc the reader will copy.
+
+**FID-10 · 引語密度規則不吃真見證** · profile `blog`
+> 小美說：「第三個月接到第一個案子。」阿哲說：「我到第五個月才接到。」小圓說：「我還沒接到，但作品集做完了。」這三段見證體現了課程的卓越品質。
+
+The mirror image of FID-09. Three quotations, all attributed. Step 6's 「More than
+1 quoted term? Keep only the most essential one」 must **not** fire on them —
+attributed speech is exempt from the density rule, however many quotations a piece
+carries.
+
+Pass requires all three quoted sentences **and** all three names (小美 / 阿哲 / 小圓)
+to survive verbatim. Fails if the rewrite compresses them to one testimonial. The
+inflation tail 「體現了課程的卓越品質」 should be cut — note 小圓 hasn't landed a
+client, so the evidence doesn't support the claim anyway.
 
 **FID-09 · 引號不是保護傘** · profile `blog`
 > 我們的「無縫」平台提供「前所未有」的價值，讓團隊「賦能」彼此。
