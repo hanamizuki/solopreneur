@@ -46,6 +46,11 @@ Rules not listed apply at full strength across all profiles.
 **Extra strict** = flag even borderline instances.
 **Skip** = don't audit this category for this profile.
 
+**On the "Word table" row specifically**: `strict` means apply the three tiers
+*as the table defines them* — Tier 2 still needs 2+ in a paragraph to fire, Tier 3
+still needs high density. It does not promote every tier to always-replace.
+`relaxed` = Tier 1 only. `P0 only` = skip the word table.
+
 ## Auto-detection Cues
 
 | Signal | Profile |
