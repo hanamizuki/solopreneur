@@ -69,10 +69,10 @@ adb shell rm /sdcard/screenshot.png
 
 ```bash
 capture() {
-  local NAME="$1"
-  local LOCALE="$2"
-  local DEVICE_TYPE="$3"
-  local SERIAL="$4"
+  local NAME="\$1"
+  local LOCALE="\$2"
+  local DEVICE_TYPE="\$3"
+  local SERIAL="\$4"
   local OUTPUT_DIR="./screenshots/raw/$LOCALE/$DEVICE_TYPE"
 
   mkdir -p "$OUTPUT_DIR"
@@ -185,8 +185,8 @@ class UiAutomatorScreenshotTest {
 
 ```bash
 set_locale() {
-  local SERIAL="$1"
-  local LOCALE="$2"   # e.g. "de-DE"
+  local SERIAL="\$1"
+  local LOCALE="\$2"   # e.g. "de-DE"
   local LANG="${LOCALE%%-*}"  # e.g. "de"
   local REGION="${LOCALE##*-}" # e.g. "DE"
 

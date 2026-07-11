@@ -41,7 +41,7 @@ This also applies to:
 
 ## PPP Multiplier Table
 
-Apply these multipliers to the base USD price. Round all results to `.99` endings (e.g., $4.73 → $4.99, ₹249.37 → ₹249.99).
+Apply these multipliers to the base USD price. Round all results to `.99` endings (e.g., \$4.73 → \$4.99, ₹249.37 → ₹249.99).
 
 ### Tier 1 — Full Price (1.0x–1.1x)
 | Region | Code | Multiplier | Currency |
@@ -233,7 +233,7 @@ Save the full JSON. Note:
 Start with the **complete** list of existing `regionalPricingAndAvailabilityConfigs`, then override PPP target regions with calculated prices. Keep all other regions unchanged.
 
 Price format uses `units` (whole part as string) and `nanos` (fractional part as integer, 0–999999999):
-- $5.99 → `"units": "5", "nanos": 990000000`
+- \$5.99 → `"units": "5", "nanos": 990000000`
 - ₹149.99 → `"units": "149", "nanos": 990000000`
 - ¥719 → `"units": "719", "nanos": 0`
 
@@ -457,11 +457,11 @@ gplay subscriptions update --package "PACKAGE" --product-id "sub_2" --json @ppp-
 
 ### BigMac Index Approach
 Adjust prices based on relative purchasing power:
-- USA: $9.99 (baseline)
-- India: $2.99 (~70% discount)
-- Brazil: $4.99 (~50% discount)
-- UK: $9.99 (similar)
-- Switzerland: $10.99 (premium)
+- USA: \$9.99 (baseline)
+- India: \$2.99 (~70% discount)
+- Brazil: \$4.99 (~50% discount)
+- UK: \$9.99 (similar)
+- Switzerland: \$10.99 (premium)
 
 ### Tiered Regional Pricing
 Group countries into pricing tiers:

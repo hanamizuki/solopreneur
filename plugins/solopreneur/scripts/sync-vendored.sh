@@ -10,6 +10,12 @@
 # skills/<to>/, fetches the LICENSE if specified, and updates `rev` +
 # `synced_at` in the manifest.
 #
+# Two mechanical body rewrites are applied to the copied files, both idempotent
+# so a re-sync reproduces byte-identical output (validate-vendored.yml re-runs
+# this script with --pinned and fails on drift): the bundled-script path rewrite
+# to ${CLAUDE_SKILL_DIR} (all *.md), and the bare-`$N` escape (SKILL.md only).
+# See the comments at each step for why.
+#
 # Usage (from the sub-plugin's directory):
 #   ./scripts/sync-vendored.sh           # sync to latest commit on each source's branch
 #   ./scripts/sync-vendored.sh --pinned  # re-sync to revs already pinned in manifest (reproducible)
@@ -234,6 +240,55 @@ for i in $(seq 0 $((source_count - 1))); do
       rewrite_pass ".claude/skills/$from_basename/"
     fi
 
+    # Bare-`$N` escape: rewrite `$0`-`$9` to `\$0`-`\$9` in the SKILL.md body.
+    #
+    # Claude Code substitutes `$N` (shorthand for `$ARGUMENTS[N]`) into a
+    # SKILL.md on every load — model-invoked as well as slash-invoked — and a
+    # no-arg load collapses each `$N` to the empty string. Upstream skills use
+    # bare `$N` as a literal: bash positional params (`local UDID="$1"`), a
+    # Swift regex capture group (`with: "$1"`), dollar amounts (`$150k`,
+    # `$9.99`). Unescaped, the shipped skill teaches broken code — `local
+    # UDID="$1"` renders as `local UDID=""`. One backslash is the documented
+    # escape; the substitution consumes it and the reader sees `$N` again. The
+    # repo's native (non-vendored) skills got the same fix by hand in #87, which
+    # this reproduces mechanically for skills we don't own.
+    #
+    # SKILL.md only. Sibling references/*.md are pulled in with the Read tool at
+    # runtime, which returns raw bytes and never substitutes, so escaping them
+    # would only plant a stray backslash in text the model is meant to copy.
+    #
+    # Idempotent, which is what keeps the drift check green: a `$` already
+    # preceded by a backslash is passed through untouched, so re-running the
+    # sync over an escaped file is a no-op rather than a double-escape. The scan
+    # consumes only up to and including the `$` and leaves the digit in `rest`,
+    # so that digit becomes the "preceding char" for the next match and adjacent
+    # tokens (`$1$2`) both get escaped — the bug a single `sed -E` pass with a
+    # consuming left-context group would have.
+    #
+    # The grep guard mirrors rewrite_pass: files with no `$<digit>` at all are
+    # left byte-for-byte as upstream wrote them (no rewrite, no mtime churn).
+    if [[ -f "$dst_path/SKILL.md" ]] && grep -q '\$[0-9]' "$dst_path/SKILL.md"; then
+      awk '
+        {
+          out = ""
+          rest = $0
+          while (match(rest, /\$[0-9]/)) {
+            pos = RSTART
+            if (pos > 1 && substr(rest, pos - 1, 1) == "\\") {
+              out = out substr(rest, 1, pos)
+            } else {
+              out = out substr(rest, 1, pos - 1) "\\$"
+            }
+            rest = substr(rest, pos + 1)
+          }
+          print out rest
+        }
+      ' "$dst_path/SKILL.md" > "$dst_path/SKILL.md.tmp" \
+        || { echo "    error: \$N escape failed for $to" >&2; rm -f "$dst_path/SKILL.md.tmp"; exit 1; }
+      mv "$dst_path/SKILL.md.tmp" "$dst_path/SKILL.md" \
+        || { echo "    error: mv failed for $to/SKILL.md" >&2; exit 1; }
+    fi
+
     # Drop a small _VENDOR.md sidecar so the source is traceable from the skill folder.
     if [[ -n "$license_file" ]]; then
       license_line="see \`../_vendored/LICENSES/$(basename "$license_file")\`"
@@ -252,14 +307,24 @@ edits will be overwritten on the next \`scripts/sync-vendored.sh\` run.
 - **Synced at**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 - **License**: $license_line
 
-**Path rewrite**: during sync, bundled-script paths under the skill folder
+The vendored body differs from upstream verbatim by exactly the two
+mechanical substitutions below — see \`scripts/sync-vendored.sh\` for the
+transformations.
+
+**Path rewrite** (all \`*.md\`): bundled-script paths under the skill folder
 (\`.claude/skills/<to>/\`, and \`.claude/skills/<upstream-name>/\` if the
-manifest renames the folder) are mechanically rewritten to
-\`"\${CLAUDE_SKILL_DIR}/"\` (quoted so a skill-dir path containing spaces
-doesn't word-split the resulting command) so the skill resolves correctly
-when installed as a plugin. The vendored body therefore differs from
-upstream verbatim by exactly that substitution — see
-\`scripts/sync-vendored.sh\` for the transformation.
+manifest renames the folder) are rewritten to \`"\${CLAUDE_SKILL_DIR}/"\`
+(quoted so a skill-dir path containing spaces doesn't word-split the
+resulting command) so the skill resolves correctly when installed as a
+plugin.
+
+**\`\$N\` escape** (\`SKILL.md\` only): bare \`\$0\`-\`\$9\` are escaped to
+\`\\\$0\`-\`\\\$9\`. Claude Code substitutes \`\$N\` (shorthand for
+\`\$ARGUMENTS[N]\`) into a SKILL.md on every load, collapsing it to the empty
+string when no args are passed — so an unescaped literal (a bash positional
+param, a regex capture group, a dollar amount) would reach the reader
+corrupted. The backslash is consumed by that substitution, so the rendered
+skill shows \`\$N\` as upstream wrote it.
 
 To update: edit \`skills/_vendored/manifest.json\` if needed, then re-run this
 plugin's \`./scripts/sync-vendored.sh\`.
