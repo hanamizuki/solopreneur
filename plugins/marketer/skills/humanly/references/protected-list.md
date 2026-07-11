@@ -29,7 +29,7 @@ is worse than a boring sentence that is correct.
 
 ---
 
-## The Five Protected Categories
+## The Six Protected Categories
 
 ### 1. Prices and numbers
 
@@ -62,15 +62,23 @@ CTA links, signup links, citation links, anchor text.
   tool residue, not content — see patterns zh#48 / en#40. The author's own
   marketing parameters (`utm_source=newsletter`) are protected
 
-### 4. Real names and anything inside quotation marks
+### 4. Real names and directly quoted speech
 
-Testimonials, interviews, customer stories, transcripts.
+Testimonials, interviews, customer stories, transcripts, cited passages — text
+attributed to a person who actually said it.
 
 - Real names never blur into 「這位學員」 / "one participant"
 - **Quoted speech is verbatim** — including the AI-ish phrasing, mainland
   vocabulary, or half-width punctuation inside it. The value of a quote is that
   it is what the person actually said
 - Obvious typos inside a quote get flagged for the author, not fixed
+
+**Quotation marks alone do not confer protection.** Scare quotes, emphasis
+quotes, and the author's own coined terms are *style*, and they stay editable —
+they are governed by the quote-density rule (zh #16), not by this category.
+`Our "seamless" platform delivers "unprecedented" value` is promotional copy to
+fix, not a quotation to preserve. The test is attribution: **can you name who
+said it?** If not, it is not quoted speech.
 
 ### 5. Commitments
 
@@ -81,6 +89,23 @@ compliance wording.
 - Quantifiers and conditions do not drift: `14 天內`, `全額`, `不需要任何理由`
 - Boilerplate that exists for accuracy (`依發卡銀行作業為準`) is not canned AI
   tone. It is a liability boundary
+
+### 6. Code, commands, paths and identifiers
+
+Matters most under the `docs` and `technical-blog` profiles, where the facts of
+the piece *are* strings.
+
+- Inline code, CLI invocations and their flags (`python3 build-prewrite.py
+  --check`), file paths, API routes (`/v1/users`), config keys, env vars
+- Version and model strings (`gpt-5.4-mini`, `v0.5.31`) — these drift silently
+  and are read as authoritative
+- Code blocks are untouched entirely, including their comments
+- A rewrite may reword the prose *around* a command; it may never paraphrase the
+  command. "Run `build-prewrite.py --check`" does not become "run the build
+  script in check mode" — that deletes the only part the reader will copy
+
+(These are already exempt from the full-width punctuation rule; this category
+extends the same protection to their content.)
 
 ---
 
@@ -144,7 +169,7 @@ Run after the second-pass audit, before output. Not optional, and not waived by
 any automation mode.
 
 1. List what you locked before starting: N prices, N proper nouns, N links,
-   N names/quotes, N commitments
+   N names/quoted speech, N commitments, N code strings
 2. Search the rewritten text for each one. Confirm it is present and verbatim
 3. Confirm no fact, number or source appears that was not in the source text
 4. Confirm the author's position did not flip or soften (「我反對」 may not become

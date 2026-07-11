@@ -68,9 +68,13 @@ Apply the tolerance matrix — some rules are relaxed or skipped per profile.
 ### Step 4: Lock the Protected List
 
 Before touching a word, circle what may not move: prices and numbers, proper
-nouns, links and anchor text, real names and anything inside quotation marks,
-commitments (refund policy, warranty, disclaimers, legal wording). Count them —
-you will verify the same count in Step 9.
+nouns, links and anchor text, real names and directly quoted speech, commitments
+(refund policy, warranty, disclaimers, legal wording), and code — commands,
+paths, API routes, version strings. Count them — you will verify the same count
+in Step 9.
+
+Quotation marks alone are not protection: scare quotes and emphasis quotes stay
+editable. The test is attribution — can you name who said it?
 
 Full definitions, the false-positive table, and the never-invent rule:
 `references/protected-list.md`.

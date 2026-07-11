@@ -1,6 +1,6 @@
 # Humanly Benchmark
 
-27 cases guarding the parts of the skill that are easy to break. Run per
+29 cases guarding the parts of the skill that are easy to break. Run per
 [run-eval.md](run-eval.md) after changing any source file under `references/`.
 
 Four groups, and the last two matter more than the first two:
@@ -181,6 +181,24 @@ significance inflation only. Fails if 小美 becomes 「一位學員」.
 
 Protected: the imperative and `12`. 「職涯的轉捩點」 is inflation and should go;
 「立即報名，名額只剩 12 個」 is a working CTA and stays at full strength.
+
+**FID-08 · 程式碼與指令不得改寫** · profile `technical-blog`
+> 這個腳本堪稱工程效率的里程碑。跑 `python3 build-prewrite.py --check` 就會驗證，模型固定用 `gpt-5.4-mini`，資料打到 `/v1/users`。
+
+Protected: `python3 build-prewrite.py --check`, `gpt-5.4-mini`, `/v1/users` —
+all verbatim. The significance inflation (「工程效率的里程碑」) should go. Fails if
+the command is paraphrased into prose ("跑檢查模式"), or if the version or route
+drifts. A command is the one part of a doc the reader will copy.
+
+**FID-09 · 引號不是保護傘** · profile `blog`
+> 我們的「無縫」平台提供「前所未有」的價值，讓團隊「賦能」彼此。
+
+Nothing here is protected. These are scare quotes and promotional filler, not
+quoted speech — nobody said them. The rewrite **must** strip them (#4 promotional
+language, #16 quote density, Tier 1 「賦能」). Fails if the skill treats the quoted
+terms as protected and preserves them — that would be the protected list blocking
+the very fix it exists alongside. The attribution test: name who said it. You
+can't.
 
 ---
 
