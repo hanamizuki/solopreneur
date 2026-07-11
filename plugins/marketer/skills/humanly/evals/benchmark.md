@@ -1,20 +1,23 @@
 # Humanly Benchmark
 
-29 cases guarding the parts of the skill that are easy to break. Run per
-[run-eval.md](run-eval.md) after changing any source file under `references/`.
+30 cases guarding the parts of the skill that are easy to break. Run per
+[run-eval.md](run-eval.md) after changing any source file under `references/`, or
+`scripts/build-prewrite.py`.
 
-Four groups, and the last two matter more than the first two:
+Five groups. The first two ask whether the skill *catches* things; the last three
+ask whether it *breaks* things, and those matter more.
 
 | Group | Asks | Fails when |
 |---|---|---|
-| `NEW-*` | does the catalog catch it? | the pattern goes unflagged |
-| `TW-*` | is the Taiwan layer applied? | mainland vocabulary or half-width punctuation survives |
-| `FID-*` | is the protected list held? | a fact, price, name, quote or commitment moved |
-| `OVER-*` | did the rewrite add its own slop? | fake candor, staccato drama, aphorisms, or an **invented** number, source or memory appears |
+| `NEW-*` (10) | does the catalog catch it? | the pattern goes unflagged |
+| `TW-*` (5) | is the Taiwan layer applied? | an **unprotected** mainland term survives, or Chinese sentence punctuation stays half-width. Proper nouns (TW-03) and text inside quotations (TW-04) are *supposed* to survive — changing them is the failure |
+| `FID-*` (9) | is the protected list held — and not over-reaching? | a fact, price, name, quoted speech, commitment or code string moved (FID-01…08), **or** the protected list shielded something it shouldn't (FID-09) |
+| `OVER-*` (5) | did the rewrite add its own slop? | fake candor, staccato drama, aphorisms, or an **invented** number, source or memory appears |
+| `PRE-*` (1) | does prewrite mode compose correctly? | the model writes mainland vocabulary or half-width punctuation *from scratch* |
 
 A skill that scores 10/10 on `NEW-*` and fails one `FID-*` or `OVER-*` is worse
 than useless: it produces confident, human-sounding text that says something the
-author never said. **`FID-*` and `OVER-*` are pass/fail, not scored.**
+author never said. **`FID-*`, `OVER-*` and `PRE-*` are pass/fail, not scored.**
 
 Two standing rules for every case in every group:
 
@@ -140,10 +143,13 @@ clean the smell and leave the protected item byte-identical.
 **FID-01 · 價格與優惠碼** · profile `blog`
 > 這是一堂充滿啟發、扎實豐富的課程，帶你邁向全新高峰。早鳥價 4,800 元，折扣碼 EARLY500，只到 3/31。
 
-Protected: `4,800`, `EARLY500`, `3/31`. The promotional sentence should go. Note
-the profile is `blog`, where Promotional language is `strict` — the CTA is
-preserved by the false-positive row in `protected-list.md`, not by a profile.
-That is the point of the case.
+The input is two sentences. The **first** is pure promotion and should go (or be
+replaced by a 需作者補充 marker). The **second** carries everything protected —
+`4,800`, `EARLY500`, `3/31` — and survives verbatim.
+
+Note the profile is `blog`, where Promotional language is `strict`. The offer
+line is preserved by the false-positive row in `protected-list.md`, not by a
+profile. That is the point of the case.
 
 **FID-02 · 精確度不得漂移** · profile `blog`
 > 我們的開信率大約 42%，這個數字標誌著電子報策略的重大突破。

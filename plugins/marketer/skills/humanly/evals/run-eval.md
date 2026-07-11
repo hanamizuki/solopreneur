@@ -12,6 +12,10 @@ still *behaves*.
 - **`NEW-*`** — when the pattern catalog changed.
 - **`TW-*`** — when anything on the zh side changed (`patterns-zh.md`,
   `word-table-zh.md`, `taiwan-localization.md`).
+- **`PRE-*`** — when `scripts/build-prewrite.py`, `taiwan-localization.md`, or a
+  `｜prewrite`-flagged pattern changed, i.e. whenever the contents of
+  `references/generated/prewrite-*.md` move. Nothing else in the suite exercises
+  the prewrite path, so a regression there is invisible everywhere else.
 
 ## Procedure
 
@@ -19,7 +23,7 @@ Run each case in a **fresh subagent** — one case per agent, no shared context.
 agent running the whole suite in a single session will pattern-match on the
 earlier cases and score better than the skill deserves.
 
-Prompt per case:
+**Rewrite-mode prompt** (`NEW-*`, `TW-*`, `FID-*`, `OVER-*`):
 
 > Apply the humanly skill in rewrite mode to the text below.
 > Context profile: `<profile>`.
@@ -27,14 +31,27 @@ Prompt per case:
 >
 > `<input text>`
 
+**Prewrite-mode prompt** (`PRE-*`) — different shape: there is no input text, and
+the agent must be held to the one file prewrite mode actually loads.
+
+> Read `references/generated/prewrite-{lang}.md` — **that file only**. Do not read
+> `patterns-*.md`, `taiwan-localization.md`, or any other source. (Whatever is not
+> in the generated bundle is what prewrite mode does not get; that is the thing
+> under test.)
+> Then write to this brief: `<brief>`
+
 Score against the case's expectation:
 
 | Group | Pass |
 |---|---|
 | `NEW-*` | the pattern appears in *Issues found*, the rewrite applies the fix, **and** the rewrite invents nothing |
 | `TW-*` | the localization is applied — or correctly withheld, for TW-03/04/05 |
-| `FID-*` | the protected string appears **verbatim** in the rewritten version |
+| `FID-*` | the protected string appears **verbatim** in the rewritten version (FID-09 inverts this: the *unprotected* quoted terms must be gone) |
 | `OVER-*` | the rewrite introduced no hook, aphorism, staccato run, invented fact, or invented source |
+| `PRE-*` | the composed text carries no mainland term and no half-width Chinese sentence punctuation |
+
+Grade `FID-*`, `OVER-*` and `PRE-*` **mechanically** — substring and codepoint
+checks in a script, not by eye. "Looks fine" is how a drifted price gets shipped.
 
 ## Reading the results
 
@@ -58,3 +75,9 @@ catalog entry's own `改寫前`, or the agent grades itself with the answer key 
 State the expectation as something checkable ("must flag #44", "`EARLY500` survives
 verbatim", "output contains no number absent from the input"), never "sounds more
 natural".
+
+Make sure the case **can fail**. If the failure it describes is already true of
+its own input, it tests nothing — that is how FID-03 shipped unfalsifiable.
+
+Update the case count and the per-group counts in `benchmark.md`'s header. They
+are hand-maintained and they go stale; that is a known cost of keeping them.

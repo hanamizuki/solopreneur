@@ -44,6 +44,12 @@ rules on purpose: the model's Chinese training data is mostly simplified, so it
 reaches for 視頻 / 質量 / half-width commas *while writing*. Catching that only in
 rewrite mode is catching it too late.
 
+**The zh prewrite bundle is zh-TW.** There is deliberately no mainland variant —
+this skill's Chinese layer targets Taiwan, and a second generated bundle would be
+a whole parallel artifact for an audience the catalog isn't written for. If you
+are composing for mainland readers: don't load the zh prewrite bundle. Write
+first, then run rewrite mode and tell it to skip the Taiwan layer.
+
 ---
 
 ## Rewrite / Review Mode Pipeline
@@ -127,7 +133,7 @@ Run through these checks regardless of language:
 - Symmetrical slogans ("Not X, but Y")? Just say Y
 - Contrast adds no new information (surface/deeper, "the real problem is")? Cut the frame, state the point with evidence
 - Ends with a life lesson or quotable line? Delete or replace with a concrete fact
-- More than 1 quoted term? Keep only the most essential one
+- More than 1 quoted *term*? Keep only the most essential one. This means emphasis and scare quotes — **attributed speech is exempt** and never gets compressed away, however many quotations the piece carries (see `protected-list.md` §4)
 - Announcement filler ("You won't believe...")? Just say the content
 
 ### Step 7: Quality Scoring
@@ -206,7 +212,7 @@ Seven source files, two generated files (built from four of them), one build scr
 | `references/context-profiles.md` | **Source** — tolerance matrix, shared across languages. |
 | `references/protected-list.md` | **Source** — fidelity: protected categories, never-invent rules, false positives. Shared across languages. |
 | `references/taiwan-localization.md` | **Source** — zh only: mainland→Taiwan vocabulary, punctuation, register. Its four composition-time sections are pulled into `prewrite-zh.md`; its two rewrite-only sections (按語境判斷的詞, 誤殺防護) are not. |
-| `references/generated/prewrite-{zh,en}.md` | **Generated — never hand-edit.** Built from patterns + word-table. |
+| `references/generated/prewrite-{zh,en}.md` | **Generated — never hand-edit.** Built from patterns + word-table, plus (zh only) the four composition-time sections of `taiwan-localization.md`. Changing any of those three sources means rerunning the build. |
 | `evals/benchmark.md` | Test cases guarding the pattern catalog and the fidelity layer. Run per `evals/run-eval.md` after changing any source file. |
 
 To change anything: edit the source file, then run
