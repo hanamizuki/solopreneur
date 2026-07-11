@@ -55,8 +55,11 @@ CONFIGS = {
         # for 視頻 / 質量 / half-width punctuation while *writing* Traditional
         # Chinese. Those sections have to be in the prewrite brief or the rule
         # only ever fires after the damage is done. The rewrite-only sections of
-        # taiwan-localization.md (誤殺防護, 按語境判斷的詞) stay out — nothing to
-        # false-positive on when there is no source text yet.
+        # taiwan-localization.md (誤殺防護, 按語境判斷的詞) stay out — they say "do
+        # not wrongly *change* X", which is meaningless with no source text yet.
+        # A rule that belongs on both paths goes in the substitution table (a
+        # qualified row), not in 按語境判斷的詞 — otherwise it never reaches the
+        # writer. Anything PRE-01 fails on must be reachable from this list.
         "extra_sources": [
             (
                 "taiwan-localization.md",
