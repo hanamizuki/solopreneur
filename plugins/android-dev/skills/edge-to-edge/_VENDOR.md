@@ -6,27 +6,17 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `system/edge-to-edge`
 - **Pinned commit**: fe95b6fdf002ece6c7340013623d41d8deec6f52
-- **Synced at**: 2026-07-11T17:24:40Z
+- **Synced at**: 2026-07-11T18:48:33Z
 - **License**: see `../_vendored/LICENSES/android-skills-LICENSE.txt`
 
-The vendored body differs from upstream verbatim by exactly the two
-mechanical substitutions below — see `scripts/sync-vendored.sh` for the
-transformations.
-
-**Path rewrite** (all `*.md`): bundled-script paths under the skill folder
-(`.claude/skills/<to>/`, and `.claude/skills/<upstream-name>/` if the
-manifest renames the folder) are rewritten to `"${CLAUDE_SKILL_DIR}/"`
-(quoted so a skill-dir path containing spaces doesn't word-split the
-resulting command) so the skill resolves correctly when installed as a
-plugin.
-
-**`$N` escape** (`SKILL.md` only): bare `$0`-`$9` are escaped to
-`\$0`-`\$9`. Claude Code substitutes `$N` (shorthand for
-`$ARGUMENTS[N]`) into a SKILL.md on every load, collapsing it to the empty
-string when no args are passed — so an unescaped literal (a bash positional
-param, a regex capture group, a dollar amount) would reach the reader
-corrupted. The backslash is consumed by that substitution, so the rendered
-skill shows `$N` as upstream wrote it.
+**Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
+files so they work as part of a plugin: the frontmatter `name:` is
+normalized to the folder name; bundled-script paths are rewritten to
+`"${CLAUDE_SKILL_DIR}/"`; argument tokens (`$0`-`$9`,
+`$ARGUMENTS`) in `SKILL.md` are escaped as `\$…` so Claude Code does
+not substitute them into the body at load time; and
+`disable-model-invocation` is injected when the manifest asks for it. See
+`scripts/sync-vendored.sh` for the exact transformations and the reasons.
 
 To update: edit `skills/_vendored/manifest.json` if needed, then re-run this
 plugin's `./scripts/sync-vendored.sh`.
