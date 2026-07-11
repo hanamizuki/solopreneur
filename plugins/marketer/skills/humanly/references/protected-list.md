@@ -5,7 +5,11 @@
 > **Read by rewrite / review mode, in every language.** Deliberately shared
 > (like `context-profiles.md`): the categories are language-neutral, only the
 > output markers differ per language.
-> **Adding a protected category or a false-positive case → edit this file only.**
+> **This is where false positives live.** Individual pattern entries carry a
+> 誤殺邊界 only when the carve-out is specific to that one pattern; everything
+> cross-cutting belongs here. Adding a false-positive case → edit this file.
+> Adding a protected *category* → edit this file **and** SKILL.md Step 4, which
+> names them so the model knows what to lock before it reads this.
 
 Lock these before the first pass. Verify them again after the last one.
 
@@ -124,7 +128,7 @@ The rule fires, the judgment is wrong, the text gets worse. Let these through.
 | AI vocabulary | The word being discussed, not used | 「我戒掉了『賦能』這個詞」 is a mention. Do not touch |
 | Stiff officialese | The correct register for a notice | A maintenance announcement is supposed to sound formal |
 | Vague 「優化」 | Attached to a concrete action and metric | If it is followed by what changed and by how much, keep it |
-| Promotional urgency | A working CTA | Deadlines, seat counts and imperatives are function, not slop (see the sales-page profile). Make them *more* concrete, never weaker |
+| Promotional urgency | A working CTA | Deadlines, seat counts and imperatives are function, not slop. The promotional-language rule targets the hype *around* the offer, never the call to action itself. Make a CTA *more* concrete, never weaker |
 | Colloquial fragments, unfinished sentences | The human texture you are trying to preserve | Do not touch a word |
 | A colon introducing quoted speech (他說：「⋯⋯」 / She said: "…") | Required syntax | The banned colon is the *announcement* colon (「重點是：」, "Here's the thing:"). Introducing a quotation is not that — and a colon inside a protected quote is doubly untouchable |
 

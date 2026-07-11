@@ -56,7 +56,7 @@ Read these files (paths relative to this SKILL.md):
 | `references/word-table-{lang}.md` | 3-tier word replacement table (+ banned sentence patterns for zh) |
 | `references/context-profiles.md` | Tolerance matrix by content type |
 | `references/protected-list.md` | What a rewrite may never touch, and what it may never invent |
-| `references/taiwan-localization.md` | **zh only.** Mainland→Taiwan vocabulary, full-width punctuation, register. Skip when the target audience is mainland China |
+| `references/taiwan-localization.md` | **zh only, loaded by default.** Mainland→Taiwan vocabulary, full-width punctuation, register. Skip the layer only if the user says the audience is mainland China — never infer it |
 
 ### Step 3: Detect Context Profile
 
@@ -84,7 +84,7 @@ Full definitions, the false-positive table, and the never-invent rule:
 - Significance inflation on routine events
 - Hallucinated citations — decimal-precise studies, misattributed quotes. Mark `[source unverified]` / 〔需查證來源〕, keep the sentence verbatim, never verify or invent
 - AI tool residue — `utm_source=chatgpt.com`, `turn0search0`, `citeturn`. Grep for these; it is the one class you can catch mechanically
-- Unfilled template placeholders — `[Product Name]`, `{{name}}`, XX 公司. Flag them, never fill them in
+- Unfilled template placeholders — `[Product Name]`, `[insert case study]`. Flag them, never fill them in. Not merge tags in an actual template, and not deliberate anonymization — see the boundary on the catalog entry
 
 **P1 — Obvious AI smell (fix before output):**
 - Tier 1 word violations
@@ -108,7 +108,7 @@ Run through these checks regardless of language:
 - Three consecutive sentences same length? Break one up
 - Three consecutive sentences all *short*, hammering for drama? Merge them back — that is the same metronome, just faster
 - The piece takes no position at all ("both have their merits", "it depends on the person")? Ask the author which one they picked and why. Never pick for them
-- Opens with an era-hat ("In today's rapidly evolving landscape")? Delete the first paragraph and check whether the piece lost any information. It didn't
+- Opens with an era-hat ("In today's rapidly evolving landscape")? Delete the first paragraph and ask whether the piece lost any information. If it didn't, the paragraph was warm-up. If it did, keep it — some era-openings are the argument
 - Paragraph ends with a tidy one-liner? Vary the ending
 - Em dash before a reveal? Remove it
 - Explaining a metaphor? Trust the reader
@@ -172,7 +172,7 @@ the author can fill, mark it in place and move on:
 | | 中文 | English |
 |---|---|---|
 | Fact only the author has | `（需作者補充：具體教什麼／來了多少人）` | `(needs author input: which feature, how many users)` |
-| Citation that needs checking | `〔需查證來源〕` + the original sentence, verbatim | `[source unverified]` + the original sentence, verbatim |
+| Citation that needs checking | `〔需查證來源〕` **before** the original sentence, which stays verbatim | `[source unverified]` **before** the original sentence, which stays verbatim |
 
 A rewrite that comes back mostly markers is **not a failure**. For a draft that
 was all air, it is the correct result — the ball goes back to the author.
@@ -215,8 +215,8 @@ comment says exactly where new content belongs.
 
 Based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) and [avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) v3.3.0 (MIT License).
 
-The fidelity layer (`protected-list.md`), the Taiwan localization layer, and zh
-patterns #41–#50 are adapted from
+The fidelity layer (`protected-list.md`), the Taiwan localization layer, zh
+patterns #41–#50, and en patterns #39–#41 are adapted from
 [Raymondhou0917/speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw)
 (MIT License).
 

@@ -85,6 +85,17 @@ BANNER = (
     "     Regenerate: python3 plugins/marketer/skills/humanly/scripts/build-prewrite.py -->\n"
 )
 
+# Sources live in references/; the generated files live in references/generated/.
+# A bare `sibling.md` link copied out of a source would resolve against
+# references/generated/ and point at nothing, so re-anchor it one level up.
+# The lookahead keeps this idempotent and leaves already-relative links
+# (`../patterns-zh.md`, written by this script's own intro/appendix) alone.
+SIBLING_LINK_RE = re.compile(r"`(?!\.\./)([A-Za-z0-9_-]+\.md)`")
+
+
+def reanchor_links(text):
+    return SIBLING_LINK_RE.sub(r"`../\1`", text)
+
 
 def fail(msg) -> NoReturn:
     print(f"build-prewrite: ERROR: {msg}", file=sys.stderr)
@@ -250,7 +261,7 @@ def build(lang):
     for entry in entries:
         out.append(f"- #{entry['num']} {entry['title']} — {entry['summary']}")
     out.append("")
-    return "\n".join(out), len(entries), len(picked)
+    return reanchor_links("\n".join(out)), len(entries), len(picked)
 
 
 def parse_args():
