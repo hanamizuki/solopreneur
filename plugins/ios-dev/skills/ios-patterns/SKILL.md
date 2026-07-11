@@ -100,7 +100,7 @@ extension JSONDecoder {
             // Normalize PostgreSQL "yyyy-MM-dd HH:mm:ss.SSSSSS" → ISO8601
             let normalized = s
                 .replacingOccurrences(of: " ", with: "T")
-                .replacingOccurrences(of: #"(\.\d{3})\d+"#, with: "$1",
+                .replacingOccurrences(of: #"(\.\d{3})\d+"#, with: "\$1",
                                       options: .regularExpression)
             f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             if let d = f.date(from: normalized) { return d }

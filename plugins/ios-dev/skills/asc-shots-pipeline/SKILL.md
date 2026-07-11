@@ -212,8 +212,8 @@ declare -A LOCALE_UDID=(
 )
 
 set_simulator_locale() {
-  local UDID="$1"
-  local LOCALE="$2"            # e.g. de-DE
+  local UDID="\$1"
+  local LOCALE="\$2"            # e.g. de-DE
   local LANG="${LOCALE%%-*}"   # de
   local APPLE_LOCALE="${LOCALE/-/_}" # de_DE
 
@@ -259,8 +259,8 @@ declare -A LOCALE_UDID=(
 )
 
 capture_locale() {
-  local LOCALE="$1"
-  local UDID="$2"
+  local LOCALE="\$1"
+  local UDID="\$2"
   local LANG="${LOCALE%%-*}"
   local APPLE_LOCALE="${LOCALE/-/_}"
 

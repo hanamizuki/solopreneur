@@ -6,17 +6,17 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/rudrankriyam/app-store-connect-cli-skills
 - **Source path**: `skills/asc-screenshot-resize`
 - **Pinned commit**: ed0049a59ebbe68743019922c7150c4f5bb29db2
-- **Synced at**: 2026-06-24T13:44:41Z
+- **Synced at**: 2026-07-11T19:03:45Z
 - **License**: see `../_vendored/LICENSES/app-store-connect-cli-skills-LICENSE`
 
-**Path rewrite**: during sync, bundled-script paths under the skill folder
-(`.claude/skills/<to>/`, and `.claude/skills/<upstream-name>/` if the
-manifest renames the folder) are mechanically rewritten to
-`"${CLAUDE_SKILL_DIR}/"` (quoted so a skill-dir path containing spaces
-doesn't word-split the resulting command) so the skill resolves correctly
-when installed as a plugin. The vendored body therefore differs from
-upstream verbatim by exactly that substitution — see
-`scripts/sync-vendored.sh` for the transformation.
+**Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
+files so they work as part of a plugin: the frontmatter `name:` is
+normalized to the folder name; bundled-script paths are rewritten to
+`"${CLAUDE_SKILL_DIR}/"`; argument tokens (`$0`-`$9`) in a
+`SKILL.md` that takes no arguments are escaped as `\$0`-`\$9`, so
+Claude Code does not substitute them into the body at load time; and
+`disable-model-invocation` is injected when the manifest asks for it. See
+`scripts/sync-vendored.sh` for the exact transformations and the reasons.
 
 To update: edit `skills/_vendored/manifest.json` if needed, then re-run this
 plugin's `./scripts/sync-vendored.sh`.

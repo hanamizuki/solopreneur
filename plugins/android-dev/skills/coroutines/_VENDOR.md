@@ -6,17 +6,17 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/new-silvermoon/awesome-android-agent-skills
 - **Source path**: `.github/skills/concurrency_and_networking/android-coroutines`
 - **Pinned commit**: e5d0275e9f28f4e5feb5939210d78ef39568c029
-- **Synced at**: 2026-06-23T08:36:44Z
+- **Synced at**: 2026-07-11T19:03:23Z
 - **License**: see `../_vendored/LICENSES/awesome-android-agent-skills-LICENSE`
 
-**Path rewrite**: during sync, bundled-script paths under the skill folder
-(`.claude/skills/<to>/`, and `.claude/skills/<upstream-name>/` if the
-manifest renames the folder) are mechanically rewritten to
-`"${CLAUDE_SKILL_DIR}/"` (quoted so a skill-dir path containing spaces
-doesn't word-split the resulting command) so the skill resolves correctly
-when installed as a plugin. The vendored body therefore differs from
-upstream verbatim by exactly that substitution — see
-`scripts/sync-vendored.sh` for the transformation.
+**Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
+files so they work as part of a plugin: the frontmatter `name:` is
+normalized to the folder name; bundled-script paths are rewritten to
+`"${CLAUDE_SKILL_DIR}/"`; argument tokens (`$0`-`$9`) in a
+`SKILL.md` that takes no arguments are escaped as `\$0`-`\$9`, so
+Claude Code does not substitute them into the body at load time; and
+`disable-model-invocation` is injected when the manifest asks for it. See
+`scripts/sync-vendored.sh` for the exact transformations and the reasons.
 
 To update: edit `skills/_vendored/manifest.json` if needed, then re-run this
 plugin's `./scripts/sync-vendored.sh`.
