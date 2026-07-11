@@ -257,13 +257,21 @@ for i in $(seq 0 $((source_count - 1))); do
     # runtime, which returns raw bytes and never substitutes, so escaping them
     # would only plant a stray backslash in text the model is meant to copy.
     #
-    # Idempotent, which is what keeps the drift check green: a `$` already
-    # preceded by a backslash is passed through untouched, so re-running the
-    # sync over an escaped file is a no-op rather than a double-escape. The scan
-    # consumes only up to and including the `$` and leaves the digit in `rest`,
-    # so that digit becomes the "preceding char" for the next match and adjacent
-    # tokens (`$1$2`) both get escaped — the bug a single `sed -E` pass with a
-    # consuming left-context group would have.
+    # Idempotent, which is what keeps the drift check green: a `$` preceded by an
+    # ODD number of backslashes is already escaped and passes through untouched,
+    # so re-running the sync over an escaped file is a no-op rather than a
+    # double-escape. Counting the whole run — rather than testing only the single
+    # character before the `$` — is what makes `\\$1` come out right: there the
+    # two backslashes escape each other, leaving the `$` bare and still in need
+    # of escaping. No such sequence exists upstream today; the run count is here
+    # so this rewriter cannot be quietly wrong the day one shows up.
+    #
+    # The scan consumes only up to and including the `$` and leaves the digit in
+    # `rest`, so that digit becomes the "preceding char" for the next match and
+    # adjacent tokens (`$1$2`) both get escaped — the bug a single `sed -E` pass
+    # with a consuming left-context group would have. Truncating there never
+    # splits a backslash run either: `rest` restarts at the digit, so any run
+    # preceding a later `$` lies wholly inside it.
     #
     # The grep guard mirrors rewrite_pass: files with no `$<digit>` at all are
     # left byte-for-byte as upstream wrote them (no rewrite, no mtime churn).
@@ -274,7 +282,13 @@ for i in $(seq 0 $((source_count - 1))); do
           rest = $0
           while (match(rest, /\$[0-9]/)) {
             pos = RSTART
-            if (pos > 1 && substr(rest, pos - 1, 1) == "\\") {
+            slashes = 0
+            p = pos - 1
+            while (p >= 1 && substr(rest, p, 1) == "\\") {
+              slashes++
+              p--
+            }
+            if (slashes % 2 == 1) {
               out = out substr(rest, 1, pos)
             } else {
               out = out substr(rest, 1, pos - 1) "\\$"
@@ -284,9 +298,9 @@ for i in $(seq 0 $((source_count - 1))); do
           print out rest
         }
       ' "$dst_path/SKILL.md" > "$dst_path/SKILL.md.tmp" \
-        || { echo "    error: \$N escape failed for $to" >&2; rm -f "$dst_path/SKILL.md.tmp"; exit 1; }
+        || { echo "    error: \$N escape failed for $dst_path/SKILL.md" >&2; rm -f "$dst_path/SKILL.md.tmp"; exit 1; }
       mv "$dst_path/SKILL.md.tmp" "$dst_path/SKILL.md" \
-        || { echo "    error: mv failed for $to/SKILL.md" >&2; exit 1; }
+        || { echo "    error: mv failed for $dst_path/SKILL.md" >&2; exit 1; }
     fi
 
     # Drop a small _VENDOR.md sidecar so the source is traceable from the skill folder.
