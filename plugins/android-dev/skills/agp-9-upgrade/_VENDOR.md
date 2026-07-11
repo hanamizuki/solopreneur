@@ -6,15 +6,15 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `build/agp/agp-9-upgrade`
 - **Pinned commit**: fe95b6fdf002ece6c7340013623d41d8deec6f52
-- **Synced at**: 2026-07-11T18:57:15Z
+- **Synced at**: 2026-07-11T19:03:35Z
 - **License**: see `../_vendored/LICENSES/android-skills-LICENSE.txt`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is
 normalized to the folder name; bundled-script paths are rewritten to
-`"${CLAUDE_SKILL_DIR}/"`; argument tokens (`$0`-`$9`,
-`$ARGUMENTS`) in `SKILL.md` are escaped as `\$…` so Claude Code does
-not substitute them into the body at load time; and
+`"${CLAUDE_SKILL_DIR}/"`; argument tokens (`$0`-`$9`) in a
+`SKILL.md` that takes no arguments are escaped as `\$0`-`\$9`, so
+Claude Code does not substitute them into the body at load time; and
 `disable-model-invocation` is injected when the manifest asks for it. See
 `scripts/sync-vendored.sh` for the exact transformations and the reasons.
 

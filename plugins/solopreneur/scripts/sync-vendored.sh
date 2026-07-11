@@ -246,7 +246,8 @@ for i in $(seq 0 $((source_count - 1))); do
       rewrite_pass ".claude/skills/$from_basename/"
     fi
 
-    # Argument-token escape: `$0`-`$9` and `$ARGUMENTS` -> `\$0`-`\$9`, `\$ARGUMENTS`.
+    # Argument-token escape: `$0`-`$9` -> `\$0`-`\$9` in a SKILL.md that takes no
+    # arguments.
     #
     # Claude Code substitutes argument tokens into a SKILL.md body at load time —
     # model-invoked as well as slash-invoked — and a skill loaded with no arguments
@@ -286,19 +287,45 @@ for i in $(seq 0 $((source_count - 1))); do
     # SKILL.md only. Sibling references/*.md are pulled in with the Read tool at
     # runtime, which returns raw bytes and never substitutes, so escaping them
     # would only plant a stray backslash in text the model is meant to copy.
-    if grep -qE '\\\\\$([0-9]|ARGUMENTS)' "$dst_path/SKILL.md"; then
+    if grep -qE '\\\\\$[0-9]' "$dst_path/SKILL.md"; then
       echo "    error: upstream $to/SKILL.md has two or more backslashes before an" >&2
       echo "           argument token. Claude Code cannot render that text — see the" >&2
       echo "           argument-token comment in scripts/sync-vendored.sh. Fix by hand." >&2
       exit 1
     fi
 
-    # `(?<!\\)\$(?=[0-9]|ARGUMENTS)` is the mirror image of the regex the loader
-    # itself uses to FIND escapes — `(?<!\\)\\\$(?=\d|ARGUMENTS)` — so we insert
-    # exactly what it looks for, and only where it is missing. Both assertions are
-    # zero-width: the `$` is the whole match, so nothing between two adjacent
-    # tokens is consumed and `$1$2` escapes both. (A `sed` left-context group,
-    # having no lookbehind, would eat the boundary and miss the second.)
+    # Escaping only makes sense for a skill that never takes arguments. In one that
+    # does, `$N` is a placeholder, not a literal, and escaping it would sever the
+    # skill from its own input — a silent break, and the drift check would stay
+    # green right through it, because CI only asks whether the sync reproduces the
+    # committed bytes, never whether those bytes still work.
+    #
+    # A skill advertises arguments in two ways: `argument-hint` / `arguments` in
+    # the frontmatter, or `$ARGUMENTS` in the body (which needs no declaration).
+    # Either way its tokens are load-bearing, so leave the whole file alone. Note
+    # this is also why `$ARGUMENTS` itself is never escaped: in a third-party skill
+    # body it is far likelier to be a deliberate placeholder than a literal, and a
+    # literal `$ARGUMENTS` is not a thing these skills write.
+    #
+    # Nothing upstream is in this position today — 0 of 77 declare `arguments:` or
+    # reference `$ARGUMENTS`, and `designer/impeccable`, the only one with an
+    # `argument-hint`, uses no token at all. The check is here because this pass is
+    # what introduces the hazard: before it, no rewrite could break a vendored
+    # skill; after it, one silently could.
+    takes_args=0
+    if awk 'NR==1 && /^---$/ { fm=1; next } fm && /^---$/ { exit } fm' "$dst_path/SKILL.md" \
+         | grep -qE '^(arguments|argument-hint):'; then
+      takes_args=1
+    elif grep -q '\$ARGUMENTS' "$dst_path/SKILL.md"; then
+      takes_args=1
+    fi
+
+    # `(?<!\\)\$(?=[0-9])` is the mirror image of the regex the loader itself uses
+    # to FIND escapes — `(?<!\\)\\\$(?=\d|ARGUMENTS)` — so we insert exactly what it
+    # looks for, and only where it is missing. Both assertions are zero-width: the
+    # `$` is the whole match, so nothing between two adjacent tokens is consumed and
+    # `$1$2` escapes both. (A `sed` left-context group, having no lookbehind, would
+    # eat the boundary and miss the second.)
     #
     # What keeps the drift check green is determinism, not idempotency: `rm -rf` +
     # `cp -R` above re-copies pristine upstream on every run, so this pass never
@@ -306,8 +333,12 @@ for i in $(seq 0 $((source_count - 1))); do
     #
     # The grep guard mirrors rewrite_pass: a file with no token at all is not
     # rewritten at all, so it stays byte-for-byte as upstream wrote it.
-    if grep -qE '\$([0-9]|ARGUMENTS)' "$dst_path/SKILL.md"; then
-      perl -pe 's/(?<!\\)\$(?=[0-9]|ARGUMENTS)/\\\$/g' "$dst_path/SKILL.md" > "$dst_path/SKILL.md.tmp" \
+    if [[ "$takes_args" -eq 1 ]]; then
+      if grep -qE '\$[0-9]' "$dst_path/SKILL.md"; then
+        echo "    note: $to takes arguments — \$N left unescaped (placeholders, not literals)"
+      fi
+    elif grep -qE '\$[0-9]' "$dst_path/SKILL.md"; then
+      perl -pe 's/(?<!\\)\$(?=[0-9])/\\\$/g' "$dst_path/SKILL.md" > "$dst_path/SKILL.md.tmp" \
         || { echo "    error: token escape failed for $dst_path/SKILL.md" >&2; rm -f "$dst_path/SKILL.md.tmp"; exit 1; }
       mv "$dst_path/SKILL.md.tmp" "$dst_path/SKILL.md" \
         || { echo "    error: mv failed for $dst_path/SKILL.md" >&2; rm -f "$dst_path/SKILL.md.tmp"; exit 1; }
@@ -334,9 +365,9 @@ edits will be overwritten on the next \`scripts/sync-vendored.sh\` run.
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter \`name:\` is
 normalized to the folder name; bundled-script paths are rewritten to
-\`"\${CLAUDE_SKILL_DIR}/"\`; argument tokens (\`\$0\`-\`\$9\`,
-\`\$ARGUMENTS\`) in \`SKILL.md\` are escaped as \`\\\$…\` so Claude Code does
-not substitute them into the body at load time; and
+\`"\${CLAUDE_SKILL_DIR}/"\`; argument tokens (\`\$0\`-\`\$9\`) in a
+\`SKILL.md\` that takes no arguments are escaped as \`\\\$0\`-\`\\\$9\`, so
+Claude Code does not substitute them into the body at load time; and
 \`disable-model-invocation\` is injected when the manifest asks for it. See
 \`scripts/sync-vendored.sh\` for the exact transformations and the reasons.
 
