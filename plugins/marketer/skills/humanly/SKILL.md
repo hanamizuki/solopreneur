@@ -33,10 +33,16 @@ When invoked before writing:
    - English → `references/generated/prewrite-en.md`
 3. Internalize the principles and examples, then proceed with the writing task
 
-The prewrite file already bundles the core principles, the highest-frequency
-patterns with before/after examples, the Tier 1 word table (plus banned
-sentence patterns for zh), and a one-line index of every pattern. Do NOT
+The prewrite file already bundles the core principles, the "examples teach shape,
+not license to fabricate" rule, the highest-frequency patterns with before/after
+examples, the Tier 1 word table (plus banned sentence patterns and the Taiwan
+localization rules for zh), and a one-line index of every pattern. Do NOT
 additionally load the full patterns file — it is for rewrite / review mode.
+
+The zh bundle carries the mainland→Taiwan vocabulary and full-width punctuation
+rules on purpose: the model's Chinese training data is mostly simplified, so it
+reaches for 視頻 / 質量 / half-width commas *while writing*. Catching that only in
+rewrite mode is catching it too late.
 
 ---
 
@@ -199,7 +205,7 @@ Seven source files, two generated files (built from four of them), one build scr
 | `references/word-table-{zh,en}.md` | **Source** — banned words (3 tiers); zh also holds banned sentence patterns. |
 | `references/context-profiles.md` | **Source** — tolerance matrix, shared across languages. |
 | `references/protected-list.md` | **Source** — fidelity: protected categories, never-invent rules, false positives. Shared across languages. |
-| `references/taiwan-localization.md` | **Source** — zh only: mainland→Taiwan vocabulary, punctuation, register. Not part of the prewrite build. |
+| `references/taiwan-localization.md` | **Source** — zh only: mainland→Taiwan vocabulary, punctuation, register. Its four composition-time sections are pulled into `prewrite-zh.md`; its two rewrite-only sections (按語境判斷的詞, 誤殺防護) are not. |
 | `references/generated/prewrite-{zh,en}.md` | **Generated — never hand-edit.** Built from patterns + word-table. |
 | `evals/benchmark.md` | Test cases guarding the pattern catalog and the fidelity layer. Run per `evals/run-eval.md` after changing any source file. |
 

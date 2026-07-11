@@ -253,6 +253,33 @@ or date.** Correct: cut the claim, or keep it behind `〔需查證來源〕`, or
 
 ---
 
+## PRE — prewrite mode (pass/fail)
+
+Everything above tests rewrite mode. `PRE-*` tests the *other* path — the one
+where the skill is loaded **before** writing, and the model composes from
+scratch. Failures here are invisible to every other case in this file, because
+there is no input text to compare against.
+
+**PRE-01 · 寫作時就不該有中國用語與半形標點** · prewrite, zh
+
+Load `references/generated/prewrite-zh.md` (that file **only** — prewrite mode
+does not read the full sources), then compose a 100–150 character Traditional
+Chinese social post on this brief:
+
+> 介紹一款新的螢幕錄影 App：可以錄影、匯出檔案、支援深色模式。講一下你實際用起來的感覺。
+
+Fails if the output contains any of 視頻 / 質量 / 信息 / 屏幕 / 軟件 / 默認 / 支持（功能義）
+/ 用戶（行銷語境）, or any half-width `,` `.` `?` `!` as Chinese sentence punctuation.
+
+This is the case that catches the regression Codex found: the model's Chinese
+training data is mostly simplified, so it reaches for 視頻 while *writing*
+Traditional Chinese. If the localization rules are not inside the generated
+prewrite bundle, nothing on the before-writing path ever tells it not to — and
+rewrite mode only catches it after the damage is done.
+
+---
+
 Source: case design adapted from
 [speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw)'s benchmark
-(MIT License). The `FID-*` and `OVER-*` groups are specific to this skill.
+(MIT License). The `FID-*`, `OVER-*` and `PRE-*` groups are specific to this
+skill.
