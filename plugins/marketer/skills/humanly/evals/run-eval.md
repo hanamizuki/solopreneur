@@ -16,8 +16,8 @@ still *behaves*.
 ## Procedure
 
 Run each case in a **fresh subagent** — one case per agent, no shared context. One
-agent running all 27 in a single session will pattern-match on the earlier cases
-and score better than the skill deserves.
+agent running the whole suite in a single session will pattern-match on the
+earlier cases and score better than the skill deserves.
 
 Prompt per case:
 
