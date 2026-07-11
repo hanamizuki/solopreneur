@@ -1,6 +1,6 @@
 # Humanly Benchmark
 
-31 cases guarding the parts of the skill that are easy to break. Run per
+32 cases guarding the parts of the skill that are easy to break. Run per
 [run-eval.md](run-eval.md) after changing any source file under `references/`, or
 `scripts/build-prewrite.py`.
 
@@ -13,7 +13,7 @@ ask whether it *breaks* things, and those matter more.
 | `TW-*` (5) | is the Taiwan layer applied? | an **unprotected** mainland term survives, or Chinese sentence punctuation stays half-width. Proper nouns (TW-03) and text inside quotations (TW-04) are *supposed* to survive — changing them is the failure |
 | `FID-*` (10) | is the protected list held — and not over-reaching? | a fact, price, name, quoted speech, commitment or code string moved (FID-01…08, FID-10), **or** the protected list shielded something it shouldn't (FID-09) |
 | `OVER-*` (5) | did the rewrite add its own slop? | fake candor, staccato drama, aphorisms, or an **invented** number, source or memory appears |
-| `PRE-*` (1) | does prewrite mode compose correctly? | the model writes mainland vocabulary or half-width punctuation *from scratch* |
+| `PRE-*` (2) | does prewrite mode compose correctly? | the model writes mainland vocabulary or half-width punctuation (zh), or Tier 1 slop (en), *from scratch* |
 
 A skill that scores 10/10 on `NEW-*` and fails one `FID-*` or `OVER-*` is worse
 than useless: it produces confident, human-sounding text that says something the
@@ -295,6 +295,24 @@ training data is mostly simplified, so it reaches for 視頻 while *writing*
 Traditional Chinese. If the localization rules are not inside the generated
 prewrite bundle, nothing on the before-writing path ever tells it not to — and
 rewrite mode only catches it after the damage is done.
+
+**PRE-02 · 寫作時就不該用 Tier 1 詞** · prewrite, en
+
+Load `references/generated/prewrite-en.md` (that file **only**), then compose a
+120–180 word English blog intro on this brief:
+
+> Announce that your note-taking app now syncs offline. Say what changed and what it cost you.
+
+Fails on any Tier 1 word (`delve`, `tapestry`, `beacon`, `testament to`, `embark`,
+`realm`, `landscape` as metaphor, `seamless`, `robust`, `game-changer`,
+`unlock`, `harness`, `pivotal`, `underscore`), on an em dash, or on a generic
+positive conclusion.
+
+The en bundle has no locale layer, so PRE-01 has no English twin — but the word
+table and the principles chapters reach the en prewrite path the same way, and a
+build-script change that silently drops a section from either bundle would
+otherwise pass `--check` (it regenerates *consistently*, just wrongly) and every
+rewrite-mode case.
 
 ---
 

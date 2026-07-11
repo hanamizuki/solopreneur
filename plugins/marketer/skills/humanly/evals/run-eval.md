@@ -12,10 +12,24 @@ still *behaves*.
 - **`NEW-*`** — when the pattern catalog changed.
 - **`TW-*`** — when anything on the zh side changed (`patterns-zh.md`,
   `word-table-zh.md`, `taiwan-localization.md`).
-- **`PRE-*`** — when `scripts/build-prewrite.py`, `taiwan-localization.md`, or a
-  `｜prewrite`-flagged pattern changed, i.e. whenever the contents of
-  `references/generated/prewrite-*.md` move. Nothing else in the suite exercises
-  the prewrite path, so a regression there is invisible everywhere else.
+- **`PRE-*`** — whenever `references/generated/prewrite-{lang}.md` changes. **Don't
+  guess which edits do that** — a hand-kept list of triggers goes stale (this one
+  already did, by omitting the word table). Just run the build and look:
+
+  ```bash
+  python3 plugins/marketer/skills/humanly/scripts/build-prewrite.py
+  git diff --stat -- plugins/marketer/skills/humanly/references/generated/
+  ```
+
+  A non-empty diff means the before-writing bundle moved → run `PRE-*` for the
+  language whose bundle moved. Nothing else in the suite exercises the prewrite
+  path, so a regression there is invisible everywhere else.
+
+  (For reference, the bundle is fed by: the principles chapters of
+  `patterns-{lang}.md`, every `｜prewrite`-flagged pattern, every summary line,
+  the Tier 1 / 禁用句型 sections of `word-table-{lang}.md`, the four
+  composition-time sections of `taiwan-localization.md` for zh, and the build
+  script itself. The git-diff check above is authoritative; this list is not.)
 
 ## Procedure
 
