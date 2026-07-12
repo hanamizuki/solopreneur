@@ -50,10 +50,15 @@ jobs:
           # generator can also CREATE files (a plugin newly added to the
           # marketplace gets a fresh .codex-plugin/plugin.json), and untracked
           # files are invisible to `git diff`.
-          drift="$(git status --porcelain -- 'plugins/*/.codex-plugin' '.agents' '.codex')"
+          #
+          # The wildcard pathspec needs the trailing `/**`: a git pathspec is
+          # matched against the full file path, so 'plugins/*/.codex-plugin'
+          # alone matches zero tracked files and would wave modified manifests
+          # through. (Literal dir pathspecs like '.agents' match recursively.)
+          drift="$(git status --porcelain -- 'plugins/*/.codex-plugin/**' '.agents' '.codex')"
           if [[ -n "$drift" ]]; then
             echo "$drift"
-            git diff -- 'plugins/*/.codex-plugin' '.agents' '.codex'
+            git diff -- 'plugins/*/.codex-plugin/**' '.agents' '.codex'
             echo "::error::Generated Codex surfaces drift from their sources of truth."
             echo "::error::Re-run ./scripts/generate-codex-manifests.sh and commit the result."
             exit 1

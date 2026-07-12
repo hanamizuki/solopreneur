@@ -71,7 +71,30 @@ if [[ -n "$overlay_mismatch" ]]; then
   exit 1
 fi
 
+# Overlays own Codex-only fields, nothing else. The merge below is
+# right-biased (`+ $overlay`), so a reserved key in an overlay entry would
+# silently replace the value copied from the Claude manifest — breaking
+# version lockstep or the hooks guard while the drift check stays green.
+# Refuse loudly instead.
+reserved=$(jq -r '
+  to_entries[]
+  | .key as $plugin
+  | .value
+  | keys[]
+  | select(. as $k | ["name", "version", "description", "license", "hooks"] | index($k))
+  | "\($plugin): \(.)"' "$OVERLAYS")
+if [[ -n "$reserved" ]]; then
+  echo "error: scripts/codex-manifest-overlays.json sets fields owned by the Claude manifest:" >&2
+  echo "$reserved" | sed 's/^/       /' >&2
+  exit 1
+fi
+
 # --- Surface 1: per-plugin .codex-plugin/plugin.json ------------------------
+# Removed first, then rebuilt from the current marketplace list, so a plugin
+# dropped from the marketplace loses its manifest (the deletion shows up as
+# drift). Skipping the removal would leave the stale file committed and the
+# drift check green — the same rebuild-from-scratch reasoning as surface 3.
+rm -rf "$REPO_ROOT"/plugins/*/.codex-plugin
 for name in "${plugins[@]}"; do
   claude_manifest="$REPO_ROOT/plugins/$name/.claude-plugin/plugin.json"
   if [[ ! -f "$claude_manifest" ]]; then
