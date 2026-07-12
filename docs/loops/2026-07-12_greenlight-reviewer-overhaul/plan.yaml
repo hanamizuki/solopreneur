@@ -1,0 +1,32 @@
+# Orchestration plan: greenlight reviewer overhaul + naming agy migration
+name: "Greenlight reviewer overhaul"
+source_todo: "todos/backlog/2026-07-12_greenlight-reviewer-overhaul.md"
+created_at: "2026-07-12"
+
+prs:
+  - id: pr1
+    branch: feature/greenlight-reviewer-overhaul
+    title: "feat(greenlight): reviewer registry + activity detection + agy migration"
+    type: code
+    subagent: ai-engineer
+    depends_on: []
+    spec: pr1-greenlight-overhaul.md
+    files:
+      - plugins/solopreneur/skills/greenlight/SKILL.md
+      - plugins/solopreneur/shared/config.md
+      - plugins/solopreneur/skills/merge-pr/SKILL.md
+      - plugins/solopreneur/skills/todos-babysit/SKILL.md
+      - plugins/solopreneur/skills/todos-cleanup/SKILL.md
+      - plugins/solopreneur/skills/worktree-handoff/SKILL.md
+      - plugins/solopreneur/skills/preview/SKILL.md
+      - README.md
+
+  - id: pr2
+    branch: feature/naming-agy
+    title: "fix(naming): migrate dead gemini CLI to agy"
+    type: code
+    subagent: marketer
+    depends_on: []
+    spec: pr2-naming-agy.md
+    files:
+      - plugins/marketer/skills/naming/SKILL.md
