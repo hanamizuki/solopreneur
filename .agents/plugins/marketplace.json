@@ -5,43 +5,78 @@
       "name": "solopreneur",
       "description": "Core skills: plan review, code review loops, backlog management, and thinking partners.",
       "license": "MIT",
-      "source": "./plugins/solopreneur"
+      "source": "./plugins/solopreneur",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
     },
     {
       "name": "designer",
       "description": "UI/UX design expertise. Ships the designer agent and 10 vendored third-party design skills (taste-* archetype family + impeccable).",
       "license": "MIT",
-      "source": "./plugins/designer"
+      "source": "./plugins/designer",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Design"
     },
     {
       "name": "ios-dev",
       "description": "iOS/macOS SwiftUI expertise. Ships the ios-dev agent, ios-patterns, ios-app-templates (reference apps), and 23 vendored third-party skills (iphone-apps + asc-* App Store Connect CLI).",
       "license": "MIT",
-      "source": "./plugins/ios-dev"
+      "source": "./plugins/ios-dev",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
     },
     {
       "name": "android-dev",
       "description": "Android/Kotlin expertise. Ships the android-dev agent, android-patterns, and 39 vendored third-party skills (Compose / architecture / Gradle + 18 gplay-* Google Play Console CLI + 6 official Android team skills).",
       "license": "MIT",
-      "source": "./plugins/android-dev"
+      "source": "./plugins/android-dev",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
     },
     {
       "name": "ai-engineer",
       "description": "AI / LLM application engineering expertise. Ships the ai-engineer agent plus in-house skills (langgraph, ai-app-templates) and 1 vendored skill (senior-prompt-engineer) for production LLM systems, RAG, agents, and prompt design.",
       "license": "MIT",
-      "source": "./plugins/ai-engineer"
+      "source": "./plugins/ai-engineer",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
     },
     {
       "name": "marketer",
       "description": "Marketing / brand / writing expertise. Ships the marketer agent plus GTM strategy, naming, X/Twitter & LinkedIn growth, AI-pattern removal, and brand-aware slide design.",
       "license": "MIT",
-      "source": "./plugins/marketer"
+      "source": "./plugins/marketer",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Marketing"
     },
     {
       "name": "neo4j-dev",
       "description": "Neo4j graph database expertise. Ships the neo4j-dev agent and 4 vendored third-party skills (cypher / cypher-guide / migration / cli-tools).",
       "license": "MIT",
-      "source": "./plugins/neo4j-dev"
+      "source": "./plugins/neo4j-dev",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
     }
   ]
 }

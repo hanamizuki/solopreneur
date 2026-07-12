@@ -149,9 +149,15 @@ Generated `plugins/<n>/.codex-plugin/plugin.json`:
 
 Generated `.agents/plugins/marketplace.json` lists all seven plugins with
 `./plugins/<name>` sources, mirroring `.claude-plugin/marketplace.json`
-entries (name, description, license, source). Local development installs
-from the working tree via this file; end users add the GitHub repo,
-optionally pinned `@<plugin>--v<version>`.
+entries (name, description, license, source). Each entry additionally
+carries the fields the Codex marketplace contract asks for ("Always
+include `policy.installation`, `policy.authentication`, and `category`"):
+a uniform `policy` of `AVAILABLE` / `ON_INSTALL`, and `category` reused
+from the plugin's overlay `interface.category` (single source, no
+duplication). The CLI installs entries without these fields; directory-
+style consumers may enforce the documented contract. Local development
+installs from the working tree via this file; end users add the GitHub
+repo, optionally pinned `@<plugin>--v<version>`.
 
 Pinning caveat: a marketplace ref freezes the **whole repo snapshot** at
 that commit, so pinning one plugin's tag also freezes the other six at

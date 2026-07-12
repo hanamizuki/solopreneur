@@ -15,7 +15,12 @@
 #   2. .agents/plugins/marketplace.json — mirrors .claude-plugin/
 #      marketplace.json entries (name, description, license, source); the
 #      `./plugins/<name>` sources make the working tree installable as a
-#      local Codex marketplace.
+#      local Codex marketplace. Each entry also carries the fields the
+#      Codex marketplace contract asks for ("Always include
+#      policy.installation, policy.authentication, and category"): a
+#      uniform policy, and category taken from the plugin's overlay
+#      interface — the CLI installs entries without them, but directory-
+#      style consumers may enforce the documented contract.
 #   3. .codex/agents/*.toml — copies of plugins/*/agents/*.toml so Codex
 #      picks the agents up natively for in-repo development. No TOMLs exist
 #      until rollout PR 5a, so this step is a no-op that produces no
@@ -89,6 +94,16 @@ if [[ -n "$reserved" ]]; then
   exit 1
 fi
 
+# The marketplace entries below take their `category` from the overlay's
+# interface, so every overlay entry must carry one — a null category would
+# generate a marketplace that violates the documented contract.
+no_category=$(jq -r 'to_entries[] | select(.value.interface.category == null) | .key' "$OVERLAYS")
+if [[ -n "$no_category" ]]; then
+  echo "error: overlay entries missing interface.category:" >&2
+  echo "$no_category" | sed 's/^/       /' >&2
+  exit 1
+fi
+
 # --- Surface 1: per-plugin .codex-plugin/plugin.json ------------------------
 # Removed first, then rebuilt from the current marketplace list, so a plugin
 # dropped from the marketplace loses its manifest (the deletion shows up as
@@ -117,9 +132,18 @@ for name in "${plugins[@]}"; do
 done
 
 # --- Surface 2: .agents/plugins/marketplace.json -----------------------------
+# policy is uniform: every plugin is plainly installable and has nothing to
+# authenticate beyond install time (no MCP servers shipped today). category
+# reuses the overlay's interface.category rather than duplicating it.
 mkdir -p "$(dirname "$CODEX_MARKETPLACE")"
-jq '{name, plugins: [.plugins[] | {name, description, license, source}]}' \
-  "$CLAUDE_MARKETPLACE" > "$CODEX_MARKETPLACE"
+jq --slurpfile ovl "$OVERLAYS" '{
+  name,
+  plugins: [.plugins[] | {
+    name, description, license, source,
+    policy: {installation: "AVAILABLE", authentication: "ON_INSTALL"},
+    category: $ovl[0][.name].interface.category
+  }]
+}' "$CLAUDE_MARKETPLACE" > "$CODEX_MARKETPLACE"
 echo "generated: .agents/plugins/marketplace.json"
 
 # --- Surface 3: .codex/agents/*.toml -----------------------------------------
