@@ -49,6 +49,21 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 **Be specific about feelings.** Instead of "this is concerning," write "there's something unsettling about agents churning away at 3am while nobody's watching."
 
+**Let the information density be uneven.** The line above is about sentence length; this one is about how much space you give things. AI lays every point out at equal length. A person remembers an example halfway through, spends three paragraphs on it, then comes back. Those disproportionate stretches are the parts readers remember. Find the one point you actually have something to say about and give it twice the room.
+
+**You're allowed to not land it.** The model is afraid of an ending that isn't an ending, so it stamps one on. Once you cut the canned sign-off you do not have to supply a replacement. Stopping on the last concrete sentence is fine. So is stopping somewhere you haven't figured out yet ("I've run this for three months. Whether I keep it next month, no idea."). The exception: support replies, notices and reports carry responsibility in their conclusion, so they need one.
+
+### The four don'ts (guardrails on the above)
+
+The six moves above are **directions, not material**. These four exist because "add voice" is the instruction models most often over-execute — performing humanity is just a different flavor of slop:
+
+- **Don't manufacture aphorisms.** Rhythm comes from cutting filler and keeping the point, not from squeezing a quotable line out of every paragraph ending (core rule 5).
+- **Don't perform casualness.** Sprinkling "honestly," "look," and "I mean" into every sentence is as fake as mechanical parallelism. Colloquial fragments are the author's to keep, not yours to add.
+- **Don't perform uncertainty.** Bolting on "I still haven't figured this out" as an ending is the same move as bolting on "In conclusion" — just aimed the other way. Write uncertainty only where it's real; write a change of mind only where one happened.
+- **Don't sacrifice accuracy to sound human.** Technical writing gets to be technical. Precise terms, formal clauses and complete explanations don't need more voice. The target is templated and performative writing, not professionalism.
+
+**The line: the voice belongs to the author, not to you.** When a passage needs a concrete example, a position, or a turning point and the author never gave you one, leave `(needs author input: what did you actually do here?)` — **do not invent one**. A fabricated "I was wrong about this for two years" is far worse than the empty sentence it replaced: empty is boring, invented is a lie told in someone else's name. Full rules in `protected-list.md`.
+
 ### Before (clean but soulless):
 > The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.
 
@@ -76,6 +91,27 @@ Quick pass after writing:
 - Mix short sentences (3-8 words) with long ones (20+). Fragments are fine.
 - Vary paragraph length. Some paragraphs are one sentence. Others need room.
 - If text-to-speech could read it without pausing, it's too uniform.
+
+---
+
+## How to Read the "After" Examples (they are not a license to fabricate)
+
+Every "After" below shows what a sentence looks like **once the author has
+supplied the material**. They routinely carry specifics the "Before" never had
+("80 people showed up", "three new IT parks", "a 2019 survey by the Chinese
+Academy of Sciences"). That is there to show you the **target shape** — it is
+**not permission to manufacture one**.
+
+When writing or rewriting, if cutting the filler leaves a hole and the author
+never gave you what fills it:
+
+- Missing fact → leave `(needs author input: …)` in place. Do not copy the
+  example and invent a convincing number.
+- Missing source → leave `[source unverified]`. Do not invent a real-sounding
+  institution (see #39).
+
+**The examples teach shape; facts come only from the author.** Full rules:
+Never Invent in `protected-list.md`.
 
 ---
 
@@ -682,6 +718,59 @@ Summary: "on the surface X, deeper down Y" / "the real problem is" fakes insight
 
 ---
 
+### 39. Hallucinated Citations
+
+Summary: a decimal-precise study that doesn't exist, a quote pinned on the wrong person — mark `[source unverified]` and hand it back, never verify or invent for the author
+
+**Watch for:** decimal-precise research figures with no traceable study ("productivity rose 47.3%"), famous quotes attributed to the wrong person, book citations with no page number, dead links, institution names that sound real but have no source
+
+**Problem:** The sibling of #5, and the worse one. #5 withholds the source ("experts believe"); this one supplies a source that looks specific and does not exist. False precision is harder to catch than vagueness and does more damage to the author's credibility.
+
+**Before:**
+> A Harvard study found that workers using a note-taking system are 47.3% more productive. As Einstein said, "Compound interest is the eighth wonder of the world."
+
+**After:**
+> [source unverified] A Harvard study found that workers using a note-taking system are 47.3% more productive.
+> [source unverified] As Einstein said, "Compound interest is the eighth wonder of the world."
+
+Both sentences survive **verbatim**; only the marker is added. Note that "this quote is actually misattributed" is *your* finding, not the author's text — put it in the delivery notes, never in the prose in place of the original.
+
+**Action:** Keep the suspect sentence **verbatim**, prefix it with `[source unverified]`, hand it back to the author. Do not delete it, do not go verify it, do not invent a source, and do not swap in another equally suspect one. Fact-checking is out of scope for this skill — flagging it *is* the correct delivery.
+
+---
+
+### 40. AI Tool Residue
+
+Summary: `utm_source=chatgpt.com` and `turn0search0` are hard proof of unproofread AI output; grep before publishing
+
+**Watch for (hard evidence, clear these first):**
+- Link parameters: `utm_source=chatgpt.com`, `utm_source=openai`, `utm_source=copilot.com`, `utm_source=perplexity`, `referrer=grok.com`
+- Citation placeholder codes: `turn0search0`, `citeturn0news0` and similar residue containing private-use Unicode characters
+- Pasted chat frame: "Here's the cleaned-up version, ready to copy:" (the copy-paste form of #19)
+
+**Action:** Strip the parameters and residue, keep the link itself. The author's own marketing parameters (`utm_source=newsletter`) are protected — see `protected-list.md`.
+
+**How to check:** Before publishing, search for `utm_source=`, `turn0`, `citeturn`. This is the one pattern in the catalog that can be caught mechanically. Don't skip it.
+
+---
+
+### 41. Unfilled Template Placeholders
+
+Summary: `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the author, never fill them in
+
+**Watch for:** `[Product Name]`, `[insert case study here]`, `[Company]`, `XX Corp`, `{{name}}`, `<your name>`
+
+**Problem:** The most embarrassing tell of all. It means nobody read the draft before it shipped.
+
+**Action:** Flag each one for the author to fill. **Do not fill them in yourself** — guessing a placeholder is inventing a fact (see Never Invent in `protected-list.md`).
+
+**False-positive boundary:** Two things look like placeholders and are not.
+
+- **A merge tag in a template is the feature, not an omission.** `{{name}}`, `{{first_name}}`, Liquid/Handlebars variables, placeholders inside code blocks — all pass. Only flag placeholders in *finished copy*. The test: is this text meant to be *sent*, or meant to have *data poured into it*?
+- **Deliberate anonymization is not an omission.** "my last job at [Company]", "one client", "Person A". Asking the author to fill these in is asking them to de-anonymize. Pass.
+
+---
+
 ## Full Example
 
 **Before (AI-sounding):**
@@ -705,5 +794,7 @@ Summary: "on the surface X, deeper down Y" / "the real problem is" fakes insight
 ## Reference
 
 This guide is based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup. The patterns documented there come from observations of thousands of instances of AI-generated text on Wikipedia.
+
+Patterns #39–#41 are adapted from [speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw) (MIT License).
 
 Sources: [blader/humanizer](https://github.com/blader/humanizer), [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop)

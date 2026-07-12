@@ -44,6 +44,21 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 **Be specific about feelings.** Instead of "this is concerning," write "there's something unsettling about agents churning away at 3am while nobody's watching."
 
+**Let the information density be uneven.** The line above is about sentence length; this one is about how much space you give things. AI lays every point out at equal length. A person remembers an example halfway through, spends three paragraphs on it, then comes back. Those disproportionate stretches are the parts readers remember. Find the one point you actually have something to say about and give it twice the room.
+
+**You're allowed to not land it.** The model is afraid of an ending that isn't an ending, so it stamps one on. Once you cut the canned sign-off you do not have to supply a replacement. Stopping on the last concrete sentence is fine. So is stopping somewhere you haven't figured out yet ("I've run this for three months. Whether I keep it next month, no idea."). The exception: support replies, notices and reports carry responsibility in their conclusion, so they need one.
+
+### The four don'ts (guardrails on the above)
+
+The six moves above are **directions, not material**. These four exist because "add voice" is the instruction models most often over-execute — performing humanity is just a different flavor of slop:
+
+- **Don't manufacture aphorisms.** Rhythm comes from cutting filler and keeping the point, not from squeezing a quotable line out of every paragraph ending (core rule 5).
+- **Don't perform casualness.** Sprinkling "honestly," "look," and "I mean" into every sentence is as fake as mechanical parallelism. Colloquial fragments are the author's to keep, not yours to add.
+- **Don't perform uncertainty.** Bolting on "I still haven't figured this out" as an ending is the same move as bolting on "In conclusion" — just aimed the other way. Write uncertainty only where it's real; write a change of mind only where one happened.
+- **Don't sacrifice accuracy to sound human.** Technical writing gets to be technical. Precise terms, formal clauses and complete explanations don't need more voice. The target is templated and performative writing, not professionalism.
+
+**The line: the voice belongs to the author, not to you.** When a passage needs a concrete example, a position, or a turning point and the author never gave you one, leave `(needs author input: what did you actually do here?)` — **do not invent one**. A fabricated "I was wrong about this for two years" is far worse than the empty sentence it replaced: empty is boring, invented is a lie told in someone else's name. Full rules in `../protected-list.md`.
+
 ### Before (clean but soulless):
 > The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.
 
@@ -71,6 +86,27 @@ Quick pass after writing:
 - Mix short sentences (3-8 words) with long ones (20+). Fragments are fine.
 - Vary paragraph length. Some paragraphs are one sentence. Others need room.
 - If text-to-speech could read it without pausing, it's too uniform.
+
+---
+
+## How to Read the "After" Examples (they are not a license to fabricate)
+
+Every "After" below shows what a sentence looks like **once the author has
+supplied the material**. They routinely carry specifics the "Before" never had
+("80 people showed up", "three new IT parks", "a 2019 survey by the Chinese
+Academy of Sciences"). That is there to show you the **target shape** — it is
+**not permission to manufacture one**.
+
+When writing or rewriting, if cutting the filler leaves a hole and the author
+never gave you what fills it:
+
+- Missing fact → leave `(needs author input: …)` in place. Do not copy the
+  example and invent a convincing number.
+- Missing source → leave `[source unverified]`. Do not invent a real-sounding
+  institution (see #39).
+
+**The examples teach shape; facts come only from the author.** Full rules:
+Never Invent in `../protected-list.md`.
 
 ---
 
@@ -301,3 +337,6 @@ Full definitions and before/after examples: `../patterns-en.md`.
 - #36 Rewrite-vs-Patch Threshold — 5+ word flags, 3+ pattern categories, uniform rhythm → rewrite, don't patch
 - #37 Therapy-Speak (Emotional Validation) — don't certify feelings ("your anxiety is valid" → "of course you're anxious"); cut absolving lines
 - #38 Reframing as a Substitute for Reasoning — "on the surface X, deeper down Y" / "the real problem is" fakes insight through tone escalation; cut the frame, add the reasoning
+- #39 Hallucinated Citations — a decimal-precise study that doesn't exist, a quote pinned on the wrong person — mark `[source unverified]` and hand it back, never verify or invent for the author
+- #40 AI Tool Residue — `utm_source=chatgpt.com` and `turn0search0` are hard proof of unproofread AI output; grep before publishing
+- #41 Unfilled Template Placeholders — `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the author, never fill them in

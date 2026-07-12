@@ -25,7 +25,7 @@ Rules not listed apply at full strength across all profiles.
 | Rule | social | social-zh | blog | technical-blog | investor-email | docs | support-email | casual |
 |------|--------|-----------|------|----------------|----------------|------|---------------|--------|
 | Em dashes | relaxed (2/post) | **strict (zero)** | strict | strict | strict | relaxed | strict | skip |
-| Semicolons / colons | relaxed | **strict (zero)** | strict | strict | strict | relaxed | relaxed | skip |
+| Semicolons / announcement colons† | relaxed | **strict (zero)** | strict | strict | strict | relaxed | relaxed | skip |
 | Bold overuse | relaxed | relaxed | strict | strict | strict | relaxed | skip | skip |
 | Emoji in headers | relaxed (1-2 OK) | relaxed (1-2 OK) | strict | strict | strict | skip | skip | skip |
 | Excessive bullets | skip | skip | strict | relaxed | strict | skip | skip | skip |
@@ -43,8 +43,18 @@ Rules not listed apply at full strength across all profiles.
 
 *Technical-blog word table exceptions: `robust`, `comprehensive`, `seamless`, `ecosystem`, `leverage` (platform APIs), `facilitate`, `underpin`, `streamline` are legitimate in technical context. Still flag: `delve`, `tapestry`, `beacon`, `embark`, `testament to`, `game-changer`, `harness`.
 
+† **Colons: only the announcement colon is banned**, in every profile including
+`social-zh`'s "zero" — 「重點是：」 / "Here's the thing:". The colon that introduces
+quoted speech (他說：「⋯⋯」 / She said: "…") is required syntax and is never
+counted, least of all inside a quote, which is protected verbatim.
+
 **Extra strict** = flag even borderline instances.
 **Skip** = don't audit this category for this profile.
+
+**On the "Word table" row specifically**: `strict` means apply the three tiers
+*as the table defines them* — Tier 2 still needs 2+ in a paragraph to fire, Tier 3
+still needs high density. It does not promote every tier to always-replace.
+`relaxed` = Tier 1 only. `P0 only` = skip the word table.
 
 ## Auto-detection Cues
 

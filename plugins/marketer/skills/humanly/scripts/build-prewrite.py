@@ -50,6 +50,27 @@ CONFIGS = {
         "principles_start": "## 核心規則",
         "principles_end": "## 內容模式",
         "word_sections": ["## Tier 1 — 必換", "## 禁用句型 — 看到就刪"],
+        # Locale rules that bite at composition time, not just at rewrite time:
+        # the model's Chinese training data is mostly simplified, so it reaches
+        # for 視頻 / 質量 / half-width punctuation while *writing* Traditional
+        # Chinese. Those sections have to be in the prewrite brief or the rule
+        # only ever fires after the damage is done. The rewrite-only sections of
+        # taiwan-localization.md (誤殺防護, 按語境判斷的詞) stay out — they say "do
+        # not wrongly *change* X", which is meaningless with no source text yet.
+        # A rule that belongs on both paths goes in the substitution table (a
+        # qualified row), not in 按語境判斷的詞 — otherwise it never reaches the
+        # writer. Anything PRE-01 fails on must be reachable from this list.
+        "extra_sources": [
+            (
+                "taiwan-localization.md",
+                [
+                    "## 中國用語替換表",
+                    "## 全形標點規則",
+                    "## 引號規則",
+                    "## 台灣語感校準",
+                ],
+            ),
+        ],
         "title": "# 中文寫作 Prewrite（寫作前必讀）",
         "intro": (
             "寫作前讀完這一份就好。原則與範例用來內化語感，詞表與句型看到就避開。"
@@ -81,9 +102,20 @@ CONFIGS = {
 
 BANNER = (
     "<!-- AUTO-GENERATED — DO NOT EDIT.\n"
-    "     Sources: ../{patterns} + ../{word_table}\n"
+    "     Sources: {sources}\n"
     "     Regenerate: python3 plugins/marketer/skills/humanly/scripts/build-prewrite.py -->\n"
 )
+
+# Sources live in references/; the generated files live in references/generated/.
+# A bare `sibling.md` link copied out of a source would resolve against
+# references/generated/ and point at nothing, so re-anchor it one level up.
+# The lookahead keeps this idempotent and leaves already-relative links
+# (`../patterns-zh.md`, written by this script's own intro/appendix) alone.
+SIBLING_LINK_RE = re.compile(r"`(?!\.\./)([A-Za-z0-9_-]+\.md)`")
+
+
+def reanchor_links(text):
+    return SIBLING_LINK_RE.sub(r"`../\1`", text)
 
 
 def fail(msg) -> NoReturn:
@@ -218,11 +250,26 @@ def build(lang):
         extract_section(word_lines, h, cfg["word_table"]) for h in cfg["word_sections"]
     ]
 
+    # Optional per-language extra sources (currently: the Taiwan locale rules
+    # that apply while composing, not only while rewriting).
+    extra_names = []
+    for fname, headings in cfg.get("extra_sources", []):
+        extra_path = REFERENCES / fname
+        if not extra_path.exists():
+            fail(f"source file not found: {extra_path}")
+        extra_lines = extra_path.read_text(encoding="utf-8-sig").splitlines()
+        for heading in headings:
+            word_blocks.append(extract_section(extra_lines, heading, fname))
+        extra_names.append(fname)
+
     picked = [e for e in entries if e["pre_write"]]
     if not picked:
         fail(f"{cfg['patterns']}: no pattern carries a prewrite flag")
 
-    out = [BANNER.format(patterns=cfg["patterns"], word_table=cfg["word_table"])]
+    sources = " + ".join(
+        f"../{name}" for name in [cfg["patterns"], cfg["word_table"], *extra_names]
+    )
+    out = [BANNER.format(sources=sources)]
     out.append(cfg["title"])
     out.append("")
     out.append(cfg["intro"])
@@ -250,7 +297,7 @@ def build(lang):
     for entry in entries:
         out.append(f"- #{entry['num']} {entry['title']} — {entry['summary']}")
     out.append("")
-    return "\n".join(out), len(entries), len(picked)
+    return reanchor_links("\n".join(out)), len(entries), len(picked)
 
 
 def parse_args():
