@@ -6,8 +6,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/alirezarezvani/claude-skills
 - **Source path**: `engineering-team/skills/senior-prompt-engineer`
 - **Pinned commit**: 4a3c05b69e64f4925f7fc65c88890f614f79caf0
-- **Synced at**: 2026-07-11T19:03:21Z
-- **License**: see `../_vendored/LICENSES/claude-skills-LICENSE`
+- **Synced at**: 2026-07-12T10:10:30Z
+- **License**: see `../../vendor/LICENSES/claude-skills-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is
@@ -18,5 +18,5 @@ Claude Code does not substitute them into the body at load time; and
 `disable-model-invocation` is injected when the manifest asks for it. See
 `scripts/sync-vendored.sh` for the exact transformations and the reasons.
 
-To update: edit `skills/_vendored/manifest.json` if needed, then re-run this
+To update: edit `vendor/manifest.json` if needed, then re-run this
 plugin's `./scripts/sync-vendored.sh`.

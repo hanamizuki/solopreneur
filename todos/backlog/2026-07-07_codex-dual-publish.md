@@ -83,7 +83,7 @@
 
 - [ ] Write the `.codex-plugin/plugin.json` generator (from `.claude-plugin/plugin.json` + `interface` overlay), generate all 7 manifests, and wire a CI drift check (mirror the validate-vendored pattern).
 - [ ] Add `.agents/plugins/marketplace.json` for Codex local/dev marketplace installation.
-- [ ] Move `skills/_vendored` → `plugins/<n>/vendor/` and `skills/_shared` → `plugins/solopreneur/shared/` — update `plugins/solopreneur/scripts/sync-vendored.sh`, `.github/workflows/{sync,validate}-vendored.yml`, 5 agent references, and 7 config.md references in the same change. Land AFTER the `$N escape` backlog todo (both touch sync-vendored.sh).
+- [x] Move `skills/_vendored` → `plugins/<n>/vendor/` and `skills/_shared` → `plugins/solopreneur/shared/` — update `plugins/solopreneur/scripts/sync-vendored.sh`, `.github/workflows/{sync,validate}-vendored.yml`, 5 agent references, and 7 config.md references in the same change. Land AFTER the `$N escape` backlog todo (both touch sync-vendored.sh). ✅ PR 3
 - [ ] Add Codex validation script for plugin manifests and skill directories.
 - [ ] Add dependency matrix for plugin deps, skill deps, agents/subagents, MCP/apps, external CLIs, env vars, sandbox/network assumptions.
 - [ ] Convert 6 Claude agents into Codex custom agent TOML (in-repo `.codex/agents/`) plus a bootstrap skill that installs them into `~/.codex/agents/`.

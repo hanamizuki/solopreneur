@@ -37,7 +37,7 @@ non-null wins:
 
 Existing configs on the old flat schema (`{ "todos": {...} }` at the
 top level) keep working via layer 5; migration is optional. See
-`plugins/solopreneur/skills/_shared/config.md` for the full helper
+`plugins/solopreneur/shared/config.md` for the full helper
 definitions and a sample migrated config.
 
 ## Versioning & release

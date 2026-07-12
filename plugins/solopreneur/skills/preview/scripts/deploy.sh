@@ -78,7 +78,7 @@ fi
 # --- repo identity for per-repo preview overrides ---
 # Anchored at $DIR, NOT cwd: deploy.sh's target dir is separate from the
 # directory it is invoked from, so the repo key must follow the proposal dir.
-# Mirrors _shared/config.md's solopreneur_repo_key but stays $DIR-anchored in
+# Mirrors shared/config.md's solopreneur_repo_key but stays $DIR-anchored in
 # the fallback too (origin URL normalized to host/owner/repo; else git toplevel
 # path; else $DIR's absolute path — NOT $PWD, which would be cwd-anchored and
 # contradict the anchoring above).
@@ -98,14 +98,14 @@ _preview_repo_key() {
 REPO_KEY="$(_preview_repo_key)"
 
 # --- read a preview config value: per-repo override -> user-global default ---
-# Cascade (first non-null wins), mirroring _shared/config.md layers 1-4:
+# Cascade (first non-null wins), mirroring shared/config.md layers 1-4:
 #   1. primary  .repos[<rk>].preview.<key>
 #   2. primary  .default.preview.<key>
 #   3. fallback .repos[<rk>].preview.<key>
 #   4. fallback .default.preview.<key>
 # Uses `| values` (NOT `// empty`) so a literal `false` (autoProtect:false) is
 # preserved rather than dropped as if unset — keep this value-semantics in
-# sync with _shared/config.md's reader. Reading per key (not the whole
+# sync with shared/config.md's reader. Reading per key (not the whole
 # `preview` subtree) is deliberate: it lets repos[<rk>].preview.path coexist
 # with these keys instead of shadowing them. No legacy top-level layer —
 # projects/autoProtect have no flat form.

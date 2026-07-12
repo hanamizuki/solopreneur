@@ -35,10 +35,10 @@ A link they can open in their browser, read or play with, and respond to with co
 
 The proposal shouldn't live somewhere arbitrary — it should sit alongside the work the user is already doing. The resolved parent path is **persisted per repo** in the solopreneur config so subsequent runs in the same repo skip the probe and the question entirely.
 
-Inline the cascade config helpers (copied verbatim from `_shared/config.md`) at the top of this step's bash work:
+Inline the cascade config helpers (copied verbatim from `shared/config.md`) at the top of this step's bash work:
 
 ```bash
-# --- solopreneur config helpers (inlined from _shared/config.md) ---
+# --- solopreneur config helpers (inlined from shared/config.md) ---
 # Compute the canonical repo identity used as the key under `.repos` in
 # solopreneur.json. Falls back to git toplevel path, then $PWD.
 solopreneur_repo_key() {

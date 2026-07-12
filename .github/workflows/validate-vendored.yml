@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - 'plugins/*/skills/**'
+      - 'plugins/*/vendor/**'
       - 'plugins/*/scripts/sync-vendored.sh'
       - '.github/workflows/validate-vendored.yml'
   push:
     branches: [main]
     paths:
       - 'plugins/*/skills/**'
+      - 'plugins/*/vendor/**'
       - 'plugins/*/scripts/sync-vendored.sh'
 
 permissions:
@@ -39,15 +41,17 @@ jobs:
 
       - name: Check for drift
         run: |
-          # Exclude manifest.json and _VENDOR.md sidecars — sync-vendored.sh
-          # always bumps `synced_at` timestamps in both, even in --pinned mode,
-          # so a freshly re-synced manifest and sidecars legitimately differ
-          # from committed ones. The rev field is what we care about, and any
-          # rev mismatch would have triggered re-fetch and produced file diffs
-          # in the skills/ directory outside these excluded paths.
+          # Diff covers skills/ (synced skill bodies) AND vendor/ (LICENSES) —
+          # the sync writes into both. Exclude manifest.json and _VENDOR.md
+          # sidecars: sync-vendored.sh always bumps `synced_at` timestamps in
+          # both, even in --pinned mode, so a freshly re-synced manifest and
+          # sidecars legitimately differ from committed ones. The rev field is
+          # what we care about, and any rev mismatch would have triggered
+          # re-fetch and produced file diffs outside these excluded paths.
           if ! git diff --exit-code \
                  -- 'plugins/${{ matrix.plugin }}/skills/' \
-                 ':!plugins/${{ matrix.plugin }}/skills/_vendored/manifest.json' \
+                    'plugins/${{ matrix.plugin }}/vendor/' \
+                 ':!plugins/${{ matrix.plugin }}/vendor/manifest.json' \
                  ':!plugins/${{ matrix.plugin }}/skills/**/_VENDOR.md'; then
             echo
             echo "::error::Vendored skill files in plugins/${{ matrix.plugin }}/ drift from pinned manifest revs."

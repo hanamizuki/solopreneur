@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/Leonxlnx/taste-skill
 - **Source path**: `skills/soft-skill`
 - **Pinned commit**: 06d6028b5c623016c59ce8536f578e5a1127b499
-- **Synced at**: 2026-07-11T19:03:38Z
+- **Synced at**: 2026-07-12T10:10:46Z
 - **License**: (none — upstream has no LICENSE file as of sync)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
@@ -18,5 +18,5 @@ Claude Code does not substitute them into the body at load time; and
 `disable-model-invocation` is injected when the manifest asks for it. See
 `scripts/sync-vendored.sh` for the exact transformations and the reasons.
 
-To update: edit `skills/_vendored/manifest.json` if needed, then re-run this
+To update: edit `vendor/manifest.json` if needed, then re-run this
 plugin's `./scripts/sync-vendored.sh`.
