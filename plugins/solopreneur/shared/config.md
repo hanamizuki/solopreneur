@@ -25,7 +25,7 @@ Solopreneur config has two top-level sections:
 {
   "default": {
     // settings that apply to every repo lacking an override
-    "greenlight": { "fallback_order": ["codex-bot", "gemini"] },
+    "greenlight": { "fallback_order": ["codex-bot", "codex-cli"] },
     "plans":      { "dir": "docs/plans" }
   },
   "repos": {
@@ -116,7 +116,7 @@ configs like:
 
 ```jsonc
 {
-  "greenlight": { "fallback_order": ["codex-bot", "gemini"] },
+  "greenlight": { "fallback_order": ["codex-bot", "codex-cli"] },
   "todos":      { "backlog": "/abs/path/backlog", ... },
   "preview":    { "paths": { "github.com/owner/repo": "docs/preview" } }
 }
@@ -130,7 +130,7 @@ above a default), hand-edit the JSON like this:
 ```jsonc
 {
   "default": {
-    "greenlight": { "fallback_order": ["codex-bot", "gemini"] }
+    "greenlight": { "fallback_order": ["codex-bot", "codex-cli"] }
   },
   "repos": {
     "github.com/owner/mojo-apps":  { "todos":  { "backlog": "todos/backlog", ... } },
@@ -226,7 +226,7 @@ read_solopreneur_config() {
 
 # Write a feature subtree to .default.<key> in the primary file.
 # Sibling keys are preserved (atomic read-modify-write).
-# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","gemini"]}'
+# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","codex-cli"]}'
 write_solopreneur_config() {
   local key="\$1"
   local value_expr="\$2"

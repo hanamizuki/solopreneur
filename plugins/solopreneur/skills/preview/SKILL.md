@@ -118,7 +118,7 @@ read_solopreneur_config() {
 
 # Write a feature subtree to .default.<key> in the primary file.
 # Sibling keys are preserved (atomic read-modify-write).
-# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","gemini"]}'
+# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","codex-cli"]}'
 write_solopreneur_config() {
   local key="\$1"
   local value_expr="\$2"

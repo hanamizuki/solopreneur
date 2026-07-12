@@ -78,7 +78,7 @@ Start them and walk away. They loop until the job is done.
 | Skill | What it does |
 |---|---|
 | [`/autopilot`](./plugins/solopreneur/skills/autopilot/SKILL.md) | **Auto Build.** Splits a large feature into multiple PRs and orchestrates unattended implementation, review, and merge. Supports scheduling for off-hours execution |
-| [`/greenlight`](./plugins/solopreneur/skills/greenlight/SKILL.md) | **Code Review Loop.** Triggers external reviewers (Codex, Gemini, CodeRabbit), fixes issues, re-triggers. Loops until the PR is clean |
+| [`/greenlight`](./plugins/solopreneur/skills/greenlight/SKILL.md) | **Code Review Loop.** Triggers external reviewers (Codex bot + CLI, the Gemini bot when active on the repo, CodeRabbit), fixes issues, re-triggers. Loops until the PR is clean |
 | [`/todos-babysit`](./plugins/solopreneur/skills/todos-babysit/SKILL.md) | **Backlog Monitor.** Scans backlog and in-progress todos, cross-references PR status, reviews new items, and maintains worktrees. **Interactive mode**: presents a confirmation checkpoint before acting. **Loop mode** (`/loop 24h /todos-babysit`): auto-executes safe operations and auto-implements bug fixes that pass the readiness gate. Notifies only for items that need human judgment |
 
 #### Skill-index plumbing
@@ -95,7 +95,7 @@ Start them and walk away. They loop until the job is done.
 - **[context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7)** MCP: strongly recommended. Used by `/tech-vetting`, `/specialist-review`, and every stack agent (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) for current official docs. Graceful skip if absent.
 - **[`gstack /review`](https://github.com/garrytan/gstack/tree/main/review)**: recommended. Powers the `/greenlight` internal review phase (SQL safety, trust boundaries, structural issues).
 - **[Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector)**: recommended. `/greenlight` PR mode default reviewer (`@codex review`).
-- **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR mode alternative reviewer (`/gemini review`).
+- **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR-mode reviewer (`/gemini review`), offered only when activity detection finds it acting on the repo. Consumer Code Assist stopped GitHub code review on 2026-07-17; **enterprise is unaffected**. For post-commit review, `/greenlight` uses the Antigravity CLI (`agy`) as its Gemini-family reviewer.
 - **[CodeRabbit](https://coderabbit.ai)**: optional. `/greenlight` passive reviewer (auto-triggered on push).
 - **[Vercel CLI](https://vercel.com/docs/cli)**: optional. `/preview` deploys previews to a protected Vercel review URL when present, can target a public bucket for external sharing, and gracefully degrades to a local `open` of the HTML when absent.
 
@@ -243,7 +243,7 @@ Idea
  │   │   dispatches: ios-dev · android-dev · neo4j-dev · designer · marketer
  │   │
  │   └─ /greenlight ────────── External review loop
- │       triggers: Codex bot · Gemini Code Assist · CodeRabbit
+ │       triggers: Codex bot · Gemini bot (when active) · CodeRabbit
  │
  ├─ /preview ──────────── Deploy interactive HTML for human review
  │
@@ -282,9 +282,11 @@ iOS, and Android.
 
 ### Review code until it's clean
 
-`/greenlight` triggers external reviewers (Codex bot, Gemini, CodeRabbit),
-fixes every finding, re-triggers. Repeats until no new suggestions remain.
-Also works in uncommitted mode on `main` for quick pre-commit cleanup.
+`/greenlight` triggers external reviewers (Codex bot, the Gemini bot when active
+on the repo, CodeRabbit), fixes every finding, re-triggers. Repeats until no new
+suggestions remain. Also works in uncommitted mode on `main` for quick pre-commit
+cleanup, and in post-commit mode where it adds the Antigravity CLI (`agy`) as a
+Gemini-family reviewer alongside Codex.
 
 ### Brand & GTM strategy
 
