@@ -62,6 +62,16 @@ plugins=()
 while IFS= read -r name; do plugins+=("$name"); done \
   < <(jq -r '.plugins[].name' "$CLAUDE_MARKETPLACE")
 
+# A duplicated name would slip through the set-like 1:1 check below and
+# generate a marketplace with two entries resolving the same plugin name —
+# silently ambiguous on install. Refuse loudly.
+dupes=$(jq -r '[.plugins[].name] | group_by(.) | map(select(length > 1) | .[0]) | .[]' "$CLAUDE_MARKETPLACE")
+if [[ -n "$dupes" ]]; then
+  echo "error: duplicate plugin names in .claude-plugin/marketplace.json:" >&2
+  echo "$dupes" | sed 's/^/       /' >&2
+  exit 1
+fi
+
 # Overlay entries and marketplace entries must match 1:1 in both directions:
 # a plugin without an overlay would silently ship without its Codex-only
 # metadata, and a stale overlay entry means the overlay no longer describes
