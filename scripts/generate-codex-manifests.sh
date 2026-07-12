@@ -114,12 +114,9 @@ if [[ -n "$no_category" ]]; then
   exit 1
 fi
 
-# --- Surface 1: per-plugin .codex-plugin/plugin.json ------------------------
-# Removed first, then rebuilt from the current marketplace list, so a plugin
-# dropped from the marketplace loses its manifest (the deletion shows up as
-# drift). Skipping the removal would leave the stale file committed and the
-# drift check green — the same rebuild-from-scratch reasoning as surface 3.
-rm -rf "$REPO_ROOT"/plugins/*/.codex-plugin
+# Validate every remaining input BEFORE the destructive rebuilds below, so a
+# bad source fails the run while the committed artifacts are still intact —
+# a mid-loop failure after an rm would leave a half-rebuilt working tree.
 for name in "${plugins[@]}"; do
   claude_manifest="$REPO_ROOT/plugins/$name/.claude-plugin/plugin.json"
   if [[ ! -f "$claude_manifest" ]]; then
@@ -133,7 +130,28 @@ for name in "${plugins[@]}"; do
     echo "error: $claude_manifest is missing one of name/version/description/license" >&2
     exit 1
   fi
+done
 
+# Same pre-flight for surface 3: two plugins shipping the same agent TOML
+# basename would collide in .codex/agents/.
+toml_dupes=$(for toml in "$REPO_ROOT"/plugins/*/agents/*.toml; do
+  [[ -e "$toml" ]] || continue # glob matched nothing
+  basename "$toml"
+done | sort | uniq -d)
+if [[ -n "$toml_dupes" ]]; then
+  echo "error: two plugins ship an agent TOML with the same name — rename one:" >&2
+  echo "$toml_dupes" | sed 's/^/       /' >&2
+  exit 1
+fi
+
+# --- Surface 1: per-plugin .codex-plugin/plugin.json ------------------------
+# Removed first, then rebuilt from the current marketplace list, so a plugin
+# dropped from the marketplace loses its manifest (the deletion shows up as
+# drift). Skipping the removal would leave the stale file committed and the
+# drift check green — the same rebuild-from-scratch reasoning as surface 3.
+rm -rf "$REPO_ROOT"/plugins/*/.codex-plugin
+for name in "${plugins[@]}"; do
+  claude_manifest="$REPO_ROOT/plugins/$name/.claude-plugin/plugin.json"
   mkdir -p "$REPO_ROOT/plugins/$name/.codex-plugin"
   jq --argjson overlay "$(jq --arg n "$name" '.[$n]' "$OVERLAYS")" \
     '{name, version, description, license, hooks: {}} + $overlay' \
@@ -163,14 +181,9 @@ echo "generated: .agents/plugins/marketplace.json"
 rm -rf "$REPO_ROOT/.codex/agents"
 copied=0
 for toml in "$REPO_ROOT"/plugins/*/agents/*.toml; do
-  [[ -e "$toml" ]] || continue # glob matched nothing
-  dst="$REPO_ROOT/.codex/agents/$(basename "$toml")"
-  if [[ -e "$dst" ]]; then
-    echo "error: two plugins ship an agent TOML named $(basename "$toml") — rename one" >&2
-    exit 1
-  fi
+  [[ -e "$toml" ]] || continue # glob matched nothing (collisions pre-checked above)
   mkdir -p "$REPO_ROOT/.codex/agents"
-  cp "$toml" "$dst"
+  cp "$toml" "$REPO_ROOT/.codex/agents/$(basename "$toml")"
   copied=$((copied + 1))
   echo "generated: .codex/agents/$(basename "$toml")"
 done
