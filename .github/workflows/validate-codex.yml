@@ -23,6 +23,7 @@ on:
       - '.agents/**'
       - '.codex/**'
       - 'scripts/**'
+      - '.github/workflows/validate-codex.yml'
 
 permissions:
   contents: read
