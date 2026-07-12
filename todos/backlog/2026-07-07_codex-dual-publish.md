@@ -81,11 +81,11 @@
 
 ## 後續 migration tasks（依拍板決策更新）
 
-- [ ] Write the `.codex-plugin/plugin.json` generator (from `.claude-plugin/plugin.json` + `interface` overlay), generate all 7 manifests, and wire a CI drift check (mirror the validate-vendored pattern).
-- [ ] Add `.agents/plugins/marketplace.json` for Codex local/dev marketplace installation.
+- [x] Write the `.codex-plugin/plugin.json` generator (from `.claude-plugin/plugin.json` + `interface` overlay), generate all 7 manifests, and wire a CI drift check (mirror the validate-vendored pattern). ✅ PR 4
+- [x] Add `.agents/plugins/marketplace.json` for Codex local/dev marketplace installation. ✅ PR 4
 - [x] Move `skills/_vendored` → `plugins/<n>/vendor/` and `skills/_shared` → `plugins/solopreneur/shared/` — update `plugins/solopreneur/scripts/sync-vendored.sh`, `.github/workflows/{sync,validate}-vendored.yml`, 5 agent references, and 7 config.md references in the same change. Land AFTER the `$N escape` backlog todo (both touch sync-vendored.sh). ✅ PR 3
-- [ ] Add Codex validation script for plugin manifests and skill directories.
-- [ ] Add dependency matrix for plugin deps, skill deps, agents/subagents, MCP/apps, external CLIs, env vars, sandbox/network assumptions.
+- [x] Add Codex validation script for plugin manifests and skill directories. ✅ PR 4
+- [x] Add dependency matrix for plugin deps, skill deps, agents/subagents, MCP/apps, external CLIs, env vars, sandbox/network assumptions (filled into the spec's Dependency audit matrix section). ✅ PR 4
 - [ ] Convert 6 Claude agents into Codex custom agent TOML (in-repo `.codex/agents/`) plus a bootstrap skill that installs them into `~/.codex/agents/`.
 - [ ] Add one platform-neutral `using-<plugin>` router skill per plugin — router + usage guide, advisory delegation (implementation/multi-step → dispatch the agent; quick lookup → invoke the skill directly), no embedded skill list.
 - [ ] Add a generated `docs/skills-catalog.md` (script + CI staleness check) listing every skill across plugins — platform-independent, can land before any Codex work.

@@ -1,0 +1,51 @@
+{
+  "solopreneur": {
+    "interface": {
+      "displayName": "Solopreneur",
+      "category": "Developer Tools",
+      "capabilities": ["Interactive", "Read", "Write"]
+    }
+  },
+  "designer": {
+    "interface": {
+      "displayName": "Designer",
+      "category": "Design",
+      "capabilities": ["Interactive", "Read", "Write"]
+    }
+  },
+  "marketer": {
+    "interface": {
+      "displayName": "Marketer",
+      "category": "Marketing",
+      "capabilities": ["Interactive", "Read", "Write"]
+    }
+  },
+  "ios-dev": {
+    "interface": {
+      "displayName": "iOS Dev",
+      "category": "Developer Tools",
+      "capabilities": ["Interactive", "Read", "Write"]
+    }
+  },
+  "android-dev": {
+    "interface": {
+      "displayName": "Android Dev",
+      "category": "Developer Tools",
+      "capabilities": ["Interactive", "Read", "Write"]
+    }
+  },
+  "ai-engineer": {
+    "interface": {
+      "displayName": "AI Engineer",
+      "category": "Developer Tools",
+      "capabilities": ["Interactive", "Read", "Write"]
+    }
+  },
+  "neo4j-dev": {
+    "interface": {
+      "displayName": "Neo4j Dev",
+      "category": "Developer Tools",
+      "capabilities": ["Interactive", "Read", "Write"]
+    }
+  }
+}

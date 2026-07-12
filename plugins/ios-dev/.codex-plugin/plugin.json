@@ -1,0 +1,16 @@
+{
+  "name": "ios-dev",
+  "version": "0.4.8",
+  "description": "iOS/macOS SwiftUI expertise. Ships the ios-dev agent, ios-patterns, ios-app-templates (reference apps), and 23 vendored third-party skills (iphone-apps + asc-* App Store Connect CLI).",
+  "license": "MIT",
+  "hooks": {},
+  "interface": {
+    "displayName": "iOS Dev",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ]
+  }
+}
