@@ -149,9 +149,15 @@ Generated `plugins/<n>/.codex-plugin/plugin.json`:
 
 Generated `.agents/plugins/marketplace.json` lists all seven plugins with
 `./plugins/<name>` sources, mirroring `.claude-plugin/marketplace.json`
-entries (name, description, license, source). Local development installs
-from the working tree via this file; end users add the GitHub repo,
-optionally pinned `@<plugin>--v<version>`.
+entries (name, description, license, source). Each entry additionally
+carries the fields the Codex marketplace contract asks for ("Always
+include `policy.installation`, `policy.authentication`, and `category`"):
+a uniform `policy` of `AVAILABLE` / `ON_INSTALL`, and `category` reused
+from the plugin's overlay `interface.category` (single source, no
+duplication). The CLI installs entries without these fields; directory-
+style consumers may enforce the documented contract. Local development
+installs from the working tree via this file; end users add the GitHub
+repo, optionally pinned `@<plugin>--v<version>`.
 
 Pinning caveat: a marketplace ref freezes the **whole repo snapshot** at
 that commit, so pinning one plugin's tag also freezes the other six at
@@ -262,16 +268,32 @@ practices). For a quick reference lookup, invoke the matching
 
 ## Dependency audit matrix
 
-Filled into this section of the spec by rollout PR 4 (no companion doc).
-Columns:
+Every claim below is grep-verified against the tree (audited 2026-07-12).
 
 | plugin | marketplace deps | cross-plugin refs | agents | MCP/apps | external CLIs | env vars | sandbox/network |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `solopreneur` | none | none (base the others reference) | none | context7 (optional) | `gh`, `git`, `codex`, `gemini` (review loops); `vercel`, `jq` (preview); `python3` (worktree-handoff, merge-pr); `jq`, `perl` (sync-vendored, maintainer-only); `curl` | `CLAUDE_CONFIG_DIR`, `CLAUDE_SKILL_DIR`; `DISCORD_*` (todos-babysit); Vercel org/project ids (preview) | high: GitHub API, Vercel deploys, Discord API, reviewer CLIs |
+| `designer` | `solopreneur >=0.5.1` | skill-index read (agent); sync-vendored symlink | `designer` | Pencil, Stitch, context7 (all optional) | `node`/`npm` (impeccable; puppeteer only for URL scans); `codex`/`claude`/`gemini` (optional live-edit) | `CLAUDE_CONFIG_DIR`, `CLAUDE_SKILL_DIR`, `CLAUDE_PROJECT_DIR`, `IMPECCABLE_CONTEXT_DIR`, `PORT` | mostly local; network only for optional MCPs and URL scans |
+| `marketer` | `solopreneur >=0.5.1` | skill-index read (agent); no sync-vendored symlink (all skills in-house) | `marketer` | chrome-devtools (one option in linkedin-growth) | `codex`/`gemini` (naming, optional); `python3` (humanly regen, maintainer-only); `qrencode` (optional); `curl` (CDN icons) | `CLAUDE_CONFIG_DIR`, `CODEX_GIT_FLAG` | low: local content generation; optional reviewer CLIs and CDN fetches |
+| `ios-dev` | `solopreneur >=0.5.1` | skill-index read (agent); sync-vendored symlink | `ios-dev` | context7 (optional); RevenueCat MCP (required by asc-revenuecat-catalog-sync); browser automation (required by asc-app-create-ui); astro (optional) | `asc` (all asc-* skills); `xcodebuild`/`xcrun`/`swift`; `python3`/`pip` (asc-shots-pipeline, asc-screenshot-resize, asc-notarization); brew extras (xcodegen, swiftlint, fastlane, imagemagick, …); `curl` | `CLAUDE_CONFIG_DIR`, `CLAUDE_SKILL_DIR`; ASC credential placeholders (`ISSUER_ID`, `KEY_ID`, signing secrets) | high at release: App Store Connect API, TestFlight uploads, notarization; builds stay local |
+| `android-dev` | `solopreneur >=0.5.1` | skill-index read (agent); sync-vendored symlink | `android-dev` | context7 (optional) | `gplay` (all gplay-* skills); `gradle`/`gradlew`; `adb`; `jq` | `CLAUDE_CONFIG_DIR`, `CLAUDE_SKILL_DIR`; Play credential placeholders (`EDIT_ID`, `PACKAGE`, `BUCKET_ID`, …) | high at release: Play Console API, GCS report downloads; builds and devices stay local |
+| `ai-engineer` | `solopreneur >=0.5.1` | no skill-index read (the one agent without Extended Discovery); sync-vendored symlink | `ai-engineer` | context7 (optional) | `python3`/`pytest` (skill scripts) | `CLAUDE_SKILL_DIR` | low: local Python; LLM API keys belong to the built app, not the plugin |
+| `neo4j-dev` | `solopreneur >=0.5.1` | skill-index read (agent); sync-vendored symlink | `neo4j-dev` | context7, Neo4j MCP (both optional) | `cypher-shell`, `aura-cli`, `neo4j-admin`, `npx`, `python3` (cli-tools helpers, cypher schema guardrail), `curl` | `CLAUDE_CONFIG_DIR`, `CLAUDE_SKILL_DIR`; `NEO4J_PASSWORD`, Aura `CLIENT_ID`/`CLIENT_SECRET`/`INSTANCE_ID` | network to the database: bolt, Query API v2 over HTTPS, Aura API |
 
-Seed rows verified so far: all six non-base plugins declare a
-marketplace dependency on `solopreneur` whose only runtime coupling is an
-optional read of the skill-index artifact (five agents; `ai-engineer` has
-none); `sync-vendored.sh` coupling is repo-dev only and irrelevant to
-installs.
+Reading notes:
+
+- The two five-of-six couplings have different members: the skill-index
+  read covers every agent except `ai-engineer`'s, while the
+  `sync-vendored.sh` symlink covers every plugin except `marketer`. The
+  symlink is repo-maintainer machinery, irrelevant to installs on either
+  platform.
+- Credential-looking env vars (`ISSUER_ID`, `EDIT_ID`, `NEO4J_PASSWORD`,
+  …) are placeholders inside documented CLI commands, not values any
+  skill reads at load time — they record what the external CLI needs.
+- context7 is optional everywhere it appears (explicit graceful
+  degradation). The only hard MCP requirements are per-skill:
+  `asc-revenuecat-catalog-sync` (RevenueCat MCP) and `asc-app-create-ui`
+  (browser automation).
 
 ## Validation
 

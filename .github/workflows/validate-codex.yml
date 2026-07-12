@@ -1,0 +1,72 @@
+name: Validate Codex surfaces
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/*/.claude-plugin/plugin.json'
+      - 'plugins/*/.codex-plugin/**'
+      - 'plugins/*/agents/**'
+      - 'plugins/*/skills/**'
+      - '.claude-plugin/marketplace.json'
+      - '.agents/**'
+      - '.codex/**'
+      - 'scripts/**'
+      - '.github/workflows/validate-codex.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/*/.claude-plugin/plugin.json'
+      - 'plugins/*/.codex-plugin/**'
+      - 'plugins/*/agents/**'
+      - 'plugins/*/skills/**'
+      - '.claude-plugin/marketplace.json'
+      - '.agents/**'
+      - '.codex/**'
+      - 'scripts/**'
+      - '.github/workflows/validate-codex.yml'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: validate-codex-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Regenerate Codex surfaces
+        run: ./scripts/generate-codex-manifests.sh
+
+      - name: Check for drift
+        run: |
+          # `git status --porcelain` instead of `git diff --exit-code`: the
+          # generator can also CREATE files (a plugin newly added to the
+          # marketplace gets a fresh .codex-plugin/plugin.json), and untracked
+          # files are invisible to `git diff`.
+          #
+          # The wildcard pathspec needs the trailing `/**`: a git pathspec is
+          # matched against the full file path, so 'plugins/*/.codex-plugin'
+          # alone matches zero tracked files and would wave modified manifests
+          # through. (Literal dir pathspecs like '.agents' match recursively.)
+          drift="$(git status --porcelain -- 'plugins/*/.codex-plugin/**' '.agents' '.codex')"
+          if [[ -n "$drift" ]]; then
+            echo "$drift"
+            git diff -- 'plugins/*/.codex-plugin/**' '.agents' '.codex'
+            echo "::error::Generated Codex surfaces drift from their sources of truth."
+            echo "::error::Re-run ./scripts/generate-codex-manifests.sh and commit the result."
+            exit 1
+          fi
+
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+
+      - name: Validate structure and install smoke
+        run: ./scripts/validate-codex.sh
