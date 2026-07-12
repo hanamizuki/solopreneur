@@ -21,7 +21,7 @@ skip it and proceed with remaining skills plus built-in knowledge.
 
 Always available — ships with this plugin. Invoke with `designer:<name>`.
 
-Vendored from third-party sources (see `skills/_vendored/manifest.json` for
+Vendored from third-party sources (see `vendor/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
 - `designer:impeccable` — Design / redesign / critique / audit /

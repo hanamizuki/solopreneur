@@ -18,7 +18,7 @@ related commits. Present findings for user confirmation, then move files.
 Before scanning, resolve the todo directory paths. Define the config helpers first:
 
 ```bash
-# --- solopreneur config helpers (inlined from _shared/config.md) ---
+# --- solopreneur config helpers (inlined from shared/config.md) ---
 # Compute the canonical repo identity used as the key under `.repos` in
 # solopreneur.json. Falls back to git toplevel path, then $PWD.
 solopreneur_repo_key() {

@@ -5,7 +5,7 @@
 # Sub-plugins reach it via relative symlinks at plugins/<plugin>/scripts/sync-vendored.sh
 # so PLUGIN_DIR resolves to the calling plugin's root, not solopreneur's.
 #
-# Reads <plugin>/skills/_vendored/manifest.json, sparse-clones each source repo
+# Reads <plugin>/vendor/manifest.json, sparse-clones each source repo
 # at the pinned (or latest) revision, copies each `from` skill folder to
 # skills/<to>/, fetches the LICENSE if specified, and updates `rev` +
 # `synced_at` in the manifest.
@@ -31,8 +31,8 @@ set -euo pipefail
 # Resolve PLUGIN_DIR via $0 (works for both direct execution and symlink
 # invocation — $0 is the path actually used to invoke the script).
 PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-MANIFEST="$PLUGIN_DIR/skills/_vendored/manifest.json"
-LICENSES_DIR="$PLUGIN_DIR/skills/_vendored/LICENSES"
+MANIFEST="$PLUGIN_DIR/vendor/manifest.json"
+LICENSES_DIR="$PLUGIN_DIR/vendor/LICENSES"
 SKILLS_DIR="$PLUGIN_DIR/skills"
 TMP_ROOT="$(mktemp -d -t solopreneur-vendor-sync.XXXXXX)"
 
@@ -55,7 +55,7 @@ fi
 
 if [[ ! -f "$MANIFEST" ]]; then
   echo "error: manifest not found at $MANIFEST" >&2
-  echo "       This script needs a manifest at <plugin>/skills/_vendored/manifest.json." >&2
+  echo "       This script needs a manifest at <plugin>/vendor/manifest.json." >&2
   echo "       If you ran it from plugins/solopreneur/scripts/ directly, switch to a sub-plugin" >&2
   echo "       (e.g. plugins/android-dev, plugins/ios-dev, plugins/designer) and run from there:" >&2
   echo "         cd plugins/android-dev && ./scripts/sync-vendored.sh" >&2
@@ -346,7 +346,7 @@ for i in $(seq 0 $((source_count - 1))); do
 
     # Drop a small _VENDOR.md sidecar so the source is traceable from the skill folder.
     if [[ -n "$license_file" ]]; then
-      license_line="see \`../_vendored/LICENSES/$(basename "$license_file")\`"
+      license_line="see \`../../vendor/LICENSES/$(basename "$license_file")\`"
     else
       license_line="(none — upstream has no LICENSE file as of sync)"
     fi
@@ -371,7 +371,7 @@ Claude Code does not substitute them into the body at load time; and
 \`disable-model-invocation\` is injected when the manifest asks for it. See
 \`scripts/sync-vendored.sh\` for the exact transformations and the reasons.
 
-To update: edit \`skills/_vendored/manifest.json\` if needed, then re-run this
+To update: edit \`vendor/manifest.json\` if needed, then re-run this
 plugin's \`./scripts/sync-vendored.sh\`.
 EOF
 

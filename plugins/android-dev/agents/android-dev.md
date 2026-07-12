@@ -27,7 +27,7 @@ In-house:
   date formatting (MM/DD vs DD/MM, MIUI locale quirks). Index in SKILL.md points
   to individual references under `references/`.
 
-Vendored from third-party sources (see `skills/_vendored/manifest.json` for
+Vendored from third-party sources (see `vendor/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
 - `android-dev:accessibility` — Audit/fix Android accessibility issues

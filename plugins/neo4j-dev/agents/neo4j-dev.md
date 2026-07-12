@@ -20,7 +20,7 @@ skip it and proceed with remaining skills plus built-in knowledge.
 
 Always available — ships with this plugin. Invoke with `neo4j-dev:<name>`.
 
-Vendored from third-party sources (see `skills/_vendored/manifest.json` for
+Vendored from third-party sources (see `vendor/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
 - `neo4j-dev:neo4j-cypher-guide` — Comprehensive guide for writing modern

@@ -60,7 +60,7 @@ jobs:
         if: steps.gate.outputs.should_run == 'true'
         id: diff
         env:
-          MANIFEST_PATH: plugins/${{ matrix.plugin }}/skills/_vendored/manifest.json
+          MANIFEST_PATH: plugins/${{ matrix.plugin }}/vendor/manifest.json
         run: |
           set -euo pipefail
           # sync-vendored.sh always bumps `synced_at` timestamps in manifest.json
@@ -84,7 +84,7 @@ jobs:
         if: steps.gate.outputs.should_run == 'true' && steps.diff.outputs.changed == 'true'
         id: body
         env:
-          MANIFEST_PATH: plugins/${{ matrix.plugin }}/skills/_vendored/manifest.json
+          MANIFEST_PATH: plugins/${{ matrix.plugin }}/vendor/manifest.json
           MATRIX_PLUGIN: ${{ matrix.plugin }}
         run: |
           set -euo pipefail
@@ -159,8 +159,8 @@ jobs:
           git add -A
           ./scripts/sync-vendored.sh --pinned
           if ! git diff --exit-code \
-                 -- 'skills/' \
-                 ':!skills/_vendored/manifest.json' \
+                 -- 'skills/' 'vendor/' \
+                 ':!vendor/manifest.json' \
                  ':!skills/**/_VENDOR.md'; then
             echo "::error::Pinned re-sync drifted from upstream sync — investigate before opening PR."
             exit 1

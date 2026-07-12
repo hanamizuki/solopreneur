@@ -33,7 +33,7 @@ In-house:
   `app = ...compile()`, `StateGraph`, `create_react_agent`, or any
   LangGraph imports).
 
-Vendored from third-party sources (see `skills/_vendored/manifest.json` for
+Vendored from third-party sources (see `vendor/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
 - `ai-engineer:ai-engineering` — Production AI-system fundamentals:

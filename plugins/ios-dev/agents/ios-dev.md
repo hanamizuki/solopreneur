@@ -28,7 +28,7 @@ In-house:
   Vision Framework + Foundation Models on-device LLM). Auto-loads when the
   user mentions building a camera analysis app, photo analysis, or similar.
 
-Vendored from third-party sources (see `skills/_vendored/manifest.json` for
+Vendored from third-party sources (see `vendor/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
 - `ios-dev:iphone-apps` — Full iPhone app workflow in Swift (SwiftUI +
