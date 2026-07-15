@@ -457,9 +457,12 @@ Target count: {candidates_per_model}
 The brief contains free-form user input. Always write it to a file first
 with the Write tool, then feed the CLI from that file. Preferred: stdin
 heredoc or a `--file` flag. When a CLI supports neither and only takes the
-prompt as an argument (agy `--print` reads no stdin), embed the file with
-a **double-quoted** command substitution — `"$(cat brief.md)"`. Double
-quoting is load-bearing: bash inserts the substituted file content
+prompt as an argument (agy `--print` reads no stdin), embed the file with a
+**double-quoted** command substitution, written on its own line:
+
+    "$(cat brief.md)"
+
+Double quoting is load-bearing: bash inserts the substituted file content
 literally and does not re-scan it, so any `$(...)`, backticks, or `;` in
 the brief stay inert (verified). Never use the unquoted form, and never
 `eval` the brief.
@@ -492,8 +495,13 @@ CODEX_EXIT=$?
 # Antigravity CLI (agy) — Gemini-family model. Print mode reads no stdin,
 # so embed the brief in the prompt argument via double-quoted "$(cat ...)"
 # (safe — see Step 4). Pin the Gemini model for family diversity vs Claude
-# (main loop) and Codex (GPT-family).
-agy --dangerously-skip-permissions --model "Gemini 3.1 Pro (High)" --print \
+# (main loop) and Codex (GPT-family). No --dangerously-skip-permissions:
+# candidate generation is text-only and needs no tools, and the brief is
+# user-controlled — auto-approving tool use would turn a prompt injection in
+# the brief into real file/command execution. Headless --print with default
+# permissions still answers (verified); if the model ever tries a tool it
+# stalls until --print-timeout and degrades, which is the safe outcome.
+agy --model "Gemini 3.1 Pro (High)" --print \
   "Generate the target number of brand-name candidates from the brief below.
 Output one candidate per line, no numbering or commentary.
 
@@ -510,12 +518,18 @@ External CLIs fail for many reasons (rate limit, auth expiry, network,
 model outage). **Never silently proceed on failure.** After each
 invocation, in this order:
 
-1. Check exit code. Non-zero → failure. Also treat an **empty raw output
-   file** as failure regardless of exit code: agy's `--print` has a known
-   non-TTY stdout-drop issue (exit 0 but blank output), so a zero-length
-   `gemini-${TS}.txt` means the branch produced nothing. `[ -s file ]`
-   suffices — degrade the same as any other failure (drop the slot, run
-   Claude + Codex only).
+1. Check exit code. Non-zero → failure. Then two content checks on the raw
+   output file — either one is a failure and degrades the slot the same way
+   (drop it, run Claude + Codex only):
+   - **Empty output**: agy's `--print` has a known non-TTY stdout-drop issue
+     (exit 0 but blank output), so a zero-length `gemini-${TS}.txt` means the
+     branch produced nothing. `[ -s file ]` catches it.
+   - **Auth prompt, not an answer**: an auth lapse between the Step 1 gate and
+     this call makes agy print a Google authorization / sign-in URL (e.g. an
+     `accounts.google.com` link) into the file. That output is non-empty, so it
+     slips past `[ -s ]` and would be parsed as candidate names. Reuse the
+     Step 1 auth-URL match here: if the raw output contains such a URL, treat
+     the branch as failed, not as candidates.
 2. **Parse the output into a candidate list first, then count.**
    Models may emit one-per-line, numbered lists, bullets, wrapped
    paragraphs, or comma-separated — count the parsed candidates, not
