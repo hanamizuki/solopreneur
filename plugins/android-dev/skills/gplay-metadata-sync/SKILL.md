@@ -93,22 +93,17 @@ gplay listings get \
 ```
 
 ### Update listing
+`listings update` sets all fields for a locale via individual flags (fields not
+provided are cleared). Use `listings patch` for partial updates.
 ```bash
 gplay listings update \
   --package com.example.app \
   --edit $EDIT_ID \
   --locale en-US \
-  --json @listing.json
-```
-
-### listing.json format
-```json
-{
-  "title": "My Awesome App",
-  "shortDescription": "A short description under 80 characters",
-  "fullDescription": "A full description under 4000 characters...",
-  "video": "https://www.youtube.com/watch?v=VIDEO_ID"
-}
+  --title "My Awesome App" \
+  --short-description "A short description under 80 characters" \
+  --full-description "A full description under 4000 characters..." \
+  --video "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
 ## Image Management
@@ -155,7 +150,7 @@ gplay images delete \
   --edit $EDIT_ID \
   --locale en-US \
   --type phoneScreenshots \
-  --image-id IMAGE_ID \
+  --image IMAGE_ID \
   --confirm
 ```
 
@@ -184,7 +179,7 @@ Validate against Google Play limits:
 
 | Field | Limit |
 |-------|-------|
-| Title | 50 characters |
+| Title | 30 characters |
 | Short Description | 80 characters |
 | Full Description | 4000 characters |
 

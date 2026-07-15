@@ -22,7 +22,7 @@ gplay release \
   --package com.example.app \
   --track production \
   --bundle app-release.aab \
-  --rollout 10
+  --rollout 0.1
 ```
 
 This releases to 10% of users.
@@ -33,7 +33,7 @@ gplay promote \
   --package com.example.app \
   --from beta \
   --to production \
-  --rollout 25
+  --rollout 0.25
 ```
 
 ## Increase Rollout Percentage
@@ -43,19 +43,19 @@ gplay promote \
 gplay rollout update \
   --package com.example.app \
   --track production \
-  --rollout 25
+  --rollout 0.25
 
 # Increase to 50%
 gplay rollout update \
   --package com.example.app \
   --track production \
-  --rollout 50
+  --rollout 0.5
 
 # Increase to 100% (or use complete)
 gplay rollout update \
   --package com.example.app \
   --track production \
-  --rollout 100
+  --rollout 1.0
 ```
 
 ## Halt Rollout
@@ -107,16 +107,16 @@ gplay tracks get \
 ### Conservative (7-day rollout)
 ```bash
 # Day 1: 10%
-gplay release --package com.example.app --track production --bundle app.aab --rollout 10
+gplay release --package com.example.app --track production --bundle app.aab --rollout 0.1
 
 # Day 2: 25% (monitor crash rate)
-gplay rollout update --package com.example.app --track production --rollout 25
+gplay rollout update --package com.example.app --track production --rollout 0.25
 
 # Day 3: 50%
-gplay rollout update --package com.example.app --track production --rollout 50
+gplay rollout update --package com.example.app --track production --rollout 0.5
 
 # Day 5: 75%
-gplay rollout update --package com.example.app --track production --rollout 75
+gplay rollout update --package com.example.app --track production --rollout 0.75
 
 # Day 7: 100%
 gplay rollout complete --package com.example.app --track production
@@ -125,10 +125,10 @@ gplay rollout complete --package com.example.app --track production
 ### Aggressive (3-day rollout)
 ```bash
 # Day 1: 25%
-gplay release --package com.example.app --track production --bundle app.aab --rollout 25
+gplay release --package com.example.app --track production --bundle app.aab --rollout 0.25
 
 # Day 2: 50%
-gplay rollout update --package com.example.app --track production --rollout 50
+gplay rollout update --package com.example.app --track production --rollout 0.5
 
 # Day 3: 100%
 gplay rollout complete --package com.example.app --track production
@@ -137,19 +137,19 @@ gplay rollout complete --package com.example.app --track production
 ### Cautious (for critical apps)
 ```bash
 # Day 1: 5%
-gplay release --package com.example.app --track production --bundle app.aab --rollout 5
+gplay release --package com.example.app --track production --bundle app.aab --rollout 0.05
 
 # Day 2: 10% (monitor carefully)
-gplay rollout update --package com.example.app --track production --rollout 10
+gplay rollout update --package com.example.app --track production --rollout 0.1
 
 # Day 3: 25%
-gplay rollout update --package com.example.app --track production --rollout 25
+gplay rollout update --package com.example.app --track production --rollout 0.25
 
 # Day 5: 50%
-gplay rollout update --package com.example.app --track production --rollout 50
+gplay rollout update --package com.example.app --track production --rollout 0.5
 
 # Day 7: 75%
-gplay rollout update --package com.example.app --track production --rollout 75
+gplay rollout update --package com.example.app --track production --rollout 0.75
 
 # Day 10: 100%
 gplay rollout complete --package com.example.app --track production

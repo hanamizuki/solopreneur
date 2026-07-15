@@ -41,7 +41,7 @@ gplay release \
   --track production \
   --bundle app-release.aab \
   --release-notes @release-notes.json \
-  --rollout 10
+  --rollout 0.1
 ```
 
 **Dry run** (preview the release without executing):
@@ -115,8 +115,9 @@ gplay release \
      --package com.example.app \
      --edit $EDIT_ID \
      --track production \
-     --json @track-config.json
+     --releases @releases.json
    ```
+   `--releases` takes a JSON array of track releases (or `@file`).
 
 4. **Validate edit**:
    ```bash
@@ -144,26 +145,26 @@ gplay promote \
   --package com.example.app \
   --from beta \
   --to production \
-  --rollout 25
+  --rollout 0.25
 ```
 
 ## Staged Rollout Management
 
-**Start with 10% rollout**:
+**Start with a 10% rollout** (fraction `0.1`):
 ```bash
 gplay release \
   --package com.example.app \
   --track production \
   --bundle app.aab \
-  --rollout 10
+  --rollout 0.1
 ```
 
-**Increase to 50%**:
+**Increase to 50%** (fraction `0.5`):
 ```bash
 gplay rollout update \
   --package com.example.app \
   --track production \
-  --rollout 50
+  --rollout 0.5
 ```
 
 **Halt rollout** (pause distribution):
@@ -183,35 +184,36 @@ gplay rollout complete --package com.example.app --track production
 
 ## Release Notes Format
 
-### JSON format (multi-locale)
-`release-notes.json`:
+The single `--release-notes` flag accepts three shapes: a JSON array (multi-locale), plain text (auto-assigned to `en-US`), or an `@file` path pointing to either. There is no separate locale flag.
+
+### JSON array format (multi-locale)
+`release-notes.json` — a JSON array of `{language, text}` entries:
 ```json
-{
-  "en-US": "Bug fixes and performance improvements",
-  "es-ES": "Correcciones de errores y mejoras de rendimiento",
-  "fr-FR": "Corrections de bugs et améliorations des performances"
-}
+[
+  { "language": "en-US", "text": "Bug fixes and performance improvements" },
+  { "language": "es-ES", "text": "Correcciones de errores y mejoras de rendimiento" },
+  { "language": "fr-FR", "text": "Corrections de bugs et améliorations des performances" }
+]
 ```
+Pass it with `--release-notes @release-notes.json`.
 
 ### Plain text format (single locale)
-You can also provide release notes as plain text for a single locale:
+Provide release notes as plain text — it is auto-assigned to `en-US`:
 ```bash
 gplay release \
   --package com.example.app \
   --track beta \
   --bundle app.aab \
-  --release-notes "Bug fixes and performance improvements" \
-  --release-notes-locale en-US
+  --release-notes "Bug fixes and performance improvements"
 ```
 
-Or from a text file:
+Or from a file (plain text or a JSON array) with `@`:
 ```bash
 gplay release \
   --package com.example.app \
   --track beta \
   --bundle app.aab \
-  --release-notes @release-notes.txt \
-  --release-notes-locale en-US
+  --release-notes @release-notes.txt
 ```
 
 ## Release Flags Reference
@@ -219,11 +221,11 @@ gplay release \
 | Flag | Description |
 |------|-------------|
 | `--package` | App package name (required) |
-| `--track` | Target track (required) |
-| `--bundle` | Path to AAB file (required) |
-| `--release-notes` | Release notes (JSON file with `@`, plain text, or text file with `@`) |
-| `--release-notes-locale` | Locale for plain text release notes (e.g., `en-US`) |
-| `--rollout` | Rollout percentage (1-100) |
+| `--track` | Target track (production, beta, alpha, internal; default: `internal`) |
+| `--bundle` | Path to AAB file (use `--bundle` or `--apk`, not both) |
+| `--apk` | Path to APK file (alternative to `--bundle`) |
+| `--release-notes` | Release notes: plain text (auto-assigned en-US), a JSON array of `{language, text}`, or `@file` |
+| `--rollout` | Staged rollout fraction (0.0-1.0, default: 1.0 for full rollout) |
 | `--listings-dir` | Directory containing store listings to sync |
 | `--screenshots-dir` | Directory containing screenshots to upload |
 | `--skip-metadata` | Skip metadata/listings sync during release |
@@ -252,21 +254,21 @@ gplay release --package com.example.app --track internal --bundle app.aab
 gplay promote --package com.example.app --from internal --to beta
 
 # Week 3: Production with staged rollout
-gplay promote --package com.example.app --from beta --to production --rollout 10
-gplay rollout update --package com.example.app --track production --rollout 50  # Day 2
-gplay rollout complete --package com.example.app --track production            # Day 7
+gplay promote --package com.example.app --from beta --to production --rollout 0.1
+gplay rollout update --package com.example.app --track production --rollout 0.5  # Day 2
+gplay rollout complete --package com.example.app --track production             # Day 7
 ```
 
 **Strategy 2: Direct to Production with Staged Rollout**
 ```bash
 # Day 1: 10%
-gplay release --package com.example.app --track production --bundle app.aab --rollout 10
+gplay release --package com.example.app --track production --bundle app.aab --rollout 0.1
 
 # Day 2: 25%
-gplay rollout update --package com.example.app --track production --rollout 25
+gplay rollout update --package com.example.app --track production --rollout 0.25
 
 # Day 3: 50%
-gplay rollout update --package com.example.app --track production --rollout 50
+gplay rollout update --package com.example.app --track production --rollout 0.5
 
 # Day 7: 100%
 gplay rollout complete --package com.example.app --track production
@@ -282,7 +284,7 @@ gplay release \
   --listings-dir ./metadata \
   --screenshots-dir ./metadata \
   --release-notes @release-notes.json \
-  --rollout 10 \
+  --rollout 0.1 \
   --dry-run
 
 # 2. Execute the release
@@ -293,7 +295,7 @@ gplay release \
   --listings-dir ./metadata \
   --screenshots-dir ./metadata \
   --release-notes @release-notes.json \
-  --rollout 10
+  --rollout 0.1
 ```
 
 ## Notes
