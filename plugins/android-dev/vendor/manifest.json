@@ -156,16 +156,8 @@
           "to": "gplay-screenshot-automation"
         },
         {
-          "from": "skills/gplay-signing-setup",
-          "to": "gplay-signing-setup"
-        },
-        {
           "from": "skills/gplay-submission-checks",
           "to": "gplay-submission-checks"
-        },
-        {
-          "from": "skills/gplay-subscription-localization",
-          "to": "gplay-subscription-localization"
         },
         {
           "from": "skills/gplay-testers-orchestration",

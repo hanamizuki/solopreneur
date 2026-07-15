@@ -67,13 +67,11 @@ upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 - `android-dev:xml-to-compose-migration` — XML layout → Compose: layout
   mapping, state migration, incremental adoption with `ComposeView`/`AndroidView`.
 
-Google Play Console CLI (`gplay`) workflow — 18 skills, all `gplay-*`:
+Google Play Console CLI (`gplay`) workflow — 16 skills, all `gplay-*`:
 
 - `android-dev:gplay-cli-usage` — `gplay` CLI flags, output formats,
   pagination, auth, discovery — read this when designing or running gplay
   commands.
-- `android-dev:gplay-signing-setup` — App signing, keystores, Play App
-  Signing setup / migration.
 - `android-dev:gplay-gradle-build` — Gradle build, sign, package APK /
   AAB before upload.
 - `android-dev:gplay-release-flow` — End-to-end release across tracks
@@ -95,8 +93,6 @@ Google Play Console CLI (`gplay`) workflow — 18 skills, all `gplay-*`:
   plans, offers.
 - `android-dev:gplay-purchase-verification` — Server-side receipt
   validation via Google Play Developer API.
-- `android-dev:gplay-subscription-localization` — Bulk-localize
-  subscription display names / descriptions / offer tags across all locales.
 - `android-dev:gplay-ppp-pricing` — Region-specific PPP pricing for
   subscriptions and IAP.
 - `android-dev:gplay-review-management` — Review monitoring, filtering,
