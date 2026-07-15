@@ -1,24 +1,25 @@
 {
-  "status": "pending",
+  "status": "done",
   "plan_dir": "docs/loops/2026-07-12_greenlight-reviewer-overhaul",
-  "started_at": null,
-  "completed_at": null,
+  "started_at": "2026-07-12T21:23:15+08:00",
+  "completed_at": "2026-07-15T17:20:00+08:00",
+  "note": "Wave subagents created both PRs then died on a session limit before finishing review/merge. Orchestrator processed all reviews and merged directly after the limit reset.",
   "prs": {
     "pr1": {
-      "number": null,
-      "status": "pending",
+      "number": 111,
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": { "rounds": 2, "fixed": 6, "pushed_back": 1, "reviewer": "coderabbit+gemini+codex" }
     },
     "pr2": {
-      "number": null,
-      "status": "pending",
+      "number": 110,
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": { "rounds": 3, "fixed": 5, "pushed_back": 0, "reviewer": "coderabbit+gemini+codex" }
     }
   }
 }
