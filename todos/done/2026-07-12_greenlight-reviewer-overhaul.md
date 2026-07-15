@@ -1,5 +1,7 @@
 # greenlight reviewer 體系整修：registry ＋ 活動偵測 ＋ Gemini sunset 清理 ＋ agy 遷移
 
+> ✅ **已完成 2026-07-15**（autopilot）。PR A → #111（greenlight registry + 偵測 + agy）、PR B → #110（naming agy 遷移），皆 merge 進 main。兩 PR 走 CodeRabbit/Gemini/Codex review 各數輪，處理過的重點 finding：三處 agy 呼叫拿掉 `--dangerously-skip-permissions`（純文字 review、diff/brief 是不可信輸入）、diff 明確框為 untrusted、agy argv ARG_MAX size guard、nonce 完成 marker、detection 改 all-or-nothing。**唯一剩下的是 repo 外 operator note**：builder 機 `~/Agents/claude/builder/solopreneur.json` 的 `fallback_order` 仍含 `"gemini"`（consumer tier，7/17 後該 bot 會死；留著只是多浪費一次 timeout，偵測落地後也會提示）。
+
 目標：一次整修 greenlight 的 reviewer 選擇機制。兩個動機同時發生：(1) Google consumer 版 Gemini Code Assist 2026-07-17 停止 GitHub code review、consumer Gemini CLI 已死；(2) 既有痛點——reviewer 選項硬編，但每個 user / repo 裝的 bot 不一樣。解法一體：reviewer registry ＋ pre-flight 活動偵測（gemini bot 的呈現交給偵測，不做靜態存廢決策），死掉的 Gemini CLI 路徑換 Antigravity CLI（`agy`）。
 
 單一 todo 的理由：wizard / fallback / reviewer 表在 SKILL.md 同幾個區塊，拆「sunset 急救」與「偵測 feature」會先寫一版過渡訊息再被偵測改寫；且 7/17 沒有硬壞點（bot 無回應有現成 timeout-fallback 兜底、CLI 早已死且被 degradation 蓋住），撐不起分段成本。實作時可拆 PR（見 Tasks 分組）。
