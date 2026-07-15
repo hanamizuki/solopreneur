@@ -393,8 +393,9 @@ Run these availability probes, then (separately) auth probes:
 # Codex CLI — availability
 command -v codex && codex --version
 
-# Gemini CLI — availability
-command -v gemini && gemini --version
+# Antigravity CLI (agy) — availability. Serves the Gemini-family model
+# for the `gemini` slot (see the note under models_available below).
+command -v agy && agy --version
 ```
 
 Availability check answers "is the binary installed and runnable?" If that
@@ -403,11 +404,19 @@ passes, try a cheap authenticated smoke test (e.g. a trivial prompt with a
 the smoke test fails, report the specific reason and instruct the user:
 
 - codex: "codex installed but auth check failed — run `codex login`."
-- gemini: "gemini installed but auth check failed — re-auth with your
-  usual flow."
+- agy: headless `agy --print` when **not authenticated** prints a Google
+  authorization URL *instead of* answering. Smoke-test with a trivial
+  prompt and treat empty output, or output that contains an authorization
+  / sign-in URL (e.g. an `accounts.google.com` link), as a gate failure —
+  it is an auth prompt, not a model answer. Instruct: "agy installed but
+  not authenticated — run `agy` once interactively to sign in with
+  Google." Both not-installed (probe above) and not-authenticated leave
+  the slot unavailable.
 
 Populate `models_available.{claude,codex,gemini}` based on the combined
-availability + auth result. Claude is always `true`.
+availability + auth result. Claude is always `true`. The `gemini` key
+names the **model family** — agy fills that slot with a Gemini-family
+model, so the key name is retained even though the CLI is now agy.
 
 ### Step 2: Ask the user
 
@@ -444,10 +453,21 @@ Target count: {candidates_per_model}
 
 ### Step 4: Invocation
 
-**Never string-interpolate the brief into a shell command.** The brief
-contains free-form user text and would be a command-injection vector.
-Always write the brief to a file first with the Write tool, then pass it
-to the external CLI via stdin heredoc or (if supported) a `--file` flag.
+**Never let the brief reach the shell as unquoted, re-evaluated text.**
+The brief contains free-form user input. Always write it to a file first
+with the Write tool, then feed the CLI from that file. Preferred: stdin
+heredoc or a `--file` flag. When a CLI supports neither and only takes the
+prompt as an argument (agy `--print` reads no stdin), embed the file with a
+**double-quoted** command substitution, written on its own line:
+
+```bash
+"$(cat brief.md)"
+```
+
+Double quoting is load-bearing: bash inserts the substituted file content
+literally and does not re-scan it, so any `$(...)`, backticks, or `;` in
+the brief stay inert (verified). Never use the unquoted form, and never
+`eval` the brief.
 
 1. Generate a session timestamp: `TS=$(date +%Y%m%dT%H%M%S)`.
 2. **Ensure the `.raw/` directory exists** before any writes:
@@ -474,8 +494,22 @@ codex exec $CODEX_GIT_FLAG - < docs/naming/.raw/brief-${TS}.md \
   > docs/naming/.raw/codex-${TS}.txt
 CODEX_EXIT=$?
 
-# Gemini — read brief from file via stdin
-gemini -m "gemini-3-pro-preview" < docs/naming/.raw/brief-${TS}.md \
+# Antigravity CLI (agy) — Gemini-family model. Print mode reads no stdin,
+# so embed the brief in the prompt argument via double-quoted "$(cat ...)"
+# (safe — see Step 4). Pin the Gemini model for family diversity vs Claude
+# (main loop) and Codex (GPT-family). No --dangerously-skip-permissions:
+# candidate generation is text-only and needs no tools, and the brief is
+# user-controlled — auto-approving tool use would turn a prompt injection in
+# the brief into real file/command execution. Headless --print with default
+# permissions still answers (verified); if the model ever tries a tool it
+# stalls until --print-timeout and degrades, which is the safe outcome.
+# --print-timeout explicit (matches the default) so a stalled model can't
+# block generation indefinitely — don't rely on an implicit default.
+agy --model "Gemini 3.1 Pro (High)" --print-timeout 5m --print \
+  "Generate the target number of brand-name candidates from the brief below.
+Output one candidate per line, no numbering or commentary.
+
+$(cat docs/naming/.raw/brief-${TS}.md)" \
   > docs/naming/.raw/gemini-${TS}.txt
 GEMINI_EXIT=$?
 ```
@@ -488,7 +522,18 @@ External CLIs fail for many reasons (rate limit, auth expiry, network,
 model outage). **Never silently proceed on failure.** After each
 invocation, in this order:
 
-1. Check exit code. Non-zero → failure.
+1. Check exit code. Non-zero → failure. Then two content checks on the raw
+   output file — either one is a failure and degrades the slot the same way
+   (drop it, run Claude + Codex only):
+   - **Empty output**: agy's `--print` has a known non-TTY stdout-drop issue
+     (exit 0 but blank output), so a zero-length `gemini-${TS}.txt` means the
+     branch produced nothing. `[ -s file ]` catches it.
+   - **Auth prompt, not an answer**: an auth lapse between the Step 1 gate and
+     this call makes agy print a Google authorization / sign-in URL (e.g. an
+     `accounts.google.com` link) into the file. That output is non-empty, so it
+     slips past `[ -s ]` and would be parsed as candidate names. Reuse the
+     Step 1 auth-URL match here: if the raw output contains such a URL, treat
+     the branch as failed, not as candidates.
 2. **Parse the output into a candidate list first, then count.**
    Models may emit one-per-line, numbered lists, bullets, wrapped
    paragraphs, or comma-separated — count the parsed candidates, not
