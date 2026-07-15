@@ -152,6 +152,17 @@ CALL (row) {
 ```
 Input stream must be outside subquery. Auto-commit only — never wrap in `beginTransaction()`. `PERIODIC COMMIT` deprecated.
 
+`DISJOINT BY` [2026.06, Cypher 25] on `IN CONCURRENT TRANSACTIONS` prevents deadlocks by scheduling batches that share lock-prone resources sequentially — use when importing relationships:
+```cypher
+CYPHER 25
+LOAD CSV WITH HEADERS FROM 'file:///rels.csv' AS line
+CALL (line) {
+  MATCH (a:Movie {id: line.movieId}), (b:Person {id: line.personId})
+  MERGE (b)-[:ACTED_IN]->(a)
+} IN CONCURRENT TRANSACTIONS OF 1000 ROWS DISJOINT BY (line.movieId, line.personId)
+```
+`DISJOINT BY (expr,...)` declares lock keys (outer-query variables only); `DISJOINT BY AUTO` infers them via static analysis; `DISJOINT BY NONE` disables. Overrides `dbms.cypher.transactions.default_subquery_batch_strategy`. `EXPLAIN`/`PROFILE` shows keys in `DISJOINT BY (...)` on `TransactionForeach`.
+
 ### QPE basics
 ```cypher
 CYPHER 25

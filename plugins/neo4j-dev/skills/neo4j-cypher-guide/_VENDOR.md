@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/tomasonjo/blogs
 - **Source path**: `claude-skills/neo4j-cypher-guide/neo4j-cypher-guide`
 - **Pinned commit**: 11fd30bdf48c3d7d1f008276d2592a1a007e1c4f
-- **Synced at**: 2026-07-12T10:10:59Z
+- **Synced at**: 2026-07-15T10:32:21Z
 - **License**: (none — upstream has no LICENSE file as of sync)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
