@@ -460,7 +460,9 @@ heredoc or a `--file` flag. When a CLI supports neither and only takes the
 prompt as an argument (agy `--print` reads no stdin), embed the file with a
 **double-quoted** command substitution, written on its own line:
 
-    "$(cat brief.md)"
+```bash
+"$(cat brief.md)"
+```
 
 Double quoting is load-bearing: bash inserts the substituted file content
 literally and does not re-scan it, so any `$(...)`, backticks, or `;` in
@@ -501,7 +503,9 @@ CODEX_EXIT=$?
 # the brief into real file/command execution. Headless --print with default
 # permissions still answers (verified); if the model ever tries a tool it
 # stalls until --print-timeout and degrades, which is the safe outcome.
-agy --model "Gemini 3.1 Pro (High)" --print \
+# --print-timeout explicit (matches the default) so a stalled model can't
+# block generation indefinitely — don't rely on an implicit default.
+agy --model "Gemini 3.1 Pro (High)" --print-timeout 5m --print \
   "Generate the target number of brand-name candidates from the brief below.
 Output one candidate per line, no numbering or commentary.
 
