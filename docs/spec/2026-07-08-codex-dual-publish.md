@@ -1,6 +1,11 @@
 # Codex Dual-Publish
 
-**Status:** Approved design (10 decisions resolved 2026-07-08)
+**Status:** Approved design (10 decisions resolved 2026-07-08). **Rollout PAUSED
+at PR 5a on 2026-07-15** — the pilot found that proactive skill-triggered agent
+spawning does not fire under `codex exec` (even at Ultra level); the routers
+degrade to inline guidance. See
+[pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md) before
+resuming.
 **Date:** 2026-07-08
 **Affected plugins:** all seven (`solopreneur`, `designer`, `marketer`, `ios-dev`, `android-dev`, `ai-engineer`, `neo4j-dev`)
 **Research trail:** `todos/backlog/2026-07-07_codex-dual-publish.md`
