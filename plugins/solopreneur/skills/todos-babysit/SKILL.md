@@ -101,7 +101,7 @@ read_solopreneur_config() {
 
 # Write a feature subtree to .default.<key> in the primary file.
 # Sibling keys are preserved (atomic read-modify-write).
-# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","gemini"]}'
+# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","codex-cli"]}'
 write_solopreneur_config() {
   local key="\$1"
   local value_expr="\$2"
@@ -516,7 +516,13 @@ gh pr create --title "{short description}" --body "Implements {todo filename}"
 Invoke `/greenlight` on the PR. This runs the full review pipeline:
 - Phase 1: Internal review (`/simplify`, `/specialist-review`, `/review`, code review skills)
 - Phase 2: Consolidate and fix
-- Phase 3: External reviewer loop (Codex/Gemini/CodeRabbit)
+- Phase 3: External reviewer loop — activity-detected active bots (Codex bot, and
+  the Gemini bot when active on the repo), Codex CLI, and CodeRabbit as a passive
+  reviewer
+
+In **auto mode**, invoke it as `/greenlight unattended` so reviewer exhaustion
+fails fast (logs and returns non-zero) instead of blocking on the wizard — the
+auto-mode fail-safe below then leaves the PR and notifies.
 
 ### Step 5: Wrap Up
 
