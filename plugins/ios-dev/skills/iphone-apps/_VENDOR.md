@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/glittercowboy/taches-cc-resources
 - **Source path**: `skills/expertise/iphone-apps`
 - **Pinned commit**: 1757615b99ab789a72ff2d02e9f6112af2a15c04
-- **Synced at**: 2026-07-12T10:10:54Z
+- **Synced at**: 2026-07-15T10:32:22Z
 - **License**: see `../../vendor/LICENSES/taches-cc-resources-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied

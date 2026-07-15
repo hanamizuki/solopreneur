@@ -128,7 +128,7 @@ asc validate subscriptions --app "APP_ID" --output json --pretty
 
 ### 9. App Privacy advisory
 
-The public API cannot fully verify App Privacy publish state. If validation reports an advisory, use the experimental web-session flow or confirm manually.
+The public API cannot fully verify App Privacy publish state. If validation reports an advisory, use the web-session flow or confirm manually.
 
 ```bash
 asc web privacy pull --app "APP_ID" --out "./privacy.json"
@@ -171,18 +171,18 @@ Use the lower-level review-submission API when the submission needs multiple rev
 
 ```bash
 asc review submissions-create --app "APP_ID" --platform IOS
-asc review items-add --submission "SUBMISSION_ID" --item-type appStoreVersions --item-id "VERSION_ID"
-asc review items-add --submission "SUBMISSION_ID" --item-type gameCenterChallengeVersions --item-id "GC_CHALLENGE_VERSION_ID"
+asc review items add --submission "SUBMISSION_ID" --item-type appStoreVersions --item-id "VERSION_ID"
+asc review items add --submission "SUBMISSION_ID" --item-type gameCenterChallengeVersions --item-id "GC_CHALLENGE_VERSION_ID"
 asc review submissions-submit --id "SUBMISSION_ID" --confirm
 ```
 
-For non-renewing IAPs that Apple requires to be selected with the next app version, the public API can reject both direct review items and standalone IAP submission. After validating IAP readiness, use the experimental web-session attachment only for that web-only gap:
+For non-renewing IAPs that Apple requires to be selected with the next app version, the public API can reject both direct review items and standalone IAP submission. After validating IAP readiness, use the web-session attachment only for that web-only gap:
 
 ```bash
 asc web review iaps attach --app "APP_ID" --iap-id "IAP_ID" --confirm
 ```
 
-This command uses unofficial Apple web-session endpoints and should be documented in the handoff.
+This command requires an authenticated Apple web session and should be documented in the handoff.
 
 ## Monitor
 
