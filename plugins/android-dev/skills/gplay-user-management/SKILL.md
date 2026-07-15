@@ -1,196 +1,172 @@
 ---
 name: gplay-user-management
-description: User and grant management for Google Play Console via gplay users and gplay grants commands. Use when asked to manage developer account users, permissions, or app-level access grants.
+description: User and grant management for Google Play Console via gplay users and gplay grants commands. Use when asked to manage developer account users, account-wide permissions, or per-app access grants.
 ---
 
 # User & Grant Management
 
-Use this skill when you need to manage users and their permissions in Google Play Console.
+Manage team members and their permissions in Google Play Console. Two layers:
+
+- **Users** (`gplay users`) — account-wide members. Permissions here (`*_GLOBAL`, `CAN_SEE_ALL_APPS`) apply across the whole developer account.
+- **Grants** (`gplay grants`) — per-app access for a user. Permissions here apply to a single package only.
+
+Use **users** to add someone to the account (optionally with account-wide powers). Use **grants** to give an existing user access to specific apps without granting account-wide reach. Least privilege: prefer per-app grants over global permissions.
 
 ## Preconditions
-- Ensure credentials are set (`gplay auth login` or `GPLAY_SERVICE_ACCOUNT` env var).
-- Service account needs "Admin" permission to manage users and grants.
-- Developer account ID is required for user operations.
 
-## User Management
+- Credentials set (`gplay auth login` or `GPLAY_SERVICE_ACCOUNT`).
+- Service account needs permission to manage users (`CAN_MANAGE_PERMISSIONS_GLOBAL`).
+- **Developer ID** is required for every command. Pass it with `--developer`. Find it in the Play Console URL (`play.google.com/console/u/0/developers/<DEVELOPER_ID>/...`).
 
-### List all users
+## Key concepts
+
+- The flag is `--developer` (Developer ID), **not** `--developer-id`.
+- There is **no** `--role` or `--permissions` flag. Permissions are supplied as a JSON body via `--json`.
+- `--json` accepts an inline JSON string **or** `@path/to/file.json`.
+- Users JSON key: `developerAccountPermissions` (account-wide). Grants JSON key: `appLevelPermissions` (per-app).
+- `delete` requires `--confirm` — it is a no-op safety guard, and the deletion is irreversible.
+
+## Users (account-wide)
+
 ```bash
-gplay users list \
-  --developer-id DEVELOPER_ID
-```
+# List users
+gplay users list --developer DEVELOPER_ID
+gplay users list --developer DEVELOPER_ID --paginate --page-size 50
+gplay users list --developer DEVELOPER_ID --output table
 
-### List users with pagination
-```bash
-gplay users list \
-  --developer-id DEVELOPER_ID \
-  --paginate
-```
-
-### List users as table
-```bash
-gplay users list \
-  --developer-id DEVELOPER_ID \
-  --output table
-```
-
-### Create a new user
-```bash
+# Create a user (inline JSON)
 gplay users create \
-  --developer-id DEVELOPER_ID \
+  --developer DEVELOPER_ID \
   --email user@example.com \
-  --role admin
-```
+  --json '{"developerAccountPermissions":["CAN_SEE_ALL_APPS"]}'
 
-### Create user with specific permissions
-```bash
+# Create with an expiration and JSON from a file
 gplay users create \
-  --developer-id DEVELOPER_ID \
-  --email user@example.com \
-  --role custom \
-  --permissions "VIEW_APP_INFORMATION,MANAGE_STORE_LISTING"
-```
+  --developer DEVELOPER_ID \
+  --email contractor@example.com \
+  --json @perms.json
 
-### Update a user
-```bash
+# Update a user's account-wide permissions
 gplay users update \
-  --developer-id DEVELOPER_ID \
+  --developer DEVELOPER_ID \
   --email user@example.com \
-  --role viewer
-```
+  --json '{"developerAccountPermissions":["CAN_SEE_ALL_APPS","CAN_VIEW_FINANCIAL_DATA_GLOBAL"]}'
 
-### Delete a user
-```bash
+# Delete a user (requires --confirm)
 gplay users delete \
-  --developer-id DEVELOPER_ID \
+  --developer DEVELOPER_ID \
   --email user@example.com \
   --confirm
 ```
 
-## Grant Management
+Users JSON body (`expirationTime` is optional, RFC 3339):
 
-Grants control app-level access for users.
+```json
+{
+  "developerAccountPermissions": [
+    "CAN_SEE_ALL_APPS",
+    "CAN_VIEW_FINANCIAL_DATA_GLOBAL"
+  ],
+  "expirationTime": "2025-12-31T23:59:59Z"
+}
+```
 
-### Create a grant (give user access to an app)
+`update` also accepts `--update-mask` (comma-separated fields) to update only specific fields; if omitted, all fields in the body are applied.
+
+### Account-level permissions (users)
+
+`CAN_SEE_ALL_APPS`, `CAN_VIEW_FINANCIAL_DATA_GLOBAL`, `CAN_MANAGE_PERMISSIONS_GLOBAL`,
+`CAN_EDIT_GAMES_GLOBAL`, `CAN_PUBLISH_GAMES_GLOBAL`, `CAN_REPLY_TO_REVIEWS_GLOBAL`,
+`CAN_MANAGE_PUBLIC_APKS_GLOBAL`, `CAN_MANAGE_TRACK_APKS_GLOBAL`, `CAN_MANAGE_TRACK_USERS_GLOBAL`,
+`CAN_MANAGE_PUBLIC_LISTING_GLOBAL`, `CAN_MANAGE_DRAFT_APPS_GLOBAL`,
+`CAN_CREATE_MANAGED_PLAY_APPS_GLOBAL`, `CAN_CHANGE_MANAGED_PLAY_SETTING_GLOBAL`,
+`CAN_MANAGE_ORDERS_GLOBAL`
+
+## Grants (per-app)
+
 ```bash
+# Grant a user access to one app
 gplay grants create \
-  --developer-id DEVELOPER_ID \
+  --developer DEVELOPER_ID \
   --email user@example.com \
   --package com.example.app \
-  --permissions "VIEW_APP_INFORMATION,VIEW_FINANCIAL_DATA"
-```
+  --json '{"appLevelPermissions":["CAN_ACCESS_APP","CAN_MANAGE_PUBLIC_APKS"]}'
 
-### Update a grant (change permissions)
-```bash
+# Update an app grant
 gplay grants update \
-  --developer-id DEVELOPER_ID \
+  --developer DEVELOPER_ID \
   --email user@example.com \
   --package com.example.app \
-  --permissions "VIEW_APP_INFORMATION,MANAGE_STORE_LISTING,MANAGE_RELEASES"
-```
+  --json '{"appLevelPermissions":["CAN_ACCESS_APP","CAN_MANAGE_PUBLIC_LISTING"]}'
 
-### Delete a grant (revoke app access)
-```bash
+# Revoke an app grant (requires --confirm)
 gplay grants delete \
-  --developer-id DEVELOPER_ID \
+  --developer DEVELOPER_ID \
   --email user@example.com \
   --package com.example.app \
   --confirm
 ```
 
-## Common Flags
+Grants JSON body:
 
-### User flags
-
-| Flag | Description |
-|------|-------------|
-| `--developer-id` | Developer account ID (required) |
-| `--email` | User email address |
-| `--role` | Role: `admin`, `viewer`, `custom` |
-| `--permissions` | Comma-separated permission list (for custom role) |
-| `--output` | Output format (`json`, `table`, `markdown`) |
-| `--paginate` | Fetch all pages |
-| `--confirm` | Required for destructive operations |
-
-### Grant flags
-
-| Flag | Description |
-|------|-------------|
-| `--developer-id` | Developer account ID (required) |
-| `--email` | User email address (required) |
-| `--package` | App package name (required) |
-| `--permissions` | Comma-separated permission list (required) |
-| `--confirm` | Required for delete operations |
-
-## Available Permissions
-
-| Permission | Description |
-|------------|-------------|
-| `VIEW_APP_INFORMATION` | View app info and download bulk reports |
-| `VIEW_FINANCIAL_DATA` | View financial data, orders, and cancellation surveys |
-| `MANAGE_ORDERS` | Manage orders and subscriptions |
-| `MANAGE_STORE_LISTING` | Manage store listing, pricing, and distribution |
-| `MANAGE_RELEASES` | Manage production and testing releases |
-| `MANAGE_APP_CONTENT` | Manage app content rating and policy declarations |
-| `VIEW_APP_QUALITY` | View app quality information |
-
-## Workflow Examples
-
-### Onboard a new team member
-```bash
-# 1. Create user account
-gplay users create \
-  --developer-id 1234567890 \
-  --email newdev@example.com \
-  --role custom \
-  --permissions "VIEW_APP_INFORMATION"
-
-# 2. Grant access to specific apps
-gplay grants create \
-  --developer-id 1234567890 \
-  --email newdev@example.com \
-  --package com.example.app1 \
-  --permissions "VIEW_APP_INFORMATION,MANAGE_RELEASES"
-
-gplay grants create \
-  --developer-id 1234567890 \
-  --email newdev@example.com \
-  --package com.example.app2 \
-  --permissions "VIEW_APP_INFORMATION,MANAGE_STORE_LISTING"
+```json
+{
+  "appLevelPermissions": [
+    "CAN_ACCESS_APP",
+    "CAN_MANAGE_PUBLIC_APKS"
+  ]
+}
 ```
 
-### Offboard a team member
-```bash
-# Revoke all access by deleting the user
-gplay users delete \
-  --developer-id 1234567890 \
-  --email departed@example.com \
-  --confirm
+`update` also accepts `--update-mask`.
+
+### App-level permissions (grants)
+
+`CAN_ACCESS_APP` (basic access), `CAN_VIEW_FINANCIAL_DATA`, `CAN_MANAGE_PERMISSIONS`,
+`CAN_REPLY_TO_REVIEWS`, `CAN_MANAGE_PUBLIC_APKS` (production releases),
+`CAN_MANAGE_TRACK_APKS` (test tracks), `CAN_MANAGE_TRACK_USERS` (testers),
+`CAN_MANAGE_PUBLIC_LISTING`, `CAN_MANAGE_DRAFT_APPS`, `CAN_MANAGE_ORDERS`
+
+## Permission recipes
+
+Build the JSON body from the constants above. `CAN_ACCESS_APP` is the base for any app grant.
+
+**Read-only viewer (per app):**
+```json
+{"appLevelPermissions":["CAN_ACCESS_APP"]}
 ```
 
-### Audit current permissions
-```bash
-# List all users in table format
-gplay users list \
-  --developer-id 1234567890 \
-  --paginate \
-  --output table
+**Release manager (per app):**
+```json
+{"appLevelPermissions":["CAN_ACCESS_APP","CAN_MANAGE_PUBLIC_APKS","CAN_MANAGE_TRACK_APKS","CAN_MANAGE_TRACK_USERS","CAN_MANAGE_DRAFT_APPS"]}
 ```
 
-### Promote user to release manager
-```bash
-gplay grants update \
-  --developer-id 1234567890 \
-  --email dev@example.com \
-  --package com.example.app \
-  --permissions "VIEW_APP_INFORMATION,MANAGE_RELEASES,MANAGE_STORE_LISTING"
+**Finance (per app):**
+```json
+{"appLevelPermissions":["CAN_ACCESS_APP","CAN_VIEW_FINANCIAL_DATA","CAN_MANAGE_ORDERS"]}
 ```
 
-## Best Practices
+**Account-wide finance (user):**
+```json
+{"developerAccountPermissions":["CAN_SEE_ALL_APPS","CAN_VIEW_FINANCIAL_DATA_GLOBAL"]}
+```
 
-1. **Principle of least privilege** - Grant only the permissions each user needs.
-2. **Use app-level grants** - Prefer grants over account-level roles for fine-grained control.
-3. **Audit regularly** - Periodically review users and their permissions.
-4. **Offboard promptly** - Remove users immediately when they leave the team.
-5. **Use `--confirm` carefully** - Delete operations are irreversible.
-6. **Automate onboarding** - Script user creation and grant assignment for consistency.
+## Workflows
+
+**Onboard a member scoped to specific apps** — create the user with minimal (or no) account-wide permissions, then add per-app grants:
+```bash
+gplay users create --developer DEVELOPER_ID --email dev@example.com \
+  --json '{"developerAccountPermissions":[]}'
+gplay grants create --developer DEVELOPER_ID --email dev@example.com \
+  --package com.example.app --json '{"appLevelPermissions":["CAN_ACCESS_APP","CAN_MANAGE_PUBLIC_APKS"]}'
+```
+
+**Offboard** — delete the user to revoke all access at once:
+```bash
+gplay users delete --developer DEVELOPER_ID --email departed@example.com --confirm
+```
+
+**Audit** — list everyone as a table:
+```bash
+gplay users list --developer DEVELOPER_ID --paginate --output table
+```

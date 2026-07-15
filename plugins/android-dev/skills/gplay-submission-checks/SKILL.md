@@ -13,6 +13,64 @@ Use this skill to validate everything before submitting a release to Google Play
 - AAB/APK built and signed.
 - Service account has at least "Release Manager" permission.
 
+## Prefer the First-Class Commands
+
+The CLI has canonical, purpose-built commands. Reach for these before
+hand-scripting individual validators:
+
+- **`gplay validate --package <pkg>`** — the canonical release-readiness report.
+  Combines local artifact/metadata/screenshot/release-note checks with remote
+  track and listing state and Console-only follow-up items. Use `--bundle`,
+  `--listings-dir`, `--screenshots-dir`, `--track`, and `--strict` (treat
+  warnings as failures) to scope it.
+
+  ```bash
+  gplay validate \
+    --package com.example.app \
+    --bundle app-release.aab \
+    --track production \
+    --strict
+  ```
+
+- **`gplay preflight --file <app.aab>`** — offline AAB/APK compliance and
+  hygiene: manifest presence, bundle/dex size, native-lib coverage, debuggable
+  and testOnly flags, cleartext traffic, dangerous permissions, and a secret
+  scan (API keys / private keys). No API calls. Exit codes: 0 clean, 1 findings
+  at/above `--fail-on`.
+
+  ```bash
+  gplay preflight --file app-release.aab --max-size 150M --fail-on warning
+  ```
+
+- **`gplay checks upload`** — Google Checks compliance analysis as a CI gate.
+  Use `--severity-threshold PRIORITY` to fail the pipeline on high-priority
+  failed checks before release.
+
+  ```bash
+  gplay checks upload \
+    --account "$CHECKS_ACCOUNT" \
+    --app "$CHECKS_APP" \
+    --binary app-release.aab \
+    --binary-type ANDROID_AAB \
+    --severity-threshold PRIORITY
+  ```
+
+- **`gplay publish track --strict`** — preflight + publish in one step. Builds
+  the readiness report, stops on blocking issues (and warnings with `--strict`),
+  then runs the release workflow only if preflight passes.
+
+  ```bash
+  gplay publish track \
+    --package com.example.app \
+    --track production \
+    --bundle app-release.aab \
+    --release-notes @release-notes.json \
+    --strict
+  ```
+
+The detailed per-artifact checks below remain useful for narrowing down a
+failure or for CI steps that gate on one concern at a time.
+
 ## Pre-submission Checklist
 
 ### 1. Validate Bundle Integrity
@@ -113,13 +171,18 @@ gplay tracks get --package com.example.app --edit $EDIT_ID --track production --
 
 ### 7. Deobfuscation / Mapping File
 
-Upload ProGuard/R8 mapping files so crash reports in Play Console are readable:
+Upload ProGuard/R8 mapping files so crash reports in Play Console are readable.
+This command is **edit-scoped** (needs `--edit`) and the version flag is
+`--apk-version`, not `--version-code`:
 
 ```bash
+EDIT_ID=$(gplay edits create --package com.example.app | jq -r '.id')
 gplay deobfuscation upload \
   --package com.example.app \
-  --version-code 42 \
+  --edit $EDIT_ID \
+  --apk-version 42 \
   --file mapping.txt
+gplay edits commit --package com.example.app --edit $EDIT_ID
 ```
 
 Without mapping files, crash stack traces in Android Vitals will be obfuscated and unusable.
@@ -313,11 +376,14 @@ gplay release \
   --dry-run \
   --output table
 
-echo "=== Step 6: Upload mapping file ==="
+echo "=== Step 6: Upload mapping file (edit-scoped) ==="
+EDIT_ID=$(gplay edits create --package "$PACKAGE" | jq -r '.id')
 gplay deobfuscation upload \
   --package "$PACKAGE" \
-  --version-code 42 \
+  --edit "$EDIT_ID" \
+  --apk-version 42 \
   --file "$MAPPING"
+gplay edits commit --package "$PACKAGE" --edit "$EDIT_ID"
 
 echo "=== All checks passed. Ready to release. ==="
 ```
@@ -328,29 +394,37 @@ Add these checks to your CI pipeline to catch issues before they reach Play Cons
 
 ```yaml
 # GitHub Actions example
-- name: Validate bundle
-  run: gplay validate bundle --file app/build/outputs/bundle/release/app-release.aab
+- name: Offline preflight (compliance + secret scan)
+  run: gplay preflight --file app/build/outputs/bundle/release/app-release.aab --fail-on error
 
-- name: Validate metadata
-  run: gplay validate listing --dir metadata/
-
-- name: Validate screenshots
-  run: gplay validate screenshots --dir metadata/
-
-- name: Dry run release
+- name: Checks compliance gate
   run: |
-    gplay release \
+    gplay checks upload \
+      --account ${{ secrets.CHECKS_ACCOUNT }} \
+      --app ${{ secrets.CHECKS_APP }} \
+      --binary app/build/outputs/bundle/release/app-release.aab \
+      --binary-type ANDROID_AAB \
+      --severity-threshold PRIORITY
+
+- name: Canonical readiness report
+  run: |
+    gplay validate \
       --package ${{ secrets.PACKAGE_NAME }} \
-      --track internal \
       --bundle app/build/outputs/bundle/release/app-release.aab \
-      --dry-run
+      --track internal \
+      --strict
   env:
     GPLAY_SERVICE_ACCOUNT: ${{ secrets.GPLAY_SERVICE_ACCOUNT_PATH }}
 ```
 
 ## Agent Behavior
-- Always run `gplay validate` commands before attempting a release.
-- Use `--dry-run` as the final gate before real releases.
+- Prefer the first-class commands: `gplay validate` (readiness report),
+  `gplay preflight` (offline), `gplay checks upload` (Checks gate), and
+  `gplay publish track --strict` (preflight + publish) over hand-scripting.
+- Always run `gplay validate` before attempting a release.
+- Use `--dry-run` (or `publish track --strict`) as the final gate before real releases.
+- `gplay deobfuscation upload` is edit-scoped: use `--edit` and `--apk-version`
+  (not `--version-code`), then commit the edit.
 - Always confirm exact flags with `--help` before running commands.
 - Use `--output table` for human-readable validation output.
 - When multiple validation steps fail, report all failures together rather than stopping at the first one.

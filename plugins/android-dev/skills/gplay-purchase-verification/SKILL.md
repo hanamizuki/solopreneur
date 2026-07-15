@@ -88,7 +88,19 @@ gplay purchases products consume \
 
 ## Verify Subscription
 
-### Get subscription details
+> **Prefer the v2 API.** For new integrations use `gplay purchases subscriptionsv2 get`
+> (and `subscriptionsv2 cancel/defer/revoke`, `purchases productsv2 get`). The v2
+> `SubscriptionPurchaseV2` model reflects base plans and offers; the v1 endpoints
+> below still work but are the legacy shape.
+
+### Get subscription details (v2, recommended)
+```bash
+gplay purchases subscriptionsv2 get \
+  --package com.example.app \
+  --token <SUBSCRIPTION_TOKEN>
+```
+
+### Get subscription details (v1, legacy)
 ```bash
 gplay purchases subscriptions get \
   --package com.example.app \
@@ -222,6 +234,18 @@ Set up Pub/Sub to receive subscription events:
    - Monetization Setup → Real-time developer notifications
    - Enter topic name
 
+gplay can scaffold and decode RTDN without hand-writing the base64/JSON parsing:
+
+```bash
+# Print the Pub/Sub topic + Play Console setup steps
+gplay rtdn setup --package com.example.app
+
+# Decode an RTDN payload into readable JSON (notification type, token, etc.)
+# Accepts a full Pub/Sub envelope (message.data is base64) or the raw notification.
+gplay rtdn decode --data '{"message":{"data":"<BASE64_DATA>"}}'
+cat payload.json | gplay rtdn decode --file -
+```
+
 3. **Subscribe to events**:
 ```python
 from google.cloud import pubsub_v1
@@ -328,11 +352,14 @@ gplay orders batch-get \
 ```
 
 ### Refund order
+`orders refund` is a destructive write and requires `--confirm` — without it the
+command refuses to run.
 ```bash
 gplay orders refund \
   --package com.example.app \
   --order-id GPA.1234-5678-9012-34567 \
-  --revoke  # Also revoke access
+  --revoke \    # Also revoke entitlement/access
+  --confirm     # Required — refund is irreversible
 ```
 
 ## Security Best Practices
