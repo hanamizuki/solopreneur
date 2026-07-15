@@ -372,7 +372,7 @@ When updating PPP prices on subscriptions with active subscribers, new prices on
 gplay baseplans migrate-prices \
   --package "PACKAGE" \
   --product-id "PRODUCT_ID" \
-  --base-plan "BASE_PLAN_ID" \
+  --base-plan-id "BASE_PLAN_ID" \
   --json @migration.json
 ```
 
@@ -383,14 +383,14 @@ Apply migration to every base plan that had its prices changed:
 gplay baseplans migrate-prices \
   --package "PACKAGE" \
   --product-id "PRODUCT_ID" \
-  --base-plan monthly \
+  --base-plan-id monthly \
   --json @migration.json
 
 # Yearly plan
 gplay baseplans migrate-prices \
   --package "PACKAGE" \
   --product-id "PRODUCT_ID" \
-  --base-plan yearly \
+  --base-plan-id yearly \
   --json @migration.json
 ```
 

@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/tamtom/gplay-cli-skills
 - **Source path**: `skills/gplay-migrate-fastlane`
-- **Pinned commit**: d3983dd3e9ee794654c7739892f121321e049724
-- **Synced at**: 2026-07-12T10:10:40Z
+- **Pinned commit**: 439c9aea171247318a32da91674e50b295aef94e
+- **Synced at**: 2026-07-15T12:28:43Z
 - **License**: see `../../vendor/LICENSES/gplay-cli-skills-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied

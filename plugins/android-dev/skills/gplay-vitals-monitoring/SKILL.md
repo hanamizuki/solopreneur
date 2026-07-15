@@ -1,247 +1,148 @@
 ---
 name: gplay-vitals-monitoring
-description: App vitals monitoring for crashes, ANRs, performance metrics, and errors via gplay vitals commands. Use when asked to check app stability, crash rates, ANR rates, or performance data from Google Play Console.
+description: Monitor Android app stability and performance from the Play Developer Reporting API via gplay vitals. Use to query crash/ANR rates, detect release regressions with anomaly detection, filter error issues/reports with AIP-160 expressions, and break down startup/rendering/battery metrics by dimension. Use when asked to check crash rates, ANR rates, error trends, performance data, or to gate a release on stability.
 ---
 
 # App Vitals Monitoring
 
-Use this skill when you need to monitor app stability, performance, and errors from Google Play Console.
+`gplay vitals` hits the **Play Developer Reporting API** (separate from the Android Publisher API used by most other commands). Every subcommand outputs **JSON by default**; add `--output table|markdown` for humans or `--pretty` to indent JSON. Dates are ISO 8601 (`YYYY-MM-DD`).
 
 ## Preconditions
-- Ensure credentials are set (`gplay auth login` or `GPLAY_SERVICE_ACCOUNT` env var).
+- Credentials set (`gplay auth login` or `GPLAY_SERVICE_ACCOUNT`).
 - Service account needs "View app information and download bulk reports" permission.
-- App must have active installs generating vitals data.
+- The app must have enough installs to generate vitals data (small apps return empty sets).
 
-## Crash Monitoring
+## The real surface
+There are exactly three groups. There is **no** `crashes list/get`, no `errors list/get`, no `performance overview/permissions`, no `--cluster-id`, `--version-code`, `--start-time/--end-time`, `--severity`, or `--error-id`.
 
-### List crash clusters
+| Command | Purpose |
+|---------|---------|
+| `vitals crashes query` | Crash / ANR **rate** metrics over a date range |
+| `vitals crashes anomalies` | Auto-detected regressions — the release gate |
+| `vitals performance startup\|rendering\|battery` | Performance metric breakdowns |
+| `vitals errors issues` | Grouped error **issues** (AIP-160 filterable) |
+| `vitals errors reports` | Individual error **reports** with stack traces |
+
+## Crash & ANR rate metrics
+
+`gplay vitals crashes query` returns rate metrics, not a cluster list. Switch metric with `--type crash|anr`; group with `--dimension`.
+
 ```bash
-gplay vitals crashes list \
-  --package com.example.app
+# Crash rate for a window
+gplay vitals crashes query --package com.example.app --from 2026-06-01 --to 2026-06-30 --output table
+
+# ANR rate
+gplay vitals crashes query --package com.example.app --type anr --output table
+
+# Break down by version to spot a bad build
+gplay vitals crashes query --package com.example.app --dimension versionCode --output table
+
+# By device model
+gplay vitals crashes query --package com.example.app --dimension deviceModel --paginate
 ```
 
-### Get crash cluster details
+Other valid dimensions include `deviceModel`, `deviceBrand`, `apiLevel`, `countryCode`. Use `--paginate` to pull every page.
+
+## Anomaly detection — the regression / release gate
+
+`gplay vitals crashes anomalies` lists automatically detected deviations that likely indicate a regression from a new release. This is the command to run in a post-release watch or a CI gate — it does the "is this worse than baseline?" judgement for you across crash, ANR, error, and performance metric sets.
+
 ```bash
-gplay vitals crashes get \
-  --package com.example.app \
-  --cluster-id CLUSTER_ID
+# All anomalies in the last 7 days (default window)
+gplay vitals crashes anomalies --package com.example.app --output table
+
+# Just ANR regressions, most recent 20
+gplay vitals crashes anomalies --package com.example.app --type anr --limit 20
+
+# Scope to a release window
+gplay vitals crashes anomalies --package com.example.app --from 2026-06-25 --to 2026-07-02
 ```
 
-### Filter by time range
+`--type` accepts `crash`, `anr`, `errors`, `performance`, or `all` (default). `--limit` is 1–1000 (default 50).
+
+## Performance metrics
+
+Three subcommands, each with an optional `--dimension` (e.g. `apiLevel`, `deviceModel`, `country`):
+
 ```bash
-gplay vitals crashes list \
-  --package com.example.app \
-  --start-time 2026-01-01T00:00:00Z \
-  --end-time 2026-02-01T00:00:00Z
+# Cold/warm/hot startup percentiles, broken down by API level
+gplay vitals performance startup --package com.example.app --dimension apiLevel --output table
+
+# Slow (16ms) and frozen (700ms) frame rates
+gplay vitals performance rendering --package com.example.app --from 2026-06-01 --to 2026-06-30
+
+# Battery: excessive wakeups vs. stuck wake locks (choose with --type)
+gplay vitals performance battery --package com.example.app --type wakeup --output table
+gplay vitals performance battery --package com.example.app --type wakelock
 ```
 
-### Filter by version code
+## Errors: issues vs. reports, filtered with AIP-160
+
+- **`errors issues`** — reports grouped into issues (counts, distinct users). Start here to triage.
+- **`errors reports`** — individual reports with stack traces and device info. Drill in from an issue.
+
+Both filter via a single `--filter` AIP-160 expression. Supported fields: `errorIssueType` (`CRASH`, `ANR`, `NON_FATAL`), `apiLevel`, `versionCode`, `deviceModel`, `deviceBrand`, `deviceType`, `appProcessState` (`FOREGROUND`, `BACKGROUND`), `isUserPerceived`; `reports` additionally supports `errorIssueId` and `errorReportId`.
+
 ```bash
-gplay vitals crashes list \
-  --package com.example.app \
-  --version-code 42
+# Top crash issues by report count
+gplay vitals errors issues --package com.example.app \
+  --filter 'errorIssueType = CRASH' \
+  --order-by 'errorReportCount desc' --page-size 10 --output table
+
+# ANR issues most impacting distinct users
+gplay vitals errors issues --package com.example.app \
+  --filter 'errorIssueType = ANR' --order-by 'distinctUsers desc'
+
+# Compound filter: crashes on a specific version, foreground only
+gplay vitals errors reports --package com.example.app \
+  --filter 'errorIssueType = CRASH AND versionCode = 105 AND appProcessState = FOREGROUND'
+
+# All reports belonging to one issue (drill-down)
+gplay vitals errors reports --package com.example.app \
+  --filter 'errorIssueId = 1234567890' --page-size 20
 ```
 
-### Filter by app version name
+`--order-by` (issues only) accepts `errorReportCount` / `distinctUsers` with `asc`/`desc`. Use `--paginate` for everything.
+
+## JSON + jq extraction
+
+Default JSON is meant to be piped:
+
 ```bash
-gplay vitals crashes list \
-  --package com.example.app \
-  --version-name "1.2.0"
+# Pull the errorIssueId of the worst crash issue
+WORST=$(gplay vitals errors issues --package com.example.app \
+  --filter 'errorIssueType = CRASH' --order-by 'errorReportCount desc' --page-size 1 \
+  | jq -r '.errorIssues[0].name')
+
+# Count anomalies flagged in the release window
+gplay vitals crashes anomalies --package com.example.app --from 2026-06-25 --to 2026-07-02 \
+  | jq '.anomalies | length'
 ```
 
-### Paginate through all crash clusters
+Field names vary by endpoint — inspect once with `--pretty` before scripting against a path.
+
+## Stability workflow
+
+1. **Watch after every release.** Run `vitals crashes anomalies` scoped to the rollout window first — it surfaces regressions without you setting thresholds.
+2. **Confirm the trend.** `vitals crashes query --type crash` and `--type anr` for the rate; add `--dimension versionCode` to confirm the new build is the culprit.
+3. **Triage.** `vitals errors issues --filter 'errorIssueType = CRASH' --order-by 'errorReportCount desc'` to rank by impact.
+4. **Drill in.** Take the issue id and run `vitals errors reports --filter 'errorIssueId = <id>'` for stack traces and device breakdown.
+5. **Track ANRs separately** — they weigh heavily on Play ranking; always check `--type anr` distinctly.
+
+## CI/CD stability gate
+
+Prefer `anomalies` over hand-rolled thresholds. Note `--rollout` is a **fraction 0.0–1.0**, never a percent.
+
 ```bash
-gplay vitals crashes list \
-  --package com.example.app \
-  --paginate
-```
+ANOMALIES=$(gplay vitals crashes anomalies \
+  --package com.example.app --type all --from "$RELEASE_DATE" \
+  | jq '.anomalies | length')
 
-### Output as table for readability
-```bash
-gplay vitals crashes list \
-  --package com.example.app \
-  --output table
-```
-
-## ANR Monitoring
-
-### List ANR clusters
-```bash
-gplay vitals crashes list \
-  --package com.example.app \
-  --type anr
-```
-
-### Get ANR cluster details
-```bash
-gplay vitals crashes get \
-  --package com.example.app \
-  --cluster-id CLUSTER_ID \
-  --type anr
-```
-
-## Performance Metrics
-
-### Get performance overview
-```bash
-gplay vitals performance overview \
-  --package com.example.app
-```
-
-### Startup time metrics
-```bash
-gplay vitals performance startup \
-  --package com.example.app
-```
-
-### Filter by device type
-```bash
-gplay vitals performance overview \
-  --package com.example.app \
-  --device-type phone
-```
-
-### Filter by OS version
-```bash
-gplay vitals performance overview \
-  --package com.example.app \
-  --os-version 14
-```
-
-### Rendering metrics (slow/frozen frames)
-```bash
-gplay vitals performance rendering \
-  --package com.example.app
-```
-
-### Battery metrics
-```bash
-gplay vitals performance battery \
-  --package com.example.app
-```
-
-### Permission denials
-```bash
-gplay vitals performance permissions \
-  --package com.example.app
-```
-
-## Error Reporting
-
-### List error clusters
-```bash
-gplay vitals errors list \
-  --package com.example.app
-```
-
-### Get error details
-```bash
-gplay vitals errors get \
-  --package com.example.app \
-  --error-id ERROR_ID
-```
-
-### Filter errors by severity
-```bash
-gplay vitals errors list \
-  --package com.example.app \
-  --severity critical
-```
-
-### Filter errors by time range
-```bash
-gplay vitals errors list \
-  --package com.example.app \
-  --start-time 2026-01-01T00:00:00Z \
-  --end-time 2026-02-01T00:00:00Z
-```
-
-## Common Flags
-
-| Flag | Description |
-|------|-------------|
-| `--package` | App package name (required) |
-| `--start-time` | Start of time range (RFC 3339) |
-| `--end-time` | End of time range (RFC 3339) |
-| `--version-code` | Filter by version code |
-| `--version-name` | Filter by version name |
-| `--type` | Event type (`crash`, `anr`) |
-| `--output` | Output format (`json`, `table`, `markdown`) |
-| `--paginate` | Fetch all pages |
-| `--pretty` | Pretty-print JSON output |
-
-## Workflow Examples
-
-### Daily stability check
-```bash
-# Check crash rate for the latest version
-gplay vitals crashes list \
-  --package com.example.app \
-  --version-name "2.1.0" \
-  --output table
-
-# Check ANR rate
-gplay vitals crashes list \
-  --package com.example.app \
-  --version-name "2.1.0" \
-  --type anr \
-  --output table
-
-# Review performance
-gplay vitals performance overview \
-  --package com.example.app \
-  --output table
-```
-
-### Investigate a crash spike
-```bash
-# 1. List top crash clusters
-gplay vitals crashes list \
-  --package com.example.app \
-  --start-time 2026-02-10T00:00:00Z \
-  --output table
-
-# 2. Get details for the top cluster
-CLUSTER=$(gplay vitals crashes list \
-  --package com.example.app \
-  --start-time 2026-02-10T00:00:00Z | jq -r '.[0].clusterId')
-
-gplay vitals crashes get \
-  --package com.example.app \
-  --cluster-id $CLUSTER \
-  --pretty
-
-# 3. Check if it's version-specific
-gplay vitals crashes list \
-  --package com.example.app \
-  --version-code 105 \
-  --output table
-```
-
-### CI/CD stability gate
-```bash
-# Check if crash rate exceeds threshold before promoting
-CRASH_COUNT=$(gplay vitals crashes list \
-  --package com.example.app \
-  --version-name "$VERSION" | jq 'length')
-
-if [ "$CRASH_COUNT" -gt 10 ]; then
-  echo "Too many crash clusters ($CRASH_COUNT). Halting promotion."
+if [ "$ANOMALIES" -gt 0 ]; then
+  echo "Vitals anomalies detected ($ANOMALIES). Halting promotion."
   exit 1
 fi
 
-gplay promote \
-  --package com.example.app \
-  --from beta \
-  --to production \
-  --rollout 10
+# Clean — promote beta to a 10% staged production rollout
+gplay promote --package com.example.app --from beta --to production --rollout 0.1
 ```
-
-## Best Practices
-
-1. **Monitor after every release** - Check vitals within 24-48 hours of rollout.
-2. **Upload deobfuscation files** - Ensure crash stack traces are readable.
-3. **Set up CI stability gates** - Block promotion when crash rates exceed thresholds.
-4. **Track ANRs separately** - ANRs impact Play Store ranking more than crashes.
-5. **Compare across versions** - Filter by version code to detect regressions.
-6. **Use JSON output in scripts** - Parse with `jq` for automated monitoring.

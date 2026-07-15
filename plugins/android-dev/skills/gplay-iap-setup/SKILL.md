@@ -1,6 +1,6 @@
 ---
 name: gplay-iap-setup
-description: In-app products, subscriptions, base plans, and offers setup for Google Play monetization. Use when configuring in-app purchases or subscription products.
+description: In-app products, subscriptions, base plans, and offers setup for Google Play monetization, including bulk-localizing subscription display names, descriptions, and benefits across all locales. Use when configuring in-app purchases or subscription products.
 ---
 
 # In-App Purchase Setup for Google Play
@@ -134,10 +134,10 @@ gplay iap list --package com.example.app
 ```
 
 ### Create product
+`iap create` has no `--sku` flag — the SKU/productId lives in the JSON body:
 ```bash
 gplay iap create \
   --package com.example.app \
-  --sku premium_upgrade \
   --json @product.json
 ```
 
@@ -232,6 +232,61 @@ Subscriptions use the `units`/`nanos`/`currencyCode` price format:
 }
 ```
 
+### Bulk-localize subscriptions across locales
+
+Subscription listings are an **array** of per-locale objects (not an object
+keyed by locale). Each entry uses `languageCode`, `title`, `benefits` (array,
+max 4), and `description`. One `subscriptions update` call sets every locale
+atomically — use `--update-mask listings` so base plans and pricing are left
+untouched.
+
+**1. Discover the locales your app already ships** (cover at least these):
+```bash
+EDIT_ID=$(gplay edits create --package com.example.app | jq -r '.id')
+gplay listings list --package com.example.app --edit "$EDIT_ID" --output table
+```
+
+**2. Build a listings-only JSON file** (`subscription-listings.json`):
+```json
+{
+  "listings": [
+    { "languageCode": "en-US", "title": "Premium Monthly", "benefits": ["Unlimited access", "No ads"], "description": "Premium access to all features." },
+    { "languageCode": "de-DE", "title": "Premium Monatlich", "benefits": ["Unbegrenzter Zugang", "Keine Werbung"], "description": "Premium-Zugang zu allen Funktionen." },
+    { "languageCode": "es-ES", "title": "Premium Mensual", "benefits": ["Acceso ilimitado", "Sin anuncios"], "description": "Acceso premium a todas las funciones." },
+    { "languageCode": "ja-JP", "title": "プレミアム月額", "benefits": ["無制限アクセス", "広告なし"], "description": "すべての機能にプレミアムアクセス。" }
+  ]
+}
+```
+
+**3. Apply to one subscription:**
+```bash
+gplay subscriptions update \
+  --package com.example.app \
+  --product-id premium_monthly \
+  --json @subscription-listings.json \
+  --update-mask listings
+```
+
+**4. Loop over every subscription in the app:**
+```bash
+PACKAGE="com.example.app"
+gplay subscriptions list --package "$PACKAGE" --paginate \
+  | jq -r '.[].productId' \
+  | while read -r PRODUCT_ID; do
+      gplay subscriptions update \
+        --package "$PACKAGE" \
+        --product-id "$PRODUCT_ID" \
+        --json @subscription-listings.json \
+        --update-mask listings
+    done
+```
+
+Verify with `gplay subscriptions get --package com.example.app --product-id premium_monthly --pretty`
+and confirm every `languageCode` appears in the `listings` array. Constraints:
+title max 55 chars, description max 80 chars, benefits max 4 items. When the
+user gives a single display name, reuse it for all locales; when they give
+per-locale translations, use each locale's own text.
+
 ## Base Plans
 
 Base plans define the billing period and price for subscriptions.
@@ -241,7 +296,7 @@ Base plans define the billing period and price for subscriptions.
 gplay baseplans activate \
   --package com.example.app \
   --product-id premium_monthly \
-  --base-plan monthly
+  --base-plan-id monthly
 ```
 
 ### Deactivate base plan
@@ -249,7 +304,7 @@ gplay baseplans activate \
 gplay baseplans deactivate \
   --package com.example.app \
   --product-id premium_monthly \
-  --base-plan monthly
+  --base-plan-id monthly
 ```
 
 ### Migrate prices
@@ -257,7 +312,7 @@ gplay baseplans deactivate \
 gplay baseplans migrate-prices \
   --package com.example.app \
   --product-id premium_monthly \
-  --base-plan monthly \
+  --base-plan-id monthly \
   --json @migration.json
 ```
 
@@ -270,7 +325,7 @@ Offers provide discounts, free trials, or introductory pricing.
 gplay offers list \
   --package com.example.app \
   --product-id premium_monthly \
-  --base-plan monthly
+  --base-plan-id monthly
 ```
 
 ### Create offer
@@ -278,7 +333,7 @@ gplay offers list \
 gplay offers create \
   --package com.example.app \
   --product-id premium_monthly \
-  --base-plan monthly \
+  --base-plan-id monthly \
   --json @offer.json
 ```
 
@@ -325,14 +380,14 @@ gplay offers create \
 gplay offers activate \
   --package com.example.app \
   --product-id premium_monthly \
-  --base-plan monthly \
+  --base-plan-id monthly \
   --offer-id trial_7day
 
 # Deactivate
 gplay offers deactivate \
   --package com.example.app \
   --product-id premium_monthly \
-  --base-plan monthly \
+  --base-plan-id monthly \
   --offer-id trial_7day
 ```
 
@@ -359,14 +414,21 @@ gplay pricing convert \
   --json @price-request.json
 ```
 
-### price-request.json
+### price-request.json (ConvertRegionPricesRequest)
+The body is a single base `price` as Money — `units` is the whole-currency
+amount as a string, `nanos` is the fractional part (990000000 = .99):
 ```json
 {
-  "basePriceMicros": "4990000",
-  "baseCurrency": "USD",
-  "targetCurrencies": ["GBP", "EUR", "JPY"]
+  "price": {
+    "currencyCode": "USD",
+    "units": "9",
+    "nanos": 990000000
+  }
 }
 ```
+The response returns converted prices for all supported regions plus a
+`regionVersion` you can pass as `--regions-version` to subscriptions, base
+plans, offers, and one-time product commands.
 
 ## Common Monetization Patterns
 
@@ -400,7 +462,7 @@ gplay subscriptions create \
 gplay offers create \
   --package com.example.app \
   --product-id premium \
-  --base-plan monthly \
+  --base-plan-id monthly \
   --json @trial.json
 ```
 

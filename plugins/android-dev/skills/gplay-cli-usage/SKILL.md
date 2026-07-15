@@ -90,8 +90,10 @@ gplay tracks list --package com.example.app | jq '.tracks[] | select(.track == "
 
 ### Use profiles
 ```bash
-gplay auth add-profile production --service-account /path/to/prod-sa.json
-gplay auth use-profile production
+# Create/login a named profile
+gplay auth login --profile production --service-account /path/to/prod-sa.json
+# Switch the active profile
+gplay auth switch --profile production
 gplay --profile production tracks list --package com.example.app
 ```
 
@@ -114,13 +116,15 @@ gplay init --package com.example.app --service-account /path/to/sa.json
 
 ### List apps in developer account
 ```bash
-gplay apps list --developer-id 1234567890
-gplay apps list --developer-id 1234567890 --output table
+gplay apps list
+gplay apps list --output table
+gplay apps list --paginate
 ```
 
 ### Generate CLI documentation
 ```bash
-gplay docs generate --format markdown --output-dir ./docs
+gplay docs generate --output-file ./GPLAY.md
+gplay docs generate --output-file -   # write to stdout
 ```
 
 ### Self-update
@@ -131,21 +135,22 @@ gplay update --check  # Check for updates without installing
 
 ### Financial reports
 ```bash
-gplay reports financial list --developer <id>
-gplay reports financial list --developer <id> --type earnings --from 2026-01 --to 2026-06
-gplay reports financial download --developer <id> --from 2026-01 --type earnings --dir ./reports
+# --bucket-id is the GCS bucket ID/URI from Play Console > Download reports > Copy Cloud Storage URI
+gplay reports financial list --bucket-id <id>
+gplay reports financial list --bucket-id <id> --type earnings --from 2026-01 --to 2026-06
+gplay reports financial download --bucket-id <id> --from 2026-01 --type earnings --dir ./reports
 ```
 
 ### Statistics reports
 ```bash
-gplay reports stats list --developer <id>
-gplay reports stats list --developer <id> --package com.example.app --type installs
-gplay reports stats download --developer <id> --package com.example.app --from 2026-01 --type installs --dir ./reports
+gplay reports stats list --bucket-id <id>
+gplay reports stats list --bucket-id <id> --package com.example.app --type installs
+gplay reports stats download --bucket-id <id> --package com.example.app --from 2026-01 --type installs --dir ./reports
 ```
 
 ### Send notifications
 ```bash
-gplay notify --webhook https://hooks.slack.com/... --message "Release deployed"
+gplay notify send --webhook-url https://hooks.slack.com/... --message "Release deployed"
 ```
 
 ## Edit sessions

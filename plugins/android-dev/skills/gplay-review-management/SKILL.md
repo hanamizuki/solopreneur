@@ -59,6 +59,12 @@ gplay reviews list --package com.example.app \
   | jq '.reviews[] | select(.comments[0].userComment.language == "en")'
 ```
 
+### Machine-translated review text
+Use the built-in `--translation-language` flag to get review text translated by Google, rather than reading it in the original language:
+```bash
+gplay reviews list --package com.example.app --translation-language en-US
+```
+
 ### Reviews containing keywords
 ```bash
 # Find reviews mentioning "crash"
@@ -76,46 +82,11 @@ gplay reviews get \
 
 ## Reply to Reviews
 
-### Reply to single review
 ```bash
 gplay reviews reply \
   --package com.example.app \
   --review REVIEW_ID \
   --text "Thank you for your feedback! We've fixed this issue in version 1.2.3."
-```
-
-### Reply templates
-
-**Bug report response:**
-```bash
-gplay reviews reply \
-  --package com.example.app \
-  --review REVIEW_ID \
-  --text "Thank you for reporting this issue. We've identified the problem and a fix will be available in the next update. Please update to version X.X.X when it's released."
-```
-
-**Feature request response:**
-```bash
-gplay reviews reply \
-  --package com.example.app \
-  --review REVIEW_ID \
-  --text "Thank you for your suggestion! We've added this to our roadmap and will consider it for a future release."
-```
-
-**Positive review response:**
-```bash
-gplay reviews reply \
-  --package com.example.app \
-  --review REVIEW_ID \
-  --text "Thank you so much for your kind words! We're glad you're enjoying the app."
-```
-
-**Crash report response:**
-```bash
-gplay reviews reply \
-  --package com.example.app \
-  --review REVIEW_ID \
-  --text "We're sorry you experienced a crash. This issue has been fixed in version X.X.X. Please update and let us know if you continue to have problems."
 ```
 
 ## Automated Review Response
@@ -179,51 +150,6 @@ gplay reviews list --package com.example.app --paginate \
 ```bash
 gplay reviews list --package com.example.app --paginate \
   | jq '.reviews[] | select(.comments[0].userComment.text | test("refund|money back"; "i"))'
-```
-
-## Review Response Best Practices
-
-### DO:
-- ✅ Respond within 24-48 hours
-- ✅ Be professional and empathetic
-- ✅ Acknowledge the issue
-- ✅ Provide a solution or timeline
-- ✅ Thank users for feedback
-- ✅ Personalize responses when possible
-
-### DON'T:
-- ❌ Argue with users
-- ❌ Use template responses for everything
-- ❌ Ignore negative reviews
-- ❌ Make promises you can't keep
-- ❌ Be defensive
-- ❌ Copy-paste the same response to every review
-
-## Response Templates
-
-### General bug fix
-```
-Thank you for reporting this. We've identified the issue and it will be fixed in our next update (version X.X.X). We appreciate your patience!
-```
-
-### Already fixed
-```
-Thank you for your feedback! This issue has been resolved in our latest version (X.X.X). Please update your app and let us know if you continue to experience any problems.
-```
-
-### Need more info
-```
-Thank you for your feedback. We'd like to help resolve this issue. Could you please email us at support@example.com with more details about what happened? This will help us investigate further.
-```
-
-### Feature request
-```
-Thank you for the suggestion! We've added this to our feature backlog and will consider it for a future release. Please keep the feedback coming!
-```
-
-### Positive review
-```
-Thank you so much! We're thrilled to hear you're enjoying the app. If you have any suggestions for improvements, we'd love to hear them!
 ```
 
 ## Monitoring Dashboard
