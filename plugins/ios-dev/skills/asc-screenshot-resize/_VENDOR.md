@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/rudrankriyam/app-store-connect-cli-skills
 - **Source path**: `skills/asc-screenshot-resize`
-- **Pinned commit**: ed0049a59ebbe68743019922c7150c4f5bb29db2
-- **Synced at**: 2026-07-12T10:10:52Z
+- **Pinned commit**: 0ae3da2bf0a43300d3c994593f4df73f3e3da230
+- **Synced at**: 2026-07-15T12:28:21Z
 - **License**: see `../../vendor/LICENSES/app-store-connect-cli-skills-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
