@@ -225,6 +225,31 @@ One .md file per PR. Format:
 Specs describe **what to do + how to verify completion**, not pseudo code.
 Let the implementation subagent decide how to write the code.
 
+### Spec quality gate (acceptance criteria)
+
+Step 3 is where a fuzzy goal gets compiled into a loop contract, so gate the
+acceptance criteria **before writing the spec**. This is a lightweight checklist
+prompt — **no subagent**; the real enforcement is greenlight's verifier loop (see
+`../greenlight/SKILL.md` "Inner verify loop"). Run it inline:
+
+- **Every acceptance criterion must be an executable command or a verifiable
+  assertion.** An executable command is something a shell can run and pass/fail on
+  (`cd x && uv run pytest tests/test_x.py`, `grep -n "reason_class" file.md`); a
+  verifiable assertion names an observable state or behavior ("stops within 60s of the
+  shutdown event"). **Reject vague criteria** — "works correctly", "handles errors
+  properly", "the UI looks right" have no verifier — and rewrite them into a command or
+  an observable condition before proceeding.
+- **`type: docs` PRs are exempt** (prose criteria are checklist assertions a reviewer
+  judges, not runnable commands), **BUT cross-check the exemption against the mechanical
+  S whitelist** from greenlight's sizing cascade
+  (`../greenlight/SKILL.md` → "Mechanical cascade"): the pure-prose whitelist is
+  `docs/**` (excluding `docs/loops/**`), `todos/**`, the repo-root `README.md`,
+  `LICENSE`, `.gitignore`. If any path in the PR's `files` list falls **outside** that
+  whitelist, the self-declared `type: docs` is not trustworthy — **override it to
+  `code` (or at minimum flag it)** and apply the gate in full. A `SKILL.md` edit is not
+  docs. This closes the gaming path where a mislabeled `docs` type buys both this
+  exemption and the sizing PR's S light-review.
+
 ### state.json
 
 Initial state (multi-PR or single-PR + schedule; **not** written for single-PR

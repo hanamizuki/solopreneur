@@ -159,8 +159,9 @@ You have an objective verify command: <VERIFY_CMD>. Before you commit:
    final failing assertion / first error line plus the tail, capped in size the
    same way this file caps agy input at AGY_MAX_DIFF_BYTES — and retry the fix.
 5. Cap: 3 verify attempts total. On the 3rd consecutive failure, do NOT commit or
-   push — return a structured halt result (reason `inner-verify-failed`, the FULL
-   verify log, your attempted-fix summary) instead of committing.
+   push — return a structured halt result (reason `inner-verify-failed`,
+   `reason_class: invariant-violation`, the FULL verify log, your attempted-fix
+   summary) instead of committing.
 
 Truncate every feedback log this way; the full log rides only in the halt
 payload. Three stacked rounds of full logs would otherwise drown the signal.
@@ -175,16 +176,25 @@ must explicitly reference that same file. If the diff touches a test file or the
 verify definition that no finding called out → do not commit.** Match per file —
 a finding about one test file does not license editing a different, unmentioned
 test file. Halt (unattended / autopilot dispatch) or flag (attended) with the
-reason `anti-gaming: fix touches test/verify definition unprompted`. At size S
+reason `anti-gaming: fix touches test/verify definition unprompted`
+(`reason_class: authority-boundary` — a refusal that needs a human, see
+[Escalation taxonomy](#escalation-taxonomy-halt--flag--note)). At size S
 (added by a later PR) there are no internal reviewers, so this guard is the only
 defense against fix-to-pass gaming — it lands here, not in the escalation PR.
 
-### Minimal halt / flag primitive
+### Halt / flag primitive
 
-A fuller escalation taxonomy arrives in a later PR; this PR ships the minimum.
+The level model that assigns halt / flag / note, the two-question rubric,
+`reason_class`, the attended projection, and the findings-contradiction table all live
+in [Escalation taxonomy](#escalation-taxonomy-halt--flag--note). This subsection is the
+operational primitive the inner verify loop uses: how a halt is written and what the
+orchestrator must do when one fires.
 
 - **halt** — stop the loop and do not commit. Write a payload file — last round's
-  findings + the FULL verify log + attempted-fix summary + suggested next step —
+  findings + the FULL verify log + attempted-fix summary + a **`reason_class`**
+  (`transient-dependency` / `invariant-violation` / `authority-boundary` — retry
+  semantics in [Escalation taxonomy](#escalation-taxonomy-halt--flag--note)) +
+  suggested next step —
   under `docs/loops/<run>/halts/` when running inside an autopilot run dir, else
   the standalone fallback `docs/loops/<date>_greenlight-<branch-slug>/halts/`
   (`<date>` = `YYYY-MM-DD`, `<branch-slug>` = current branch with every `/`
@@ -204,7 +214,9 @@ A fuller escalation taxonomy arrives in a later PR; this PR ships the minimum.
 ### Flags section (final report)
 
 When any flag fired (no verifier configured, an attended anti-gaming catch, an
-auto-classified size **S** without an explicit override, and future flag sources),
+auto-classified size **S** without an explicit override, and the other flag sources in
+[Escalation taxonomy](#escalation-taxonomy-halt--flag--note) — a pushed-back P1, a fix
+over 20 lines, a merge with no CI signal, findings contradictions ① and ②),
 append a prominent section to whichever mode's final report runs:
 
 ```text
@@ -230,6 +242,113 @@ stage is additive with the review rounds, not a multiplier on them. The inner lo
 multiplies fix work per round; a repo whose `verify` command is slow pays for it
 here — which is why `verify` must stay fast and E2E stays in CI (see config
 `verify` key).
+
+## Escalation taxonomy (halt / flag / note)
+
+Every escalation in this skill resolves to one of **three levels**. The model is
+**unattended-first** (greenlight runs unattended under autopilot / todos-babysit), with
+an [attended projection](#attended-projection) for manual runs. The operational
+mechanics — how a halt payload is written, the orchestrator's obligation on a halt —
+live in [Halt / flag primitive](#halt--flag-primitive); this section is the model that
+assigns a level.
+
+### Two-question rubric
+
+Assign a level by asking, in order:
+
+1. **Can the loop still continue?** A mechanical block — every reviewer tool is down,
+   the environment is broken, the round budget is spent, an invariant is violated — is
+   a **halt**. Not negotiable.
+2. **Is this decision mine to make?** Three checks: **reversibility** (can a wrong call
+   be undone cheaply?), **scope** (is it inside the spec / size authorization?), and
+   **adjudicability** (is there a test or spec that mechanically decides right from
+   wrong?). A decision that is expensive-if-wrong, or that cannot be mechanically
+   adjudicated → escalate to a human (**flag**, or **halt** when it also blocks the
+   loop). Everything else → act autonomously and leave a trace (**note**).
+
+### The three levels
+
+| Level | Behavior (unattended) | Examples |
+|---|---|---|
+| **halt** | Stop, write the payload, report — **blocked**, exit non-zero. | External reviewers all down; a broken invariant; a fix that must touch a dangerous path outside the size authorization; inner verify fails 3×. |
+| **flag** | Keep looping; record the decision in the report's prominent **Flags** section for a human to adjudicate afterward. | A pushed-back P1; a fix over 20 lines; a loop that ran with no verifier configured; a merge with no CI signal; an auto-classified size **S**; findings contradictions ① and ② (below). |
+| **note** | Normal stats — no special surfacing. | `fixed` / `pushed-back` counts; out-of-contract (③ note-tier) and style-only (⑤) push-backs. |
+
+The **flag** middle tier is what makes unattended running safe: without it, an
+unattended run could only choose between halting on everything and running fully
+autonomously with no human ever told. Keep the Flags section signal-dense —
+correctness-flavored events only; style noise stays at **note** (see contradiction ⑤).
+
+### `reason_class` (halt retry semantics)
+
+Every halt payload carries a **`reason_class`** so a downstream orchestrator can route
+retry-vs-blocked without re-deriving intent:
+
+| `reason_class` | Meaning | Retry semantics | Fires when |
+|---|---|---|---|
+| `transient-dependency` | A dependency is down but may recover. | **Retryable** — orchestrator waits and retries. | External reviewers all exhausted (unattended fallback). |
+| `invariant-violation` | A hard correctness / state invariant broke. | **Do not retry** — orchestrator marks blocked. | Inner verify fails 3×; a post-commit invariant violation (TIP ≠ HEAD, origin/main unreachable, BASE unreachable, push-verification mismatch, branch changed mid-loop). |
+| `authority-boundary` | The next step needs authority the run does not have — refuse. | **Do not retry — a human must intervene.** | A fix would touch a dangerous path outside the size authorization (contradiction ③); the anti-gaming guard catches a fix editing test / verify definitions unprompted. |
+
+The autopilot orchestrator consumes this from the halt payload greenlight references in
+its report — see `../autopilot/references/orchestrator.md` (failure table).
+
+### Attended projection
+
+The three levels are unattended-first, but greenlight is also run manually, and the
+flow is full of "ask the user" branches. Attended runs **project** the levels — with no
+regression to existing interactive behavior:
+
+| Level | Unattended | Attended |
+|---|---|---|
+| **halt** | blocked, exit non-zero | **ask the user** and let them decide (not a hard exit) — the existing "ask the user" / wizard branches |
+| **flag** | record in the Flags section | surface **inline** during the run (and still in the Flags section) |
+| **note** | stats | stats |
+
+So every existing "ask the user" behavior (the reviewer-exhaustion wizard, an ambiguous
+consolidation, the ">20 lines discuss first" note) is the **attended projection of a
+halt or flag** — unchanged when attended, and given a defined unattended path here.
+
+### Findings-contradiction handling table
+
+Reviewers can contradict each other (or the spec), and the verification gate's skeptics
+validate each finding independently — they never cross-compare, so both sides of a
+contradiction can survive. **Conservative side = leave the current state untouched**
+(no-action), never guess one side and execute it. Unattended disposition:
+
+| # | Contradiction | Disposition (unattended) |
+|---|---|---|
+| ① | **Same-round opposite fixes** for the same code (e.g. ponytail says delete a defensive check, specialist says add a null check) | Apply **neither** — no-action is the only move that negates neither side and keeps the state that already passed prior rounds → record both as pushed-back(contradiction) + **flag**. |
+| ② | **Cross-round flip-flop** — a new finding would revert a previously accepted fix (e.g. round 1 extract a helper, round 3 inline it back) | Maintain a per-loop **accepted-fixes journal** and include it in the fix subagent's prompt; a mutually-exclusive new finding is **not executed** → pushed-back(flip-flop) + **flag**. Conservative side = the already-accepted fix (no thrashing). |
+| ③ | **Finding conflicts with the spec / size authorization** — mechanically adjudicable, the spec is the judge | The spec wins → pushed-back(out-of-contract) + **note**. If the reviewer's reasoning is correctness-grade (it implies the spec itself is wrong) → escalate to **flag**. If the fix would touch a dangerous path → **halt** (`authority-boundary`). Standalone `/greenlight` with no spec: this type degenerates to ①. |
+| ④ | **Reviewer P1 vs fix-subagent false-positive push-back** (reviewer vs fix agent, not two reviewers) | Push back the P1 → **flag** (pre-existing decision; listed for completeness). |
+| ⑤ | **Style-only contradiction** — the low-stakes version of ① (e.g. one wants more comments, one finds them noisy) | No action + **note** — never flag; every style contradiction flagged would drown the Flags section, which stays correctness-flavored. |
+
+**Attended runs keep asking** (the [attended projection](#attended-projection) of ①②'s
+flag / ③'s halt). One-line summary: mechanically adjudicable → let the spec judge;
+otherwise leave the state untouched — flag the correctness-grade contradictions, note
+the style ones; the only halt is a fix that crosses the authorization boundary.
+
+### Where the existing sites map
+
+The taxonomy re-labels existing behavior; only two behaviors change (contradictions no
+longer ask the user in unattended runs — the table above; and the orchestrator now
+defers its round bound to greenlight — orchestrator.md). The scattered rules map as:
+
+- **Phase 1 all internal reviewers fail** → **unchanged**: skip Phase 1 + 2 and proceed
+  to Phase 3 (NOT a halt — internal review is optional; external review still runs).
+  See [Phase 1](#phase-1-internal-review) "All fail".
+- **External fallback exhausted** (all reviewers down) → **halt**,
+  `reason_class: transient-dependency` — see [Fallback Logic](#fallback-logic).
+- **Post-commit invariant violations** → **halt**, `reason_class: invariant-violation` —
+  the invariant guards in [Post-commit parsing](#post-commit-mode-parsing-modepost-commit-only)
+  and the per-round re-checks.
+- **Fix over 20 lines** → **flag** (attended: discuss first).
+- **Contradictory findings** → the
+  [table above](#findings-contradiction-handling-table).
+- **Inner verify 3× fail / anti-gaming catch** → **halt** (`invariant-violation` /
+  `authority-boundary`) — see
+  [Inner verify loop](#inner-verify-loop-objective-verifier-gate).
 
 ## Sizing (S/M/L risk profile)
 
@@ -653,6 +772,12 @@ if ! git merge-base --is-ancestor <BASE_SHA> origin/main:
      itself local-only. Either widen the range to start at or before
      origin/main, or push existing local commits first."
 ```
+
+> These invariant guards — and the per-round re-checks in Phase 3 (Step 1's branch /
+> BASE / TIP checks and the push-verification gates) — are **halt /
+> `invariant-violation`** in the
+> [Escalation taxonomy](#escalation-taxonomy-halt--flag--note): a hard stop the
+> orchestrator must not retry (attended: surface the error and ask the user).
 
 After resolving, jump to **[Post-commit Mode](#post-commit-mode)** — skip the PR mode parsing block below.
 
@@ -1247,7 +1372,10 @@ Wait for all successful subagents to report, then proceed to Phase 2.
 After receiving all successful reports:
 1. **Merge and deduplicate**: same suggestion for the same file and line → keep only one
 2. **Group by file**: list all suggestions organized by file
-3. **Escalate ambiguity**: if suggestions contradict each other, or the orchestrator can't determine whether to fix, ask the user
+3. **Handle contradictions**: when suggestions contradict each other, apply the
+   [Findings-contradiction handling table](#findings-contradiction-handling-table).
+   Unattended runs follow the table (no prompt); attended runs keep asking the user
+   (the [attended projection](#attended-projection)).
 
 > **Verification gate (optional).** At **effective size L** with the `Workflow` tool
 > available (S and M skip it), run the adversarial verification gate on the
@@ -1483,7 +1611,8 @@ no per-round reset.
   triggering — do not hard-fail**:
   > "fallback_order lists `gemini` but no recent Gemini activity was detected on
   >  this repo. Trying it anyway; on no response it will time out and fall through."
-- If all entries fail: attended run → ask the user; **unattended run → fail fast** (below).
+- If all entries fail: attended run → ask the user; **unattended run → halt with
+  `reason_class: transient-dependency`** (below).
 
 **Without config (first use or unconfigured):**
 1. Use `current_reviewer` (default codex-bot, or user-specified) to trigger review
@@ -1512,9 +1641,13 @@ no per-round reset.
 
 **Unattended callers never prompt.** When greenlight is invoked with the
 `unattended` argument (todos-babysit auto mode, autopilot dispatch), every "ask the
-user" / wizard branch above is replaced by: **log the reviewer exhaustion and exit
-non-zero (fail fast).** The caller's own fail-safe then takes over (todos-babysit
-leaves the PR and notifies; autopilot stops and reports). Never block on input.
+user" / wizard branch above is replaced by a **halt** with
+`reason_class: transient-dependency` (external reviewers are down but may recover —
+see [Escalation taxonomy](#escalation-taxonomy-halt--flag--note)): log the reviewer
+exhaustion, write the halt payload, and exit non-zero. The caller's own fail-safe then
+takes over — todos-babysit leaves the PR and notifies; autopilot's orchestrator
+consumes the `reason_class` and routes a `transient-dependency` halt to wait-and-retry
+rather than straight to blocked. Never block on input.
 
 **Gemini compatibility (consumer sunset).** Consumer Gemini Code Assist stopped
 GitHub code review on 2026-07-17; **enterprise is unaffected**, so `gemini` stays a
@@ -1832,6 +1965,6 @@ these conditions is met:
 
 - Between review rounds, **don't rush to fix** — use the `receiving-code-review` framework to evaluate each suggestion first
 - If the same issue is raised for two consecutive rounds, re-evaluate before deciding to push back
-- If fix volume is large (>20 lines), discuss with user before implementing
+- If fix volume is large (>20 lines), that is a **flag** (see [Escalation taxonomy](#escalation-taxonomy-halt--flag--note)): attended runs discuss with the user before implementing; unattended runs proceed and record it in the Flags section
 - Use `sleep` for polling, not busy-wait, to avoid resource waste
 - Reviewer switches stop to ask the user (when no config), or auto-switch per config order with notification
