@@ -78,7 +78,9 @@ Invoke the /greenlight skill to run the automated code review loop. When the pla
 set a size for this PR, pass it as the `size={SIZE}` token (e.g. `/greenlight size=m`)
 so review weight matches the planned risk; greenlight still recomputes the size from
 the real diff and takes the upward max, so the token never under-reviews.
-If the review loop exceeds 3 rounds with unresolved issues, stop and report.
+Greenlight caps itself at its per-size max rounds (S 3 / M 5 / L 10); let it run to
+that cap rather than imposing a separate lower cap here, which would negate the size
+profile. If it stops with unresolved issues still open, report and halt.
 
 ### 6. CI Check + Merge
 After the final push (greenlight may have pushed fix commits in Step 5),

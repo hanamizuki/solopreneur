@@ -250,9 +250,11 @@ escalates — L is checked first and wins over S.
 
 1. **L — any of these (OR):**
    - a touched path matches `migrations/`, auth / payment / crypto code,
-     `.github/workflows/`, a `Dockerfile` / container / infra config, or a
-     dependency manifest with a substantive change (lockfiles excluded — they are
-     generated, not authored);
+     `.github/workflows/`, a `Dockerfile` / container / infra config (k8s, Helm,
+     Terraform), or a dependency manifest with a substantive change — `package.json`,
+     `requirements*.txt`, `Pipfile`, `pyproject.toml`, `go.mod`, `build.gradle(.kts)`,
+     `pom.xml`, `Podfile`, and the like (lockfiles excluded — they are generated, not
+     authored);
    - OR the diff exceeds ~400 changed lines, excluding lockfiles and generated files.
 2. **S — all touched files fall inside the whitelist (AND):** `docs/**`
    (**excluding `docs/loops/**`** — that is live orchestration config the autopilot
@@ -279,7 +281,7 @@ COMPUTED_SIZE=M
 #     crypto tokens match anywhere in a path on purpose (catch oauth, cryptography,
 #     prepayment, …); a rare false hit like "author" simply escalates. ---
 if printf '%s\n' "$FILES" | grep -qiE \
-   '(^|/)migrations/|auth|payment|crypto|^\.github/workflows/|(^|/)Dockerfile|(^|/)(docker-compose|Containerfile)|\.(tf|tfvars)$|(^|/)(package\.json|requirements\.txt|pyproject\.toml|go\.mod|Gemfile|build\.gradle(\.kts)?|libs\.versions\.toml|pom\.xml|Podfile|Cargo\.toml|Package\.swift|composer\.json)$'; then
+   '(^|/)migrations/|auth|payment|crypto|^\.github/workflows/|(^|/)Dockerfile|(^|/)(docker-compose|Containerfile)|(^|/)(k8s|kubernetes|helm)/|\.(tf|tfvars)$|(^|/)(package\.json|requirements([-/][^/]*)?\.txt|Pipfile|setup\.(py|cfg)|pyproject\.toml|go\.mod|Gemfile|build\.gradle(\.kts)?|libs\.versions\.toml|pom\.xml|Podfile|Cargo\.toml|Package\.swift|composer\.json)$'; then
   COMPUTED_SIZE=L
 fi
 # Line budget: additions + deletions, excluding lockfiles + generated files, > ~400 → L.
@@ -288,7 +290,7 @@ fi
 # preceded by a tab, not "/" or start-of-line, so only nested lockfiles would match.
 # ($1/$2 are "-" for binary files; awk reads "-" as 0, so binaries add nothing.)
 LINES=$(git diff --numstat "$DIFF_RANGE" | awk -F'\t' '
-  $3 ~ /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock|Gemfile\.lock|composer\.lock|Podfile\.lock|go\.sum|Package\.resolved)$/ { next }
+  $3 ~ /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lock|bun\.lockb|deno\.lock|Cargo\.lock|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|composer\.lock|Podfile\.lock|gradle\.lockfile|packages\.lock\.json|go\.sum|Package\.resolved)$/ { next }
   $3 ~ /\.generated\.|\.min\.(js|css)$/ { next }
   { a+=$1; d+=$2 } END { print a+d+0 }')
 [ "${LINES:-0}" -gt 400 ] && COMPUTED_SIZE=L
@@ -353,11 +355,16 @@ vocabulary; no bot login is hardcoded here.
 
 - **S** behaves like `external_only` with a 3-round cap: Phase 1 and Phase 2 are
   skipped and the run goes straight to Phase 3, **still looping to a clean result**
-  (S is not a single-pass mode — the cost cap is the round bound, not one shot). PR
-  mode's Phase 3 already runs one reviewer at a time, so S reuses its
-  `current_reviewer` + `fallback_order` selection unchanged; Post-commit normally
-  runs codex-CLI + agy in parallel, so at S it is trimmed to the single preferred
-  available CLI (Codex CLI, else agy) to shed the doubled reviewer cost.
+  (S is not a single-pass mode — the cost cap is the round bound, not one shot).
+  Because S is external-only, its one reviewer must actually be available: when no
+  explicit reviewer arg and no `fallback_order` are configured, resolve the starting
+  `current_reviewer` to the **first available** external reviewer, preferring codex —
+  `codex-cli` when its pre-flight CLI gate passed, else a detected active-bot (prefer
+  `codex-bot`), else the `codex-bot` default with the existing not-detected warning.
+  This reuses the pre-flight CLI gate and activity detection (registry vocabulary, no
+  hardcoded logins), so an unattended S run uses the authed CLI instead of failing on
+  an absent bot. Post-commit S likewise runs a single preferred available CLI (Codex
+  CLI, else agy) rather than the usual codex-CLI + agy pair, shedding the doubled cost.
 - The **verification gate** already runs only when the `Workflow` tool is present;
   sizing adds a second condition — it runs **only at size L** (S and M skip it even
   when `Workflow` is available).
