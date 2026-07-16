@@ -176,10 +176,11 @@ must explicitly reference that same file. If the diff touches a test file or the
 verify definition that no finding called out → do not commit.** Match per file —
 a finding about one test file does not license editing a different, unmentioned
 test file. Halt (unattended / autopilot dispatch) or flag (attended) with the
-reason `anti-gaming: fix touches test/verify definition unprompted`
-(`reason_class: authority-boundary` — a refusal that needs a human, see
-[Escalation taxonomy](#escalation-taxonomy-halt--flag--note)). At size S
-(added by a later PR) there are no internal reviewers, so this guard is the only
+reason `anti-gaming: fix touches test/verify definition unprompted`. This is the
+one deliberate split where unattended and attended levels differ — a suspected
+gaming edit is cheap for a present human to adjudicate, so attended surfaces it as a
+flag rather than a hard halt (see [Escalation taxonomy](#escalation-taxonomy-halt--flag--note)).
+At size S (added by a later PR) there are no internal reviewers, so this guard is the only
 defense against fix-to-pass gaming — it lands here, not in the escalation PR.
 
 ### Halt / flag primitive
@@ -288,7 +289,7 @@ retry-vs-blocked without re-deriving intent:
 |---|---|---|---|
 | `transient-dependency` | A dependency is down but may recover. | **Retryable** — orchestrator waits and retries. | External reviewers all exhausted (unattended fallback). |
 | `invariant-violation` | A hard correctness / state invariant broke. | **Do not retry** — orchestrator marks blocked. | Inner verify fails 3×; a post-commit invariant violation (TIP ≠ HEAD, origin/main unreachable, BASE unreachable, push-verification mismatch, branch changed mid-loop). |
-| `authority-boundary` | The next step needs authority the run does not have — refuse. | **Do not retry — a human must intervene.** | A fix would touch a dangerous path outside the size authorization (contradiction ③); the anti-gaming guard catches a fix editing test / verify definitions unprompted. |
+| `authority-boundary` | The next step needs authority the run does not have — refuse. | **Do not retry — a human must intervene.** | A fix would touch a dangerous path outside the size authorization (contradiction ③). |
 
 The autopilot orchestrator consumes this from the halt payload greenlight references in
 its report — see `../autopilot/references/orchestrator.md` (failure table).
@@ -301,13 +302,18 @@ regression to existing interactive behavior:
 
 | Level | Unattended | Attended |
 |---|---|---|
-| **halt** | blocked, exit non-zero | **ask the user** and let them decide (not a hard exit) — the existing "ask the user" / wizard branches |
-| **flag** | record in the Flags section | surface **inline** during the run (and still in the Flags section) |
+| **halt** | blocked, exit non-zero | **ask the user and wait** — the loop is blocked until they decide (not a hard exit): the reviewer-exhaustion wizard, the invariant stops |
+| **flag** | record in the Flags section | **surface inline** during the run (and still record it in the Flags section) — a decision-point flag (a contradiction, a >20-line fix) keeps its existing user prompt so the human can weigh in, but, unlike a halt, the run is never hard-blocked |
 | **note** | stats | stats |
 
-So every existing "ask the user" behavior (the reviewer-exhaustion wizard, an ambiguous
-consolidation, the ">20 lines discuss first" note) is the **attended projection of a
-halt or flag** — unchanged when attended, and given a defined unattended path here.
+The distinction is not "prompt vs. no prompt" — it is whether the loop can proceed. A
+**halt** cannot continue without the answer (attended blocks on it; unattended exits);
+a **flag** always has a defined next move (unattended records + proceeds per the level /
+table), and attended merely surfaces it — keeping any pre-existing prompt — so the human
+can redirect. So every existing "ask the user" behavior maps on with no regression: the
+reviewer-exhaustion wizard is a halt (ask and wait); an ambiguous consolidation and the
+">20 lines discuss first" note are decision-point flags (surfaced with their prompt
+intact).
 
 ### Findings-contradiction handling table
 
@@ -324,8 +330,10 @@ contradiction can survive. **Conservative side = leave the current state untouch
 | ④ | **Reviewer P1 vs fix-subagent false-positive push-back** (reviewer vs fix agent, not two reviewers) | Push back the P1 → **flag** (pre-existing decision; listed for completeness). |
 | ⑤ | **Style-only contradiction** — the low-stakes version of ① (e.g. one wants more comments, one finds them noisy) | No action + **note** — never flag; every style contradiction flagged would drown the Flags section, which stays correctness-flavored. |
 
-**Attended runs keep asking** (the [attended projection](#attended-projection) of ①②'s
-flag / ③'s halt). One-line summary: mechanically adjudicable → let the spec judge;
+**Attended runs keep asking** — ①② are decision-point flags and ③'s dangerous-path
+case is a halt; either way the [attended projection](#attended-projection) surfaces the
+existing user prompt (the flag inline, the halt blocking). One-line summary:
+mechanically adjudicable → let the spec judge;
 otherwise leave the state untouched — flag the correctness-grade contradictions, note
 the style ones; the only halt is a fix that crosses the authorization boundary.
 
@@ -343,7 +351,8 @@ defers its round bound to greenlight — orchestrator.md). The scattered rules m
 - **Post-commit invariant violations** → **halt**, `reason_class: invariant-violation` —
   the invariant guards in [Post-commit parsing](#post-commit-mode-parsing-modepost-commit-only)
   and the per-round re-checks.
-- **Fix over 20 lines** → **flag** (attended: discuss first).
+- **Fix over 20 lines** → **flag** (a decision-point flag: attended surfaces it inline
+  with the existing "discuss first" prompt; unattended records it and proceeds).
 - **Contradictory findings** → the
   [table above](#findings-contradiction-handling-table).
 - **Inner verify 3× fail / anti-gaming catch** → **halt** (`invariant-violation` /
@@ -1374,8 +1383,9 @@ After receiving all successful reports:
 2. **Group by file**: list all suggestions organized by file
 3. **Handle contradictions**: when suggestions contradict each other, apply the
    [Findings-contradiction handling table](#findings-contradiction-handling-table).
-   Unattended runs follow the table (no prompt); attended runs keep asking the user
-   (the [attended projection](#attended-projection)).
+   Unattended runs follow the table (no prompt); attended runs surface it inline and
+   keep asking the user — the decision-point-flag
+   [attended projection](#attended-projection).
 
 > **Verification gate (optional).** At **effective size L** with the `Workflow` tool
 > available (S and M skip it), run the adversarial verification gate on the
@@ -1965,6 +1975,6 @@ these conditions is met:
 
 - Between review rounds, **don't rush to fix** — use the `receiving-code-review` framework to evaluate each suggestion first
 - If the same issue is raised for two consecutive rounds, re-evaluate before deciding to push back
-- If fix volume is large (>20 lines), that is a **flag** (see [Escalation taxonomy](#escalation-taxonomy-halt--flag--note)): attended runs discuss with the user before implementing; unattended runs proceed and record it in the Flags section
+- If fix volume is large (>20 lines), that is a decision-point **flag** (see [Escalation taxonomy](#escalation-taxonomy-halt--flag--note)): attended runs surface it inline and discuss with the user before implementing; unattended runs proceed and record it in the Flags section
 - Use `sleep` for polling, not busy-wait, to avoid resource waste
 - Reviewer switches stop to ask the user (when no config), or auto-switch per config order with notification
