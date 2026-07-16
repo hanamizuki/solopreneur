@@ -302,10 +302,10 @@ LINES=$(git diff --numstat "$DIFF_RANGE" | awk -F'\t' '
 if [ "$COMPUTED_SIZE" != L ] && [ -n "$FILES" ]; then
   OUTSIDE=$(printf '%s\n' "$FILES" | grep -v '^[[:space:]]*$' | while IFS= read -r f; do
     case "$f" in
-      docs/loops/*)                 echo "$f" ;;  # live orchestration config — excluded
-      docs/*|todos/*)               ;;            # whitelisted
-      README.md|LICENSE|.gitignore) ;;            # whitelisted (repo-root only)
-      *)                            echo "$f" ;;  # anything else → outside the whitelist
+      docs/loops/*)                 printf '%s\n' "$f" ;;  # live orchestration config — excluded
+      docs/*|todos/*)               ;;                     # whitelisted
+      README.md|LICENSE|.gitignore) ;;                     # whitelisted (repo-root only)
+      *)                            printf '%s\n' "$f" ;;  # anything else → outside the whitelist (echo would mangle a "-n"/"-e" filename)
     esac
   done | grep -c .)
   [ "${OUTSIDE:-1}" -eq 0 ] && COMPUTED_SIZE=S
