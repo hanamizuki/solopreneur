@@ -13,6 +13,7 @@ prs:
     branch: feature/mining-pr1        # Git branch name
     title: "feat(core): models"       # PR title (for gh pr create)
     type: code                        # code | docs (affects review depth)
+    size: m                           # optional — S/M/L review hint for /greenlight (upward-only); omit to auto-classify
     subagent: ai-engineer              # Implementation subagent type
     depends_on: []                    # List of dependent PR ids (empty = no dependencies)
     spec: pr1-models.md              # Spec filename (in same directory)
@@ -48,6 +49,7 @@ prs:
 | `prs[].branch` | ✅ | Git branch name, also used to match GitHub PRs |
 | `prs[].title` | ✅ | PR title |
 | `prs[].type` | ✅ | `code` or `docs` |
+| `prs[].size` | ❌ | Optional review-size hint (`s` / `m` / `l`) for `/greenlight`'s [S/M/L profile](../../greenlight/SKILL.md). Advisory and **upward-only** — greenlight recomputes the size from the real diff and takes `max(size, computed)`, so this can raise but never lower review weight. Omit to let greenlight classify from the diff alone. |
 | `prs[].subagent` | ✅ | Implementation subagent type |
 | `prs[].depends_on` | ✅ | List of dependent PR ids; empty array = no dependencies |
 | `prs[].spec` | ✅ | Spec filename (relative to plan directory) |

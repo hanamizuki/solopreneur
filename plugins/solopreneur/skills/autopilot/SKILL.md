@@ -101,6 +101,7 @@ PR
     - path/b.py (modified)
   subagent: ai-engineer
   type:     code   # code | docs
+  size:     m      # optional — S/M/L review hint for /greenlight (upward-only); omit to auto-classify
 
 Reason: scope is contained to a single module / single purpose, no split needed.
 ```
@@ -118,6 +119,7 @@ For each PR, list:
    - Files to create/modify (paths)
    - Dependencies on other PRs
    - Required subagent type (ios-dev / android-dev / ai-engineer / neo4j-dev / marketer / designer)
+   - Optional review size (`s` / `m` / `l`) — the S/M/L hint passed to `/greenlight`; omit to let it auto-classify from the diff
 
 **Validate the dependency graph**:
    - For PRs declared parallel: confirm file paths don't overlap
@@ -182,6 +184,7 @@ prs:
     branch: feature/xxx-pr1
     title: "feat(scope): description"
     type: code          # code | docs
+    size: m             # optional — S/M/L review hint for /greenlight (upward-only); omit to auto-classify
     subagent: ai-engineer
     depends_on: []
     spec: pr1-models.md
@@ -288,6 +291,9 @@ After the user picks, write the artifacts per Step 3's table, then proceed to St
    - `{PR_ID}`     = `pr1`
    - `{PLAN_DIR}`  = `docs/loops/<YYYY-MM-DD>_<short-name>`
    - `{SPEC_FILE}` = `pr1-<short>.md`
+   - `{SIZE}`      = the PR's `size` (`s`/`m`/`l`) when the descriptor set one — Step 5
+     of the suffix passes it to `/greenlight` as `size={SIZE}`. When unset, drop the
+     `size={SIZE}` clause so no token is passed (greenlight then auto-classifies).
 
    Leave `{PR_NUMBER}`, `{REPO_ROOT}`, `{WORKTREE_PATH}` as `{...}` literals — the
    subagent fills them in at runtime.

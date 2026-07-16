@@ -44,6 +44,7 @@ Automated review loop. Three modes:
 | `external` | Skip Phase 1 + 2 (internal review), jump to Phase 3 (PR mode only) | `/greenlight external` |
 | `codex bot` / `codex cli` / `gemini` | Specify starting reviewer (combinable with `external`, PR mode only) | `/greenlight external gemini` |
 | `unattended` | Never prompt — on reviewer exhaustion, log and exit non-zero (fail fast). Passed by unattended callers (todos-babysit auto mode, autopilot dispatch). | `/greenlight external unattended` |
+| `size=s\|m\|l` | Advisory starting size for the [S/M/L profile](#sizing-sml-risk-profile). **Upward-only** — greenlight recomputes size from the real diff and takes `max`, so this can raise but never lower review weight. Passed by autopilot from the plan's `size` field. | `/greenlight size=m` |
 | `post-commit [<SHA>\|<FROM>..<TO>]` | Force post-commit mode on a commit / range on `main` (pushed or local-only) | `/greenlight post-commit c1e7e256` |
 
 **Parsing rules:**
@@ -53,6 +54,11 @@ Automated review loop. Three modes:
 - `external` keyword (case-insensitive): PR mode only. Remainder is the reviewer spec.
 - `unattended` keyword (case-insensitive): fail-fast, no prompts. Stripped before
   reviewer-spec parsing; combinable with any mode.
+- `size=` token (case-insensitive, value `s`/`m`/`l`): advisory size for the
+  [S/M/L profile](#sizing-sml-risk-profile), used in PR mode. Stripped before
+  reviewer-spec parsing, like `unattended`; a malformed value is ignored. Not read
+  in post-commit mode (it computes size from the resolved range) or uncommitted mode
+  (unsized).
 - No keyword: mode comes from auto-detection (see Step 1 table).
 
 Arguments other than `post-commit` are ignored in **Uncommitted mode** and
@@ -68,15 +74,17 @@ skeptics refute are dropped. Only survivors reach the fix subagent. Purpose: cut
 false-positive fix cycles — a wrongly "fixed" false positive costs a whole extra
 review round.
 
-**Availability check.** The gate runs ONLY when the `Workflow` tool is present in
-the current session (Claude Code v2.1.154+, paid plans). Before each gate, check
-whether `Workflow` is among your available tools:
+**Availability check.** The gate runs ONLY when BOTH conditions hold: the effective
+size is **L** (see [Sizing](#sizing-sml-risk-profile) — S and M skip the gate
+regardless of tooling), AND the `Workflow` tool is present in the current session
+(Claude Code v2.1.154+, paid plans). Before each gate, check both:
 
-- **Present** → run the gate. The script, `VERDICT_SCHEMA`, args contract, verdict
-  rule, and result mapping are defined once in `references/adversarial-verify.md`.
-- **Absent** → **skip the gate entirely; the flow is exactly today's flow** — hand
-  every consolidated finding straight to the fix subagent. The gate is never a hard
-  dependency of greenlight.
+- **Size L and `Workflow` present** → run the gate. The script, `VERDICT_SCHEMA`,
+  args contract, verdict rule, and result mapping are defined once in
+  `references/adversarial-verify.md`.
+- **Size S or M, or `Workflow` absent** → **skip the gate entirely; the flow is
+  exactly today's flow** — hand every consolidated finding straight to the fix
+  subagent. The gate is never a hard dependency of greenlight.
 
 The gate applies at exactly three points, each carrying a short callout below:
 PR-mode Phase 2a→2b, Post-commit Phase 1→Phase 2, and Post-commit Phase 3
@@ -195,9 +203,9 @@ A fuller escalation taxonomy arrives in a later PR; this PR ships the minimum.
 
 ### Flags section (final report)
 
-When any flag fired (no verifier configured, an attended anti-gaming catch, and
-future flag sources), append a prominent section to whichever mode's final report
-runs:
+When any flag fired (no verifier configured, an attended anti-gaming catch, an
+auto-classified size **S** without an explicit override, and future flag sources),
+append a prominent section to whichever mode's final report runs:
 
 ```text
 ## Flags (human review suggested)
@@ -213,13 +221,144 @@ The inner loop is a newly multiplied retry layer, so make the nesting explicit.
 The **wave ×2** wraps, per attempt, one implement pass followed by the greenlight
 loop; within an attempt those two stages run in sequence, so their counts **add**,
 they do not multiply. Autopilot's **Step 3 self-fix ×3** runs during implement,
-then greenlight's outer review rounds (**PR mode ×10**, **post-commit ×5**) each
-now wrap **inner verify ×3** (10 × 3 = 30 fix attempts). So a single PR-mode PR
-under autopilot tops out near 2 × (3 + 10 × 3) = **66** fix attempts — the self-fix
+then greenlight's outer review rounds — now **per size** (S 3 / M 5 / L 10; see
+[Sizing](#sizing-sml-risk-profile)) — each wrap **inner verify ×3**. At the **L**
+ceiling that is 10 × 3 = 30 fix attempts, so a single PR-mode L PR under autopilot
+tops out near 2 × (3 + 10 × 3) = **66** fix attempts; a default **M** PR is
+2 × (3 + 5 × 3) = **36** and an **S** PR is 2 × (3 + 3 × 3) = **24** — the self-fix
 stage is additive with the review rounds, not a multiplier on them. The inner loop
 multiplies fix work per round; a repo whose `verify` command is slow pays for it
 here — which is why `verify` must stay fast and E2E stays in CI (see config
 `verify` key).
+
+## Sizing (S/M/L risk profile)
+
+Not every PR needs the full review weight — a one-line docs fix and a payment-path
+refactor should not run the same five reviewers for ten rounds. Greenlight
+classifies each run **by risk** into **S** / **M** / **L** and gates the expensive
+phases on the result. **PR mode and Post-commit mode are sized; Uncommitted mode is
+exempt** — it is a local, no-commit, interactive flow, keeps its own fixed loop, and
+never computes a size.
+
+### Mechanical cascade (bash-computable, no LLM judgment)
+
+Size is computed from the **real diff** — its file list and line counts — by a
+deterministic cascade. No model judgment enters the classification. The asymmetry is
+deliberate: **L is OR** (any one danger signal escalates) while **S is AND** (every
+file must be harmless to de-escalate). When the signals disagree, the cascade
+escalates — L is checked first and wins over S.
+
+1. **L — any of these (OR):**
+   - a touched path matches `migrations/`, auth / payment / crypto code,
+     `.github/workflows/`, a `Dockerfile` / container / infra config, or a
+     dependency manifest with a substantive change (lockfiles excluded — they are
+     generated, not authored);
+   - OR the diff exceeds ~400 changed lines, excluding lockfiles and generated files.
+2. **S — all touched files fall inside the whitelist (AND):** `docs/**`
+   (**excluding `docs/loops/**`** — that is live orchestration config the autopilot
+   reads and executes, not prose), `todos/**`, the **repo-root** `README.md` only
+   (plugin READMEs carry install commands and stay out), `LICENSE`, `.gitignore`.
+   Never a global `*.md` glob — in a skill-type repo the product *is* markdown, so a
+   `SKILL.md` change must classify **M**, not S.
+3. **Otherwise → M.** Any uncertainty in classification defaults to **M**.
+
+Config files are deliberately **not** in the S whitelist: a config error is a silent
+runtime behavior change, so config edits stay at M. (The former "cross-module
+boundary" trigger is deliberately dropped — it is not mechanically computable, so it
+is not part of this cascade.)
+
+```bash
+# Compute COMPUTED_SIZE from a diff range. Callers set DIFF_RANGE:
+#   PR mode      → "main...HEAD"            (three-dot: changes on this branch)
+#   Post-commit  → "<BASE_SHA>..<TIP_SHA>"  (two-dot; single commit → "<TIP>^..<TIP>")
+FILES=$(git diff --name-only "$DIFF_RANGE")
+COMPUTED_SIZE=M
+
+# --- L: any danger signal (OR). Over-matching only over-reviews, which is the safe
+#     direction for an OR cascade — a missed danger under-reviews. The auth/payment/
+#     crypto tokens match anywhere in a path on purpose (catch oauth, cryptography,
+#     prepayment, …); a rare false hit like "author" simply escalates. ---
+if printf '%s\n' "$FILES" | grep -qiE \
+   '(^|/)migrations/|auth|payment|crypto|^\.github/workflows/|(^|/)Dockerfile|(^|/)(docker-compose|Containerfile)|\.(tf|tfvars)$|(^|/)(package\.json|requirements\.txt|pyproject\.toml|go\.mod|Gemfile|build\.gradle|Cargo\.toml|Package\.swift|composer\.json)$'; then
+  COMPUTED_SIZE=L
+fi
+# Line budget: additions + deletions, excluding lockfiles + generated files, > ~400 → L.
+# (numstat prints "-" for binary files; awk reads "-" as 0, so binaries add nothing.)
+LINES=$(git diff --numstat "$DIFF_RANGE" \
+  | grep -vE '(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock|Gemfile\.lock|composer\.lock|go\.sum|Package\.resolved)$|\.generated\.|\.min\.(js|css)$' \
+  | awk '{a+=$1; d+=$2} END{print a+d+0}')
+[ "${LINES:-0}" -gt 400 ] && COMPUTED_SIZE=L
+
+# --- S: every file inside the whitelist (AND), only when not already L. The case
+#     matches docs/loops/* FIRST so it is excluded from the docs/ allowance;
+#     README.md / LICENSE / .gitignore match the repo root only (a nested path has a
+#     slash and falls through to the outside bucket). Any file outside → not S. ---
+if [ "$COMPUTED_SIZE" != L ] && [ -n "$FILES" ]; then
+  OUTSIDE=$(printf '%s\n' "$FILES" | grep -v '^[[:space:]]*$' | while IFS= read -r f; do
+    case "$f" in
+      docs/loops/*)                 echo "$f" ;;  # live orchestration config — excluded
+      docs/*|todos/*)               ;;            # whitelisted
+      README.md|LICENSE|.gitignore) ;;            # whitelisted (repo-root only)
+      *)                            echo "$f" ;;  # anything else → outside the whitelist
+    esac
+  done | grep -c .)
+  [ "${OUTSIDE:-1}" -eq 0 ] && COMPUTED_SIZE=S
+fi
+echo "COMPUTED_SIZE=$COMPUTED_SIZE"
+```
+
+### Size override & freshness
+
+A caller may pass a `size=s|m|l` token (see [Arguments](#arguments)). It is
+**advisory and upward-only**: the size computed from the real diff is authoritative,
+and the **effective size is `max(passed, computed)`** on the order **S < M < L**. A
+token never lowers the computed size. This makes scope creep upgrade-only and defeats
+"planned S, grew into M" gaming — a PR scoped `size=s` that actually touches auth is
+still reviewed as L.
+
+```bash
+# EFFECTIVE_SIZE = max(SIZE_ARG token, COMPUTED_SIZE). SIZE_ARG is the `size=` value
+# (empty when absent). Upward-only: the token can only RAISE the computed size.
+rank() { case "$1" in [sS]) echo 0;; [mM]) echo 1;; [lL]) echo 2;; *) echo -1;; esac; }
+EFFECTIVE_SIZE=$COMPUTED_SIZE
+if [ -n "${SIZE_ARG:-}" ] && [ "$(rank "$SIZE_ARG")" -gt "$(rank "$COMPUTED_SIZE")" ]; then
+  EFFECTIVE_SIZE=$(printf '%s' "$SIZE_ARG" | tr '[:lower:]' '[:upper:]')
+fi
+case "$EFFECTIVE_SIZE" in S) SIZE_MAX_ROUNDS=3;; M) SIZE_MAX_ROUNDS=5;; L) SIZE_MAX_ROUNDS=10;; esac
+# Auto-S flag: cascade landed on S with no explicit override → flag for a human to
+# sanity-check the classification (see the Flags section). An explicit size=s is a
+# human decision and is NOT flagged.
+[ "$COMPUTED_SIZE" = S ] && [ -z "${SIZE_ARG:-}" ] && echo "FLAG: auto-sized S — verify"
+echo "EFFECTIVE_SIZE=$EFFECTIVE_SIZE SIZE_MAX_ROUNDS=$SIZE_MAX_ROUNDS"
+```
+
+When the cascade auto-classifies **S** with no explicit override, add one flag-style
+line — **"auto-sized S — verify"** — to the final report (see the Flags section under
+Inner verify loop).
+
+### Profile — what each size gates
+
+Reviewer selection is expressed in the [Reviewer Registry](#reviewer-registry)
+vocabulary; no bot login is hardcoded here.
+
+| Effective size | Phase 1 internal | Verification gate | Phase 3 external loop (`SIZE_MAX_ROUNDS`) |
+|---|---|---|---|
+| **S** | **skip** | **skip** | start the first available **external** reviewer from `fallback_order` (default `codex-bot`, or `codex-cli` when that is the available local CLI) — the registry-driven selection Phase 3 already uses — and loop to clean, **max 3 rounds** |
+| **M** (default) | **2 reviewers** — `/specialist-review` + `ponytail:ponytail-review` (rows 4–5 of the Phase 1 table) | **skip** | standard registry loop, **max 5 rounds** |
+| **L** | **all 5 reviewers** | **ON** (when the `Workflow` tool is available) | full registry fallback chain, **max 10 rounds** |
+
+- **S** behaves like `external_only` with a 3-round cap: Phase 1 and Phase 2 are
+  skipped and the run goes straight to Phase 3, **still looping to a clean result**
+  (S is not a single-pass mode — the cost cap is the round bound, not one shot).
+- The **verification gate** already runs only when the `Workflow` tool is present;
+  sizing adds a second condition — it runs **only at size L** (S and M skip it even
+  when `Workflow` is available).
+- The **inner verify loop is not size-differentiated**: every size runs the same
+  single `verify` command (see [Inner verify loop](#inner-verify-loop-objective-verifier-gate)).
+  Sizing dials review weight, not the objective verifier.
+
+`SIZE_MAX_ROUNDS` (**3 / 5 / 10** for **S / M / L**) is the Phase 3 loop bound in
+**both** PR mode and Post-commit mode.
 
 ## Pre-flight Checks
 
@@ -517,7 +656,9 @@ raw_args = args ?? ""
 tokens = raw_args split on whitespace
 external_only = tokens has a token equal (case-insensitive) to "external"
 unattended    = tokens has a token equal (case-insensitive) to "unattended"
-reviewer_args = tokens with the "external"/"unattended" tokens dropped, rejoined + trimmed
+size_arg      = value of a token matching (case-insensitive) "size=<s|m|l>", else ""
+                (a malformed size=… value is ignored — treated as "")
+reviewer_args = tokens with the "external"/"unattended"/"size=…" tokens dropped, rejoined + trimmed
 current_reviewer = reviewer_args non-empty ? reviewer_args : "codex bot"
 
 # `unattended` (set by todos-babysit auto mode / autopilot dispatch): every
@@ -530,9 +671,16 @@ if current_reviewer == "codex cli" and pre-flight detected CLI not installed or 
     - not installed: "Codex CLI not installed, switching to Codex GitHub bot. To install: npm install -g @openai/codex && codex login"
     - not authenticated: "Codex CLI not authenticated, switching to Codex GitHub bot. Run: !codex login"
   → current_reviewer = "codex bot"
+
+# Effective size (see Sizing). Run the cascade over the PR diff and take the
+# upward max of the passed token and the computed size:
+#   export SIZE_ARG="<size_arg>"; DIFF_RANGE="main...HEAD"
+#   → run the "Mechanical cascade" + "Size override & freshness" snippets
+#   → EFFECTIVE_SIZE ∈ {S,M,L}, SIZE_MAX_ROUNDS ∈ {3,5,10}
+# If COMPUTED_SIZE=S and size_arg is empty, record the "auto-sized S — verify" flag.
 ```
 
-**If `external_only == true`, skip Phase 1 and Phase 2, jump directly to Phase 3.**
+**If `external_only == true` OR `EFFECTIVE_SIZE == S`, skip Phase 1 and Phase 2, jump directly to Phase 3** (size S reviews externally only — see [Sizing](#sizing-sml-risk-profile)).
 
 ---
 
@@ -691,18 +839,44 @@ mode would never gate a fix, defeating this PR's purpose. On `NO_VERIFIER`, skip
 the inner loop in both dispatches and add the "no objective verifier configured
 for this loop" flag to the final report.
 
+### Resolve the effective size (once, before Phase 1)
+
+Post-commit mode is sized too (only Uncommitted mode is exempt). Compute it once,
+before Phase 1, exactly as [Sizing](#sizing-sml-risk-profile) prescribes — run the
+cascade with `DIFF_RANGE` set to the resolved review range and no `size=` token
+(post-commit ignores non-`post-commit` args, so `SIZE_ARG` is empty and
+`EFFECTIVE_SIZE = COMPUTED_SIZE`):
+
+```bash
+# Single commit → "<TIP_SHA>^..<TIP_SHA>"; range → "<BASE_SHA>..<TIP_SHA>" (two-dot).
+if [ "$RANGE_SPEC" = single ]; then DIFF_RANGE="${TIP_SHA}^..${TIP_SHA}"; else DIFF_RANGE="${BASE_SHA}..${TIP_SHA}"; fi
+SIZE_ARG=""   # post-commit takes no size= token
+# ... then run the Sizing "Mechanical cascade" + "Size override & freshness"
+#     snippets → EFFECTIVE_SIZE, SIZE_MAX_ROUNDS.
+```
+
+`EFFECTIVE_SIZE` then gates Phase 1 reviewer selection, the verification gate, and
+the Phase 3 `SIZE_MAX_ROUNDS` loop bound below — the same profile PR mode uses.
+Because there is no override token, an S here is always auto-classified, so it
+records the "auto-sized S — verify" flag.
+
 ### Phase 1: Internal Review (post-commit variant)
 
-Same as PR mode Phase 1 — dispatch the subagents in parallel, report-only — but
-the diff range is `RANGE_SPEC` instead of `main...HEAD`. Each subagent prompt must
-include the actual diff content (output of the diff command above), not the raw
-shell expression. Subagents are still report-only.
+Same as PR mode Phase 1, **including the `EFFECTIVE_SIZE` gate**
+([Sizing](#sizing-sml-risk-profile)): at **S** skip Phase 1 (and Phase 2) entirely
+and go straight to Phase 3; at **M** run only `/specialist-review` +
+`ponytail:ponytail-review`; at **L** run all 5. Dispatch the selected subagents in
+parallel, report-only — but the diff range is `RANGE_SPEC` instead of `main...HEAD`.
+Each subagent prompt must include the actual diff content (output of the diff
+command above), not the raw shell expression. Subagents are still report-only.
 
-After all subagents return, consolidate findings (merge + dedupe) → `PHASE1_FINDINGS`.
+After all subagents return, consolidate findings (merge + dedupe) → `PHASE1_FINDINGS`
+(at size S there are none — skip to Phase 3).
 
-> **Verification gate (optional).** If the `Workflow` tool is available, run the
-> adversarial verification gate on `PHASE1_FINDINGS` before Phase 2 — see
-> [Verification gate](#verification-gate) and `references/adversarial-verify.md`.
+> **Verification gate (optional).** At **effective size L** with the `Workflow` tool
+> available (S and M skip it), run the adversarial verification gate on
+> `PHASE1_FINDINGS` before Phase 2 — see [Verification gate](#verification-gate) and
+> `references/adversarial-verify.md`.
 > Pass `PHASE1_FINDINGS` as `findings` and the resolved range diff command from the
 > [Range resolution](#range-resolution-recap) table as `diff_cmd`. Replace
 > `PHASE1_FINDINGS` with the **confirmed (survivor)** list; record **rejected**
@@ -786,7 +960,7 @@ If Codex CLI is also unavailable, the existing "both CLIs fail → stop" path fi
 
 ```
 round = 0
-LOOP (max 5 rounds):
+LOOP (max SIZE_MAX_ROUNDS rounds — S 3 / M 5 / L 10; see Sizing):
   round += 1
 
   1. Verify still on main, BASE_SHA is reachable from HEAD, and TIP_SHA == HEAD:
@@ -890,9 +1064,10 @@ LOOP (max 5 rounds):
        more specific description).
      - Result: deduped list of findings from both reviewers.
 
-  3b. VERIFICATION GATE (optional): if the Workflow tool is available, challenge
-     MERGED_FINDINGS with the adversarial gate before Step 4 (see the "Verification
-     gate" section and references/adversarial-verify.md). Pass MERGED_FINDINGS as
+  3b. VERIFICATION GATE (optional): at effective size L with the Workflow tool
+     available (S and M skip it), challenge MERGED_FINDINGS with the adversarial gate
+     before Step 4 (see the "Verification gate" section and
+     references/adversarial-verify.md). Pass MERGED_FINDINGS as
      `findings` and this round's diff command (Range resolution table) as `diff_cmd`.
      Replace MERGED_FINDINGS with the confirmed survivors; record rejected findings
      as pushed back and carry their reasoning into prior-push-back context. If every
@@ -947,7 +1122,7 @@ LOOP (max 5 rounds):
      the full cumulative range (`BASE_SHA..HEAD`) — not just the latest fix commit.
      Loop back to Step 1.
 
-End: max 5 rounds → stop and report last round's findings; let user decide.
+End: max SIZE_MAX_ROUNDS rounds (S 3 / M 5 / L 10) → stop and report last round's findings; let user decide.
 ```
 
 ### Exit Conditions
@@ -957,8 +1132,10 @@ End: max 5 rounds → stop and report last round's findings; let user decide.
    the round runs Codex CLI only, so Codex's clean result alone is the pass —
    don't wait on a reviewer that didn't run.)
 2. **Push-back exit**: all findings repeat prior rounds with the same reasoning → done.
-3. **Max 5 rounds** (lower than Uncommitted Mode's 10 — post-commit is a follow-up
-   review stage, not fresh implementation): stop and report last round; user decides.
+3. **Max `SIZE_MAX_ROUNDS` rounds** — **S 3 / M 5 / L 10** by effective size (see
+   [Sizing](#sizing-sml-risk-profile)); the M default of 5 matches this mode's prior
+   fixed cap and stays lower than Uncommitted Mode's 10, since post-commit is a
+   follow-up review stage, not fresh implementation: stop and report last round; user decides.
 4. **Aborted invariants**: branch changed, BASE unreachable, both CLIs unavailable →
    stop with specific reason.
 
@@ -1008,9 +1185,14 @@ otherwise. On a halt, report **blocked** and reference the `halts/` payload path
 ## Phase 1: Internal Review
 
 > **⏭️ Skip entirely if `MODE=uncommitted`.**
-> **⏭️ If `external_only == true`, skip this phase — go to [Phase 3](#phase-3-external-review-loop).**
+> **⏭️ If `external_only == true` OR `EFFECTIVE_SIZE == S`, skip this phase — go to [Phase 3](#phase-3-external-review-loop).** (Size S reviews externally only; see [Sizing](#sizing-sml-risk-profile).)
 
-**Dispatch subagents in parallel (`run_in_background: true`), each running a review skill. All report-only — no code changes.**
+**Which reviewers run depends on `EFFECTIVE_SIZE` (see [Sizing](#sizing-sml-risk-profile)):**
+- **M (default)** → dispatch **only rows 4 and 5** below (`/specialist-review` + `ponytail:ponytail-review`).
+- **L** → dispatch **all 5** rows below.
+- **S** → Phase 1 is skipped entirely (handled by the skip above).
+
+**Dispatch the selected subagents in parallel (`run_in_background: true`), each running a review skill. All report-only — no code changes.**
 
 | Subagent | Skill | Source | Focus |
 |----------|-------|--------|-------|
@@ -1037,7 +1219,7 @@ Wait for all successful subagents to report, then proceed to Phase 2.
 ## Phase 2: Consolidate + Fix
 
 > **⏭️ Skip entirely if `MODE=uncommitted`.**
-> **⏭️ If `external_only == true`, skip this phase — go to [Phase 3](#phase-3-external-review-loop).**
+> **⏭️ If `external_only == true` OR `EFFECTIVE_SIZE == S`, skip this phase — go to [Phase 3](#phase-3-external-review-loop).**
 
 ### 2a. Consolidate reports
 
@@ -1046,9 +1228,10 @@ After receiving all successful reports:
 2. **Group by file**: list all suggestions organized by file
 3. **Escalate ambiguity**: if suggestions contradict each other, or the orchestrator can't determine whether to fix, ask the user
 
-> **Verification gate (optional).** If the `Workflow` tool is available, run the
-> adversarial verification gate on the consolidated suggestion list before
-> dispatching 2b — see [Verification gate](#verification-gate) and
+> **Verification gate (optional).** At **effective size L** with the `Workflow` tool
+> available (S and M skip it), run the adversarial verification gate on the
+> consolidated suggestion list before dispatching 2b — see
+> [Verification gate](#verification-gate) and
 > `references/adversarial-verify.md`. Pass the deduped suggestions as `findings`
 > and `git diff main...HEAD` as `diff_cmd`. Dispatch 2b with only the **confirmed
 > (survivor)** findings; record each **rejected** finding as pushed back (with the
@@ -1365,11 +1548,12 @@ UNRESOLVED=$(gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int
 
 ```
 # ── Initialization (after pre-flight, before entering loop) ──
-# Argument parsing (see above): external_only and current_reviewer are set
+# Argument parsing (see above): external_only, current_reviewer, and EFFECTIVE_SIZE
+# are set. SIZE_MAX_ROUNDS = 3 / 5 / 10 for S / M / L (see Sizing).
 # current_reviewer = reviewer_args non-empty ? reviewer_args : "codex bot"
 
 round = 0
-LOOP (max 10 rounds):
+LOOP (max SIZE_MAX_ROUNDS rounds — S 3 / M 5 / L 10; see Sizing):
   round += 1
   1. Trigger review with current_reviewer (record TRIGGER_COMMENT_ID)
   2. Poll for feedback (unresolved threads + issue comment ID comparison)
@@ -1613,7 +1797,7 @@ these conditions is met:
 - Stop fixing — end the loop
 
 ### 3. Maximum round protection
-- Max **10 rounds**. If exceeded, stop and notify user, let them decide whether to continue
+- Max **`SIZE_MAX_ROUNDS` rounds** — **S 3 / M 5 / L 10** by effective size (see [Sizing](#sizing-sml-risk-profile)). If exceeded, stop and notify user, let them decide whether to continue
 
 ### On exit:
 1. Notify user: "Review loop complete" + exit reason + last round's reviewer feedback
