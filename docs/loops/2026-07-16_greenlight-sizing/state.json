@@ -1,41 +1,41 @@
 {
-  "status": "in_progress",
+  "status": "done",
   "plan_dir": "docs/loops/2026-07-16_greenlight-sizing",
   "started_at": "2026-07-16T16:55:06+0800",
-  "completed_at": null,
-  "resume_note": "2026-07-16 17:15 — wave 1 agents died on account session limit (resets 21:20 Asia/Taipei). Implementations were salvaged: both branches pushed, PRs opened (pr1 #124, pr2 #123). Resume at 21:24 dispatches review-phase agents (greenlight → CI → merge) for both, then waves pr3 → pr4 as normal.",
+  "completed_at": "2026-07-16T20:59:18+0800",
+  "resume_note": "2026-07-16 20:59 — run complete: all 4 PRs merged (#124, #123, #125, #126). Wave 1 survived a session-limit outage via branch salvage (see git history d91585f); pr4 needed one limit-window retry. Wave dispatch used a parse-guarded copy of wave-workflow.md's script (args-as-string runtime gotcha; upstream template fix tracked in todos backlog, commit dbd4653).",
   "prs": {
     "pr1": {
       "number": 124,
-      "status": "review",
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": { "rounds": 3, "fixed": 9, "pushed_back": 1 }
     },
     "pr2": {
       "number": 123,
-      "status": "review",
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": { "rounds": 2, "fixed": 6, "pushed_back": 4 }
     },
     "pr3": {
-      "number": null,
-      "status": "pending",
+      "number": 125,
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": { "rounds": 4, "fixed": 8, "pushed_back": 2 }
     },
     "pr4": {
-      "number": null,
-      "status": "pending",
+      "number": 126,
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": { "rounds": 4, "fixed": 11, "pushed_back": 0 }
     }
   }
 }

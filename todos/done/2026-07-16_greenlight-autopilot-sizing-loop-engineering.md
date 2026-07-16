@@ -1,6 +1,6 @@
 # Greenlight / Autopilot 分級（S/M/L）與 loop engineering
 
-Status: doing（2026-07-16 autopilot 排程執行中，plan: docs/loops/2026-07-16_greenlight-sizing/）
+Status: done（2026-07-16 autopilot 完成，4/4 PRs merged——見文末執行結果）
 目標：autopilot / greenlight 流程太重，對 typo PR 和核心邏輯 PR 跑同一套。引入以風險為軸的 S/M/L 分級，並用 loop engineering 五要素（目標 / Verifier / Feedback / Stopping / Escalation）補上流程的結構性缺口。
 
 ## 已查證的現狀事實（2026-07-16 二輪查核，含行號，免重新考古）
@@ -175,3 +175,16 @@ acceptance criteria 每條必須是可執行命令或可驗證斷言，「功能
 （無。最後一條——flag 觸發清單含 findings 矛盾處置——2026-07-16 與 Hana 逐條確認完畢，拍板內容見第 4 節矛盾處置表。全部決策齊備，可動工。）
 
 （先前已收掉：post-commit verify 時序——verify 跑在 commit 前即無壞 commit 問題，見第 2 節時序注意。M external max 5——與 post-commit 現狀一致，刻意寫死。S external max rounds——3，對衝 codex 對 docs PR 挑 style nit 燒輪數的風險。「受影響 tests」怎麼定義——單一 verify 命令後問題消失，第一版就是跑 config 寫死的那條命令。）
+
+## 執行結果（2026-07-16 autopilot run，plan: docs/loops/2026-07-16_greenlight-sizing/）
+
+4 PRs 全數 merge：
+
+| 計畫編號 | GitHub PR | 內容 | Review 統計 |
+|---|---|---|---|
+| PR 0 | #124 | fix(merge-pr): CI gate pinned to head SHA（含移除 `\|\| true`、pending≠green、pr-subagent-template Step 6 stale-SHA 修正） | 3 輪、修 9、push back 1 |
+| PR 1 | #123 | feat(greenlight): verifier 內迴圈 + anti-gaming guard + 最小 halt/flag primitive + config `verify` key | 2 輪、修 6、push back 4 |
+| PR 2 | #125 | feat(greenlight): S/M/L cascade 判定 + per-size profile gate + plan.yaml `size` 欄位 | 4 輪、修 8、push back 2 |
+| PR 3 | #126 | feat(greenlight): escalation taxonomy（reason_class + attended 投影 + 矛盾處置表）+ autopilot spec 品質 gate | 4 輪、修 11、push back 0 |
+
+過程註記：wave 1（PR 0/1）曾整批撞 session limit，實作自殘留 worktree／已推 branch 搶救（pr2 連 PR 都已開好），零重做；pr4 撞第二輪限額後重試成功。wave dispatch 踩到 wave-workflow args 字串化 runtime 坑，以 parse-guarded script 副本繞過——模板源頭修正已有獨立 backlog 待辦（commit dbd4653）。尚未 release：版本 bump 走 `/release`，不隨 merge 觸發。
