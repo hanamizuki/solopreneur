@@ -215,7 +215,7 @@ For each completed subagent:
 | Test failure (within subagent) | subagent self-fixes up to 3 times |
 | Test failure (after retries) | blocked |
 | PR creation failure | retry once |
-| Review loop exceeds 3 rounds | subagent escalates, marks blocked |
+| Review loop halt (greenlight returns a halt) | No separate round cap here — defer to greenlight's own per-size round bound (S 3 / M 5 / L 10). Read the halt payload's `reason_class` (greenlight references the `halts/` path in its report): `transient-dependency` → wait-and-retry (same path as "GitHub API unavailable" below); `invariant-violation` / `authority-boundary` → blocked. See greenlight's [Escalation taxonomy](../../greenlight/SKILL.md#escalation-taxonomy-halt--flag--note). |
 | CI failure | read CI log, dispatch fix subagent |
 | Merge conflict | auto rebase + force push |
 | GitHub API unavailable | wait 60s and retry, blocked after 2 attempts |

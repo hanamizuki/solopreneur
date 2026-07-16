@@ -180,6 +180,10 @@ One .md file per PR, placed in the same directory as the plan.
 ### Writing Principles
 
 1. **Describe intent, not implementation**: "Create a maintenance loop that runs once on startup, then repeats every N hours" — not 50 lines of pseudo code
-2. **Acceptance criteria must be verifiable**: "Stops within 60 seconds after shutdown event is set" — not "can stop correctly"
+2. **Acceptance criteria must be verifiable** — every criterion is an executable
+   command or a verifiable assertion: "Stops within 60 seconds after shutdown event is
+   set" — not "can stop correctly". This is **enforced at planning time** by the
+   autopilot spec quality gate (`../SKILL.md` Step 3), which rejects vague criteria
+   before the spec is written.
 3. **List files to read**: so the subagent knows which parts of the codebase are relevant
 4. **List file paths**: so tech-vetting can verify paths exist and don't overlap
