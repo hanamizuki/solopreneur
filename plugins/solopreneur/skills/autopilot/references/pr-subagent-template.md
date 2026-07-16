@@ -78,9 +78,24 @@ Invoke the /greenlight skill to run the automated code review loop.
 If the review loop exceeds 3 rounds with unresolved issues, stop and report.
 
 ### 6. CI Check + Merge
-- Poll CI: every 60 seconds `gh pr checks {PR_NUMBER}`, max 10 attempts
-- All CI passes → invoke /merge-pr skill
-- CI fails → read CI log, attempt one fix; if still failing → stop
+After the final push (greenlight may have pushed fix commits in Step 5),
+capture the exact commit CI must pass for — the pushed head SHA:
+
+    PUSHED_SHA=$(git rev-parse HEAD)
+
+Poll CI pinned to that SHA, every 60 seconds, max 10 attempts. No result is
+trusted until it reflects `PUSHED_SHA` — a just-pushed commit whose CI has not
+registered yet must never inherit an earlier commit's green:
+- Confirm the PR head has caught up first: `gh pr view {PR_NUMBER} --json
+  headRefOid --jq '.headRefOid'` must equal `PUSHED_SHA`. Until it does, keep
+  polling (do not read checks against a stale head SHA).
+- Then read `gh pr checks {PR_NUMBER}`. **"No checks reported yet" for
+  `PUSHED_SHA` is treated as pending — keep polling, never as success.**
+  Absence of checks is never a pass.
+- All checks green for `PUSHED_SHA` → invoke /merge-pr skill (which
+  re-verifies the same head-SHA gate before merging).
+- Any check failed → read CI log, attempt one fix; if still failing → stop
+- Still pending after 10 attempts → stop; do not merge
 
 ### 7. Cleanup
 - Worktree is automatically cleaned up by the isolation mechanism (branch deleted after merge)
