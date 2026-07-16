@@ -483,13 +483,149 @@ if [ -n "$DOING" ] && [ -n "$DONE_DIR" ] && [[ "$PLAN_FILE" == "$DOING"/* ]]; th
 fi
 ```
 
-### Step 4: Merge the PR
+### Step 4: CI gate — merge only when checks for the head SHA are green
+
+Before merging, confirm CI has passed **for the exact commit that will be
+merged**. Every read is pinned to the PR's current head SHA so a just-pushed
+commit whose CI has not registered yet can never inherit an earlier commit's
+green — a gate that passes on a stale green is worse than no gate, because
+everything downstream then trusts a false signal.
+
+**Four outcomes (all handled by the loop below):**
+
+1. **All checks for the head SHA green → merge.**
+2. **Any check pending, or no checks reported yet → not green.** Poll every
+   60s, up to 10 attempts (mirrors autopilot Step 6). Still not green → abort
+   with `CI still pending — not merging`. Absence of checks is never success.
+3. **Any check failed → abort**, listing the failing check names.
+4. **Repo has zero CI checks configured at all → merge**, but print a
+   prominent `merged with no CI signal` flag line. This is concluded *only*
+   after the full poll budget elapses with no check ever reported — a check
+   that shows up pending keeps us in outcome 2, never here.
 
 ```bash
-gh pr merge $PR_NUMBER --squash --delete-branch 2>&1 || true
+# Pin every read to the exact commit we are about to merge. Passing the SHA
+# in the API path (not `gh pr checks`, which reads the PR's current head and
+# can lag behind a just-pushed commit) is what makes the stale-SHA race
+# impossible: checks for an older commit can never be mistaken for this one's.
+HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')
+if [ -z "$HEAD_SHA" ]; then
+  echo "Could not resolve head SHA for PR $PR_NUMBER — refusing to merge blind."
+  exit 1
+fi
+echo "Gating merge on CI for head SHA: $HEAD_SHA"
+
+# Verdict for a SHA: green | pending | failed | none. Reads BOTH the Checks
+# API (GitHub Actions) and legacy commit statuses (external CI) so a
+# status-only repo is neither mistaken for "no CI" nor merged over a red
+# external check. `--paginate --slurp` pulls EVERY page of check-runs: a commit
+# with >100 checks (large monorepos do) would otherwise hide failures on later
+# pages and let the gate pass a red commit as green.
+ci_verdict_for_sha() {
+  local sha="$1" cr st
+  # A failed API call must NEVER be mistaken for "zero checks". A rate-limit /
+  # network / auth blip that returned no data would read as `none` and, after
+  # the poll budget, merge a repo that actually HAS CI. Treat any fetch failure
+  # as `pending` so the loop retries and ultimately aborts, never merges. (No
+  # `2>/dev/null`: let gh's error surface for the operator.)
+  cr=$(gh api --paginate --slurp "repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100") || { echo pending; return; }
+  st=$(gh api "repos/{owner}/{repo}/commits/$sha/status")                                     || { echo pending; return; }
+
+  local cr_total cr_bad cr_incomplete st_total st_state
+  # `--slurp` wraps the pages in an array: total_count is identical on every
+  # page (read [0]); check-runs are flattened across all pages (.[].check_runs[]).
+  cr_total=$(jq -r '.[0].total_count // 0' <<<"$cr")
+  # "bad" = a completed run whose conclusion is not a pass (success/neutral/
+  # skipped). Matches GitHub branch-protection semantics — cancelled,
+  # timed_out, action_required and failure all count as not-passing.
+  cr_bad=$(jq '[.[].check_runs[]? | select(.status=="completed") | select(.conclusion!="success" and .conclusion!="neutral" and .conclusion!="skipped")] | length' <<<"$cr")
+  cr_incomplete=$(jq '[.[].check_runs[]? | select(.status!="completed")] | length' <<<"$cr")
+  st_total=$(jq -r '.total_count // 0' <<<"$st")
+  st_state=$(jq -r '.state // "pending"' <<<"$st")
+
+  # Neither system reports anything for this SHA.
+  if [ "$cr_total" -eq 0 ] && [ "$st_total" -eq 0 ]; then echo none; return; fi
+  # Any hard failure wins. Legacy commit-status rolls up to success/pending/
+  # failure/error — `error` (external CI infra failure) is a hard fail too, not
+  # a pass, so catch it here or it falls through to green.
+  if [ "$cr_bad" -gt 0 ] || [ "$st_state" = failure ] || [ "$st_state" = error ]; then echo failed; return; fi
+  # Anything still running, or statuses rolled up pending — but only when
+  # statuses actually exist: an empty status set reports state=pending, which
+  # must NOT be read as an outstanding check (verified against the API).
+  if [ "$cr_incomplete" -gt 0 ] || { [ "$st_total" -gt 0 ] && [ "$st_state" = pending ]; }; then echo pending; return; fi
+  echo green
+}
+
+MAX_ATTEMPTS=10
+ATTEMPT=0
+EVER_SAW_CHECK=0
+NO_CI_SIGNAL=0
+
+while :; do
+  VERDICT=$(ci_verdict_for_sha "$HEAD_SHA")
+
+  if [ "$VERDICT" = green ]; then
+    echo "CI green for $HEAD_SHA — proceeding to merge."
+    break
+  fi
+
+  if [ "$VERDICT" = failed ]; then
+    echo "CI FAILED for $HEAD_SHA — refusing to merge. Failing checks:"
+    gh api --paginate "repos/{owner}/{repo}/commits/$HEAD_SHA/check-runs?per_page=100" \
+      --jq '.check_runs[] | select(.status=="completed") | select(.conclusion!="success" and .conclusion!="neutral" and .conclusion!="skipped") | "  - \(.name): \(.conclusion)"'
+    gh api "repos/{owner}/{repo}/commits/$HEAD_SHA/status" \
+      --jq '.statuses[]? | select(.state=="failure" or .state=="error") | "  - \(.context): \(.state)"'
+    exit 1
+  fi
+
+  # VERDICT is "pending" or "none" → not green yet.
+  [ "$VERDICT" = pending ] && EVER_SAW_CHECK=1
+  ATTEMPT=$((ATTEMPT + 1))
+
+  if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
+    if [ "$EVER_SAW_CHECK" -eq 1 ]; then
+      echo "CI still pending — not merging (waited ${MAX_ATTEMPTS}×60s for $HEAD_SHA)."
+      exit 1
+    fi
+    # No check EVER reported across the whole window → treat as a repo with
+    # zero CI configured. Proceed, but flag loudly — never silent.
+    echo "FLAG: merged with no CI signal — no checks ever reported for $HEAD_SHA."
+    NO_CI_SIGNAL=1
+    break
+  fi
+
+  if [ "$EVER_SAW_CHECK" -eq 1 ]; then
+    echo "CI pending for $HEAD_SHA (attempt $ATTEMPT/$MAX_ATTEMPTS) — waiting 60s..."
+  else
+    echo "No checks reported yet for $HEAD_SHA (attempt $ATTEMPT/$MAX_ATTEMPTS) — treating as pending, waiting 60s..."
+  fi
+  sleep 60
+done
+```
+
+### Step 5: Merge the PR
+
+`|| true` is intentionally **absent**: a merge rejected by branch protection
+(or any other `gh` error) must surface as an explicit failure carrying gh's
+own error output, not be swallowed as success.
+
+```bash
+# Re-confirm the head has not advanced since the Step 4 gate. A commit pushed
+# during the poll window would otherwise be merged while only the OLD SHA's CI
+# was verified — the exact stale-green that head-SHA pinning exists to prevent.
+LATEST_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')
+if [ "$LATEST_HEAD" != "$HEAD_SHA" ]; then
+  echo "PR head moved ($HEAD_SHA → $LATEST_HEAD) since the CI gate — refusing to merge a commit CI hasn't cleared. Re-run /merge-pr to re-gate the new head."
+  exit 1
+fi
+
+if ! gh pr merge "$PR_NUMBER" --squash --delete-branch; then
+  echo "Merge command failed (see gh error above) — stopping."
+  exit 1
+fi
 
 # Verify the merge succeeded
-STATE=$(gh pr view $PR_NUMBER --json state --jq '.state')
+STATE=$(gh pr view "$PR_NUMBER" --json state --jq '.state')
 echo "PR state: $STATE"
 [ "$STATE" = "MERGED" ] || { echo "Merge failed — stopping."; exit 1; }
 ```
@@ -498,7 +634,7 @@ Note: `--delete-branch` deletes the remote branch. The local branch deletion
 will fail because the worktree is still checked out — this is expected. Step 0
 of the *next* `/merge-pr` run (from any other session) will clean it up.
 
-### Step 5: Report status
+### Step 6: Report status
 
 ```text
 PR #<N> merged to main (commit <sha>)
@@ -509,6 +645,14 @@ from another session):
   branch:   <branch>
 
 To clean up immediately, run /merge-pr from the main repo or another worktree session.
+```
+
+If the CI gate (Step 4) merged with the no-CI-signal flag set
+(`NO_CI_SIGNAL=1`), prepend this prominent line to the report so it cannot be
+missed. Omit it entirely on the normal CI-green path:
+
+```text
+[FLAG] merged with no CI signal — repo has no CI checks configured
 ```
 
 ---
