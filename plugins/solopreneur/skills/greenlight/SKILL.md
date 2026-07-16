@@ -279,13 +279,13 @@ COMPUTED_SIZE=M
 #     crypto tokens match anywhere in a path on purpose (catch oauth, cryptography,
 #     prepayment, …); a rare false hit like "author" simply escalates. ---
 if printf '%s\n' "$FILES" | grep -qiE \
-   '(^|/)migrations/|auth|payment|crypto|^\.github/workflows/|(^|/)Dockerfile|(^|/)(docker-compose|Containerfile)|\.(tf|tfvars)$|(^|/)(package\.json|requirements\.txt|pyproject\.toml|go\.mod|Gemfile|build\.gradle|Cargo\.toml|Package\.swift|composer\.json)$'; then
+   '(^|/)migrations/|auth|payment|crypto|^\.github/workflows/|(^|/)Dockerfile|(^|/)(docker-compose|Containerfile)|\.(tf|tfvars)$|(^|/)(package\.json|requirements\.txt|pyproject\.toml|go\.mod|Gemfile|build\.gradle(\.kts)?|libs\.versions\.toml|pom\.xml|Podfile|Cargo\.toml|Package\.swift|composer\.json)$'; then
   COMPUTED_SIZE=L
 fi
 # Line budget: additions + deletions, excluding lockfiles + generated files, > ~400 → L.
 # (numstat prints "-" for binary files; awk reads "-" as 0, so binaries add nothing.)
 LINES=$(git diff --numstat "$DIFF_RANGE" \
-  | grep -vE '(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock|Gemfile\.lock|composer\.lock|go\.sum|Package\.resolved)$|\.generated\.|\.min\.(js|css)$' \
+  | grep -vE '(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock|Gemfile\.lock|composer\.lock|Podfile\.lock|go\.sum|Package\.resolved)$|\.generated\.|\.min\.(js|css)$' \
   | awk '{a+=$1; d+=$2} END{print a+d+0}')
 [ "${LINES:-0}" -gt 400 ] && COMPUTED_SIZE=L
 
@@ -343,13 +343,17 @@ vocabulary; no bot login is hardcoded here.
 
 | Effective size | Phase 1 internal | Verification gate | Phase 3 external loop (`SIZE_MAX_ROUNDS`) |
 |---|---|---|---|
-| **S** | **skip** | **skip** | start the first available **external** reviewer from `fallback_order` (default `codex-bot`, or `codex-cli` when that is the available local CLI) — the registry-driven selection Phase 3 already uses — and loop to clean, **max 3 rounds** |
+| **S** | **skip** | **skip** | run the mode's **existing external Phase 3** unchanged — PR mode via its registry-driven `current_reviewer` + `fallback_order` (default `codex-bot`, preferring codex), Post-commit via its codex-CLI + agy dispatch — and loop to clean, **max 3 rounds** |
 | **M** (default) | **2 reviewers** — `/specialist-review` + `ponytail:ponytail-review` (rows 4–5 of the Phase 1 table) | **skip** | standard registry loop, **max 5 rounds** |
 | **L** | **all 5 reviewers** | **ON** (when the `Workflow` tool is available) | full registry fallback chain, **max 10 rounds** |
 
 - **S** behaves like `external_only` with a 3-round cap: Phase 1 and Phase 2 are
   skipped and the run goes straight to Phase 3, **still looping to a clean result**
-  (S is not a single-pass mode — the cost cap is the round bound, not one shot).
+  (S is not a single-pass mode — the cost cap is the round bound, not one shot). S
+  does **not** change *which* reviewer runs — each mode's existing Phase 3 selection
+  and fallback are reused as-is (PR mode's `current_reviewer` + `fallback_order`,
+  Post-commit's codex-CLI + agy); sizing only skips the internal phases and sets the
+  round cap.
 - The **verification gate** already runs only when the `Workflow` tool is present;
   sizing adds a second condition — it runs **only at size L** (S and M skip it even
   when `Workflow` is available).
