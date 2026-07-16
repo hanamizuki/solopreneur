@@ -128,7 +128,7 @@ Verify 命令來源：solopreneur.json 加 `verify` feature key（`read_solopren
 | 級 | 行為 | 例子 |
 |---|---|---|
 | **halt** | 停下、打包 payload、回報（unattended = exit non-zero） | **external** reviewer 全掛（Phase 1 internal 全掛照現狀 skip → 繼續 Phase 3，不 halt——別退步）、invariant 壞、fix 要碰授權外危險 path（S/M loop 中途發現要動 auth = size 前提變了）、inner verify ×3 不過 |
-| **flag** | 繼續跑，決定記入 report 醒目區，人類事後裁決 | push back P1、fix >20 行、無 verifier 配置下跑完的 loop、無 CI signal 下 merge、自動判 S |
+| **flag** | 繼續跑，決定記入 report 醒目區，人類事後裁決 | push back P1、fix >20 行、無 verifier 配置下跑完的 loop、無 CI signal 下 merge、自動判 S、findings 矛盾（①②，見下方矛盾處置表） |
 | **note** | 正常統計 | fixed / pushed-back 計數 |
 
 二輪 review 補強：
@@ -136,6 +136,18 @@ Verify 命令來源：solopreneur.json 加 `verify` feature key（`read_solopren
 - **halt payload 帶 `reason_class`**：`transient-dependency`（reviewer 全掛——可重試）／`invariant-violation`（硬停，別重試）／`authority-boundary`（refuse，必須人介入）。下游 orchestrator 本來就分「wait-retry」和「blocked」兩路（orchestrator.md:211-221），壓平的 halt 餵不了這個分流。
 - **Attended 投影**：三級是 unattended-first，但 greenlight 也會被人手動跑，現存流程滿是「ask the user」分支。attended 時 halt → 問使用者再決定（不是 exit non-zero）、flag → inline 呈現、note 照舊。不寫清楚會 regress 現有互動行為。
 - PR 3 統一框架時一併收攏 orchestrator 的 blocked 規則（>3 輪 blocked vs greenlight max 10 的不一致）。
+
+**Findings 矛盾處置表（2026-07-16 與 Hana 逐條拍板）**。「挑保守方」＝維持現狀不動手，不是猜一邊執行。背景：現狀全 SKILL.md 只有一條矛盾規則（Phase 2a :865 問人，attended-only），Phase 3 零規則；verification gate 的 3 skeptics 逐條獨立驗真偽、不交叉比對，矛盾雙方都會存活。
+
+| 型 | 例 | unattended 處置 |
+|---|---|---|
+| ① 同輪對撞：兩 reviewer 對同段碼開相反藥方 | ponytail 說刪防禦 check、specialist 說加 null check | 兩條都不做（no-action 是唯一不否定任一方的動作，維持已通過前輪的現狀）→ 各記 pushed-back(contradiction) + **flag** |
+| ② 跨輪翻烙餅：新 finding 要求 revert 前輪已採納 fix（review loop 經典不收斂模式，現狀零偵測、只靠 max rounds 兜底） | round 1 codex 說抽 helper、round 3 說 inline 回去 | loop 維護「已採納 fix」清單、fix subagent prompt 帶上；互斥 → 不執行、pushed-back(flip-flop) + **flag**。保守方＝已採納的前輪 fix，不 thrash |
+| ③ finding 撞 spec／size 授權（**可機械裁決，spec 就是裁判**，不屬「無法裁決」桶） | spec 寫全 sync、reviewer 要 async | spec 勝 → pushed-back(out-of-contract) + **note**；reviewer 理由是 correctness 級（暗示 spec 本身錯）→ 升 **flag**；fix 要碰危險 path → **halt**（authority-boundary，上表已拍板） |
+| ④ reviewer 說 P1、fix subagent 判 false positive（reviewer vs fix agent，非 reviewer 互撞） | — | push back P1 → **flag**（上表已拍板，列出僅為完整） |
+| ⑤ 純 style 對撞（①的低配版） | 一個要多註解、一個嫌註解吵 | no-action + **note**（不進 flag——每條都 flag 會把 flag 區灌成噪音，flag 只留 correctness 味道的矛盾） |
+
+（attended 模式維持現狀問人；standalone `/greenlight` 無 spec 時 ③ 退化成 ①。一句話：可機械裁決的讓 spec 裁；不可裁決的一律不動手，correctness 級 flag、style 級 note；唯一 halt 是撞授權邊界。）
 
 **halt payload**：最後一輪 findings + verify 失敗 log（完整版）+ 已嘗試 fix 摘要 + push-back 理由 + 建議下一步，落成檔案：`docs/loops/<run>/halts/` 子目錄——與 plan.yaml / state.json 活 config 分開，且 `docs/loops/**` 已排除出 S 白名單，halt 記錄不會反過來走輕審。獨立跑 `/greenlight` 沒有 run 目錄——fallback 自建 `docs/loops/<date>_greenlight-<branch>/halts/`。report 引用路徑。
 
@@ -156,10 +168,10 @@ acceptance criteria 每條必須是可執行命令或可驗證斷言，「功能
 0. **PR 0：merge-pr 補 `gh pr checks`**（零依賴、堵 standalone `/merge-pr` 的「CI 紅照樣 merge」真洞 + autopilot 路徑 defense-in-depth——最先 land）。行數小但正確性預算全花在第 3 節三細節：pin HEAD SHA、pending/無 check ≠ green、移除 `|| true`。acceptance criteria 必含「pending 不算綠」。
 1. **PR 1：verifier 內迴圈 + 最小 halt/flag primitive**（價值最高——唯一改變 loop 收斂性質的改動）：config `verify` key + fix 後 gate（verify 在 commit 前）+ log 截斷回餵 + inner max 3 + **anti-gaming guard** + halt payload 落檔 + flag 進 report 醒目區（最小形式，完整 taxonomy 留 PR 3）+ 每 size work 上界明文。
 2. **PR 2：S/M/L 判定 + profile gate**：greenlight pre-flight 加 cascade 判定（真實 diff 計算，plan size 只當 advisory 取 max）、各 phase 加 size 條件（reviewer 選擇走 registry 語彙）、autopilot 傳 `size:`、pr-subagent-template 帶 token。不確定一律 default M；自動判 S → flag。
-3. **PR 3：escalation 完整 taxonomy（reason_class + attended 投影 + 收攏 orchestrator blocked 規則）+ spec 品質 gate（含 `type: docs` 交叉否決）**。
+3. **PR 3：escalation 完整 taxonomy（reason_class + attended 投影 + 收攏 orchestrator blocked 規則 + findings 矛盾處置表）+ spec 品質 gate（含 `type: docs` 交叉否決）**。
 
-## 開放問題（動工前要跟 Hana 確認）
+## 開放問題
 
-- **flag 觸發清單**要再斟酌（二輪 review 認可上表例子的方向，但 Hana 尚未逐條確認；特別是「findings 矛盾且無 test 可裁決」在 unattended 下 halt 還是挑保守方 + flag）。
+（無。最後一條——flag 觸發清單含 findings 矛盾處置——2026-07-16 與 Hana 逐條確認完畢，拍板內容見第 4 節矛盾處置表。全部決策齊備，可動工。）
 
-（已收掉：post-commit verify 時序——verify 跑在 commit 前即無壞 commit 問題，見第 2 節時序注意。M external max 5——與 post-commit 現狀一致，刻意寫死。S external max rounds——3，對衝 codex 對 docs PR 挑 style nit 燒輪數的風險。「受影響 tests」怎麼定義——單一 verify 命令後問題消失，第一版就是跑 config 寫死的那條命令。）
+（先前已收掉：post-commit verify 時序——verify 跑在 commit 前即無壞 commit 問題，見第 2 節時序注意。M external max 5——與 post-commit 現狀一致，刻意寫死。S external max rounds——3，對衝 codex 對 docs PR 挑 style nit 燒輪數的風險。「受影響 tests」怎麼定義——單一 verify 命令後問題消失，第一版就是跑 config 寫死的那條命令。）
