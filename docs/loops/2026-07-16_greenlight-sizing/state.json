@@ -1,20 +1,21 @@
 {
-  "status": "pending",
+  "status": "in_progress",
   "plan_dir": "docs/loops/2026-07-16_greenlight-sizing",
-  "started_at": null,
+  "started_at": "2026-07-16T16:55:06+0800",
   "completed_at": null,
+  "resume_note": "2026-07-16 17:15 — wave 1 agents died on account session limit (resets 21:20 Asia/Taipei). Implementations were salvaged: both branches pushed, PRs opened (pr1 #124, pr2 #123). Resume at 21:24 dispatches review-phase agents (greenlight → CI → merge) for both, then waves pr3 → pr4 as normal.",
   "prs": {
     "pr1": {
-      "number": null,
-      "status": "pending",
+      "number": 124,
+      "status": "review",
       "worktree": null,
       "error": null,
       "retry_count": 0,
       "review_summary": null
     },
     "pr2": {
-      "number": null,
-      "status": "pending",
+      "number": 123,
+      "status": "review",
       "worktree": null,
       "error": null,
       "retry_count": 0,
