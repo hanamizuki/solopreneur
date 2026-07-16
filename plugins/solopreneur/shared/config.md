@@ -26,7 +26,8 @@ Solopreneur config has two top-level sections:
   "default": {
     // settings that apply to every repo lacking an override
     "greenlight": { "fallback_order": ["codex-bot", "codex-cli"] },
-    "plans":      { "dir": "docs/plans" }
+    "plans":      { "dir": "docs/plans" },
+    "verify":     { "cmd": "make verify" }
   },
   "repos": {
     // per-repo overrides, keyed by normalized repo identity
@@ -34,7 +35,8 @@ Solopreneur config has two top-level sections:
       "todos": { "backlog": "todos/backlog", "doing": "todos/doing", ... }
     },
     "github.com/owner/repo-b": {
-      "plans": { "dir": "docs/proposals" }
+      "plans":  { "dir": "docs/proposals" },
+      "verify": { "cmd": "cargo clippy -- -D warnings && cargo test --lib" }
     }
   }
 }
@@ -42,6 +44,45 @@ Solopreneur config has two top-level sections:
 
 A repo key (`github.com/owner/repo` style) is computed from the working repo's
 `origin` remote — see `solopreneur_repo_key` below.
+
+## The `verify` feature key
+
+`verify` names the repo's fast, deterministic verify entry point — the single
+command greenlight's inner verify loop runs against the working tree after each
+fix and before committing (see `skills/greenlight/SKILL.md`, "Inner verify
+loop"). Store the command inside a one-field object rather than as a bare
+string, following the scalar-wrapper guidance under "Edge case" below: the
+object also lets a per-repo entry override-to-disable a global default (a
+non-null object wins the cascade; an empty `cmd` then means "skip").
+
+```jsonc
+{
+  "default": {
+    "verify": { "cmd": "make verify" }   // lint + typecheck + fast unit tests
+  },
+  "repos": {
+    // per-repo override; empty cmd disables verify for this repo despite the default
+    "github.com/owner/rust-svc": { "verify": { "cmd": "cargo clippy -- -D warnings && cargo test --lib" } },
+    "github.com/owner/no-ci":    { "verify": { "cmd": "" } }
+  }
+}
+```
+
+Read it with the cascade helper and pull the command string out (tolerate an
+unset key — jq gets empty stdin and must not abort the block):
+
+```bash
+VERIFY_CMD=$(read_solopreneur_config verify | jq -r '.cmd // empty' 2>/dev/null)
+[ -z "$VERIFY_CMD" ] && echo "NO_VERIFIER" || echo "VERIFY_CMD=$VERIFY_CMD"
+```
+
+Keep the command **fast and deterministic** — lint, typecheck, and fast unit
+tests only. E2E and security suites belong in CI, never in this command: they
+are slow and flaky, and flakiness inside greenlight's bounded retry loop
+produces false halts. It is intentionally a **single** command, not a per-size
+matrix — the layer that would differ most across sizes (E2E) is exactly the
+layer excluded here. A repo with no `verify` configured makes greenlight skip
+the inner loop and flag the run as having no objective verifier.
 
 ## Lookup order (read)
 
