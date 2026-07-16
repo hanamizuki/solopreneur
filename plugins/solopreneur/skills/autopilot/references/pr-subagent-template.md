@@ -74,8 +74,13 @@ If only suggestions → note them and keep them in mind during implementation.
 - gh pr create --title "{TITLE}" --body "Auto-created by Autopilot.\n\nSpec: {PLAN_DIR}/{SPEC_FILE}"
 
 ### 5. Auto Review
-Invoke the /greenlight skill to run the automated code review loop.
-If the review loop exceeds 3 rounds with unresolved issues, stop and report.
+Invoke the /greenlight skill to run the automated code review loop. When the plan
+set a size for this PR, pass it as the `size={SIZE}` token (e.g. `/greenlight size=m`)
+so review weight matches the planned risk; greenlight still recomputes the size from
+the real diff and takes the upward max, so the token never under-reviews.
+Greenlight caps itself at its per-size max rounds (S 3 / M 5 / L 10); let it run to
+that cap rather than imposing a separate lower cap here, which would negate the size
+profile. If it stops with unresolved issues still open, report and halt.
 
 ### 6. CI Check + Merge
 After the final push (greenlight may have pushed fix commits in Step 5),
@@ -170,4 +175,5 @@ How you emit the result depends on how you were dispatched:
 | `{PR_ID}` | plan.yaml `prs[].id` | `pr2` |
 | `{PLAN_DIR}` | Plan directory path | `docs/loops/2026-03-29_mining` |
 | `{SPEC_FILE}` | plan.yaml `prs[].spec` | `pr2-collector.md` |
+| `{SIZE}` | plan.yaml `prs[].size` (`s`/`m`/`l`); **omit the `size=` token entirely when unset** | `m` |
 | `{PR_NUMBER}` | Obtained after PR creation | `81` |
