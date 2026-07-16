@@ -94,8 +94,16 @@ registered yet must never inherit an earlier commit's green:
   Absence of checks is never a pass.
 - All checks green for `PUSHED_SHA` → invoke /merge-pr skill (which
   re-verifies the same head-SHA gate before merging).
-- Any check failed → read CI log, attempt one fix; if still failing → stop
-- Still pending after 10 attempts → stop; do not merge
+- Any check failed → read CI log, attempt one fix. After pushing the fix,
+  re-capture `PUSHED_SHA=$(git rev-parse HEAD)` and restart this gate from the
+  headRefOid check — the new commit needs its own CI and must never inherit the
+  old SHA's result. If still failing → stop
+- Still pending after 10 attempts → stop; do not merge.
+- A repo with **zero CI configured** is indistinguishable from "checks not
+  registered yet" at this poll, so autopilot deliberately keeps treating it as
+  pending and stops rather than auto-merging with no signal — an unattended run
+  must not merge blind. To land a genuinely CI-less repo, run `/merge-pr`
+  directly; its gate merges with an explicit `merged with no CI signal` flag.
 
 ### 7. Cleanup
 - Worktree is automatically cleaned up by the isolation mechanism (branch deleted after merge)

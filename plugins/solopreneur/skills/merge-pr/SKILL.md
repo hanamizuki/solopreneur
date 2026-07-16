@@ -509,32 +509,46 @@ everything downstream then trusts a false signal.
 # can lag behind a just-pushed commit) is what makes the stale-SHA race
 # impossible: checks for an older commit can never be mistaken for this one's.
 HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')
+if [ -z "$HEAD_SHA" ]; then
+  echo "Could not resolve head SHA for PR $PR_NUMBER — refusing to merge blind."
+  exit 1
+fi
 echo "Gating merge on CI for head SHA: $HEAD_SHA"
 
 # Verdict for a SHA: green | pending | failed | none. Reads BOTH the Checks
 # API (GitHub Actions) and legacy commit statuses (external CI) so a
 # status-only repo is neither mistaken for "no CI" nor merged over a red
-# external check. ponytail: per_page=100 ceiling — add --paginate only if a
-# single commit ever carries >100 checks.
+# external check. `--paginate --slurp` pulls EVERY page of check-runs: a commit
+# with >100 checks (large monorepos do) would otherwise hide failures on later
+# pages and let the gate pass a red commit as green.
 ci_verdict_for_sha() {
   local sha="$1" cr st
-  cr=$(gh api "repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100" 2>/dev/null); [ -n "$cr" ] || cr='{}'
-  st=$(gh api "repos/{owner}/{repo}/commits/$sha/status" 2>/dev/null);              [ -n "$st" ] || st='{}'
+  # A failed API call must NEVER be mistaken for "zero checks". A rate-limit /
+  # network / auth blip that returned no data would read as `none` and, after
+  # the poll budget, merge a repo that actually HAS CI. Treat any fetch failure
+  # as `pending` so the loop retries and ultimately aborts, never merges. (No
+  # `2>/dev/null`: let gh's error surface for the operator.)
+  cr=$(gh api --paginate --slurp "repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100") || { echo pending; return; }
+  st=$(gh api "repos/{owner}/{repo}/commits/$sha/status")                                     || { echo pending; return; }
 
   local cr_total cr_bad cr_incomplete st_total st_state
-  cr_total=$(jq -r '.total_count // 0' <<<"$cr")
+  # `--slurp` wraps the pages in an array: total_count is identical on every
+  # page (read [0]); check-runs are flattened across all pages (.[].check_runs[]).
+  cr_total=$(jq -r '.[0].total_count // 0' <<<"$cr")
   # "bad" = a completed run whose conclusion is not a pass (success/neutral/
   # skipped). Matches GitHub branch-protection semantics — cancelled,
   # timed_out, action_required and failure all count as not-passing.
-  cr_bad=$(jq '[.check_runs[]? | select(.status=="completed") | select(.conclusion!="success" and .conclusion!="neutral" and .conclusion!="skipped")] | length' <<<"$cr")
-  cr_incomplete=$(jq '[.check_runs[]? | select(.status!="completed")] | length' <<<"$cr")
+  cr_bad=$(jq '[.[].check_runs[]? | select(.status=="completed") | select(.conclusion!="success" and .conclusion!="neutral" and .conclusion!="skipped")] | length' <<<"$cr")
+  cr_incomplete=$(jq '[.[].check_runs[]? | select(.status!="completed")] | length' <<<"$cr")
   st_total=$(jq -r '.total_count // 0' <<<"$st")
   st_state=$(jq -r '.state // "pending"' <<<"$st")
 
   # Neither system reports anything for this SHA.
   if [ "$cr_total" -eq 0 ] && [ "$st_total" -eq 0 ]; then echo none; return; fi
-  # Any hard failure wins.
-  if [ "$cr_bad" -gt 0 ] || [ "$st_state" = failure ]; then echo failed; return; fi
+  # Any hard failure wins. Legacy commit-status rolls up to success/pending/
+  # failure/error — `error` (external CI infra failure) is a hard fail too, not
+  # a pass, so catch it here or it falls through to green.
+  if [ "$cr_bad" -gt 0 ] || [ "$st_state" = failure ] || [ "$st_state" = error ]; then echo failed; return; fi
   # Anything still running, or statuses rolled up pending — but only when
   # statuses actually exist: an empty status set reports state=pending, which
   # must NOT be read as an outstanding check (verified against the API).
@@ -557,7 +571,7 @@ while :; do
 
   if [ "$VERDICT" = failed ]; then
     echo "CI FAILED for $HEAD_SHA — refusing to merge. Failing checks:"
-    gh api "repos/{owner}/{repo}/commits/$HEAD_SHA/check-runs?per_page=100" \
+    gh api --paginate "repos/{owner}/{repo}/commits/$HEAD_SHA/check-runs?per_page=100" \
       --jq '.check_runs[] | select(.status=="completed") | select(.conclusion!="success" and .conclusion!="neutral" and .conclusion!="skipped") | "  - \(.name): \(.conclusion)"'
     gh api "repos/{owner}/{repo}/commits/$HEAD_SHA/status" \
       --jq '.statuses[]? | select(.state=="failure" or .state=="error") | "  - \(.context): \(.state)"'
@@ -596,6 +610,15 @@ done
 own error output, not be swallowed as success.
 
 ```bash
+# Re-confirm the head has not advanced since the Step 4 gate. A commit pushed
+# during the poll window would otherwise be merged while only the OLD SHA's CI
+# was verified — the exact stale-green that head-SHA pinning exists to prevent.
+LATEST_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')
+if [ "$LATEST_HEAD" != "$HEAD_SHA" ]; then
+  echo "PR head moved ($HEAD_SHA → $LATEST_HEAD) since the CI gate — refusing to merge a commit CI hasn't cleared. Re-run /merge-pr to re-gate the new head."
+  exit 1
+fi
+
 if ! gh pr merge "$PR_NUMBER" --squash --delete-branch; then
   echo "Merge command failed (see gh error above) — stopping."
   exit 1
