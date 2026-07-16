@@ -177,10 +177,12 @@ verify definition that no finding called out → do not commit.** Match per file
 a finding about one test file does not license editing a different, unmentioned
 test file. In both modes the immediate action is the same — **do not commit** — with the
 reason `anti-gaming: fix touches test/verify definition unprompted`; the level differs
-only in what follows. Unattended **halts** the loop; attended **flags** it and lets the
-present human adjudicate the suspected gaming. This is the one deliberate unattended-halt
-/ attended-flag split (a suspected gaming edit is cheap to adjudicate live), noted as an
-intentional exception in the [Escalation taxonomy](#escalation-taxonomy-halt--flag--note).
+only in what follows. Unattended **halts** the loop (its halt payload carries
+`reason_class: authority-boundary` → the orchestrator blocks); attended **flags** it and
+lets the present human adjudicate the suspected gaming. This is the one deliberate
+unattended-halt / attended-flag split (a suspected gaming edit is cheap to adjudicate
+live), an intentional exception to the usual halt→ask projection noted in the
+[Escalation taxonomy](#escalation-taxonomy-halt--flag--note).
 At size S (added by a later PR) there are no internal reviewers, so this guard is the only
 defense against fix-to-pass gaming — it lands here, not in the escalation PR.
 
@@ -289,8 +291,15 @@ retry-vs-blocked without re-deriving intent:
 | `reason_class` | Meaning | Retry semantics | Fires when |
 |---|---|---|---|
 | `transient-dependency` | A dependency is down but may recover. | **Retryable** — orchestrator waits and retries. | External reviewers all exhausted (unattended fallback). |
-| `invariant-violation` | A hard correctness / state invariant broke. | **Do not retry** — orchestrator marks blocked. | Inner verify fails 3×; a post-commit invariant violation (TIP ≠ HEAD, origin/main unreachable, BASE unreachable, push-verification mismatch, branch changed mid-loop). |
-| `authority-boundary` | The next step needs authority the run does not have — refuse. | **Do not retry — a human must intervene.** | A fix would touch a dangerous path outside the size authorization (contradiction ③). |
+| `invariant-violation` | A hard stop the loop cannot resolve itself — a broken correctness / state invariant, or the round budget spent without convergence. | **Do not retry** — orchestrator marks blocked. | Inner verify fails 3×; a post-commit invariant violation (TIP ≠ HEAD, origin/main unreachable, BASE unreachable, push-verification mismatch, branch changed mid-loop); the round budget spent (max `SIZE_MAX_ROUNDS` reached with findings still unresolved). |
+| `authority-boundary` | The next step needs authority the run does not have — refuse. | **Do not retry — a human must intervene.** | A fix would touch a dangerous path outside the size authorization (contradiction ③); the anti-gaming guard's **unattended** halt (a refusal to commit a suspected gaming edit). |
+
+`reason_class` governs only the **unattended** halt's retry routing; it does **not**
+dictate the attended projection (that is set by the level — see
+[Attended projection](#attended-projection)). The two are independent axes: the
+anti-gaming guard writes an `authority-boundary` payload when it halts unattended, yet
+its attended level is deliberately **flag**, not the usual halt→ask (the one documented
+exception — see [Anti-gaming guard](#anti-gaming-guard-before-every-commit)).
 
 The autopilot orchestrator consumes this from the halt payload greenlight references in
 its report — see `../autopilot/references/orchestrator.md` (failure table).
@@ -359,8 +368,8 @@ defers its round bound to greenlight — orchestrator.md). The scattered rules m
 - **Inner verify 3× fail** → **halt**, `reason_class: invariant-violation` — see
   [Inner verify loop](#inner-verify-loop-objective-verifier-gate).
 - **Anti-gaming catch** → the deliberate **unattended-halt / attended-flag** split from
-  the verifier PR (not a uniform halt, carries no `reason_class`): "do not commit" holds
-  in both modes; unattended halts the loop, attended flags it for the present human to
+  the verifier PR: "do not commit" holds in both modes; unattended halts the loop (payload
+  `reason_class: authority-boundary`), attended flags it for the present human to
   adjudicate. See [Anti-gaming guard](#anti-gaming-guard-before-every-commit).
 
 ## Sizing (S/M/L risk profile)
