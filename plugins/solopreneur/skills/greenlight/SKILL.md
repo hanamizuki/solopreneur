@@ -88,6 +88,127 @@ evaluated per-thread through `receiving-code-review`).
 back" in the final report, and their reasoning must be carried into later rounds'
 "prior push-backs" context so a repeat finding can push-back-exit.
 
+## Inner verify loop (objective verifier gate)
+
+Every fix dispatch that ends in a commit is wrapped in an **inner verify loop**:
+after the fix subagent edits, it runs an objective verify command against the
+**working tree before committing**, and may commit + push only once that command
+passes. This is a different question from the reviewer-clean stopping criterion —
+keep the two roles separate:
+
+- **Verifier (objective, runs code)** — gates whether a fix may **push**. It
+  executes the repo's own lint / typecheck / fast-unit command and observes real
+  behavior (import errors, type errors, regressions).
+- **Reviewer-clean (subjective, reads diffs)** — gates whether the outer loop may
+  **stop**. Codex / agy read the diff statically; they cannot run code, so they
+  are **not** verifiers. Do not conflate the two, and never position codex/agy as
+  the verifier.
+
+Applies to the PR-mode **Phase 2b**, PR-mode **Phase 3** (Step 3b), and both
+Post-commit fix dispatches (**Phase 2** initial fix and **Step 5**). **Uncommitted
+mode is exempt** — it never commits, so there is nothing to gate; leave it as-is.
+
+### Resolving the verify command
+
+The orchestrator resolves the command **once**, before the first fix dispatch of
+the run, and passes it into each fix subagent prompt. Inline the config helper
+block (verbatim, exactly as in Pre-flight Step 2 / `shared/config.md`) in the same
+bash block, then:
+
+```bash
+# `verify` is stored as { "cmd": "<command>" }; pull the string out. An unset key
+# makes read_* print nothing → jq gets empty stdin → 2>/dev/null keeps the block
+# alive and VERIFY_CMD ends up empty.
+VERIFY_CMD=$(read_solopreneur_config verify | jq -r '.cmd // empty' 2>/dev/null)
+[ -z "$VERIFY_CMD" ] && echo "NO_VERIFIER" || echo "VERIFY_CMD=$VERIFY_CMD"
+```
+
+- **`VERIFY_CMD` empty (`NO_VERIFIER`)** → skip the inner loop entirely; the fix
+  subagent commits exactly as it does today. Add one flag-style line to the final
+  report: **"no objective verifier configured for this loop"** (see Flags below).
+  Never invent a command.
+- **`VERIFY_CMD` set** → pass it into every fix subagent this run, together with
+  the inner-loop instructions below.
+
+### Inner loop (inside the fix subagent)
+
+The loop lives INSIDE the fix subagent's instructions — the subagent owns
+edit → verify → iterate and only commits on a green verify. When `VERIFY_CMD` is
+set, add this block to the fix subagent prompt (on top of that path's own
+commit-message and hard-constraint instructions):
+
+```
+You have an objective verify command: <VERIFY_CMD>. Before you commit:
+
+1. Apply your fix edits to the working tree.
+2. Run <VERIFY_CMD> against the working tree. Do NOT commit first — lint /
+   typecheck / fast-unit are working-tree operations, so verify-before-commit
+   holds in EVERY mode, post-commit included (no "broken commit + fix commit"
+   sequence is ever created).
+3. Pass (exit 0) → proceed to the commit + push step already specified for this
+   path (unchanged commit message).
+4. Fail (non-zero) → do NOT commit. Feed yourself back only a TRUNCATED log — the
+   final failing assertion / first error line plus the tail, capped in size the
+   same way this file caps agy input at AGY_MAX_DIFF_BYTES — and retry the fix.
+5. Cap: 3 verify attempts total. On the 3rd consecutive failure, do NOT commit or
+   push — return a structured halt result (reason `inner-verify-failed`, the FULL
+   verify log, your attempted-fix summary) instead of committing.
+
+Truncate every feedback log this way; the full log rides only in the halt
+payload. Three stacked rounds of full logs would otherwise drown the signal.
+```
+
+### Anti-gaming guard (before every commit)
+
+The cheapest way to make a failing verify "pass" is to edit the tests or the
+verify command itself. The subagent must check, before it commits: **if this
+round's findings do not reference any test file or the verify command's
+definition, but the fix diff touches test files or that definition → do not
+commit.** Halt (unattended / autopilot dispatch) or flag (attended) with the
+reason `anti-gaming: fix touches test/verify definition unprompted`. At size S
+(added by a later PR) there are no internal reviewers, so this guard is the only
+defense against fix-to-pass gaming — it lands here, not in the escalation PR.
+
+### Minimal halt / flag primitive
+
+A fuller escalation taxonomy arrives in a later PR; this PR ships the minimum.
+
+- **halt** — stop the loop and do not commit. Write a payload file — last round's
+  findings + the FULL verify log + attempted-fix summary + suggested next step —
+  under `docs/loops/<run>/halts/` when running inside an autopilot run dir, else
+  the standalone fallback `docs/loops/<date>_greenlight-<branch>/halts/`
+  (`<date>` = `YYYY-MM-DD`, `<branch>` = current branch). Reference the path in
+  the final report. Unattended semantics: report **blocked** and exit non-zero.
+  Attended: surface the payload path and ask the user how to proceed.
+- **flag** — do NOT stop; keep looping, but record the event in a dedicated,
+  prominent **Flags** section of the final report (below) for a human to
+  adjudicate afterward.
+
+### Flags section (final report)
+
+When any flag fired (no verifier configured, an attended anti-gaming catch, and
+future flag sources), append a prominent section to whichever mode's final report
+runs:
+
+```
+## Flags (human review suggested)
+- <flag reason 1>
+- <flag reason 2>
+```
+
+Omit the section entirely when nothing flagged.
+
+### Worst-case work bound
+
+The inner loop is a newly multiplied retry layer, so make the multiplication
+explicit. One autopilot PR can, worst case, burn: autopilot's **Step 3 self-fix
+×3** (during implement) → then greenlight's outer review rounds (**PR mode ×10**,
+**post-commit ×5**), and each outer round now wraps **inner verify ×3** → and the
+whole PR can be retried by the **wave ×2**. So a single PR-mode PR under autopilot
+tops out near 3 × (10 × 3) × 2 fix attempts. The inner loop multiplies fix work
+per round; a repo whose `verify` command is slow pays for it here — which is why
+`verify` must stay fast and E2E stays in CI (see config `verify` key).
+
 ## Pre-flight Checks
 
 ### Step 1: Mode detection
@@ -278,6 +399,12 @@ If `MODE=post-commit`, skip PR-mode pre-flight Step 2 below; do Argument Parsing
 
    GL_CFG=$(read_solopreneur_config greenlight)
    [ -z "$GL_CFG" ] && echo "NO_CONFIG" || echo "$GL_CFG"
+
+   # Objective verifier command for the inner verify loop (see "Inner verify
+   # loop"). Empty when unconfigured → inner loop is skipped and the run is
+   # flagged "no objective verifier configured for this loop".
+   VERIFY_CMD=$(read_solopreneur_config verify | jq -r '.cmd // empty' 2>/dev/null)
+   [ -z "$VERIFY_CMD" ] && echo "NO_VERIFIER" || echo "VERIFY_CMD=$VERIFY_CMD"
    ```
    If config exists, read `fallback_order` from the `greenlight` key.
    If absent (`NO_CONFIG`), use default: codex-bot as starting reviewer, ask user on failure.
@@ -559,6 +686,10 @@ framework as Uncommitted Mode (`superpowers:receiving-code-review` first), but w
 post-commit hard constraints:
 
 - Edit source files directly.
+- **Inner verify loop** (when `VERIFY_CMD` is set): after editing, run `VERIFY_CMD`
+  against the working tree **before the commit below**; commit only on a green
+  verify; on the 3rd failure return a structured halt (no commit/push). Include the
+  anti-gaming guard. See [Inner verify loop](#inner-verify-loop-objective-verifier-gate).
 - **After edits, run `git add` + `git commit` + `git push`.** Commit message:
   `fix: post-commit review fixes (Phase 1) — <summary>`.
 - **Do NOT use `git commit --amend`.** Always fix as new commits on top — see
@@ -745,6 +876,11 @@ LOOP (max 5 rounds):
      Hard constraints (same as Phase 2):
      - Invoke `superpowers:receiving-code-review` first to evaluate findings.
      - Edit source files directly.
+     - **Inner verify loop** (when `VERIFY_CMD` is set): after editing, run
+       `VERIFY_CMD` against the working tree **before the commit below**; commit
+       only on a green verify; on the 3rd failure return a structured halt (no
+       commit/push). Include the anti-gaming guard. See
+       [Inner verify loop](#inner-verify-loop-objective-verifier-gate).
      - **After edits: `git add` + `git commit` + `git push`.** Commit message:
        `fix: post-commit review fixes (round <N>) — <summary>`.
      - **Do NOT amend. Do NOT create branch or PR.**
@@ -812,12 +948,16 @@ a bad state, don't publish anything.
 ```
 Post-commit review loop complete.
 - Range: <RANGE_SPEC>
-- Exit reason: <clean pass / push-back / max rounds / aborted>
+- Exit reason: <clean pass / push-back / max rounds / aborted / halt>
 - Rounds run: <N>
 - Items fixed: <M>  (across <K> new commits on top)
 - Items pushed back: <P>
 - Last commit pushed: <SHA>
 ```
+
+Then append the **Flags** section (Inner verify loop → Flags) if anything flagged
+this run — including "no objective verifier configured for this loop"; omit it
+otherwise. On a halt, report **blocked** and reference the `halts/` payload path.
 
 **Do not offer to amend or open a PR.** Fixes live as new commits on `main`.
 
@@ -880,12 +1020,16 @@ Hand the consolidated suggestion list to a subagent. The prompt must include:
 - Instruction: "Use the `superpowers:receiving-code-review` skill framework to evaluate each suggestion"
 - Instruction: "False positives require solid technical reasoning to push back"
 - Instruction: "After fixes, commit + push"
+- **Inner verify loop** (when `VERIFY_CMD` is set): run `VERIFY_CMD` against the
+  working tree **before committing**; commit only on a green verify; on the 3rd
+  failure return a structured halt (no commit). Include the anti-gaming guard.
+  See [Inner verify loop](#inner-verify-loop-objective-verifier-gate).
 - Commit message format: `fix: internal review fixes — <summary>`
 
 ```
 Agent(
   description: "Process internal review feedback",
-  prompt: "Here are the consolidated suggestions from internal reviewers:\n\n<SUGGESTIONS>\n\nInvoke the superpowers:receiving-code-review skill first, use its framework to evaluate each one, fix items worth fixing, then commit + push."
+  prompt: "Here are the consolidated suggestions from internal reviewers:\n\n<SUGGESTIONS>\n\nInvoke the superpowers:receiving-code-review skill first, use its framework to evaluate each one, fix items worth fixing. If a VERIFY_CMD was provided, follow the Inner verify loop: run it against the working tree before committing and commit only when it passes (3rd failure → structured halt, no commit). Then commit + push."
 )
 ```
 
@@ -1368,13 +1512,17 @@ gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int!){
    - Instruction: "Use the `superpowers:receiving-code-review` skill framework to evaluate each suggestion. If the skill is not available, evaluate each suggestion on its own merits — fix genuine issues, push back on false positives with solid technical reasoning."
    - Instruction: "False positives require solid technical reasoning to push back"
    - Instruction: "After fixes, commit + push"
+   - **Inner verify loop** (when `VERIFY_CMD` is set): run `VERIFY_CMD` against the
+     working tree **before committing**; commit only on a green verify; on the 3rd
+     failure return a structured halt (no commit). Include the anti-gaming guard.
+     See [Inner verify loop](#inner-verify-loop-objective-verifier-gate).
    - Commit message format: `fix: code review fixes — <summary>`
    - If packaged files (e.g., `.skill`) are involved, remind to re-package
 
    ```
    Agent(
      description: "Process PR code review feedback",
-     prompt: "Here are the unresolved review threads for PR #<NUMBER>:\n\n<THREADS>\n\nUse the receiving-code-review skill framework to evaluate each one, fix items worth fixing, then commit + push.",
+     prompt: "Here are the unresolved review threads for PR #<NUMBER>:\n\n<THREADS>\n\nUse the receiving-code-review skill framework to evaluate each one, fix items worth fixing. If a VERIFY_CMD was provided, follow the Inner verify loop: run it against the working tree before committing and commit only when it passes (3rd failure → structured halt, no commit). Then commit + push.",
      mode: "auto"
    )
    ```
@@ -1419,7 +1567,10 @@ these conditions is met:
 ### On exit:
 1. Notify user: "Review loop complete" + exit reason + last round's reviewer feedback
 2. Report: total rounds run, items fixed, items pushed back, which reviewer was used
-3. Ask user whether to merge the PR
+3. Append the **Flags** section (Inner verify loop → Flags) if anything flagged this
+   run — including "no objective verifier configured for this loop"; omit it
+   otherwise. On a halt, report **blocked** and reference the `halts/` payload path.
+4. Ask user whether to merge the PR
 
 ### Important Notes
 
