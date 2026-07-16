@@ -1,6 +1,6 @@
 # Greenlight / Autopilot 分級（S/M/L）與 loop engineering
 
-Status: backlog
+Status: doing（2026-07-16 autopilot 排程執行中，plan: docs/loops/2026-07-16_greenlight-sizing/）
 目標：autopilot / greenlight 流程太重，對 typo PR 和核心邏輯 PR 跑同一套。引入以風險為軸的 S/M/L 分級，並用 loop engineering 五要素（目標 / Verifier / Feedback / Stopping / Escalation）補上流程的結構性缺口。
 
 ## 已查證的現狀事實（2026-07-16 二輪查核，含行號，免重新考古）

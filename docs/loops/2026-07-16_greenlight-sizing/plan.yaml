@@ -1,0 +1,57 @@
+# Orchestration plan: greenlight/autopilot S-M-L sizing + loop engineering
+# Canonical design doc: todos/doing/2026-07-16_greenlight-autopilot-sizing-loop-engineering.md
+# Note: subagent uses the full plugin-namespaced agent type (ai-engineer:ai-engineer)
+# so both the Workflow wave dispatch (agentType) and the Agent fallback
+# (subagent_type) resolve it without a bare-name mapping step.
+name: "Greenlight/Autopilot S-M-L sizing + loop engineering"
+source_todo: "todos/doing/2026-07-16_greenlight-autopilot-sizing-loop-engineering.md"
+created_at: "2026-07-16"
+
+prs:
+  - id: pr1
+    branch: feature/sizing-pr1-merge-gate
+    title: "fix(merge-pr): gate merges on CI checks pinned to head SHA"
+    type: code
+    subagent: ai-engineer:ai-engineer
+    depends_on: []
+    spec: pr1-merge-gate.md
+    files:
+      - plugins/solopreneur/skills/merge-pr/SKILL.md
+      - plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md
+
+  - id: pr2
+    branch: feature/sizing-pr2-verifier-loop
+    title: "feat(greenlight): objective verifier inner loop with anti-gaming guard"
+    type: code
+    subagent: ai-engineer:ai-engineer
+    depends_on: []
+    spec: pr2-verifier-loop.md
+    files:
+      - plugins/solopreneur/skills/greenlight/SKILL.md
+      - plugins/solopreneur/shared/config.md
+
+  - id: pr3
+    branch: feature/sizing-pr3-sml-sizing
+    title: "feat(greenlight): risk-based S/M/L sizing with mechanical cascade"
+    type: code
+    subagent: ai-engineer:ai-engineer
+    depends_on: [pr1, pr2]
+    spec: pr3-sml-sizing.md
+    files:
+      - plugins/solopreneur/skills/greenlight/SKILL.md
+      - plugins/solopreneur/skills/autopilot/SKILL.md
+      - plugins/solopreneur/skills/autopilot/references/schemas.md
+      - plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md
+
+  - id: pr4
+    branch: feature/sizing-pr4-escalation
+    title: "feat(greenlight): escalation taxonomy + autopilot spec quality gate"
+    type: code
+    subagent: ai-engineer:ai-engineer
+    depends_on: [pr3]
+    spec: pr4-escalation.md
+    files:
+      - plugins/solopreneur/skills/greenlight/SKILL.md
+      - plugins/solopreneur/skills/autopilot/SKILL.md
+      - plugins/solopreneur/skills/autopilot/references/orchestrator.md
+      - plugins/solopreneur/skills/autopilot/references/schemas.md
