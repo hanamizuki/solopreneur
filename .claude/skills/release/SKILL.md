@@ -243,9 +243,19 @@ committed together with the bumps in Step 3.
 For each plugin marked for bump, edit
 `plugins/<name>/.claude-plugin/plugin.json`'s `version` field.
 
-Stage all bumped plugin.json files **together with the `CHANGELOG.md`
-update from Step 2.5** and commit them in one commit, so the Step 4 tags
-point at a commit that already contains the changelog (zero gap).
+Then regenerate the Codex surfaces — they mirror the Claude manifests and
+the `Validate Codex surfaces` CI gate fails on any drift, so a version bump
+that skips this step breaks CI on the release commit:
+
+```bash
+./scripts/generate-codex-manifests.sh
+```
+
+Stage all bumped plugin.json files and the regenerated Codex surfaces
+(`plugins/*/.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`)
+**together with the `CHANGELOG.md` update from Step 2.5** and commit them in
+one commit, so the Step 4 tags point at a commit that already contains the
+changelog (zero gap).
 
 Use the **subject + body two-`-m` form** below — NOT a
 `-m "$(cat <<EOF ...)"` heredoc. The product-repo worktree guard hook
@@ -256,7 +266,7 @@ direct form the subject matches, and `CHANGELOG.md` (markdown) plus the
 `plugin.json` bumps land in one commit on `main`:
 
 ```bash
-git add plugins/*/.claude-plugin/plugin.json CHANGELOG.md
+git add plugins/*/.claude-plugin/plugin.json plugins/*/.codex-plugin/plugin.json .agents/plugins/marketplace.json CHANGELOG.md
 git commit \
   -m "chore(release): <one-line summary of what's shipping>" \
   -m "<plugin1> v<old>→v<new>: <reason>
