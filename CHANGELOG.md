@@ -8,6 +8,38 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-07-16
+
+### solopreneur 0.5.31 → 0.5.32
+The `/greenlight` review loop now engineers itself around risk:
+
+- **Risk-based sizing.** Every run is classified S / M / L by a mechanical cascade over the diff (paths touched, size, risk markers). Small pure-prose changes get a lighter, faster loop; large or risky ones get more rounds and the full reviewer lineup. (#125)
+- **Objective verifier.** Each fix round must pass the project's own verify command before anything is pushed, with an anti-gaming guard so a fix can't "pass" by weakening the checks themselves. (#123)
+- **Predictable escalation.** Unattended runs escalate through one halt / flag / note taxonomy with machine-readable reason classes (transient-dependency / invariant-violation / authority-boundary), and contradictory reviewer findings are resolved by a decision table instead of stalling the run. (#126)
+- **Reviewer lineup upkeep.** Reviewers live in a registry with activity detection: the Gemini bot is only offered when it's actually acting on the repo (consumer Gemini Code Assist ends GitHub review on 2026-07-17; enterprise unaffected), and the Antigravity CLI (`agy`) replaces the discontinued `gemini` CLI as the Gemini-family reviewer in post-commit mode. (#111)
+
+`/merge-pr` now gates merges on CI checks pinned to the PR's exact head commit — a stale green from an older push no longer counts, and pending checks are waited on instead of treated as passing. (#124)
+
+`/autopilot` gained a spec quality gate: every acceptance criterion in a generated PR spec must be an executable command or a verifiable assertion, enforced at planning time. Its orchestrator also defers to greenlight's per-size round budgets instead of a hard-coded 3-round limit. (#126)
+
+### designer 0.1.6 → 0.1.7
+Re-synced `impeccable` from upstream (3.8.0 → 3.9.1): it now handles **native iOS and Android projects** — platform-aware `audit` and `adapt` variants pick HIG / Material 3 references from the project's declared platform — plus better font detection, an expanded anti-pattern registry, and smarter routing when a project has no PRODUCT.md yet (scoped fix/refine requests are no longer blocked by init). The `taste-*` skills were re-synced with upstream fixes. (#118)
+
+### marketer 0.0.8 → 0.0.9
+`/humanly` gained a fidelity layer — protected content categories that must never be invented or altered, plus a mandatory read-back step verifying a rewrite kept the original meaning — along with Taiwan-specific Traditional Chinese localization (mainland→Taiwan vocabulary, punctuation, register), ten new Chinese and three new English AI-writing patterns, and an eval benchmark guarding the catalog (adapted in part from speak-human-tw, MIT). `/naming`'s multi-model candidate generation moved from the discontinued `gemini` CLI to the Antigravity CLI (`agy`). (#106, #110)
+
+### ios-dev 0.4.8 → 0.4.9
+Re-synced the vendored `asc-*` App Store Connect skills from upstream (release flow, metadata sync, pricing, screenshot pipeline, submission health, and more picked up their latest revisions), and code examples containing `$1`-style tokens now survive Claude Code's argument substitution. (#105, #116)
+
+### android-dev 0.4.8 → 0.4.9
+Following upstream, `gplay-signing-setup` and `gplay-subscription-localization` were removed (the vendored Play Console set is now 16 `gplay-*` skills); the remaining Play Console and official Android skills (AGP 9 upgrade, Navigation 3, XML-to-Compose migration, Play Billing upgrade) were re-synced. (#113, #117)
+
+### ai-engineer 0.3.12 → 0.3.13
+Internal alignment release: vendored-skill metadata moved from `skills/_vendored/` to `vendor/`; no behavior change. (#108, #115)
+
+### neo4j-dev 0.0.6 → 0.0.7
+`neo4j-cypher` re-synced from upstream: now documents Cypher 25's `DISJOINT BY` clause for `IN CONCURRENT TRANSACTIONS` (deadlock-free concurrent relationship imports), plus graph-type reference updates. (#114)
+
 ## 2026-07-09
 
 ### solopreneur 0.5.30 → 0.5.31
