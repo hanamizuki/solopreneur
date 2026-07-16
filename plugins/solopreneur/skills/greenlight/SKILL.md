@@ -283,10 +283,14 @@ if printf '%s\n' "$FILES" | grep -qiE \
   COMPUTED_SIZE=L
 fi
 # Line budget: additions + deletions, excluding lockfiles + generated files, > ~400 → L.
-# (numstat prints "-" for binary files; awk reads "-" as 0, so binaries add nothing.)
-LINES=$(git diff --numstat "$DIFF_RANGE" \
-  | grep -vE '(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock|Gemfile\.lock|composer\.lock|Podfile\.lock|go\.sum|Package\.resolved)$|\.generated\.|\.min\.(js|css)$' \
-  | awk '{a+=$1; d+=$2} END{print a+d+0}')
+# numstat is "<add>\t<del>\t<path>", so match the PATH field ($3): its `^` anchors to
+# the path start. A line-level (^|/) anchor would MISS a root lockfile — its path is
+# preceded by a tab, not "/" or start-of-line, so only nested lockfiles would match.
+# ($1/$2 are "-" for binary files; awk reads "-" as 0, so binaries add nothing.)
+LINES=$(git diff --numstat "$DIFF_RANGE" | awk -F'\t' '
+  $3 ~ /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock|Gemfile\.lock|composer\.lock|Podfile\.lock|go\.sum|Package\.resolved)$/ { next }
+  $3 ~ /\.generated\.|\.min\.(js|css)$/ { next }
+  { a+=$1; d+=$2 } END { print a+d+0 }')
 [ "${LINES:-0}" -gt 400 ] && COMPUTED_SIZE=L
 
 # --- S: every file inside the whitelist (AND), only when not already L. The case
@@ -343,17 +347,17 @@ vocabulary; no bot login is hardcoded here.
 
 | Effective size | Phase 1 internal | Verification gate | Phase 3 external loop (`SIZE_MAX_ROUNDS`) |
 |---|---|---|---|
-| **S** | **skip** | **skip** | run the mode's **existing external Phase 3** unchanged — PR mode via its registry-driven `current_reviewer` + `fallback_order` (default `codex-bot`, preferring codex), Post-commit via its codex-CLI + agy dispatch — and loop to clean, **max 3 rounds** |
+| **S** | **skip** | **skip** | Phase 3 only, **one external reviewer** — PR mode via its registry-driven `current_reviewer` + `fallback_order` (default `codex-bot`, preferring codex); Post-commit via the single preferred available CLI (Codex CLI, else agy) instead of its usual parallel pair — loop to clean, **max 3 rounds** |
 | **M** (default) | **2 reviewers** — `/specialist-review` + `ponytail:ponytail-review` (rows 4–5 of the Phase 1 table) | **skip** | standard registry loop, **max 5 rounds** |
 | **L** | **all 5 reviewers** | **ON** (when the `Workflow` tool is available) | full registry fallback chain, **max 10 rounds** |
 
 - **S** behaves like `external_only` with a 3-round cap: Phase 1 and Phase 2 are
   skipped and the run goes straight to Phase 3, **still looping to a clean result**
-  (S is not a single-pass mode — the cost cap is the round bound, not one shot). S
-  does **not** change *which* reviewer runs — each mode's existing Phase 3 selection
-  and fallback are reused as-is (PR mode's `current_reviewer` + `fallback_order`,
-  Post-commit's codex-CLI + agy); sizing only skips the internal phases and sets the
-  round cap.
+  (S is not a single-pass mode — the cost cap is the round bound, not one shot). PR
+  mode's Phase 3 already runs one reviewer at a time, so S reuses its
+  `current_reviewer` + `fallback_order` selection unchanged; Post-commit normally
+  runs codex-CLI + agy in parallel, so at S it is trimmed to the single preferred
+  available CLI (Codex CLI, else agy) to shed the doubled reviewer cost.
 - The **verification gate** already runs only when the `Workflow` tool is present;
   sizing adds a second condition — it runs **only at size L** (S and M skip it even
   when `Workflow` is available).
@@ -977,8 +981,14 @@ LOOP (max SIZE_MAX_ROUNDS rounds — S 3 / M 5 / L 10; see Sizing):
      (TIP == HEAD is the invariant set during Argument Parsing and re-asserted
      each round after the fix-commit advance — see Step 6.)
 
-  2. Dispatch Codex CLI and agy (when `AGY_AVAILABLE=true`) **in parallel**
-     (parallel Bash tool calls, or `&`-backgrounded shell — never sequential):
+  2. Dispatch the external reviewers. **At `EFFECTIVE_SIZE` M or L**, run Codex CLI
+     and agy (when `AGY_AVAILABLE=true`) **in parallel** (parallel Bash tool calls,
+     or `&`-backgrounded shell — never sequential). **At `EFFECTIVE_SIZE` S**, run
+     only the **single preferred available** external reviewer — Codex CLI when
+     available, else agy — never both: the S profile is one reviewer (see
+     [Sizing](#sizing-sml-risk-profile)), and the parallel pair is exactly the
+     doubled cost S removes. The steps below are written for the full pair; at S,
+     skip whichever reviewer is not the chosen one.
 
      **Codex CLI:**
      ```bash
