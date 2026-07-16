@@ -175,11 +175,12 @@ test file or verify-definition file the fix diff touches, this round's findings
 must explicitly reference that same file. If the diff touches a test file or the
 verify definition that no finding called out → do not commit.** Match per file —
 a finding about one test file does not license editing a different, unmentioned
-test file. Halt (unattended / autopilot dispatch) or flag (attended) with the
-reason `anti-gaming: fix touches test/verify definition unprompted`. This is the
-one deliberate split where unattended and attended levels differ — a suspected
-gaming edit is cheap for a present human to adjudicate, so attended surfaces it as a
-flag rather than a hard halt (see [Escalation taxonomy](#escalation-taxonomy-halt--flag--note)).
+test file. In both modes the immediate action is the same — **do not commit** — with the
+reason `anti-gaming: fix touches test/verify definition unprompted`; the level differs
+only in what follows. Unattended **halts** the loop; attended **flags** it and lets the
+present human adjudicate the suspected gaming. This is the one deliberate unattended-halt
+/ attended-flag split (a suspected gaming edit is cheap to adjudicate live), noted as an
+intentional exception in the [Escalation taxonomy](#escalation-taxonomy-halt--flag--note).
 At size S (added by a later PR) there are no internal reviewers, so this guard is the only
 defense against fix-to-pass gaming — it lands here, not in the escalation PR.
 
@@ -355,9 +356,12 @@ defers its round bound to greenlight — orchestrator.md). The scattered rules m
   with the existing "discuss first" prompt; unattended records it and proceeds).
 - **Contradictory findings** → the
   [table above](#findings-contradiction-handling-table).
-- **Inner verify 3× fail / anti-gaming catch** → **halt** (`invariant-violation` /
-  `authority-boundary`) — see
+- **Inner verify 3× fail** → **halt**, `reason_class: invariant-violation` — see
   [Inner verify loop](#inner-verify-loop-objective-verifier-gate).
+- **Anti-gaming catch** → the deliberate **unattended-halt / attended-flag** split from
+  the verifier PR (not a uniform halt, carries no `reason_class`): "do not commit" holds
+  in both modes; unattended halts the loop, attended flags it for the present human to
+  adjudicate. See [Anti-gaming guard](#anti-gaming-guard-before-every-commit).
 
 ## Sizing (S/M/L risk profile)
 
