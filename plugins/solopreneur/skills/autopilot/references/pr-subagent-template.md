@@ -86,9 +86,10 @@ capture the exact commit CI must pass for — the pushed head SHA:
 Poll CI pinned to that SHA, every 60 seconds, max 10 attempts. No result is
 trusted until it reflects `PUSHED_SHA` — a just-pushed commit whose CI has not
 registered yet must never inherit an earlier commit's green:
-- Confirm the PR head has caught up first: `gh pr view {PR_NUMBER} --json
-  headRefOid --jq '.headRefOid'` must equal `PUSHED_SHA`. Until it does, keep
-  polling (do not read checks against a stale head SHA).
+- Confirm the PR head has caught up first:
+  `gh pr view {PR_NUMBER} --json headRefOid --jq '.headRefOid'` must equal
+  `PUSHED_SHA`. Until it does, keep polling (do not read checks against a stale
+  head SHA).
 - Then read `gh pr checks {PR_NUMBER}`. **"No checks reported yet" for
   `PUSHED_SHA` is treated as pending — keep polling, never as success.**
   Absence of checks is never a pass.
