@@ -5,8 +5,8 @@
       "name": "app-store-connect-cli-skills",
       "repo": "https://github.com/rudrankriyam/app-store-connect-cli-skills",
       "branch": "main",
-      "rev": "0ae3da2bf0a43300d3c994593f4df73f3e3da230",
-      "synced_at": "2026-07-15T10:32:21Z",
+      "rev": "c77169ab1a9595bbd426ec943797b36072ccf8e3",
+      "synced_at": "2026-07-19T03:45:32Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/app-store-connect-cli-skills-LICENSE",
@@ -106,7 +106,7 @@
       "repo": "https://github.com/glittercowboy/taches-cc-resources",
       "branch": "main",
       "rev": "1757615b99ab789a72ff2d02e9f6112af2a15c04",
-      "synced_at": "2026-07-15T10:32:22Z",
+      "synced_at": "2026-07-19T03:45:34Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/taches-cc-resources-LICENSE",
@@ -116,6 +116,22 @@
           "to": "iphone-apps"
         }
       ]
+    },
+    {
+      "name": "emilkowalski-skills",
+      "repo": "https://github.com/emilkowalski/skills",
+      "branch": "main",
+      "rev": "6bf24434f7730ad169077756cf9c7cd7bd675fc6",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "license_file": "LICENSES/emilkowalski-skills-LICENSE",
+      "skills": [
+        {
+          "from": "skills/apple-design",
+          "to": "apple-design"
+        }
+      ],
+      "synced_at": "2026-07-19T03:45:35Z"
     }
   ]
 }

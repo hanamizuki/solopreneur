@@ -93,61 +93,124 @@ Suggested entitlement policy:
 
 ### Step D - Ensure missing ASC items (if requested)
 
-Create or complete ASC resources first, then re-read ASC to capture canonical
-IDs. A RevenueCat product mapping is not proof that the corresponding ASC
-subscription is review-ready.
+Resolve every parent and version before writing. Match groups by exact reference
+name and products by `productId`; never treat a display name as identity. Reuse
+the canonical ID when the resource already exists, and run a create command
+only when the fully paginated read proves it is missing. A RevenueCat product
+mapping is not proof that the corresponding ASC subscription is review-ready.
 
 ```bash
-# create subscription group
-asc subscriptions groups create --app "APP_ID" --reference-name "Premium"
+# Resolve GROUP_ID by exact referenceName.
+asc subscriptions groups list --app "APP_ID" --paginate --output json
+# If and only if the fully paginated list has zero exact matches:
+asc subscriptions groups create --app "APP_ID" --reference-name "Premium" --output json
+# For one match, reuse its ID. For more than one, stop and require an explicit GROUP_ID.
 
-# create or converge a review-ready subscription in one workflow
+# Resolve SUB_ID by exact productId within GROUP_ID. Run setup only for a missing
+# parent or an explicitly approved reconciliation of that same product ID.
+asc subscriptions list --group-id "GROUP_ID" --paginate --output json
+# If and only if the fully paginated list has zero exact matches, run setup:
 asc subscriptions setup \
   --app "APP_ID" \
-  --group-reference-name "Premium" \
-  --group-locale "en-US" \
-  --group-display-name "Premium" \
+  --group-id "GROUP_ID" \
   --reference-name "Monthly" \
   --product-id "com.example.premium.monthly" \
   --subscription-period ONE_MONTH \
-  --locale "en-US" \
-  --display-name "Premium Monthly" \
-  --description "Unlock all premium features." \
   --review-screenshot "./review.png" \
   --price "3.99" \
   --price-territory "USA" \
-  --territories "USA"
+  --territories "USA" \
+  --no-verify \
+  --output json
+# For one match, reuse its ID. For more than one, stop and require an explicit SUB_ID.
+# Re-run setup for an existing SUB_ID only for an explicitly approved reconciliation.
 
-# create iap
+# Resolve the unique mutable group version for this review lifecycle.
+asc subscriptions groups versions list --group-id "GROUP_ID" --state PREPARE_FOR_SUBMISSION --paginate --output json
+# If and only if the list has zero matches:
+asc subscriptions groups versions create --group-id "GROUP_ID" --output json
+# For one match, reuse .data[0].id. For more than one, stop and require an explicit GROUP_VERSION_ID.
+
+# Resolve the en-US localization on GROUP_VERSION_ID. Create it only when
+# missing; update the resolved localization ID when its values differ.
+asc subscriptions groups versions localizations list --version-id "GROUP_VERSION_ID" --paginate --output json
+asc subscriptions groups versions localizations create --version-id "GROUP_VERSION_ID" --locale "en-US" --name "Premium" --output json
+asc subscriptions groups versions localizations update --id "GROUP_LOC_ID" --name "Premium"
+
+# Resolve the unique mutable subscription version for this review lifecycle.
+asc subscriptions versions list --subscription-id "SUB_ID" --state PREPARE_FOR_SUBMISSION --paginate --output json
+# If and only if the list has zero matches:
+asc subscriptions versions create --subscription-id "SUB_ID" --output json
+# For one match, reuse .data[0].id. For more than one, stop and require an explicit SUBSCRIPTION_VERSION_ID.
+asc subscriptions versions localizations list --version-id "SUBSCRIPTION_VERSION_ID" --paginate --output json
+asc subscriptions versions localizations create --version-id "SUBSCRIPTION_VERSION_ID" --locale "en-US" --name "Premium Monthly" --description "Unlock all premium features." --output json
+asc subscriptions versions localizations update --id "SUBSCRIPTION_LOC_ID" --name "Premium Monthly" --description "Unlock all premium features."
+
+# Read back the exact versions selected above, then run the final strict validator.
+asc subscriptions groups versions localizations list --version-id "GROUP_VERSION_ID" --paginate --output table
+asc subscriptions versions localizations list --version-id "SUBSCRIPTION_VERSION_ID" --paginate --output table
+asc validate subscriptions --app "APP_ID" --strict --output table
+
+# Resolve IAP_ID by exact productId.
+asc iap list --app "APP_ID" --paginate --output json
+# If and only if the fully paginated list has zero exact matches:
 asc iap create \
   --app "APP_ID" \
   --type NON_CONSUMABLE \
   --ref-name "Lifetime" \
-  --product-id "com.example.lifetime"
+  --product-id "com.example.lifetime" \
+  --output json
+# For one match, reuse its ID. For more than one, stop and require an explicit IAP_ID.
+
+# Resolve the unique mutable IAP version for this review lifecycle.
+asc iap versions list --iap-id "IAP_ID" --state PREPARE_FOR_SUBMISSION --paginate --output json
+# If and only if the list has zero matches:
+asc iap versions create --iap-id "IAP_ID" --output json
+# For one match, reuse .data[0].id. For more than one, stop and require an explicit IAP_VERSION_ID.
+asc iap versions localizations list --version-id "IAP_VERSION_ID" --paginate --output json
+asc iap versions localizations create --version-id "IAP_VERSION_ID" --locale "en-US" --name "Lifetime" --description "Unlock all premium features." --output json
+asc iap versions localizations update --localization-id "IAP_LOC_ID" --name "Lifetime" --description "Unlock all premium features."
+asc iap versions localizations list --version-id "IAP_VERSION_ID" --paginate --output table
 ```
 
-`subscriptions setup` must finish the ASC metadata that RevenueCat cannot:
-group localization, subscription localization, App Review screenshot delivery,
-the complete App Store price matrix, and sale availability. Keep sale
-availability scoped to the requested territories; pricing still needs Apple's
-complete equalized territory matrix.
+Each adjacent create/update pair above is conditional, not a sequence to run
+blindly: create when the list has no match, update when the resolved match has
+different values, and do nothing when it already matches. Capture `.data.id`
+from a create response or `.data[].id` from the preceding list as the canonical
+ID used by later commands. For each version list, zero
+`PREPARE_FOR_SUBMISSION` matches means create, one means reuse that ID, and more
+than one means stop and require the user to choose an explicit version ID. Do
+not create a version to resolve ambiguity: parent deletion did not reliably
+cascade IAP or subscription versions in live testing.
+
+`subscriptions setup` finishes the parent, App Review screenshot delivery,
+complete App Store price matrix, and sale availability. The version-scoped
+commands finish the group and subscription localizations that RevenueCat
+cannot. Keep sale availability scoped to the requested territories; pricing
+still needs Apple's complete equalized territory matrix. `--no-verify` is
+intentional in this split workflow because final verification must wait until
+the version metadata exists; the explicit readbacks and validator are the final
+gate.
 
 If an existing API-created subscription remains `MISSING_METADATA` even though
 the selected base price is unchanged, re-run the same setup inputs with
 `--repair`. Repair atomically rebuilds and re-saves the complete equalized price
 matrix; it is not a duplicate single-price POST.
 
-After every ASC subscription create, update, or repair, require this final gate
-before creating or attaching the RevenueCat subscription product:
+For every resolved ASC subscription, require this final gate before creating or
+attaching its RevenueCat product. Run it after the final ASC reconciliation even
+when the subscription and its selected version were reused without any ASC
+write:
 
 ```bash
 mkdir -p "./audit"
-asc validate subscriptions --app "APP_ID" --output json --pretty \
+asc validate subscriptions --app "APP_ID" --strict --output json --pretty \
   > "./audit/subscriptions-validation.json"
 ```
 
-After every ASC IAP create or update, require the IAP gate in strict mode so
-warnings also block the RevenueCat product mapping:
+For every resolved ASC IAP, require the IAP gate before creating or attaching
+its RevenueCat product. Run it after the final ASC reconciliation even when the
+IAP and its selected version were reused without any ASC write:
 
 ```bash
 mkdir -p "./audit"
@@ -155,11 +218,14 @@ asc validate iap --app "APP_ID" --strict --output json --pretty \
   > "./audit/iap-validation.json"
 ```
 
-Do not treat setup as successful if Apple still reports `MISSING_METADATA`, the
-review screenshot is not `COMPLETE`, or the validator reports incomplete or
-unverified pricing coverage. Do not attach an IAP while its strict validator
-reports warnings or errors. Direct redirection preserves each validator's exit
-status. Retain `./audit/subscriptions-validation.json` and
+Both commands are strict mapping gates, not post-write smoke tests. Do not map
+any resolved or reused subscription while validation reports warnings, errors,
+`MISSING_METADATA`, a review screenshot that is not `COMPLETE`, or incomplete
+or unverified pricing coverage. Do not map any resolved or reused IAP while its
+validator reports warnings or errors. A zero-write audit or apply run must still
+execute the applicable gate and require a zero exit status before RevenueCat
+product creation or attachment. Direct redirection preserves each validator's
+exit status. Retain `./audit/subscriptions-validation.json` and
 `./audit/iap-validation.json` as final audit evidence.
 
 ### Step E - Ensure RevenueCat app and products
@@ -227,8 +293,8 @@ Failures:
 - Use full pagination (`--paginate` for ASC, `starting_after` for RevenueCat tools).
 - Continue processing after per-item failures and report all failures together.
 - Never auto-delete ASC or RevenueCat resources in this skill.
-- After ASC subscription writes, run `asc validate subscriptions --app "APP_ID" --output json --pretty`, save its JSON, and block RevenueCat attachment for subscriptions with unresolved ASC blockers.
-- After ASC IAP writes, run `asc validate iap --app "APP_ID" --strict --output json --pretty`, save its JSON, and block RevenueCat attachment if it exits non-zero.
+- For every resolved subscription, including a reused no-write match, run `asc validate subscriptions --app "APP_ID" --strict --output json --pretty`, save its JSON, and block RevenueCat creation or attachment unless the gate exits zero with no missing metadata or incomplete pricing.
+- For every resolved IAP, including a reused no-write match, run `asc validate iap --app "APP_ID" --strict --output json --pretty`, save its JSON, and block RevenueCat creation or attachment unless the gate exits zero.
 
 ## Common pitfalls
 - Wrong RevenueCat `project_id` or app ID.

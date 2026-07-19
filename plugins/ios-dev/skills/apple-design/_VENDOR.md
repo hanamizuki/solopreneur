@@ -3,11 +3,11 @@
 This skill is vendored from a third-party source. **Do not edit in place** —
 edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
-- **Source repo**: https://github.com/rudrankriyam/app-store-connect-cli-skills
-- **Source path**: `skills/asc-crash-triage`
-- **Pinned commit**: c77169ab1a9595bbd426ec943797b36072ccf8e3
-- **Synced at**: 2026-07-19T03:45:31Z
-- **License**: see `../../vendor/LICENSES/app-store-connect-cli-skills-LICENSE`
+- **Source repo**: https://github.com/emilkowalski/skills
+- **Source path**: `skills/apple-design`
+- **Pinned commit**: 6bf24434f7730ad169077756cf9c7cd7bd675fc6
+- **Synced at**: 2026-07-19T03:45:35Z
+- **License**: see `../../vendor/LICENSES/emilkowalski-skills-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is
