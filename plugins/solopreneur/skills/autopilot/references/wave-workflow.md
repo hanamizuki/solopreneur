@@ -15,7 +15,10 @@ orchestrator session — see "What stays in the orchestrator" below.
 ## Args contract
 
 The orchestrator passes `args` as a real JSON value, exposed verbatim to the
-script as the global `args`:
+script as the global `args`. **In practice the Workflow tool may deliver `args`
+as a JSON-encoded string rather than an object** (a recurring harness quirk,
+observed consistently in production); the script template includes a defensive
+parse so this is handled transparently:
 
 ```json
 {
@@ -182,10 +185,14 @@ const RESULT_SCHEMA = {
   required: ["pr_id", "status", "github_number", "review_summary", "error"]
 };
 
-const prs = args.prs;
+// The Workflow tool may deliver `args` as a JSON-encoded string instead of an
+// object (recurring harness quirk, observed 7/7 times in production) — parse
+// defensively before touching any field.
+const input = typeof args === "string" ? JSON.parse(args) : args;
+const prs = input.prs;
 // max_retries is part of the contract, but default it so a missing value can
 // never silently collapse the retry loop to zero attempts.
-const maxRetries = args.max_retries ?? 2;
+const maxRetries = input.max_retries ?? 2;
 
 // (a) Pairwise file-overlap check. Two PRs that write the same repo-relative
 // path cannot run in parallel safely, so we refuse the whole wave before any
@@ -307,6 +314,13 @@ return {
 
 ## Notes and known limits
 
+- **Defensive `args` parse is intentional — do not remove**: the `typeof args
+  === "string"` guard at the top of the script exists because the Workflow tool
+  consistently delivers `args` as a JSON string in production, even when the
+  tool call passes a real JSON object. The guard is safe in both directions
+  (object passthrough, string parse) and costs nothing at runtime. Removing it
+  when copying the template will reproduce the `undefined is not an object`
+  crash on `prs.length`.
 - **Retry only clean pre-PR failures**: a `null` return, or a non-success that
   opened no PR, is retried up to `max_retries`; once an attempt opens a PR
   (non-null `github_number`), the result is terminal — retrying would re-run the
