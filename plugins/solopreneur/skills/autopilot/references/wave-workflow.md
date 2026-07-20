@@ -16,9 +16,7 @@ orchestrator session — see "What stays in the orchestrator" below.
 
 The orchestrator passes `args` as a real JSON value, exposed verbatim to the
 script as the global `args`. **In practice the Workflow tool may deliver `args`
-as a JSON-encoded string rather than an object** (a recurring harness quirk,
-observed consistently in production); the script template includes a defensive
-parse so this is handled transparently:
+as a JSON-encoded string rather than an object**; the script parses defensively:
 
 ```json
 {
@@ -48,7 +46,7 @@ parse so this is handled transparently:
 
 ## Script behavior, in order
 
-1. **(a) Pairwise file-overlap check** across `args.prs`. If any two PRs share a
+1. **(a) Pairwise file-overlap check** across `input.prs`. If any two PRs share a
    repo-relative path, return `{ error: "file-overlap", pairs: [...] }`
    **without dispatching any agent**. The orchestrator then runs the
    overlapping PRs in separate sequential waves.
@@ -314,13 +312,8 @@ return {
 
 ## Notes and known limits
 
-- **Defensive `args` parse is intentional — do not remove**: the `typeof args
-  === "string"` guard at the top of the script exists because the Workflow tool
-  consistently delivers `args` as a JSON string in production, even when the
-  tool call passes a real JSON object. The guard is safe in both directions
-  (object passthrough, string parse) and costs nothing at runtime. Removing it
-  when copying the template will reproduce the `undefined is not an object`
-  crash on `prs.length`.
+- **Do not remove the `typeof args === "string"` guard** — the Workflow tool
+  delivers args as a JSON string in production (see inline comment in script).
 - **Retry only clean pre-PR failures**: a `null` return, or a non-success that
   opened no PR, is retried up to `max_retries`; once an attempt opens a PR
   (non-null `github_number`), the result is terminal — retrying would re-run the
