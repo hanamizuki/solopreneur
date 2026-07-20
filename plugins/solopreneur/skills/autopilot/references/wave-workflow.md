@@ -15,7 +15,8 @@ orchestrator session — see "What stays in the orchestrator" below.
 ## Args contract
 
 The orchestrator passes `args` as a real JSON value, exposed verbatim to the
-script as the global `args`:
+script as the global `args`. **In practice the Workflow tool may deliver `args`
+as a JSON-encoded string rather than an object**; the script parses defensively:
 
 ```json
 {
@@ -45,7 +46,7 @@ script as the global `args`:
 
 ## Script behavior, in order
 
-1. **(a) Pairwise file-overlap check** across `args.prs`. If any two PRs share a
+1. **(a) Pairwise file-overlap check** across `input.prs`. If any two PRs share a
    repo-relative path, return `{ error: "file-overlap", pairs: [...] }`
    **without dispatching any agent**. The orchestrator then runs the
    overlapping PRs in separate sequential waves.
@@ -182,10 +183,14 @@ const RESULT_SCHEMA = {
   required: ["pr_id", "status", "github_number", "review_summary", "error"]
 };
 
-const prs = args.prs;
+// The Workflow tool may deliver `args` as a JSON-encoded string instead of an
+// object (recurring harness quirk, observed 7/7 times in production) — parse
+// defensively before touching any field.
+const input = typeof args === "string" ? JSON.parse(args) : args;
+const prs = input.prs;
 // max_retries is part of the contract, but default it so a missing value can
 // never silently collapse the retry loop to zero attempts.
-const maxRetries = args.max_retries ?? 2;
+const maxRetries = input.max_retries ?? 2;
 
 // (a) Pairwise file-overlap check. Two PRs that write the same repo-relative
 // path cannot run in parallel safely, so we refuse the whole wave before any
@@ -307,6 +312,8 @@ return {
 
 ## Notes and known limits
 
+- **Do not remove the `typeof args === "string"` guard** — the Workflow tool
+  delivers args as a JSON string in production (see inline comment in script).
 - **Retry only clean pre-PR failures**: a `null` return, or a non-success that
   opened no PR, is retried up to `max_retries`; once an attempt opens a PR
   (non-null `github_number`), the result is terminal — retrying would re-run the
