@@ -23,7 +23,7 @@ for details and role-based recommendations.
 | [`solopreneur`](#solopreneur-core) | 16 in-house skills (review, pipelines, thinking partners, automation) |
 | [`marketer`](#marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) |
 | [`designer`](#designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
-| [`ios-dev`](#ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 23 vendored skills (`asc-*` + `iphone-apps`) |
+| [`ios-dev`](#ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 24 vendored skills (`apple-design` + `asc-*` + `iphone-apps`) |
 | [`android-dev`](#android-dev) | `android-dev` agent + `android-patterns` + 37 vendored skills (Compose + `gplay-*` + Android official) |
 | [`ai-engineer`](#ai-engineer) | `ai-engineer` agent + `langgraph` + `ai-app-templates` + 1 vendored skill (`senior-prompt-engineer`) |
 | [`neo4j-dev`](#neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills |
@@ -145,14 +145,16 @@ The `designer` agent for UI/UX work that spans web, iOS, and Android. Ships
 ### `ios-dev`
 
 The `ios-dev` agent (SwiftUI / SwiftData / concurrency / testing / App Store)
-plus the in-house `ios-patterns` skill and 23 vendored skills covering App
-Store Connect CLI workflows and full iPhone app build/debug/ship.
+plus the in-house `ios-patterns` skill and 24 vendored skills covering Apple
+design principles, App Store Connect CLI workflows, and full iPhone app
+build/debug/ship.
 
 #### Bundled skills
 
 - [**`ios-patterns`**](./plugins/ios-dev/skills/ios-patterns/SKILL.md) (in-house): SwiftUI conventions: i18n, date parsing, Previews, state management, sheet & navigation, list spacing, expandable animation, keyboard Done button.
 - [**`ios-app-templates`**](./plugins/ios-dev/skills/ios-app-templates/SKILL.md) (in-house): reference implementations for common app categories (currently `photo-analysis-app` and `portfolio-tracker`).
 - **`asc-cli` skills** (22): vendored from [rudrankriyam/app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills). End-to-end App Store Connect workflows: TestFlight, releases, metadata, IAP, signing, screenshots, crash triage, ASO audit, RevenueCat catalog sync, notarization, submission health. ([`asc-app-create-ui`](./plugins/ios-dev/skills/asc-app-create-ui/SKILL.md), [`asc-aso-audit`](./plugins/ios-dev/skills/asc-aso-audit/SKILL.md), [`asc-build-lifecycle`](./plugins/ios-dev/skills/asc-build-lifecycle/SKILL.md), [`asc-cli-usage`](./plugins/ios-dev/skills/asc-cli-usage/SKILL.md), [`asc-crash-triage`](./plugins/ios-dev/skills/asc-crash-triage/SKILL.md), [`asc-id-resolver`](./plugins/ios-dev/skills/asc-id-resolver/SKILL.md), [`asc-localize-metadata`](./plugins/ios-dev/skills/asc-localize-metadata/SKILL.md), [`asc-metadata-sync`](./plugins/ios-dev/skills/asc-metadata-sync/SKILL.md), [`asc-notarization`](./plugins/ios-dev/skills/asc-notarization/SKILL.md), [`asc-ppp-pricing`](./plugins/ios-dev/skills/asc-ppp-pricing/SKILL.md), [`asc-release-flow`](./plugins/ios-dev/skills/asc-release-flow/SKILL.md), [`asc-revenuecat-catalog-sync`](./plugins/ios-dev/skills/asc-revenuecat-catalog-sync/SKILL.md), [`asc-screenshot-resize`](./plugins/ios-dev/skills/asc-screenshot-resize/SKILL.md), [`asc-shots-pipeline`](./plugins/ios-dev/skills/asc-shots-pipeline/SKILL.md), [`asc-signing-setup`](./plugins/ios-dev/skills/asc-signing-setup/SKILL.md), [`asc-submission-health`](./plugins/ios-dev/skills/asc-submission-health/SKILL.md), [`asc-subscription-localization`](./plugins/ios-dev/skills/asc-subscription-localization/SKILL.md), [`asc-testflight-orchestration`](./plugins/ios-dev/skills/asc-testflight-orchestration/SKILL.md), [`asc-wall-submit`](./plugins/ios-dev/skills/asc-wall-submit/SKILL.md), [`asc-whats-new-writer`](./plugins/ios-dev/skills/asc-whats-new-writer/SKILL.md), [`asc-workflow`](./plugins/ios-dev/skills/asc-workflow/SKILL.md), [`asc-xcode-build`](./plugins/ios-dev/skills/asc-xcode-build/SKILL.md))
+- [**`apple-design`**](./plugins/ios-dev/skills/apple-design/SKILL.md): vendored from [emilkowalski/skills](https://github.com/emilkowalski/skills/tree/main/skills/apple-design). Apple's fluid interface design principles translated for the web — spring animations, gesture-driven UI, momentum projection, translucent materials, typography, reduced-motion.
 - [**`iphone-apps`**](./plugins/ios-dev/skills/iphone-apps/SKILL.md): vendored from [glittercowboy/taches-cc-resources](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps). CLI-only iPhone app workflow (build, debug, test, ship).
 
 #### Requirements

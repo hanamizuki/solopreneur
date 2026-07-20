@@ -31,6 +31,9 @@ In-house:
 Vendored from third-party sources (see `vendor/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 
+- `ios-dev:apple-design` — Apple's approach to interface design and fluid,
+  physical motion, translated for the web. Spring animations, gesture-driven
+  UI, momentum projection, translucent materials, typography, reduced-motion.
 - `ios-dev:iphone-apps` — Full iPhone app workflow in Swift (SwiftUI +
   UIKit) with build, debug, test, ship — CLI-only, no Xcode. Targets iOS 26
   with iOS 18 compatibility.
