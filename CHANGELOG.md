@@ -8,6 +8,35 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-07-21
+
+### solopreneur 0.5.32 → 0.5.33
+Fixed an `/autopilot` multi-PR wave failure: the Workflow tool delivers the
+wave script's `args` as a JSON-encoded string in production (observed in
+every run), which crashed wave dispatch before any agent started. The
+wave-workflow template now parses `args` defensively and documents the
+quirk so the guard isn't removed later. (#129)
+
+### designer 0.1.7 → 0.1.8
+Routine re-sync of the vendored `taste-*` family and `impeccable` from
+upstream — this cycle picked up only pin/metadata refreshes, no content
+changes. (#127)
+
+### ios-dev 0.4.9 → 0.4.10
+New vendored skill **`apple-design`** (from emilkowalski/skills): Apple's
+fluid-interface design thinking — spring animations, gesture-driven UI,
+momentum projection, translucent materials, typography, reduced-motion —
+distilled from WWDC design talks and translated to the web platform. The
+vendored `asc-*` App Store Connect skills and `iphone-apps` were also
+re-synced to latest upstream (release flow, RevenueCat catalog sync,
+subscription localization, submission health, Xcode build, and others
+picked up new revisions). (#128)
+
+### android-dev 0.4.9 → 0.4.10
+Corrected the plugin description's vendored-skill counts (37 total, 16
+`gplay-*`) to match what actually ships — a metadata fix, no behavior
+change.
+
 ## 2026-07-16
 
 ### solopreneur 0.5.31 → 0.5.32
