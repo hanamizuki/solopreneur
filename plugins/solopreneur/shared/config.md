@@ -317,6 +317,130 @@ marker-tagged verbatim copies with:
 grep -rl "# --- solopreneur config helpers" plugins/solopreneur/skills/
 ```
 
+---
+
+# `.solopreneur.json` — the v2 path-scoped config
+
+Everything above describes `solopreneur.json`, the **legacy** per-user feature
+config read through the 4 shell helpers. This section describes
+`.solopreneur.json` (note the leading dot), a **different file** introduced for
+the preview Library.
+
+**The two coexist and neither reads the other.** Nothing in this section changes
+`solopreneur_repo_key`, `read_solopreneur_config`, `write_solopreneur_config` or
+`write_solopreneur_repo_config`; their cascade, their `| values` semantics and
+their consumers are untouched. `deploy.sh` still reads the legacy file directly,
+and `PREVIEW_PROJECT` is still the highest-priority override for that legacy
+per-page flow. The v2 file is never merged into, rewritten from, or synthesized
+out of the legacy one.
+
+The difference that matters: the legacy config keys settings by **git remote**,
+the v2 config keys them by **filesystem path**. A path scope works in a
+directory that is not a git repo, and lets one repo hold several independent
+scopes — neither of which a remote-keyed config can express.
+
+## Schema
+
+`config.schema.json` (next to this file) is the machine-verifiable definition —
+a Draft 2020-12 JSON Schema covering `.solopreneur.json` only. It deliberately
+does not describe the legacy file.
+
+```jsonc
+{
+  "schemaVersion": 2,
+  "preview": {
+    "root": "./previews",          // relative to THIS file's directory
+    "defaultTarget": "private",
+    "collections": {
+      "active":  { "path": "active",  "label": "Previews" },
+      "archive": { "path": "archive", "label": "Archive"  }
+    },
+    "targets": {
+      "private": {
+        "provider": "vercel",
+        "project": "my-private-previews",
+        "visibility": "private",   // omitted means private
+        "include": ["active", "archive"]
+      }
+    }
+  }
+}
+```
+
+## Resolution order
+
+`scripts/config-resolve.mjs` in the `preview` skill walks these layers, first
+hit wins:
+
+| # | Source                                    | Mode     |
+|---|-------------------------------------------|----------|
+| 1 | `$SOLOPRENEUR_CONFIG`                     | `v2`     |
+| 2 | nearest ancestor `.solopreneur.json` **that has a `preview` block** | `v2` |
+| 3 | `~/.config/solopreneur/config.json`       | `v2`     |
+| 4 | legacy `${CLAUDE_CONFIG_DIR}/solopreneur.json` | `legacy` |
+| 5 | legacy `~/.claude/solopreneur.json`       | `legacy` |
+| — | nothing found                             | `none`   |
+
+Layers 4–5 are **reported, not converted**: the resolver returns
+`mode: "legacy"` with the file path and the preview-related subtrees it found
+(both the `default.preview.projects.*` shape and the older flat
+`preview.paths.<repo-key>` shape), and leaves interpretation to the migrator.
+
+## Anchor and path rules
+
+- The anchor is `--from <path>`, else the current directory. It is resolved to
+  its **physical path before the walk-up** — a symlinked path and its target
+  must never resolve to different configs.
+- The walk-up does **not** stop at a git toplevel. Crossing nested repo
+  boundaries is deliberate: a repo with no config of its own inherits the
+  enclosing scope. It stops at the filesystem root.
+- A `.solopreneur.json` with no `preview` block is **skipped** and the walk
+  continues — that file may configure something else.
+- A relative `root` resolves against **the directory of the config file that
+  declared it**, never the git root and never the working directory. This is the
+  same anchoring lesson as `deploy.sh`'s `$DIR`-anchored repo key.
+- An absolute `root` is used as-is. A leading `~` inside a JSON value is **not**
+  expanded.
+- The nearest `preview` block **wholly replaces** any ancestor's — no deep merge.
+
+## Failing loudly
+
+Every one of these exits non-zero naming the offending file, and none of them
+falls through to an ancestor config:
+
+- malformed JSON, an unreadable file, or a schema validation failure
+- more than one entry under `targets` (v1 supports exactly one)
+- a `defaultTarget` that is not the declared target
+- any `provider` other than `"vercel"`
+- a `--from` outside the resolved `root` (the error names both the config and
+  the root)
+
+The single-target and single-provider limits live in the **resolver**, not the
+schema: `targets` stays a map and `provider` stays a field, so multi-target
+support arrives without a file format change.
+
+## Output
+
+`--json` is the machine-readable contract, and carries `configPath`, `mode`,
+`root`, `defaultTarget`, `target` (`{name, provider, project, visibility,
+include}`), `collections` and `legacy`. Without `--json` the same facts print as
+`key=value` lines for humans; arrays are comma-joined there, so that form is not
+losslessly parseable and scripts must use `--json`.
+
+```bash
+node scripts/config-resolve.mjs --json --from "$DIR"
+```
+
+Tests live in the skill's `tests/` directory: `node --test` from
+`skills/preview`. (A bare directory argument does not work — since Node 22.6
+the positional arguments are glob patterns, so `node --test tests/` matches the
+directory itself and fails; use `node --test tests/*.test.mjs` to run just that
+suite.)
+
+---
+
+## Appendix: legacy helper consumers
+
 One consumer carries a bespoke derivative WITHOUT the marker —
 `preview/scripts/deploy.sh`'s `_preview_repo_key`, which re-copies only the
 repo-key URL normalization (it anchors at `$DIR` instead of cwd, so it cannot
