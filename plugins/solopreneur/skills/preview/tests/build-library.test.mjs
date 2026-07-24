@@ -544,7 +544,19 @@ test('a preview.json symlinked outside the item directory is rejected', () => {
   fs.mkdirSync(dir, { recursive: true });
   fs.symlinkSync(external, path.join(dir, 'preview.json')); // metadata sourced out of tree
   fs.writeFileSync(path.join(dir, 'index.html'), '<body>x</body>');
-  assert.throws(() => build(root, ['active']), isBuildError(/escapes/));
+  assert.throws(() => build(root, ['active']), isBuildError(/is a symlink/));
+});
+
+test('a preview.json symlinked to a contained sibling is rejected (would leak metadata)', () => {
+  const root = tmp();
+  const dir = path.join(root, 'active', 'a');
+  fs.mkdirSync(dir, { recursive: true });
+  // The real metadata lives in a NON-excluded sibling; without the guard the walk
+  // would copy meta.json (with sourceRef/provenance) into /p/a/ as content.
+  fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(makeMeta('a', { sourceRef: 'secret/path.md' })));
+  fs.symlinkSync(path.join(dir, 'meta.json'), path.join(dir, 'preview.json'));
+  fs.writeFileSync(path.join(dir, 'index.html'), '<body>x</body>');
+  assert.throws(() => build(root, ['active']), isBuildError(/is a symlink/));
 });
 
 test('two filenames that normalize to the same NFC path abort', (t) => {

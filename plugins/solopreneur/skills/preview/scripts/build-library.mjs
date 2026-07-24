@@ -301,15 +301,15 @@ function computeContentHash(fingerprint, meta) {
 // ---------------------------------------------------------------------------
 
 /**
- * Read one `preview.json`. The sidecar gets the SAME containment as content
- * files: a symlinked metadata file is realpath'd and must resolve inside its item
- * directory (`containerReal`) — otherwise a bare `statSync` would FOLLOW an
- * escaping link and the builder would emit out-of-tree title / dates / hash,
- * quietly breaking the containment guarantee for the one file that drives every
- * item's metadata. A non-regular file (a FIFO would block `readFileSync` forever)
- * is rejected before any read.
+ * Read one `preview.json`. The metadata sidecar must be a REGULAR FILE — a symlink
+ * is rejected outright, for two reasons: an escaping link would source out-of-tree
+ * title/dates/hash, and a link to a non-excluded sibling (`preview.json ->
+ * meta.json`) would leave that real target to be walked and COPIED as content,
+ * publishing the raw sidecar (sourceRef, provenance) despite the sanitization
+ * guarantee. A FIFO/device (which would block `readFileSync` forever) is rejected
+ * too. So the metadata is only ever read from a plain file the walk also excludes.
  */
-function readPreviewJson(file, containerReal) {
+function readPreviewJson(file) {
   let lst;
   try {
     lst = fs.lstatSync(file);
@@ -319,22 +319,10 @@ function readPreviewJson(file, containerReal) {
     }
     throw new BuildError(`cannot read preview.json: ${file}\n  ${err.message}`);
   }
-  // lstat, then realpath a symlink and assert containment — mirrors the content
-  // walk in fingerprintItem so the metadata file cannot escape where content cannot.
   if (lst.isSymbolicLink()) {
-    let real;
-    try {
-      real = fs.realpathSync(file);
-    } catch (err) {
-      throw new BuildError(`preview.json is a broken symlink: ${file}\n  ${err.message}`);
-    }
-    if (!isUnder(real, containerReal)) {
-      throw new BuildError(`preview.json escapes its preview directory: ${file} -> ${real}`);
-    }
+    throw new BuildError(`preview.json is a symlink: ${file}\n  the metadata sidecar must be a regular file, not a symlink.`);
   }
-  // Follows a contained symlink; a FIFO or device (even via a link) is not a
-  // regular file and is rejected before readFileSync, which would block on a pipe.
-  if (!fs.statSync(file).isFile()) throw new BuildError(`preview.json is not a regular file: ${file}`);
+  if (!lst.isFile()) throw new BuildError(`preview.json is not a regular file: ${file}`);
   let parsed;
   try {
     parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -510,7 +498,7 @@ function scanCollections(rootReal, collections, include) {
       }
 
       const metaFile = path.join(itemDirReal, 'preview.json');
-      const meta = readPreviewJson(metaFile, itemDirReal);
+      const meta = readPreviewJson(metaFile);
       validatePreviewMeta(meta, metaFile);
       assertSlug(meta.id, metaFile); // defense in depth; the schema pattern already enforced it
 
