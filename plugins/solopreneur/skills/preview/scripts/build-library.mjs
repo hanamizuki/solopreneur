@@ -410,25 +410,24 @@ function fingerprintItem(itemDirReal) {
     }
   };
   const addFile = (abs, rel, size) => {
-    // NFC-normalize the relative path so the same non-ASCII filename fingerprints
-    // identically on macOS (which may hand back NFD) and Linux (NFC). `abs` stays
-    // as the OS gave it, for reading; only the derived `rel` used in the hash and
-    // the staging path is normalized, so both agree.
-    const relNfc = rel.normalize('NFC');
-    // Two distinct source names that normalize to the SAME NFC path (possible on a
-    // normalization-preserving filesystem such as Linux ext4) would otherwise
-    // collide on one fingerprint key and one staging path — silently dropping a
-    // file while the torn-snapshot guard still matched the survivor. Abort rather
-    // than coalesce, so the normalization that buys cross-platform stability can
-    // never cost an asset.
-    if (fingerprint.has(relNfc)) {
+    // NFC-normalize only the fingerprint/dedup KEY, so the same non-ASCII filename
+    // hashes identically on macOS (which may hand back NFD) and Linux (NFC). The
+    // COPY keeps the original `rel`, so the staged filename matches what the
+    // verbatim-copied HTML references — normalizing the staged name would leave an
+    // `<img src="é.png">` pointing at a renamed asset on a normalization-preserving
+    // host. `abs` stays as the OS gave it, for reading.
+    const key = rel.normalize('NFC');
+    // Two distinct source names that normalize to the SAME NFC key (possible on a
+    // normalization-preserving filesystem such as Linux ext4) are ambiguous for the
+    // content hash — abort rather than silently coalesce them into one fingerprint.
+    if (fingerprint.has(key)) {
       throw new BuildError(
-        `two files normalize to the same path ${JSON.stringify(relNfc)} in a preview — `
+        `two files normalize to the same path ${JSON.stringify(key)} in a preview — `
         + 'rename one so the names differ after Unicode NFC normalization.',
       );
     }
-    files.push({ abs, rel: relNfc, size });
-    fingerprint.set(relNfc, sha256File(abs));
+    files.push({ abs, rel, size, key });
+    fingerprint.set(key, sha256File(abs));
   };
 
   walk(itemDirReal, '');
@@ -672,9 +671,9 @@ function copyItem(item, stagingDir, injectEntry) {
     }
   }
 
-  for (const { rel } of item.files) {
+  for (const { rel, key } of item.files) {
     const staged = sha256File(path.join(dest, rel));
-    if (staged !== item.fingerprint.get(rel)) {
+    if (staged !== item.fingerprint.get(key)) {
       throw new BuildError(
         `torn snapshot: ${JSON.stringify(`${item.id}/${rel}`)} changed between scan and copy\n`
         + '  the staged bytes differ from the single-scan fingerprint, so the deployment would be inconsistent — aborting rather than publish a half-updated item.',

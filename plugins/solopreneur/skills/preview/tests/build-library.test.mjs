@@ -227,6 +227,18 @@ test('preview.json is never copied into the staging tree', () => {
   assert.ok(stagedExists(result.stagingDir, 'p', 'a', 'index.html'));
 });
 
+test('an asset keeps its source filename in staging so verbatim HTML refs resolve', () => {
+  const root = tmp();
+  const itemDir = writeItem(root, 'active', 'a', {
+    files: { 'index.html': '<body><img src="é.png"></body>' }, // HTML references the NFD name
+  });
+  fs.writeFileSync(path.join(itemDir, 'é.png'), 'PNG'); // an NFD-named asset
+  const result = build(root, ['active']);
+  const srcName = fs.readdirSync(itemDir).find((n) => n.endsWith('.png'));
+  const stagedName = fs.readdirSync(path.join(result.stagingDir, 'p', 'a')).find((n) => n.endsWith('.png'));
+  assert.equal(stagedName, srcName); // staged under the source name, not an NFC rename
+});
+
 test('excluded files and dotfiles are copied nowhere and do not affect the hash', () => {
   const root = tmp();
   const itemDir = writeItem(root, 'active', 'a', { files: { 'index.html': '<body>x</body>' } });
@@ -305,6 +317,20 @@ test('an overflowed calendar date (Feb 30) is rejected', () => {
 test('a valid leap day (Feb 29 of a leap year) is accepted', () => {
   const root = tmp();
   writeItem(root, 'active', 'a', { over: { createdAt: '2024-02-29T00:00:00Z', updatedAt: '2024-02-29T00:00:00Z' } });
+  assert.equal(build(root, ['active']).directory.items.length, 1);
+});
+
+test('a sub-millisecond-precision timestamp is rejected', () => {
+  const root = tmp();
+  // The sort resolves instants to milliseconds (Date.parse), so sub-ms precision
+  // could not be ordered — the schema caps fractional seconds at 3 digits.
+  writeItem(root, 'active', 'a', { over: { updatedAt: '2026-01-01T00:00:00.123456Z' } });
+  assert.throws(() => build(root, ['active']), isBuildError(/updatedAt/));
+});
+
+test('a millisecond-precision timestamp is accepted', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', { over: { createdAt: '2026-01-01T00:00:00.123Z', updatedAt: '2026-01-01T00:00:00.123Z' } });
   assert.equal(build(root, ['active']).directory.items.length, 1);
 });
 
