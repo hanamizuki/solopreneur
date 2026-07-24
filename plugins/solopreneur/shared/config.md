@@ -843,4 +843,65 @@ platform.
 
 Tests live in `tests/resolve-provenance.test.mjs`; run them the same way.
 
+## Library chrome
+
+The builder wires three browser-facing pieces into the staging tree so a built
+Library is navigable, not just a bare content tree. The shared front-end assets
+live only in the plugin's `skills/preview/assets/` — the content tree never holds
+them — and `build-library.mjs` copies them into `<staging>/assets/` on every
+build. Absolute `/assets/...` and `/p/<id>/` references work because the staging
+root is the deployment root.
+
+### `preview-shell.js` — injected entry chrome
+
+Injected into every item entry inside a **Shadow DOM** (full two-way style
+isolation from the preview content). It renders:
+
+- a top-left directory **icon** that opens a **sidebar** with `active` and
+  `archive` sections, each sorted `updatedAt` DESC, **Archive collapsed by
+  default**, and the current page marked `v<revision> · updated <local time>`. The
+  sidebar's catalog is fetched at runtime from the deployment's `/directory.json`
+  (the same file the index is generated from — a single source), and every item
+  link targets the same deployment's `/p/<id>/`;
+- a **provenance footer** built from the shape `resolve-provenance.mjs` returns
+  (`{ producedBy }` collapsed, or `{ createdBy, lastUpdatedBy }` distinct;
+  "unrecorded" when absent). Timestamps render in the viewer's local timezone with
+  the full ISO in a tooltip;
+- a **Share request** block — an access selector (`project-members` default /
+  `anyone-with-link`) and a read-only, copyable JSON request carrying
+  schemaVersion, preview id, revision, contentHash, the current URL, and the chosen
+  access. It performs no deploy and holds no token; it only produces the request an
+  agent later consumes.
+
+The builder injects the CURRENT item's display metadata + resolved provenance as a
+`<script type="application/json">` island (escaped via `<` → `<`, never
+concatenated), followed by the preview-shell script, at the `findInjectionPoint`
+seam. `buildLibrary`'s default seam stays verbatim; the CLI passes the real
+injector.
+
+### `comment-overlay.js` — per-preview comments
+
+The shared overlay keys its comments per preview: `preview_comments_v3:<id>` (and
+the diff/clean preference `preview_diff_clean_v1:<id>`), so previews on one Library
+origin never share one blob. The builder rewrites an existing
+`<script src="./comment-overlay.js">` tag to the shared staging asset and stamps a
+`data-preview-id` attribute; the overlay reads it via `document.currentScript`.
+Never a second tag is added. The old global `preview_comments_v2` key is **never
+auto-adopted** (it cannot be attributed to a single preview) — a manual import is
+offered on `window.__previewCommentOverlay`. A failed `localStorage` write is
+**surfaced** (a visible banner + export escape hatch), never swallowed, and a
+double-inject of the overlay is a no-op.
+
+### `library-index.html` — the Library home page
+
+Generated at `<staging>/index.html` from the `library-index.html` template + the
+projected `directory.json`, which the builder embeds as an escaped JSON island. It
+renders active and archive sections (archive collapsed by default via a native
+`<details>`, `updatedAt` DESC, links to `/p/<id>/`) — the same directory data the
+sidebar uses.
+
+Tests live in `tests/preview-shell.test.mjs` and `tests/comment-overlay.test.mjs`
+(the assets' pure helpers) and the chrome-injection cases in
+`tests/build-library.test.mjs`; run them the same way.
+
 ---

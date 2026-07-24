@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preview Library</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #111827;
+    --ink-soft: #4b5563;
+    --muted: #9ca3af;
+    --rule: #e5e7eb;
+    --bg: #fafaf9;
+    --card: #ffffff;
+  }
+  html, body { background: var(--bg); }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+  main { max-width: 820px; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+  header.page { margin-bottom: 2.5rem; }
+  h1 { font-size: 1.9rem; color: var(--ink); font-weight: 700; letter-spacing: -.01em; margin: 0 0 .35rem; }
+  .subtitle { font-size: .95rem; color: var(--muted); margin: 0; }
+  .section-title {
+    font: 600 .72rem ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
+    margin: 2.25rem 0 .75rem;
+  }
+  .count { font-weight: 500; }
+  /* Native collapse for Archive — collapsed by default (no `open`). */
+  details.archive { margin-top: 2.25rem; }
+  details.archive > summary {
+    list-style: none; cursor: pointer;
+    font: 600 .72rem ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
+    display: flex; align-items: center; gap: .4rem;
+  }
+  details.archive > summary::-webkit-details-marker { display: none; }
+  details.archive > summary::before {
+    content: "›"; display: inline-block; transition: transform .15s ease; color: var(--muted);
+  }
+  details.archive[open] > summary::before { transform: rotate(90deg); }
+  .list { display: grid; gap: .5rem; margin-top: .75rem; }
+  a.card {
+    display: block; text-decoration: none; background: var(--card);
+    border: 1px solid var(--rule); border-radius: 12px; padding: .85rem 1rem;
+    transition: border-color .15s, box-shadow .15s, transform .05s;
+  }
+  a.card:hover { border-color: #d1d5db; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+  a.card:active { transform: translateY(1px); }
+  .card-title { color: var(--ink); font-weight: 600; font-size: 1rem; word-break: break-word; }
+  .card-meta { margin-top: .2rem; font-size: .8rem; color: var(--muted); }
+  .empty { color: var(--muted); font-size: .9rem; margin: .25rem 0; }
+  footer.page { margin-top: 3rem; font-size: .78rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<!-- Build-time catalog. The builder replaces the token below with the
+     escaped directory.json (JSON.stringify + `<` neutralized), so this
+     island cannot break out of the script context. Served raw (token
+     unreplaced) it is invalid JSON and the render below degrades to empty. -->
+<script id="directory-data" type="application/json">__DIRECTORY_JSON__</script>
+
+<main>
+  <header class="page">
+    <h1>Preview Library</h1>
+    <p class="subtitle">Interactive previews for review.</p>
+  </header>
+
+  <div class="section-title">Active <span class="count">(<span id="active-count">0</span>)</span></div>
+  <div id="active-list" class="list"></div>
+
+  <details class="archive">
+    <summary>Archive <span class="count">(<span id="archive-count">0</span>)</span></summary>
+    <div id="archive-list" class="list"></div>
+  </details>
+
+  <footer class="page" id="page-footer"></footer>
+</main>
+
+<script>
+  (function () {
+    "use strict";
+    var data = {};
+    try {
+      data = JSON.parse(document.getElementById("directory-data").textContent) || {};
+    } catch (_) {
+      data = {};
+    }
+    var items = Array.isArray(data.items) ? data.items : [];
+
+    // Sort updatedAt DESC then id ASC, then split by collection. This
+    // mirrors preview-shell.js's groupDirectory; the small duplication is
+    // deliberate — sharing one module across a browser asset and this
+    // inline page script would cost more than the ~12 lines it saves.
+    items = items.slice().sort(function (a, b) {
+      var ta = Date.parse(a && a.updatedAt);
+      var tb = Date.parse(b && b.updatedAt);
+      if (isNaN(ta)) ta = -Infinity;
+      if (isNaN(tb)) tb = -Infinity;
+      if (ta !== tb) return tb - ta;
+      var ia = (a && a.id) || "";
+      var ib = (b && b.id) || "";
+      return ia < ib ? -1 : ia > ib ? 1 : 0;
+    });
+
+    var active = [];
+    var archive = [];
+    items.forEach(function (it) {
+      if (!it || typeof it.id !== "string") return;
+      (it.collection === "archive" ? archive : active).push(it);
+    });
+
+    render("active-list", active, "No previews yet.");
+    render("archive-list", archive, "Nothing archived.");
+    document.getElementById("active-count").textContent = String(active.length);
+    document.getElementById("archive-count").textContent = String(archive.length);
+
+    if (data.generatedAt) {
+      var f = document.getElementById("page-footer");
+      var w = fmt(data.generatedAt);
+      f.textContent = "Generated " + w.text;
+      f.title = data.generatedAt;
+    }
+
+    function render(id, list, emptyMsg) {
+      var wrap = document.getElementById(id);
+      wrap.textContent = "";
+      if (!list.length) {
+        var e = document.createElement("p");
+        e.className = "empty";
+        e.textContent = emptyMsg;
+        wrap.appendChild(e);
+        return;
+      }
+      list.forEach(function (it) {
+        wrap.appendChild(row(it));
+      });
+    }
+
+    // Links ALWAYS target this same deployment's /p/<id>/.
+    function row(it) {
+      var a = document.createElement("a");
+      a.className = "card";
+      a.href = "/p/" + encodeURIComponent(it.id) + "/";
+      var t = document.createElement("div");
+      t.className = "card-title";
+      t.textContent = it.title || it.id;
+      a.appendChild(t);
+      var meta = document.createElement("div");
+      meta.className = "card-meta";
+      var bits = [];
+      if (it.revision != null) bits.push("v" + it.revision);
+      if (it.updatedAt) {
+        var w = fmt(it.updatedAt);
+        bits.push("updated " + w.text);
+        meta.title = it.updatedAt;
+      }
+      if (it.project) bits.push(it.project);
+      meta.textContent = bits.join(" · ");
+      a.appendChild(meta);
+      return a;
+    }
+
+    // Local-timezone rendering; full ISO stays in the title tooltip.
+    function fmt(iso) {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return { text: String(iso) };
+      try {
+        return {
+          text: new Intl.DateTimeFormat(undefined, {
+            year: "numeric", month: "short", day: "numeric",
+            hour: "2-digit", minute: "2-digit",
+          }).format(d),
+        };
+      } catch (_) {
+        return { text: d.toLocaleString() };
+      }
+    }
+  })();
+</script>
+</body>
+</html>
