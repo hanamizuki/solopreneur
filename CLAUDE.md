@@ -40,6 +40,15 @@ top level) keep working via layer 5; migration is optional. See
 `plugins/solopreneur/shared/config.md` for the full helper
 definitions and a sample migrated config.
 
+There is a **second, separate config file**: `.solopreneur.json` (leading
+dot), used by the preview Library. It is keyed by **filesystem path**
+rather than by git remote, is read by
+`plugins/solopreneur/skills/preview/scripts/config-resolve.mjs` rather
+than by the shell helpers, and is validated against
+`plugins/solopreneur/shared/config.schema.json`. The two files coexist
+and neither reader touches the other's file — same `config.md` covers
+both.
+
 ## Versioning & release
 
 **Regular commits don't bump versions.** Land work on `main` (direct or via

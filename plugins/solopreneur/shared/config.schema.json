@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": ".solopreneur.json (schema version 2)",
+  "description": "Path-scoped solopreneur configuration. This schema describes the v2 `.solopreneur.json` file ONLY. The legacy `solopreneur.json` feature config (the `default`/`repos` cascade documented in shared/config.md) is a different file under a different regime and is deliberately not described here. The two coexist.",
+  "type": "object",
+  "required": ["schemaVersion", "preview"],
+  "properties": {
+    "schemaVersion": {
+      "description": "Format version of this file. Bumped only on a breaking layout change.",
+      "const": 2
+    },
+    "preview": { "$ref": "#/$defs/preview" }
+  },
+  "$defs": {
+    "preview": {
+      "type": "object",
+      "description": "Configuration for the preview Library rooted at this path scope.",
+      "required": ["root", "defaultTarget", "collections", "targets"],
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Content root holding the collections. A relative value resolves against the directory of THIS file, never against the git root or the current working directory. A leading `~` is NOT expanded."
+        },
+        "defaultTarget": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Key under `targets` used when no target is named explicitly."
+        },
+        "collections": { "$ref": "#/$defs/collections" },
+        "targets": {
+          "type": "object",
+          "description": "Deployment targets, keyed by name. The format allows several; v1 of the resolver accepts exactly one and rejects the rest, so multi-target support can arrive without a file format change.",
+          "additionalProperties": { "$ref": "#/$defs/target" }
+        }
+      }
+    },
+    "collections": {
+      "type": "object",
+      "description": "Local content lifecycle buckets. v1 fixes the set to `active` and `archive`; the schema stays open so a third can be added later without a format change. Staying open does not mean unvalidated — any additional collection must have the same shape as the two named ones.",
+      "required": ["active", "archive"],
+      "properties": {
+        "active": { "$ref": "#/$defs/collection" },
+        "archive": { "$ref": "#/$defs/collection" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/collection" }
+    },
+    "collection": {
+      "type": "object",
+      "required": ["path", "label"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Directory name under `preview.root` holding this collection's items."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-facing heading for this collection in the Library catalog."
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["provider", "project", "include"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Hosting provider. Kept as an open string so a second provider does not require a format change; v1 of the resolver accepts only \"vercel\"."
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Provider-side project this target publishes to. Must be a dedicated project — publishing a Library to a project that also serves a real site would overwrite it."
+        },
+        "visibility": {
+          "enum": ["private", "public"],
+          "description": "Omitted means \"private\". `public` must be written explicitly and still has to clear the publish-time content review."
+        },
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Collection keys published to this target, in catalog order."
+        }
+      }
+    }
+  }
+}
