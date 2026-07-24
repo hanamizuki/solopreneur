@@ -237,7 +237,19 @@ function readJsonIfPresent(file) {
   try {
     stat = fs.statSync(file);
   } catch (err) {
-    if (err.code === 'ENOENT' || err.code === 'ENOTDIR') return undefined;
+    if (err.code === 'ENOENT') {
+      // `stat` follows symlinks, so ENOENT means either "nothing here" or "a
+      // symlink pointing at nothing". The second is a config that is present
+      // and broken, and skipping it would hand the answer to a farther
+      // ancestor — the silent fall-through this resolver exists to prevent.
+      try {
+        fs.lstatSync(file);
+      } catch {
+        return undefined;
+      }
+      throw new ConfigError(`config is a broken symlink: ${file}`);
+    }
+    if (err.code === 'ENOTDIR') return undefined;
     throw new ConfigError(`cannot read config: ${file}\n  ${err.message}`);
   }
   if (!stat.isFile()) throw new ConfigError(`config is not a regular file: ${file}`);
@@ -470,15 +482,16 @@ export function resolveConfig({ from } = {}) {
     return decide(resolveV2(ancestor.file, ancestor.config));
   }
 
-  // Layer 3: the user-global v2 config.
+  // Layer 3: the user-global v2 config. Unlike the walk-up, a file here is not
+  // skipped for lacking a `preview` block: there is only one of these, it is a
+  // v2 file, and the schema requires `preview` — so a typo'd or half-written
+  // one is a broken higher-priority config, not a config for another feature.
   const globalFile = path.join(os.homedir(), '.config', 'solopreneur', 'config.json');
   const globalConfig = readJsonIfPresent(globalFile);
   if (globalConfig !== undefined) {
     assertConfigObject(globalConfig, globalFile);
-    if (Object.hasOwn(globalConfig, 'preview')) {
-      validateV2(globalConfig, globalFile);
-      return decide(resolveV2(globalFile, globalConfig));
-    }
+    validateV2(globalConfig, globalFile);
+    return decide(resolveV2(globalFile, globalConfig));
   }
 
   // Layers 4-5: the legacy feature config, reported as-is. BOTH files are
@@ -486,7 +499,9 @@ export function resolveConfig({ from } = {}) {
   // single-file report would hide values that are actually in effect and the
   // migrator would silently drop them.
   const candidates = [];
-  if (process.env.CLAUDE_CONFIG_DIR) candidates.push(path.join(process.env.CLAUDE_CONFIG_DIR, LEGACY_FILENAME));
+  // path.resolve, not path.join: a relative CLAUDE_CONFIG_DIR would otherwise
+  // leak into `configPath`, which is documented as absolute.
+  if (process.env.CLAUDE_CONFIG_DIR) candidates.push(path.resolve(process.env.CLAUDE_CONFIG_DIR, LEGACY_FILENAME));
   candidates.push(path.join(os.homedir(), '.claude', LEGACY_FILENAME));
   const legacy = [];
   const seen = new Set();
@@ -516,21 +531,26 @@ const USAGE = `usage: ${SELF} [--from <path>] [--json]
   --json         print the resolved decision as JSON instead of key=value lines`;
 
 /**
- * Flatten the result to `key=value` lines. Newlines inside values are escaped:
- * a config string containing one would otherwise print as extra lines that look
- * exactly like real facts.
+ * Flatten the result to `key=value` lines. Newlines are escaped everywhere they
+ * can reach the output — values, array elements, and object keys (a collection
+ * name is an arbitrary string, and it becomes part of the key). Without that, a
+ * config string containing one would print as extra lines indistinguishable
+ * from real facts.
  */
+const esc = (v) => String(v).replace(/\n/g, '\\n');
+
 function toLines(value, prefix = '') {
   if (value === null || value === undefined) return [`${prefix}=`];
   if (Array.isArray(value)) {
     return value.every((v) => !isObject(v) && !Array.isArray(v))
-      ? [`${prefix}=${value.join(',')}`]
+      ? [`${prefix}=${value.map(esc).join(',')}`]
       : value.flatMap((v, i) => toLines(v, `${prefix}[${i}]`));
   }
   if (isObject(value)) {
-    return Object.entries(value).flatMap(([key, sub]) => toLines(sub, prefix ? `${prefix}.${key}` : key));
+    return Object.entries(value)
+      .flatMap(([key, sub]) => toLines(sub, prefix ? `${prefix}.${esc(key)}` : esc(key)));
   }
-  return [`${prefix}=${String(value).replace(/\n/g, '\\n')}`];
+  return [`${prefix}=${esc(value)}`];
 }
 
 // ponytail: hand-rolled rather than node:util parseArgs — parseArgs only became

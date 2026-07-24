@@ -482,6 +482,63 @@ test('the user-global v2 config is used when no ancestor has one', () => {
   assert.equal(out.root, store);
 });
 
+test('a global v2 config missing preview is reported, not stepped over', () => {
+  const home = tmp();
+  const globalFile = writeJson(
+    path.join(home, '.config', 'solopreneur', 'config.json'),
+    { schemaVersion: 2 },
+  );
+  // There is exactly one file at this location and it is a v2 file, so a
+  // half-written one is a broken higher-priority config — not, as in the
+  // walk-up, possibly a config for some other feature.
+  const result = run(['--json', '--from', mkdirp(tmp(), 'work')], { home });
+  assertFailed(result);
+  assert.ok(result.stderr.includes(globalFile), result.stderr);
+});
+
+test('a dangling config symlink is reported, not treated as absent', () => {
+  const root = tmp();
+  writeJson(path.join(root, '.solopreneur.json'), v2('ancestor-project', { root: '.' }));
+  const repo = mkdirp(root, 'repo');
+  const dangling = path.join(repo, '.solopreneur.json');
+  fs.symlinkSync(path.join(repo, 'nowhere.json'), dangling);
+
+  // `stat` follows the link and reports ENOENT; the file is nonetheless there.
+  const result = run(['--json', '--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes(dangling), result.stderr);
+});
+
+test('a relative CLAUDE_CONFIG_DIR still yields an absolute configPath', () => {
+  const configDir = tmp();
+  writeJson(path.join(configDir, 'solopreneur.json'), {
+    default: { preview: { projects: { default: 'scratch' } } },
+  });
+
+  // Run with cwd at the config dir's parent and pass the last segment only.
+  const out = runJson(['--from', mkdirp(tmp(), 'work')], {
+    cwd: path.dirname(configDir),
+    env: { CLAUDE_CONFIG_DIR: path.basename(configDir) },
+  });
+  assert.equal(out.mode, 'legacy');
+  assert.ok(path.isAbsolute(out.configPath), out.configPath);
+  assert.equal(out.configPath, path.join(configDir, 'solopreneur.json'));
+});
+
+test('a newline in a collection name cannot forge a key=value line', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('p', { root: '.' });
+  config.preview.collections['x\nmode=legacy'] = { path: 'x', label: 'X' };
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const result = run(['--from', mkdirp(repo, 'sub')]);
+  assert.equal(result.status, 0, result.stderr);
+  const lines = result.stdout.trim().split('\n');
+  assert.ok(lines.includes('mode=v2'));
+  assert.ok(!lines.includes('mode=legacy'), result.stdout);
+});
+
 test('legacy default.preview.projects is reported as mode=legacy, not converted', () => {
   const home = tmp();
   const legacy = writeJson(path.join(home, '.claude', 'solopreneur.json'), {

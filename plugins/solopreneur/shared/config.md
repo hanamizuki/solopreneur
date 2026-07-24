@@ -426,7 +426,9 @@ single-file report would let the migrator silently drop it.
   boundaries is deliberate: a repo with no config of its own inherits the
   enclosing scope. It stops at the filesystem root.
 - A `.solopreneur.json` with no `preview` block is **skipped** and the walk
-  continues — that file may configure something else.
+  continues — that file may configure something else. This applies to the
+  walk-up only: layers 1 and 3 name one specific v2 file, so a file that is
+  there but has no `preview` block is a broken config and is reported.
 - A relative `root` resolves against **the directory of the config file that
   declared it**, never the git root and never the working directory. This is the
   same anchoring lesson as `deploy.sh`'s `$DIR`-anchored repo key.
@@ -443,7 +445,8 @@ falls through to an ancestor config:
 - a `.solopreneur.json` whose top level is not an object (it is broken, not a
   config for some other feature, so the walk must not step over it)
 - a config that is not a regular file (a FIFO or a symlink to a device would
-  otherwise block the process forever)
+  otherwise block the process forever), or a dangling symlink (`stat` reports
+  that as missing, but the file is there and broken)
 - more than one entry under `targets` (v1 supports exactly one)
 - a `defaultTarget` that is not the declared target
 - any `provider` other than `"vercel"`
