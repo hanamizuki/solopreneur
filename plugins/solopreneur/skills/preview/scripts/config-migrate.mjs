@@ -107,6 +107,12 @@ function isUnder(child, parent) {
  * `realpathSync` throws on a path whose leaf does not exist yet, which loses the
  * one thing that matters here — whether a not-yet-created root sits under a
  * symlinked ancestor that leaves the repository.
+ *
+ * A DANGLING symlink along the way is refused rather than stepped over: it
+ * exists (so it is a real component of the path, not a missing tail), yet its
+ * target is absent, so ascending past it lexically would judge the root by the
+ * wrong location and could let a link pointing outside the repo pass as
+ * contained once its target appears.
  */
 function physicalize(target) {
   const tail = [];
@@ -115,12 +121,56 @@ function physicalize(target) {
       return path.join(fs.realpathSync(cur), ...tail);
     } catch (err) {
       if (err.code !== 'ENOENT') throw err;
+      try {
+        fs.readlinkSync(cur);
+        throw new ConfigError(`the legacy preview root passes through a dangling symlink: ${cur}`);
+      } catch (linkErr) {
+        if (linkErr instanceof ConfigError) throw linkErr;
+        // Not a symlink — a genuinely missing component. Keep ascending.
+      }
       const parent = path.dirname(cur);
-      if (parent === cur) return target; // reached the filesystem root existing nowhere
+      if (parent === cur) return path.join(cur, ...tail); // existing nowhere up to the root
       tail.unshift(path.basename(cur));
       cur = parent;
     }
   }
+}
+
+/**
+ * The nearest `.solopreneur.json` that would shadow a config written at
+ * `repoDir` — any file strictly between the preview `root` and `repoDir` that
+ * carries a `preview` block (the resolver would stop there walking up from
+ * content), OR that is present but broken (a malformed or unreadable config is
+ * fatal to the resolver at every layer, so content resolution would stop there
+ * too instead of reaching the repo-root file). A `.solopreneur.json` without a
+ * `preview` block configures another feature and is skipped, exactly as the
+ * resolver's walk-up skips it. Returns `{ file, reason }` or null.
+ *
+ * The scan starts at the deepest existing directory at or under `root`, so a
+ * not-yet-created root is covered too, and it never looks at or above `repoDir`
+ * — configs there are the shadow check's concern, not this one.
+ */
+function nestedShadow(root, repoDir) {
+  let dir = root;
+  while (dir !== repoDir && isUnder(dir, repoDir) && !fs.existsSync(dir)) dir = path.dirname(dir);
+  for (; dir !== repoDir && isUnder(dir, repoDir); dir = path.dirname(dir)) {
+    const file = path.join(dir, V2_FILENAME);
+    let raw;
+    try {
+      raw = fs.readFileSync(file, 'utf8');
+    } catch (err) {
+      if (err.code === 'ENOENT') continue;
+      return { file, reason: 'is present but unreadable' };
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { file, reason: 'is present but not valid JSON' };
+    }
+    if (isObject(parsed) && Object.hasOwn(parsed, 'preview')) return { file, reason: 'already configures a preview here' };
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -780,27 +830,23 @@ function main(argv) {
     );
   }
 
-  // A v2 config already sitting BETWEEN the root and the repo root would be the
-  // one the resolver finds first when walking up from content — the repo-root
-  // config we are about to write would be silently shadowed by it. `resolveConfig`
-  // anchored at the root reports exactly what wins there today; a nested hit
-  // (strictly below the destination) means the migration would be inert. Configs
-  // at or above the destination are `assertNotShadowing`'s job and are ignored
-  // here; a containment error from some ancestor's narrower root is theirs too.
-  if (rootExists) {
-    let nested = null;
-    try {
-      const existing = resolveConfig({ from: physicalRoot });
-      const dir = existing.mode === 'v2' ? path.dirname(existing.configPath) : null;
-      if (dir && dir !== realDestDir && isUnder(dir, realDestDir)) nested = existing.configPath;
-    } catch { /* an ancestor's containment error is assertNotShadowing's concern */ }
-    if (nested) {
-      throw new ConfigError(
-        `a v2 config already covers the preview root, nearer than the repo root\n  config: ${nested}\n`
-        + `  content under ${physicalRoot} would resolve to it, not to a new ${V2_FILENAME} at the repo root\n`
-        + `  migrate that scope where it lives, or remove it first`,
-      );
-    }
+  // A `.solopreneur.json` already sitting BETWEEN the root and the repo root is
+  // the one the resolver finds first when walking up from content — the
+  // repo-root config we are about to write would be silently shadowed by it, or
+  // by a broken one that stops resolution before it. Scanning that bounded span
+  // directly (rather than asking the resolver, whose containment errors from
+  // configs ABOVE the destination would have to be told apart from real nested
+  // hits) keeps this honest: it never looks at or above the destination, so
+  // configs there stay `assertNotShadowing`'s job. It runs whether or not the
+  // root exists yet — a fresh root under an existing intermediate config is just
+  // as shadowed.
+  const shadow = nestedShadow(physicalRoot, realDestDir);
+  if (shadow) {
+    throw new ConfigError(
+      `a ${V2_FILENAME} nearer the content than the repo root ${shadow.reason}\n  config: ${shadow.file}\n`
+      + `  content under the preview root would resolve to it, not to a new ${V2_FILENAME} at the repo root\n`
+      + `  migrate that scope where it lives, or remove it first`,
+    );
   }
 
   const rootNote = legacyPath !== null

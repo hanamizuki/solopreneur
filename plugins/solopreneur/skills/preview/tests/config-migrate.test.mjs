@@ -342,12 +342,82 @@ test('a nested v2 config already covering the root is refused', () => {
     repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
   });
   // A pre-existing v2 config at docs/, nearer to the content than the repo root.
-  writeJson(path.join(s.repo, 'docs', '.solopreneur.json'), v2('already-here'));
+  const nested = writeJson(path.join(s.repo, 'docs', '.solopreneur.json'), v2('already-here'));
   mkdirp(previews, 'item');
 
   const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
   assertFailed(result);
-  assert.ok(result.stderr.includes('nearer than the repo root'), result.stderr);
+  assert.ok(result.stderr.includes('nearer the content than the repo root'), result.stderr);
+  assert.ok(result.stderr.includes(nested), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
+});
+
+test('a nested v2 config is refused even when the root does not exist yet', () => {
+  // docs/ exists (holds a preview config) but docs/preview does not — content
+  // created there later would resolve to the nearer docs config, so the scan
+  // must anchor at the deepest existing ancestor rather than skip a fresh root.
+  const s = scenario({});
+  mkdirp(s.repo, 'docs');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
+  });
+  writeJson(path.join(s.repo, 'docs', '.solopreneur.json'), v2('already-here'));
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('nearer the content'), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
+});
+
+test('a broken nested .solopreneur.json is refused, not silently stepped over', () => {
+  // A malformed config between the root and the repo root is fatal to the
+  // resolver, so content resolution would stop there — writing the repo-root
+  // config anyway would report a success that never takes effect.
+  const s = scenario({});
+  const previews = mkdirp(s.repo, 'docs', 'preview');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
+  });
+  fs.writeFileSync(path.join(s.repo, 'docs', '.solopreneur.json'), '{ "preview": {');
+  mkdirp(previews, 'item');
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('not valid JSON'), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
+});
+
+test('a .solopreneur.json without a preview block does not count as a nested shadow', () => {
+  // The resolver skips such a file during walk-up (it configures another
+  // feature), so it must not block the migration either.
+  const s = scenario({});
+  mkdirp(s.repo, 'docs', 'preview');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
+  });
+  writeJson(path.join(s.repo, 'docs', '.solopreneur.json'), { schemaVersion: 2, todos: { backlog: 'x' } });
+
+  const out = migrate(s, ['--target-project', 'p', '--write']);
+  assert.ok(out.stdout.includes(`wrote ${s.dest}`), out.stdout);
+});
+
+test('a dangling symlink in the root path is refused', () => {
+  // `link -> outside` where `outside` is missing, root `link/x`: realpath throws
+  // ENOENT on the link, but it is a real (dangling) component, not a missing
+  // tail — stepping past it lexically would wrongly read as in-repo.
+  const s = scenario({});
+  fs.symlinkSync(path.join(s.root, 'nowhere'), path.join(s.repo, 'link'), 'dir');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'link/x' } } },
+  });
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('dangling symlink'), result.stderr);
   assert.ok(!fs.existsSync(s.dest));
 });
 

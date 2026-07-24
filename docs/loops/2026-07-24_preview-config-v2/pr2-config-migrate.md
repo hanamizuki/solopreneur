@@ -204,14 +204,27 @@ file up twice onto the same `.backup-<stamp>` path, and the second
 
 **A v2 config nearer the content than the repo root is refused.** The migrated
 config lands at the repo root, but the resolver finds the *nearest* config
-walking up from content — so a pre-existing `.solopreneur.json` with a preview
-block between the root and the repo root would shadow it. Resolving from the root
-before writing reports what already wins there; a nested hit (strictly below the
-destination) means the migration would be inert, so it refuses. Configs at or
-above the destination are the shadow check's job, and the user-global
+walking up from content — so a pre-existing `.solopreneur.json` between the root
+and the repo root would shadow it. This is checked by scanning that bounded span
+directly rather than by asking the resolver: the resolver anchored at the root
+would also surface configs *above* the destination, whose containment errors
+would then have to be told apart from real nested hits, and it would swallow a
+broken nested config as "nothing there". The direct scan never looks at or above
+the destination — those are the shadow check's job — and treats a nested file as
+a shadow when it carries a `preview` block *or* is present but broken (a
+malformed or unreadable config is fatal to the resolver, so content resolution
+would stop there before ever reaching the repo-root file). A nested
+`.solopreneur.json` with no `preview` block configures another feature and is
+skipped, exactly as the resolver's walk-up skips it. The scan anchors at the
+deepest existing directory at or under the root, so a not-yet-created root under
+an existing intermediate config is covered too. Configs at or above the
+destination are the shadow check's job, and the user-global
 `~/.config/solopreneur/config.json` is explicitly excluded from that positional
 check — it is a lower layer a repo-local file overrides no matter where the repo
-sits, even directly under `~/.config/solopreneur/`.
+sits, even directly under `~/.config/solopreneur/`. Physicalizing the root also
+refuses a dangling symlink in the root path rather than stepping past it as a
+lexical component, which would otherwise read a link pointing outside the repo as
+contained until its target appeared.
 
 **Legacy files are classified before reading, and every config-derived string in
 the report is quoted.** A FIFO or a device symlink at a config path would block
