@@ -719,6 +719,17 @@ function parseAttrs(text) {
  * backstop, not a license). The original tag's `defer` / `async` are preserved —
  * a hand-authored `<head>` overlay with `defer` must not become a synchronous
  * script that runs before `<body>` exists (the overlay appends to document.body).
+ *
+ * Ceiling (deliberate, and the same one `findInjectionPoint` documents): the input
+ * is TRUSTED, template-generated HTML, so this string scan does not track raw-text
+ * context (a `<textarea>`/`<pre>` showing literal `<script …></script>` markup, or
+ * the same inside an HTML comment), and it does not propagate a CSP nonce onto the
+ * rewritten/injected tags. Handling the former needs a real HTML parser, which the
+ * builder's "Node built-ins only" rule precludes (Node ships none, and no
+ * dependency may be added); strict-CSP/nonce support is a separate concern the v1
+ * template does not use. Both are consistent with the single-trust-domain
+ * architecture — the /preview template emits exactly
+ * `<script src="./comment-overlay.js"></script>` at the end of `<body>`.
  */
 function rewriteOverlayTag(html, id) {
   const open = /<script\b/gi;
