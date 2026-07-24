@@ -120,6 +120,15 @@ function physicalize(target) {
     try {
       return path.join(fs.realpathSync(cur), ...tail);
     } catch (err) {
+      // A component along the way is a regular file (so the root cannot exist
+      // beneath it) — a user-configured unusable root, reported cleanly like the
+      // leaf-is-a-file case rather than as a raw stack trace.
+      if (err.code === 'ENOTDIR') {
+        throw new ConfigError(
+          `the legacy preview root passes through a non-directory: ${cur}\n`
+          + `  ${path.relative(cur, target) || '.'} cannot exist beneath a file`,
+        );
+      }
       if (err.code !== 'ENOENT') throw err;
       try {
         fs.readlinkSync(cur);
@@ -154,23 +163,58 @@ function nestedShadow(root, repoDir) {
   let dir = root;
   while (dir !== repoDir && isUnder(dir, repoDir) && !fs.existsSync(dir)) dir = path.dirname(dir);
   for (; dir !== repoDir && isUnder(dir, repoDir); dir = path.dirname(dir)) {
-    const file = path.join(dir, V2_FILENAME);
-    let raw;
-    try {
-      raw = fs.readFileSync(file, 'utf8');
-    } catch (err) {
-      if (err.code === 'ENOENT') continue;
-      return { file, reason: 'is present but unreadable' };
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return { file, reason: 'is present but not valid JSON' };
-    }
-    if (isObject(parsed) && Object.hasOwn(parsed, 'preview')) return { file, reason: 'already configures a preview here' };
+    const shadow = classifyNested(path.join(dir, V2_FILENAME));
+    if (shadow) return shadow;
   }
   return null;
+}
+
+/**
+ * Classify one candidate nested `.solopreneur.json`, mirroring the resolver's
+ * `readJsonIfPresent` + `assertConfigObject` exactly, so this scan agrees with
+ * how content would actually resolve past it. A regular file with a `preview`
+ * block shadows; anything the resolver treats as fatal (a non-regular file — a
+ * FIFO would otherwise block `readFileSync` forever — a dangling symlink,
+ * malformed JSON, or a non-object) also shadows, because content resolution
+ * stops there before ever reaching the repo-root file. A valid object without a
+ * `preview` block configures another feature and is skipped. Returns
+ * `{ file, reason }` or null.
+ */
+function classifyNested(file) {
+  let stat;
+  try {
+    stat = fs.statSync(file);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      // `stat` follows symlinks, so ENOENT is either "nothing here" or a
+      // symlink pointing at nothing — the latter is present and broken.
+      try {
+        fs.lstatSync(file);
+      } catch {
+        return null; // truly absent
+      }
+      return { file, reason: 'is a broken symlink' };
+    }
+    if (err.code === 'ENOTDIR') return null; // a parent is a file; nothing here
+    return { file, reason: 'cannot be read' };
+  }
+  if (!stat.isFile()) return { file, reason: 'is not a regular file' };
+
+  let raw;
+  try {
+    raw = fs.readFileSync(file, 'utf8');
+  } catch {
+    return { file, reason: 'is present but unreadable' };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { file, reason: 'is present but not valid JSON' };
+  }
+  if (!isObject(parsed)) return { file, reason: 'is present but not a JSON object' };
+  if (Object.hasOwn(parsed, 'preview')) return { file, reason: 'already configures a preview here' };
+  return null; // a valid config for another feature — the resolver walks past it
 }
 
 // ---------------------------------------------------------------------------

@@ -389,6 +389,58 @@ test('a broken nested .solopreneur.json is refused, not silently stepped over', 
   assert.ok(!fs.existsSync(s.dest));
 });
 
+test('a nested config that is a FIFO is refused, never read (no hang)', () => {
+  const s = scenario({});
+  mkdirp(s.repo, 'docs', 'preview');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
+  });
+  const fifo = path.join(s.repo, 'docs', '.solopreneur.json');
+  const mk = spawnSync('mkfifo', [fifo]);
+  if (mk.status !== 0) return; // mkfifo absent — nothing to test
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('not a regular file'), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
+});
+
+test('a nested config that is valid JSON but not an object is refused', () => {
+  // The resolver's assertConfigObject rejects a top-level null/array/string, so
+  // content resolution stops there before reaching the repo-root file.
+  const s = scenario({});
+  mkdirp(s.repo, 'docs', 'preview');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
+  });
+  fs.writeFileSync(path.join(s.repo, 'docs', '.solopreneur.json'), 'null\n');
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('not a JSON object'), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
+});
+
+test('a root passing through a regular file fails cleanly, not with a stack trace', () => {
+  const s = scenario({});
+  mkdirp(s.repo, 'docs');
+  // docs/preview is a FILE, but the root descends into it — realpath raises
+  // ENOTDIR, which must surface as a clean refusal.
+  fs.writeFileSync(path.join(s.repo, 'docs', 'preview'), 'not a directory\n');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview/item' } } },
+  });
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('non-directory'), result.stderr);
+  assert.ok(!result.stderr.includes('node:fs'), result.stderr);
+  assert.ok(result.stderr.startsWith('config-migrate.mjs:'), result.stderr);
+});
+
 test('a .solopreneur.json without a preview block does not count as a nested shadow', () => {
   // The resolver skips such a file during walk-up (it configures another
   // feature), so it must not block the migration either.
