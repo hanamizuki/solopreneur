@@ -34,10 +34,12 @@ import {
  * PATCH — default is "the PATCH takes". `echo` overrides the PATCH RESPONSE body
  * so a test can make the echo disagree with the stored value on purpose.
  * `throwOnPatch(requested)` models an INDETERMINATE PATCH: the state still
- * mutates (Vercel processed it) but the call then throws (curl timed out). Every
- * GET and PATCH is recorded so order and arguments can be asserted.
+ * mutates (Vercel processed it) but the call then throws (curl timed out).
+ * `throwOnGet(nthGet)` makes the Nth (1-based) GET throw, to model a verification
+ * read failing after the PATCH. Every GET and PATCH is recorded so order and
+ * arguments can be asserted.
  */
-function ssoFake({ current = LEGACY_PROTECTION, onPatch, echo, throwOnPatch } = {}) {
+function ssoFake({ current = LEGACY_PROTECTION, onPatch, echo, throwOnPatch, throwOnGet } = {}) {
   const state = { value: current };
   const patched = [];
   let gets = 0;
@@ -46,6 +48,7 @@ function ssoFake({ current = LEGACY_PROTECTION, onPatch, echo, throwOnPatch } = 
     get getCount() { return gets; },
     getProject: async () => {
       gets += 1;
+      if (throwOnGet && throwOnGet(gets)) throw new Error('simulated GET failure');
       return {
         ssoProtection: state.value === null ? null : { deploymentType: state.value },
         targets: {},
@@ -149,6 +152,44 @@ test('ensureProtected still restores when an indeterminate PATCH throws after nu
   );
   assert.deepEqual(deps.patched, [LEGACY_PROTECTION, snapshot]); // attempt, then restore
   assert.equal(await snapshotSsoProtection({ ...args, deps }), snapshot); // never left null
+});
+
+test('ensureProtected restores when the verification GET fails after a nulling PATCH', async () => {
+  // The PATCH nulled protection, then the verifying GET times out. That read
+  // failure must NOT propagate before the restore — it routes into best-effort
+  // restore and a fail-closed error, so the project is never left naked.
+  const snapshot = WEAKER_PROTECTION;
+  const deps = ssoFake({
+    current: snapshot,
+    onPatch: (cur, req) => (req === LEGACY_PROTECTION ? null : req),
+    throwOnGet: (n) => n === 2, // the post-PATCH verification GET
+  });
+  await assert.rejects(
+    ensureProtected({ ...args, deps }),
+    (err) => err instanceof VercelProtectError
+      && /could not protect/.test(err.message)
+      && /could not be verified/.test(err.message),
+  );
+  assert.deepEqual(deps.patched, [LEGACY_PROTECTION, snapshot]); // restore still attempted
+  assert.equal(await snapshotSsoProtection({ ...args, deps }), snapshot); // never left null
+});
+
+test('ensureProtected still verifies when the restore PATCH itself throws', async () => {
+  // The verification GET confirms null, then the restore PATCH is indeterminate
+  // (processed but threw). The module must still re-GET to confirm the restore,
+  // not exit on the throw and skip the check.
+  const snapshot = WEAKER_PROTECTION;
+  const deps = ssoFake({
+    current: snapshot,
+    onPatch: (cur, req) => (req === LEGACY_PROTECTION ? null : req),
+    throwOnPatch: (req) => req === snapshot, // the restore PATCH throws (after mutating)
+  });
+  await assert.rejects(
+    ensureProtected({ ...args, deps }),
+    (err) => err instanceof VercelProtectError && /could not protect/.test(err.message),
+  );
+  assert.deepEqual(deps.patched, [LEGACY_PROTECTION, snapshot]);
+  assert.equal(await snapshotSsoProtection({ ...args, deps }), snapshot); // restore confirmed by re-GET
 });
 
 test('ensureProtected reports success when an indeterminate PATCH actually took', async () => {
@@ -300,6 +341,16 @@ test('makeDefaultDeps throws a VercelProtectError on a non-2xx HTTP status', asy
   await assert.rejects(
     async () => deps.getProject({ projectId: 'p' }),
     (err) => err instanceof VercelProtectError && /HTTP 403/.test(err.message),
+  );
+});
+
+test('makeDefaultDeps fails closed on an empty 2xx body', async () => {
+  // An empty 2xx/204 body is unconfirmable — it must NOT parse as an empty (and
+  // therefore falsely "safe to adopt") project.
+  const deps = makeDefaultDeps({ token: 't', run: () => ({ status: 0, stdout: '\n200', stderr: '', error: null }) });
+  await assert.rejects(
+    async () => deps.getProject({ projectId: 'p' }),
+    (err) => err instanceof VercelProtectError && /empty body/.test(err.message),
   );
 });
 

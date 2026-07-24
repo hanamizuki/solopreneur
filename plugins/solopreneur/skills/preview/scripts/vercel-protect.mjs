@@ -114,54 +114,67 @@ export async function ensureProtected({ projectId, teamId, deps, deploymentType 
     );
   }
 
-  // Snapshot first, so a rejected PATCH that nulls protection can be restored.
+  // A GET that reports the real value, or `undefined` when the GET itself fails.
+  // A read error is NOT "no value": it means UNVERIFIABLE, and after a nulling
+  // PATCH it must still reach the restore path below rather than propagate and
+  // leave the project naked. This never throws.
+  const read = async () => {
+    try {
+      return await snapshotSsoProtection({ projectId, teamId, deps });
+    } catch {
+      return undefined; // state could not be confirmed
+    }
+  };
+
+  // Snapshot BEFORE any PATCH so a rejected PATCH that nulls protection can be
+  // restored. This one read propagates its error on purpose: nothing has changed
+  // yet, so failing to read the initial state is a safe, project-untouched abort.
   const snapshot = await snapshotSsoProtection({ projectId, teamId, deps });
 
-  // The PATCH echo cannot be trusted (fact 2) — issue it, then GET the real
-  // state and believe that. A PATCH that THROWS (an indeterminate result — e.g. a
-  // timeout AFTER Vercel already processed the request and nulled protection) is
-  // deliberately swallowed here: the verifying GET below is the source of truth
-  // and drives the same restore / fail-closed handling as a returned-but-rejected
-  // PATCH, so a throw can never bypass the restore and leave a project naked. (If
-  // the network is truly down the GET throws too, and we fail closed.)
+  // Apply protection. A PATCH that THROWS is indeterminate (it may have been
+  // processed AND nulled protection before the transport failed), so it is
+  // swallowed — the verifying GET, never the PATCH's return or throw, decides.
   try {
     await deps.patchSsoProtection({ projectId, teamId, deploymentType: LEGACY_PROTECTION });
-  } catch {
-    // fall through to the verifying GET — never report success on an unverified PATCH
-  }
-  const actual = await snapshotSsoProtection({ projectId, teamId, deps });
+  } catch { /* verified by the GET below */ }
 
-  if (actual === LEGACY_PROTECTION) return; // verified by GET, not by the echo
+  const actual = await read();
+  if (actual === LEGACY_PROTECTION) return; // confirmed by GET, never the echo
 
-  if (actual === null) {
-    // The PATCH was rejected and Vercel cleared ssoProtection to null — the
-    // project is now fully naked (fact 2). Put the pre-PATCH value back if there
-    // was one, verify it took, and fail closed. We must NEVER resolve here.
-    let restored = null;
-    if (snapshot !== null) {
-      await deps.patchSsoProtection({ projectId, teamId, deploymentType: snapshot });
-      restored = await snapshotSsoProtection({ projectId, teamId, deps });
-    }
-    const tail = snapshot === null
-      ? 'there was no prior value to restore, so the project is UNPROTECTED and must be fixed manually.'
-      : restored === snapshot
-        ? `restored the prior value ${JSON.stringify(restored)}.`
-        : `attempted to restore ${JSON.stringify(snapshot)} but a fresh GET reports ${JSON.stringify(restored)} `
-          + '— the project may be UNPROTECTED and must be fixed manually.';
+  // A DIFFERENT, readable value: the request was not honored (or the echo lied),
+  // but the project still holds some protection value — fail closed on that GET
+  // truth, with no pointless restore.
+  if (actual !== null && actual !== undefined) {
     throw new VercelProtectError(
-      `could not protect the project: the PATCH to ${JSON.stringify(LEGACY_PROTECTION)} was rejected and cleared `
-      + `ssoProtection to null; ${tail}`,
+      `could not protect the project: after PATCHing ssoProtection to ${JSON.stringify(LEGACY_PROTECTION)}, a fresh `
+      + `GET reports ${JSON.stringify(actual)}. The PATCH response echo is not trusted; the GET is the source of `
+      + 'truth, so protection is NOT considered in place.',
     );
   }
 
-  // A fresh GET disagrees with the requested value (and with the PATCH echo).
-  // Believe the GET — protection is not what we asked for, so do not report
-  // success.
-  throw new VercelProtectError(
-    `could not protect the project: after PATCHing ssoProtection to ${JSON.stringify(LEGACY_PROTECTION)}, a fresh GET `
-    + `reports ${JSON.stringify(actual)}. The PATCH response echo is not trusted; the GET is the source of truth, so `
-    + 'protection is NOT considered in place.',
-  );
+  // actual is null (protection cleared) or undefined (could not verify): the
+  // project may be naked, so best-effort restore the non-null snapshot and fail
+  // closed. Every step here can itself fail — a throw must NEVER bypass the
+  // fail-closed error — so the restore PATCH and its verifying read are each
+  // swallowed, and the confirmed outcome is reflected in the message.
+  let restored = actual;
+  if (snapshot !== null) {
+    try {
+      await deps.patchSsoProtection({ projectId, teamId, deploymentType: snapshot });
+    } catch { /* verified by the read below */ }
+    restored = await read();
+  }
+  const detail = snapshot === null
+    ? 'there was no prior value to restore, so the project is UNPROTECTED and must be fixed manually'
+    : restored === snapshot
+      ? `restored the prior value ${JSON.stringify(restored)}`
+      : `could not confirm a restore of ${JSON.stringify(snapshot)} (a fresh GET reports `
+        + `${restored === undefined ? 'unavailable' : JSON.stringify(restored)}) — the project may be UNPROTECTED `
+        + 'and must be fixed manually';
+  const cause = actual === undefined
+    ? `the PATCH to ${JSON.stringify(LEGACY_PROTECTION)} could not be verified (the follow-up GET failed)`
+    : `the PATCH to ${JSON.stringify(LEGACY_PROTECTION)} was rejected and cleared ssoProtection to null`;
+  throw new VercelProtectError(`could not protect the project: ${cause}; ${detail}.`);
 }
 
 /**
@@ -301,8 +314,14 @@ export function makeDefaultDeps({ token, run = spawnCurl } = {}) {
     if (httpStatus < 200 || httpStatus >= 300) {
       throw new VercelProtectError(`${SELF}: Vercel API returned HTTP ${httpStatus}: ${body.slice(0, 200)}`);
     }
+    const trimmed = body.trim();
+    if (!trimmed) {
+      // An empty 2xx/204 body is unconfirmable — parsing it as `{}` would let
+      // inventoryProject read a populated project as safely empty. Fail closed.
+      throw new VercelProtectError(`${SELF}: Vercel API returned an empty body (HTTP ${httpStatus})`);
+    }
     try {
-      return JSON.parse(body || '{}');
+      return JSON.parse(trimmed);
     } catch (err) {
       throw new VercelProtectError(`${SELF}: Vercel API returned unparseable JSON (HTTP ${httpStatus}): ${err.message}`);
     }
