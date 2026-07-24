@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `build/agp/agp-9-upgrade`
 - **Pinned commit**: 47e1dff74a5cde5d0128c5d15e74e000323135ea
-- **Synced at**: 2026-07-15T10:32:23Z
+- **Synced at**: 2026-07-24T18:53:42Z
 - **License**: see `../../vendor/LICENSES/android-skills-LICENSE.txt`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied

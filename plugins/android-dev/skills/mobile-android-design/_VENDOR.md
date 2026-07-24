@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/wshobson/agents
 - **Source path**: `plugins/ui-design/skills/mobile-android-design`
-- **Pinned commit**: b6af3711058190e4b5c5274b9758498fe626ec5a
-- **Synced at**: 2026-07-15T10:32:21Z
+- **Pinned commit**: c4b82b0ad771190355eb8e204b1329732a18449a
+- **Synced at**: 2026-07-24T18:53:40Z
 - **License**: see `../../vendor/LICENSES/wshobson-agents-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
