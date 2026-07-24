@@ -178,7 +178,7 @@ above a default), hand-edit the JSON like this:
     "greenlight": { "fallback_order": ["codex-bot", "codex-cli"] }
   },
   "repos": {
-    "github.com/owner/mojo-apps":  { "todos":  { "backlog": "todos/backlog", ... } },
+    "github.com/owner/mono-repo":  { "todos":  { "backlog": "todos/backlog", ... } },
     "github.com/owner/some-repo":  { "preview": { "path": "docs/preview" } }
   }
 }
@@ -409,6 +409,37 @@ does not describe the legacy file.
 }
 ```
 
+### Target identity (F9)
+
+A target may additionally carry `projectId` and `teamId`, binding it to a specific
+provider project rather than to a name alone:
+
+```jsonc
+"private": {
+  "provider": "vercel",
+  "project": "my-private-previews",
+  "projectId": "prj_…",     // provider-side stable project id (Vercel's prj_…)
+  "teamId": "team_…",       // owning team; omitted for a personal-scope project
+  "visibility": "private",
+  "include": ["active", "archive"]
+}
+```
+
+- **Both are optional and additive.** A name-only target (neither field) stays
+  fully valid and resolves exactly as it did before the pair existed, treated as
+  the current scope — no migration is forced.
+- **`teamId` only ever appears with a `projectId`.** A team scope is meaningless
+  without the project id it scopes, so the resolver rejects a lone `teamId`.
+- **They exist because a name is ambiguous across scopes.** One project name can
+  name both a team project and a personal one; storing the id + team removes that
+  ambiguity, which is what lets a target live on a Vercel team rather than only the
+  personal account. Deploy-time enforcement that the three agree (name, id, team)
+  is the library-deploy step's job (a later change); the identity is merely made
+  available here.
+- **`setup.mjs` writes them after provisioning** (see "Setting up from scratch").
+  They are never fabricated — an id that cannot be resolved is left unwritten, and
+  the resolver surfaces each field only when the config carries it.
+
 ## Private target protection contract
 
 A `private` target's protection is not a single flag — it is a recipe of Vercel
@@ -501,6 +532,8 @@ falls through to an ancestor config:
 - a `defaultTarget` that is not the declared target
 - any `provider` other than `"vercel"`
 - an `include` entry naming a collection that is not declared
+- a target with a `teamId` but no `projectId` (a team scope is meaningless
+  without the project id it scopes)
 - a `--from` outside the resolved `root` (the error names both the config and
   the root)
 
@@ -512,7 +545,8 @@ support arrives without a file format change.
 
 `--json` is the machine-readable contract, and carries `configPath`, `mode`,
 `root`, `defaultTarget`, `target` (`{name, provider, project, visibility,
-include}`), `collections` and `legacy` (in legacy mode, an array of
+include}`, plus `projectId` / `teamId` only when the config sets them — see
+"Target identity" above), `collections` and `legacy` (in legacy mode, an array of
 `{file, values}` — one entry per legacy file carrying preview values; `null`
 otherwise). Without `--json` the same facts print as `key=value` lines for
 humans; arrays are comma-joined there, so that form is not losslessly parseable
@@ -623,6 +657,7 @@ writing a config that claims the target is private.
 ```bash
 node scripts/setup.mjs                                  # prompts for everything
 node scripts/setup.mjs --project my-private-previews    # preset the project name
+node scripts/setup.mjs --project my-previews --team team_…   # provision under a Vercel team
 node scripts/setup.mjs --root notes/previews --force    # custom root; replace an existing v2 config
 ```
 
@@ -641,6 +676,16 @@ The flow, in order:
 - **Choose the project.** It asks whether to create a new Vercel project or link
   an existing one. Both are supported; an existing name is resolved to its
   canonical id via the same GET the protection module uses.
+- **Scope: personal or team.** `--team team_…` provisions under a Vercel team —
+  every Vercel call runs on its behalf; omitting it is personal scope. A value
+  that is not a `team_…` id is refused before any Vercel call, so a typo cannot
+  silently provision in the personal account.
+- **Bind the identity (F9).** After provisioning succeeds, setup reads the
+  project's real `projectId` back from Vercel — and, for a team-owned project, its
+  `teamId` from the project's owner — and writes them into the target, binding it
+  to a specific project rather than a name. This is best-effort and never
+  fabricated: if the id cannot be resolved, the target is written name-only. It
+  lifts the earlier personal-scope-only, name-only limitation.
 - **Provision FIRST, write LAST (fail closed).** The Vercel create/link and the
   applicable protection steps run before a single byte of config is written. If
   provisioning or verification fails, it exits non-zero having written nothing —

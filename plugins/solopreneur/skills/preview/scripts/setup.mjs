@@ -223,32 +223,41 @@ function toRoot(value) {
 }
 
 /**
- * The v2 file: a fixed single-private-target template with two substitutions.
- * Identical to config-migrate.mjs's `buildConfig` on purpose — a set-up config
- * and a migrated one are indistinguishable — but inlined rather than imported
- * because that module does not export it and must not be modified. NEVER emits
- * the legacy three buckets; exactly one target named `private`, visibility
- * `private`.
+ * The v2 file: a fixed single-private-target template. Mirrors config-migrate.mjs's
+ * `buildConfig` — a set-up config and a migrated one are otherwise indistinguishable
+ * — but inlined rather than imported because that module does not export it and must
+ * not be modified. NEVER emits the legacy three buckets; exactly one target named
+ * `private`, visibility `private`.
+ *
+ * `identity` carries the target-identity pair (F9): the real `projectId` Vercel
+ * assigned, and — for a team-owned project — its `teamId`. Both are OMITTED when
+ * absent, so a name-only setup (identity could not be resolved) emits exactly the
+ * pre-F9 shape. `teamId` is written ONLY alongside `projectId`: a team scope is
+ * meaningless without the project id it scopes (the resolver rejects the half-set
+ * case). config-migrate.mjs stays name-only — a name-only target is fully valid.
  */
-const buildConfig = (project, root) => ({
-  schemaVersion: 2,
-  preview: {
-    root,
-    defaultTarget: 'private',
-    collections: {
-      active: { path: 'active', label: 'Previews' },
-      archive: { path: 'archive', label: 'Archive' },
-    },
-    targets: {
-      private: {
-        provider: 'vercel',
-        project,
-        visibility: 'private',
-        include: ['active', 'archive'],
+const buildConfig = (project, root, { projectId, teamId } = {}) => {
+  const target = {
+    provider: 'vercel',
+    project,
+    ...(projectId ? { projectId } : {}),
+    ...(projectId && teamId ? { teamId } : {}),
+    visibility: 'private',
+    include: ['active', 'archive'],
+  };
+  return {
+    schemaVersion: 2,
+    preview: {
+      root,
+      defaultTarget: 'private',
+      collections: {
+        active: { path: 'active', label: 'Previews' },
+        archive: { path: 'archive', label: 'Archive' },
       },
+      targets: { private: target },
     },
-  },
-});
+  };
+};
 
 /**
  * Write `text` to `dest` via a same-directory temp + rename, so a crash mid-write
@@ -272,17 +281,18 @@ function writeAtomic(dest, text) {
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
-const USAGE = `usage: ${SELF} [--root <path>] [--project <name>] [--force]
+const USAGE = `usage: ${SELF} [--root <path>] [--project <name>] [--team <teamId>] [--force]
 
   --root <path>      content root for the Library (default: ${DEFAULT_ROOT})
   --project <name>   Vercel project name (else you are prompted)
+  --team <teamId>    Vercel team id ("team_…") to provision under; omit for personal scope
   --force            set up a fresh config even if one already governs here`;
 
 // ponytail: hand-rolled rather than node:util parseArgs, for the reason
 // config-resolve.mjs gives — parseArgs only became stable in 20.16, and this
 // file's declared floor is 20, where it warns onto the stderr reserved for errors.
 function parseArgs(argv) {
-  const opts = { root: undefined, project: undefined, force: false, help: false };
+  const opts = { root: undefined, project: undefined, team: undefined, force: false, help: false };
   const valueOf = (arg, name, i) => {
     if (arg.startsWith(`${name}=`)) return { value: arg.slice(name.length + 1), next: i };
     const value = argv[i + 1];
@@ -308,6 +318,8 @@ function parseArgs(argv) {
       const { value, next } = valueOf(arg, '--root', i); opts.root = value; i = next;
     } else if (arg === '--project' || arg.startsWith('--project=')) {
       const { value, next } = valueOf(arg, '--project', i); opts.project = value; i = next;
+    } else if (arg === '--team' || arg.startsWith('--team=')) {
+      const { value, next } = valueOf(arg, '--team', i); opts.team = value; i = next;
     } else {
       throw new SetupError(`unknown argument: ${arg}\n${USAGE}`);
     }
@@ -405,6 +417,41 @@ async function provision({ create, projectName, teamId, io, deps }) {
 }
 
 /**
+ * Resolve the target's durable identity (F9) from the provisioned project: the
+ * real `projectId` Vercel assigned, plus the `teamId` when the project is
+ * team-owned. Read AFTER provisioning succeeds, so protection integrity is never
+ * affected by it.
+ *
+ * Identity is additive metadata, NOT fail-closed like protection — so this is
+ * best-effort and NEVER fabricates. A GET that fails, or a project object without
+ * an `id`, yields a name-only config (the pre-F9 behavior) rather than an error or
+ * an invented id. Both values come from the resolved object, never a guess:
+ * `projectId` is its `id` (the same field the create/link path already reads), and
+ * `teamId` is its `accountId` when that is a team scope (`team_…`) — a personal
+ * project reports the user id there, so personal scope writes no teamId. `teamId`
+ * is only ever paired with a `projectId`.
+ *
+ * The `teamId` argument is the scope the request must run under (createProject /
+ * getProject are team-scoped only when it is passed); it is not itself written —
+ * the written teamId is read back from the object's owner.
+ */
+async function resolveIdentity({ projectName, teamId, deps }) {
+  let project;
+  try {
+    project = await deps.getProject({ projectId: projectName, teamId });
+  } catch {
+    project = undefined; // a failed identity read is not fatal — name-only
+  }
+  const identity = {};
+  if (project?.id) {
+    identity.projectId = project.id;
+    const owner = project.accountId;
+    if (typeof owner === 'string' && owner.startsWith('team_')) identity.teamId = owner;
+  }
+  return identity;
+}
+
+/**
  * The whole first-run flow. Returns an exit code. `io` and `deps` are injected so
  * tests drive every branch with zero real prompts and zero real network; the cwd
  * and environment come from the process (the real resolver reads them too), which
@@ -413,6 +460,17 @@ async function provision({ create, projectName, teamId, io, deps }) {
 export async function main({ argv = [], io, makeDeps }) {
   const opts = parseArgs(argv);
   if (opts.help) { io.print(`${USAGE}\n`); return 0; }
+
+  // Team-scope (F9): --team names the Vercel team every Vercel call runs on behalf
+  // of; omitted → personal scope. A team id is "team_…" — reject anything else up
+  // front, before any prompt or Vercel call, so a typo cannot silently provision in
+  // the personal account. This scope is threaded through provisioning; the teamId
+  // PERSISTED to config is read back from the project's owner (resolveIdentity), not
+  // from this flag. Lifts PR #137's personal-scope-only limitation.
+  const teamId = opts.team;
+  if (teamId !== undefined && !teamId.startsWith('team_')) {
+    throw new SetupError(`--team must be a Vercel team id (starts with "team_"), got ${JSON.stringify(teamId)}`);
+  }
 
   // 1. First-run detection. resolveConfig with NO `from` anchors at the cwd and
   //    skips the "--from must sit under root" containment check, so a v2 config
@@ -514,12 +572,6 @@ export async function main({ argv = [], io, makeDeps }) {
   if (!create && !link) {
     throw new SetupError(`unrecognized choice ${JSON.stringify(choice)} — answer "new" or "existing"`);
   }
-  // Personal scope only. Team-scoped provisioning needs the target-identity
-  // contract — projectId + teamId persisted per target (pr1 finding F9), a
-  // coordinated schema + resolver + deploy-library change: a name-only config in
-  // a team scope cannot tell a team project from a same-named personal one, so
-  // team support is deferred to that work rather than written ambiguously here.
-  const teamId = undefined;
 
   // 2. Propose — show everything BEFORE anything happens.
   io.print(`${[
@@ -529,7 +581,7 @@ export async function main({ argv = [], io, makeDeps }) {
     `  collections:     active  -> ${activeDir}`,
     `                   archive -> ${archiveDir}`,
     '  target:          private (visibility: private)',
-    `  Vercel project:  ${projectName}  (${create ? 'create new' : 'link existing'}, personal scope)`,
+    `  Vercel project:  ${projectName}  (${create ? 'create new' : 'link existing'}, ${teamId ? `team ${teamId}` : 'personal scope'})`,
   ].join('\n')}\n`);
 
   // 4. Confirm gate — before ANY Vercel call or disk write.
@@ -554,13 +606,18 @@ export async function main({ argv = [], io, makeDeps }) {
     return 0;
   }
 
+  // 5b. Bind the target to the project's real identity (F9), read back from the
+  //     provisioned project. Best-effort and never fabricated — see resolveIdentity;
+  //     an unresolvable identity yields a name-only config, not a failure.
+  const identity = await resolveIdentity({ projectName, teamId, deps });
+
   // 6. Write config + content dirs LAST, only now that protection is in place.
   //    Under --force replacing our own v2 config, preserve any sibling top-level
   //    keys the file carried — replace only schemaVersion + preview, never blow
   //    the whole file away (which would silently drop another feature's config).
   fs.mkdirSync(activeDir, { recursive: true });
   fs.mkdirSync(archiveDir, { recursive: true });
-  const fresh = buildConfig(projectName, root);
+  const fresh = buildConfig(projectName, root, identity);
   const cfgObject = priorBytes
     ? { ...JSON.parse(priorBytes), schemaVersion: fresh.schemaVersion, preview: fresh.preview }
     : fresh;

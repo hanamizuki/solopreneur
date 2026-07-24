@@ -74,6 +74,16 @@
           "minLength": 1,
           "description": "Provider-side project this target publishes to. Must be a dedicated project — publishing a Library to a project that also serves a real site would overwrite it."
         },
+        "projectId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Provider-side stable project id (Vercel's `prj_…`), written by setup after the project is created/linked so the target is bound to a specific project, not just a name. OPTIONAL and additive: a name-only config (no projectId/teamId) stays valid and is treated as the current scope. A `teamId` may appear only alongside a projectId — the resolver rejects a lone teamId."
+        },
+        "teamId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Provider team/org scope the project lives under (Vercel's `team_…`, the project's `accountId` when team-owned). OPTIONAL: omitted for a personal-scope project. Only meaningful with a projectId; a name-only config storing just `project` cannot distinguish a team project from a same-named personal one, which is what this pair resolves."
+        },
         "visibility": {
           "enum": ["private", "public"],
           "description": "Omitted means \"private\". `public` must be written explicitly and still has to clear the publish-time content review."

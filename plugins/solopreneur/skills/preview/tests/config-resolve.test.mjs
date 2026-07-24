@@ -466,6 +466,68 @@ test('an omitted visibility resolves to private', () => {
   assert.equal(out.target.visibility, 'private');
 });
 
+// --- target identity (F9) --------------------------------------------------
+
+test('a target with projectId and teamId surfaces both on the resolved target', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('identity-project', { root: '.' });
+  config.preview.targets.private.projectId = 'prj_abc123';
+  config.preview.targets.private.teamId = 'team_xyz789';
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const out = runJson(['--from', mkdirp(repo, 'sub')]);
+  assert.equal(out.target.projectId, 'prj_abc123');
+  assert.equal(out.target.teamId, 'team_xyz789');
+});
+
+test('a personal-scope target (projectId, no teamId) surfaces projectId and omits teamId', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('personal-project', { root: '.' });
+  config.preview.targets.private.projectId = 'prj_personal';
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const out = runJson(['--from', mkdirp(repo, 'sub')]);
+  assert.equal(out.target.projectId, 'prj_personal');
+  assert.ok(!('teamId' in out.target), `teamId must be omitted when absent:\n${JSON.stringify(out.target)}`);
+});
+
+test('a name-only target omits projectId and teamId (backward compatible)', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  writeJson(path.join(repo, '.solopreneur.json'), v2('name-only-project', { root: '.' }));
+
+  const out = runJson(['--from', mkdirp(repo, 'sub')]);
+  assert.ok(!('projectId' in out.target), 'projectId must be omitted');
+  assert.ok(!('teamId' in out.target), 'teamId must be omitted');
+});
+
+test('a teamId without a projectId is rejected (the both-or-neither invariant)', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('lone-team-project', { root: '.' });
+  config.preview.targets.private.teamId = 'team_lonely';
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const result = run(['--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes('teamId'), result.stderr);
+  assert.ok(result.stderr.includes('projectId'), result.stderr);
+});
+
+test('an empty projectId is rejected by the schema', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('empty-id-project', { root: '.' });
+  config.preview.targets.private.projectId = '';
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const result = run(['--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes('projectId'), result.stderr);
+});
+
 // --- layers 3-5 ------------------------------------------------------------
 
 test('the user-global v2 config is used when no ancestor has one', () => {

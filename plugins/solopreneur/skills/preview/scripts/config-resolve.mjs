@@ -367,6 +367,16 @@ function resolveV2(file, config) {
       + ` (declared: ${Object.keys(preview.collections).join(', ')})`,
     );
   }
+  // Target-identity invariant (F9): teamId scopes a projectId; on its own it
+  // identifies nothing. The schema types each field independently (its small
+  // interpreter has no cross-field dependency keyword), so this both-or-neither
+  // rule is enforced here, alongside the other resolver-level target checks.
+  if (target.teamId !== undefined && target.projectId === undefined) {
+    throw new ConfigError(
+      `invalid config: ${file}\n  preview.targets.${name}.teamId: set without a projectId`
+      + ' — a team scope is only meaningful with the project id it scopes',
+    );
+  }
 
   return {
     configPath: file,
@@ -377,6 +387,11 @@ function resolveV2(file, config) {
       name,
       provider: target.provider,
       project: target.project,
+      // Target identity (F9), passed through from config. Both are OPTIONAL and
+      // OMITTED when absent, so a name-only target resolves to exactly the shape
+      // it did before this field pair existed (backward compatible).
+      ...(target.projectId !== undefined ? { projectId: target.projectId } : {}),
+      ...(target.teamId !== undefined ? { teamId: target.teamId } : {}),
       // Fail closed: an omitted visibility is private. (A misspelled one is a
       // hard enum failure in the schema and never reaches here.)
       visibility: target.visibility ?? 'private',
