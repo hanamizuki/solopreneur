@@ -93,10 +93,13 @@ test('ensureProtected sets the legacy enum and verifies it with a fresh GET', as
   assert.ok(deps.getCount >= 2, `expected a verify GET after the PATCH, saw ${deps.getCount}`);
 });
 
-test('ensureProtected on an already-protected project is idempotent success', async () => {
+test('ensureProtected on an already-protected project returns without a PATCH', async () => {
+  // Already protected (a verified GET) → do not touch it: a needless PATCH could
+  // be rejected and null an already-safe project (fact 2).
   const deps = ssoFake({ current: LEGACY_PROTECTION });
   await ensureProtected({ ...args, deps });
-  assert.deepEqual(deps.patched, [LEGACY_PROTECTION]);
+  assert.deepEqual(deps.patched, [], 'must not issue a PATCH when already protected');
+  assert.equal(deps.getCount, 1, 'a single snapshot GET confirms it');
 });
 
 // --- ensureProtected: the trust rules --------------------------------------

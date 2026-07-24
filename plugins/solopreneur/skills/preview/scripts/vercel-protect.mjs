@@ -131,6 +131,11 @@ export async function ensureProtected({ projectId, teamId, deps, deploymentType 
   // yet, so failing to read the initial state is a safe, project-untouched abort.
   const snapshot = await snapshotSsoProtection({ projectId, teamId, deps });
 
+  // Already protected — a verified GET (not an echo) — so return without touching
+  // it. A needless PATCH could be rejected, and a rejected PATCH clears protection
+  // (fact 2): re-PATCHing an already-safe project would risk nulling it for nothing.
+  if (snapshot === LEGACY_PROTECTION) return;
+
   // Apply protection. A PATCH that THROWS is indeterminate (it may have been
   // processed AND nulled protection before the transport failed), so it is
   // swallowed — the verifying GET, never the PATCH's return or throw, decides.
@@ -219,6 +224,14 @@ export async function removeBareDomain({ projectId, teamId, project, deps }) {
  * true ONLY for a protected status (302 SSO redirect, or 401); false for 200
  * (naked) and for everything else — an unconfirmable state must never be read
  * as "safe". Callers run this after every provisioning step.
+ *
+ * A 302 is treated as Vercel's SSO challenge and the redirect target is NOT
+ * parsed. The Gate A experiment verified the protected signal as a 302 but did
+ * not capture the exact SSO redirect URL, so matching a hardcoded destination
+ * would be an unverified guess (and brittle to a Vercel URL change). This holds
+ * because the target is a dedicated Vercel deployment ENTRY whose unprotected
+ * state is a 200, not an app-level redirect — so probe the ENTRY (the scope
+ * alias / immutable URL), never a route that itself issues redirects.
  */
 export async function verifyEntryProtected(url, { deps }) {
   const { status } = await deps.probe(url);
