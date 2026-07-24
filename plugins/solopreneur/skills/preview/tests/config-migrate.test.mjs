@@ -617,7 +617,9 @@ test('--write backs up every legacy file it read, with a timestamp', () => {
 
   const backups = backupsIn(s.configDir);
   assert.equal(backups.length, 1, `expected one backup, got ${JSON.stringify(backups)}`);
-  assert.match(backups[0], /^solopreneur\.json\.backup-\d{8}T\d{6}Z$/);
+  // Sub-second precision + random suffix so two repos sharing one legacy file do
+  // not collide on the stamp (see the "same second" test below).
+  assert.match(backups[0], /^solopreneur\.json\.backup-\d{8}T\d{6}\.\d+Z-[0-9a-f]+$/);
   assert.deepEqual(fs.readFileSync(path.join(s.configDir, backups[0])), original);
 });
 
@@ -793,7 +795,74 @@ test('a v2 config above the destination blocks the migration', () => {
   const result = run(['--target-project', 'p'], { cwd: s.repo, home: s.home, env: s.env });
   assertFailed(result);
   assert.ok(result.stderr.includes(ancestor), result.stderr);
-  assert.ok(result.stderr.includes('shadow'), result.stderr);
+  assert.ok(result.stderr.includes('governs this scope'), result.stderr);
+});
+
+test('a broken user-global config does not block a repo-local migration', () => {
+  // resolveConfig({}) would throw on the malformed global before any layer-3
+  // exception could apply; the shadow check now walks .solopreneur.json files
+  // itself and never reads the global (it is config.json), so it cannot throw.
+  const s = scenario({ default: { preview: { projects: { default: 'p' } } } });
+  const globalConfig = path.join(s.home, '.config', 'solopreneur', 'config.json');
+  fs.mkdirSync(path.dirname(globalConfig), { recursive: true });
+  fs.writeFileSync(globalConfig, '{ not json');
+
+  const out = migrate(s, ['--target-project', 'p']);
+  assert.ok(out.stdout.includes(`destination: ${s.dest}`), out.stdout);
+});
+
+test('a broken .solopreneur.json above the repo blocks the migration', () => {
+  // A malformed ancestor config is fatal to the resolver, so content resolution
+  // would stop there — overriding it silently would be wrong.
+  const s = scenario({ default: { preview: { projects: { default: 'p' } } } });
+  fs.writeFileSync(path.join(s.root, '.solopreneur.json'), '{ "preview": {');
+
+  const result = run(['--target-project', 'p'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('governs this scope'), result.stderr);
+  assert.ok(result.stderr.includes('not valid JSON'), result.stderr);
+});
+
+test('a malformed preview subtree is refused, never silently dropped', () => {
+  // default.preview = [] is present-but-not-an-object: the shell reader stops
+  // the cascade there with no path, so dropping it and letting a lower layer win
+  // would move previews to a directory the legacy flow never used.
+  const s = scenario({});
+  fs.writeFileSync(s.legacyFile, `{
+    "default": { "preview": [] },
+    "preview": { "paths": { "${s.repo}": "wrong/place" } }
+  }
+`);
+
+  const result = run(['--target-project', 'p'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('malformed legacy preview config'), result.stderr);
+  assert.ok(result.stderr.includes('default.preview'), result.stderr);
+});
+
+test('two repos migrated from one legacy file in the same second do not collide', () => {
+  // The shared legacy file is backed up once per run; a second-granularity stamp
+  // would make the second run fail EEXIST on COPYFILE_EXCL.
+  const root = tmp();
+  const home = mkdirp(root, 'home');
+  const configDir = mkdirp(root, 'agent-config');
+  const legacy = writeJson(path.join(configDir, 'solopreneur.json'), {
+    default: { preview: { projects: { default: 'p' } } },
+  });
+  const repoA = mkdirp(root, 'repo-a');
+  const repoB = mkdirp(root, 'repo-b');
+  git(repoA, ['init', '-q', '-b', 'main']);
+  git(repoB, ['init', '-q', '-b', 'main']);
+
+  const a = run(['--target-project', 'p', '--write'], { cwd: repoA, home, env: { CLAUDE_CONFIG_DIR: configDir } });
+  const b = run(['--target-project', 'p', '--write'], { cwd: repoB, home, env: { CLAUDE_CONFIG_DIR: configDir } });
+  assert.equal(a.status, 0, a.stderr);
+  assert.equal(b.status, 0, `second migration collided:\n${b.stderr}`);
+  assert.ok(fs.existsSync(path.join(repoA, '.solopreneur.json')));
+  assert.ok(fs.existsSync(path.join(repoB, '.solopreneur.json')));
+  // Two distinct backups of the one shared legacy file.
+  assert.equal(backupsIn(configDir).length, 2, JSON.stringify(backupsIn(configDir)));
+  assert.ok(fs.existsSync(legacy));
 });
 
 test('$SOLOPRENEUR_CONFIG set blocks the migration', () => {

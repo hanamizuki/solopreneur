@@ -230,11 +230,29 @@ function classifyNested(file) {
  * cannot find a copy written in another language. Like the resolver's copy, it
  * only ever READS.
  */
-function legacyPreviewValues(config) {
+function legacyPreviewValues(config, file) {
+  // A `preview` subtree that is present but NOT an object (`[]`, `false`, a
+  // string, a number) is corrupt: the shell reader's `jq ... | values` treats
+  // it as present and stops the cascade there, yielding no path — so silently
+  // dropping it here would let a LOWER layer's path win and move previews to a
+  // directory the legacy flow never used. Refuse it instead; the migrator cannot
+  // honestly propose a target from a malformed source. (Absent — undefined or
+  // null — is not corrupt: the cascade simply continues past it.)
+  const useObject = (node, where) => {
+    if (node === undefined || node === null) return false;
+    if (!isObject(node)) {
+      throw new ConfigError(
+        `malformed legacy preview config: ${where} is ${Array.isArray(node) ? 'an array' : `a ${typeof node}`}, not an object\n`
+        + `  in ${file}\n  the migrator cannot tell where previews should go from that — fix the legacy config first`,
+      );
+    }
+    return true;
+  };
+
   const found = {};
-  if (isObject(at(config, 'default', 'preview'))) found.default = config.default.preview;
+  if (useObject(at(config, 'default', 'preview'), 'default.preview')) found.default = config.default.preview;
   // The older flat shape, e.g. { "preview": { "paths": { "<repo-key>": "..." } } }
-  if (isObject(at(config, 'preview'))) found.preview = config.preview;
+  if (useObject(at(config, 'preview'), 'preview')) found.preview = config.preview;
   // Null prototype: `JSON.parse` creates a real own `__proto__` property, but
   // assigning that key on a normal object hits `Object.prototype`'s setter and
   // creates nothing — so a `repos.__proto__` entry would vanish from a report
@@ -243,7 +261,7 @@ function legacyPreviewValues(config) {
   // the one that turns the values into a written config.)
   const repos = Object.create(null);
   for (const [key, entry] of Object.entries(isObject(config?.repos) ? config.repos : {})) {
-    if (isObject(at(entry, 'preview'))) repos[key] = entry.preview;
+    if (useObject(at(entry, 'preview'), `repos[${show(key)}].preview`)) repos[key] = entry.preview;
   }
   if (Object.keys(repos).length) found.repos = repos;
   return found;
@@ -285,7 +303,7 @@ function readLegacy(file, { required }) {
     throw new ConfigError(`malformed JSON in legacy config: ${file}\n  ${err.message}`);
   }
   if (!isObject(config)) throw new ConfigError(`legacy config is not a JSON object: ${file}`);
-  return { file, values: legacyPreviewValues(config) };
+  return { file, values: legacyPreviewValues(config, file) };
 }
 
 /** The two default legacy locations, in the order every reader in this skill uses. */
@@ -558,8 +576,15 @@ function renderDiff(dest, text) {
 // Writing
 // ---------------------------------------------------------------------------
 
-/** `20260724T144700Z` — sortable, filename-safe, unambiguous about the zone. */
-const stampNow = () => new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+/**
+ * `20260724T144700.123Z-a1b2c3d4` — sortable, filename-safe, unambiguous about
+ * the zone. The milliseconds and random suffix matter: two repos migrated from
+ * ONE shared legacy file (the common `~/.claude/solopreneur.json` case) in the
+ * same second — or two concurrent invocations in the same millisecond — would
+ * otherwise generate the same backup name, and `COPYFILE_EXCL` would fail the
+ * second with EEXIST even though the migrations are independent.
+ */
+const stampNow = () => `${new Date().toISOString().replace(/[-:]/g, '')}-${randomUUID().slice(0, 8)}`;
 
 /**
  * Copy a legacy file aside before the migration. `COPYFILE_EXCL` so an existing
@@ -729,12 +754,20 @@ function destinationFor(cwd) {
 }
 
 /**
- * Refuse when the new file would shadow a v2 config that already covers this
- * scope. Only a config at or above the destination can be shadowed — a
- * user-global `~/.config/solopreneur/config.json` is a lower layer that a
- * repo-local file is *supposed* to win over, so it must not block a migration.
+ * Refuse when a v2 config already governs this scope from AT OR ABOVE the
+ * destination — writing a new file at the repo root would override its authority.
+ *
+ * This walks up for `.solopreneur.json` files with `classifyNested` rather than
+ * asking the resolver, which matters twice. The resolver's layer 3 is the
+ * user-global `~/.config/solopreneur/config.json` — a LOWER layer a repo-local
+ * file is meant to win over, so it must never block a migration; because it is
+ * not named `.solopreneur.json`, this walk simply never sees it, and no special
+ * exclusion is needed (even when the repo lives under `~/.config/solopreneur/`).
+ * And a broken or malformed global config would make `resolveConfig` THROW
+ * before any exclusion could apply, wrongly blocking a migration that would
+ * override it anyway — this walk never reads it, so it cannot.
  */
-function assertNotShadowing(resolved, dest) {
+function assertNotShadowing(dest) {
   // $SOLOPRENEUR_CONFIG is resolver layer 1 and wins from anywhere on disk, so
   // a file written while it is set would be inert — and this script would still
   // report success. Positional containment cannot catch that; the variable can
@@ -746,20 +779,22 @@ function assertNotShadowing(resolved, dest) {
       + `  a new ${V2_FILENAME} at ${dest} would be ignored while it is set — unset it first`,
     );
   }
-  if (resolved.mode !== 'v2') return;
-  // The user-global config (resolver layer 3) is a LOWER layer that a repo-local
-  // file overrides no matter where either sits — so it must never block a
-  // migration, even when the repo happens to live under `~/.config/solopreneur/`
-  // and the positional test would otherwise read it as an enclosing scope. Only
-  // a walk-up config (layer 2) genuinely shadows, and only when it is at or
-  // above the destination.
-  const globalConfig = path.join(os.homedir(), '.config', 'solopreneur', 'config.json');
-  if (resolved.configPath === globalConfig) return;
-  if (!isUnder(path.dirname(dest), path.dirname(resolved.configPath))) return;
-  throw new ConfigError(
-    `refusing to migrate: a v2 config already covers this scope\n  config: ${resolved.configPath}\n`
-    + `  a new ${V2_FILENAME} at ${dest} would shadow it — move or delete that one first`,
-  );
+  // Walk strictly ABOVE the destination's own directory: the destination itself
+  // is `destinationFor`'s job (it already refused if anything sits there). A
+  // `.solopreneur.json` with a preview block, or one broken the way the resolver
+  // treats as fatal, governs this area and must not be silently overridden.
+  const repoRoot = path.dirname(dest);
+  for (let dir = path.dirname(repoRoot); ; dir = path.dirname(dir)) {
+    const shadow = classifyNested(path.join(dir, V2_FILENAME));
+    if (shadow) {
+      throw new ConfigError(
+        `refusing to migrate: a ${V2_FILENAME} above the repo already governs this scope\n`
+        + `  config: ${shadow.file} (${shadow.reason})\n`
+        + `  a new ${V2_FILENAME} at ${dest} would override it — move or delete that one first`,
+      );
+    }
+    if (path.dirname(dir) === dir) return; // reached the filesystem root
+  }
 }
 
 /**
@@ -801,10 +836,11 @@ function main(argv) {
 
   const cwd = process.cwd();
   const dest = destinationFor(cwd);
-  // One resolver call, for the one question this script cannot answer itself:
-  // is a v2 config already in force here? Reading the legacy files is the
-  // migrator's own job — the resolver reports them only when nothing else won.
-  assertNotShadowing(resolveConfig({}), dest);
+  // Refuse if a v2 config already governs this scope from above the repo. This
+  // walks `.solopreneur.json` files itself rather than calling the resolver, so
+  // a lower-priority (or broken) user-global config never blocks a migration
+  // that would override it anyway — see assertNotShadowing.
+  assertNotShadowing(dest);
 
   const sources = gatherSources(options.legacyConfigs);
   if (sources.length === 0) {

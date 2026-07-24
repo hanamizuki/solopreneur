@@ -234,11 +234,30 @@ repo key, the preview path AND the `projects` bucket key are all user-controlled
 and all quoted through one `show()` helper, so a newline in any of them cannot
 forge a line that looks like the script's own statement of fact.
 
-**The shadow refusal is positional, not layer-based.** Refusing on any
-`mode === "v2"` would block a legitimate repo-local migration for anyone with a
-user-global `~/.config/solopreneur/config.json`, which is a *lower* layer that a
-repo-local file is supposed to win over. The check is instead "would the new file
-shadow a config at or above the destination?".
+**The shadow check walks `.solopreneur.json` files itself, not the resolver.**
+It refuses when a v2 config governs the scope from at or above the destination,
+by walking ancestors with the same `classifyNested` used for the nested case.
+Two things fall out of not calling `resolveConfig` here: the user-global
+`~/.config/solopreneur/config.json` is never seen (it is not named
+`.solopreneur.json`), so a lower-priority global — even one the repo sits
+directly beneath — never blocks a migration and needs no special exclusion; and
+a *broken* global cannot block it either, whereas `resolveConfig` would throw on
+a malformed global before any exclusion could apply. A broken ancestor
+`.solopreneur.json` still refuses (it is fatal to the resolver, so content
+resolution would stop there), consistent with the old behavior.
+
+**A malformed preview subtree is refused, not silently dropped.** A
+`default.preview` or `repos[key].preview` that is present but not an object
+(`[]`, `false`, a string) stops the shell reader's cascade with no path — so
+dropping it and letting a lower layer's path win would move previews somewhere
+the legacy flow never used. The migrator refuses a corrupt legacy config rather
+than guess.
+
+**The backup stamp carries milliseconds and a random suffix.** Two repos
+migrated from one shared legacy file (the common `~/.claude/solopreneur.json`
+case) in the same second — or two concurrent invocations — would otherwise
+generate the same `.backup-<stamp>` name, and `COPYFILE_EXCL` would fail the
+second with EEXIST even though the migrations are independent.
 
 **Same-directory temp is load-bearing twice.** It puts the temp on the same
 filesystem, so the rename cannot fail with EXDEV; and the resolver resolves a
