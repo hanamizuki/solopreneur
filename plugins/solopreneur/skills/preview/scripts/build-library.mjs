@@ -689,10 +689,16 @@ const OVERLAY_TAG_RE = /<script\b[^>]*\bsrc\s*=\s*["'][^"']*comment-overlay\.js[
  * guard is a backstop, not a license).
  */
 function rewriteOverlayTag(html, id) {
-  return html.replace(
-    OVERLAY_TAG_RE,
-    `<script src="/assets/comment-overlay.js" data-preview-id="${id}"></script>`,
-  );
+  return html.replace(OVERLAY_TAG_RE, (tag) => {
+    // Preserve the original tag's load-timing attributes. A hand-authored entry
+    // may place the overlay in <head> with `defer`; dropping it would make the
+    // rewritten tag run synchronously before <body> exists, and the overlay
+    // appends to document.body during its parse-time execution. `async` is
+    // carried for the same reason. `data-preview-id` is (re)set by us regardless.
+    const defer = /\bdefer\b/i.test(tag) ? ' defer' : '';
+    const asyncAttr = /\basync\b/i.test(tag) ? ' async' : '';
+    return `<script src="/assets/comment-overlay.js" data-preview-id="${id}"${defer}${asyncAttr}></script>`;
+  });
 }
 
 /**

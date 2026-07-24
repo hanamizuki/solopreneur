@@ -142,10 +142,6 @@
     };
   }
 
-  // Under Node (no document) there is nothing to render — the helpers
-  // above are already exported. In a browser, boot the chrome.
-  if (typeof document !== "undefined") boot();
-
   // ===================================================================
   // Browser boot
   // ===================================================================
@@ -603,4 +599,10 @@
     </div>
   </footer>
 </div>`;
+
+  // Boot LAST — only after STYLE and MARKUP are initialized. boot() reads them
+  // (root.innerHTML = STYLE + MARKUP), and they are `const`, so invoking boot()
+  // before their declarations would hit the temporal dead zone and throw. Under
+  // Node (no document) this is skipped; only the exported helpers above are used.
+  if (typeof document !== "undefined") boot();
 })();

@@ -208,11 +208,22 @@ test('an existing comment-overlay tag is REWRITTEN to the staging asset, never d
 
 test('the overlay rewrite tolerates single quotes and extra attributes', () => {
   const root = tmp();
-  const html = "<html><body>a<script defer src='./comment-overlay.js' data-x='1'></script></body></html>";
+  const html = "<html><body>a<script src='./comment-overlay.js' data-x='1'></script></body></html>";
   writeItem(root, 'active', 'a', { files: { 'index.html': html } });
   const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
   assert.equal((entry.match(/comment-overlay\.js/g) || []).length, 1);
   assert.match(entry, /src="\/assets\/comment-overlay\.js" data-preview-id="a"/);
+});
+
+test('the overlay rewrite preserves a defer attribute from the original tag', () => {
+  // A hand-authored entry may place the overlay in <head> with defer; dropping it
+  // would make the rewritten tag run before <body> exists and the overlay crash.
+  const root = tmp();
+  const html = '<html><head><script defer src="./comment-overlay.js"></script></head><body>a</body></html>';
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.match(entry, /<script src="\/assets\/comment-overlay\.js" data-preview-id="a" defer><\/script>/);
+  assert.equal((entry.match(/comment-overlay\.js/g) || []).length, 1, 'still exactly one overlay tag');
 });
 
 test('preview-shell (data island + script) is injected at the seam, before </body>', () => {
