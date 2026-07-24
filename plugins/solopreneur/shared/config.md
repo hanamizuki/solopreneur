@@ -413,9 +413,9 @@ does not describe the legacy file.
 
 A `private` target's protection is not a single flag — it is a recipe of Vercel
 behaviors verified against a real Hobby-plan account, enforced by
-`scripts/vercel-protect.mjs` and consumed by `setup.mjs` and the library deploy
-(later PRs). The rules exist because the naive version leaves projects
-world-readable:
+`scripts/vercel-protect.mjs`, consumed by `setup.mjs` at first-run provisioning
+(see "Setting up from scratch" below) and by the library deploy (a later PR). The
+rules exist because the naive version leaves projects world-readable:
 
 - **The protection value is the legacy enum `all_except_custom_domains`**, the
   one a fresh project auto-enables. The documented `prod_deployment_urls_and_all_previews`
@@ -611,5 +611,72 @@ Rules worth knowing before running it:
 
 `PREVIEW_PROJECT` is neither read nor changed by the migrator; it stays the
 highest-priority override for the legacy per-page flow.
+
+## Setting up from scratch
+
+`scripts/setup.mjs` is the greenfield counterpart to the migrator: where
+`config-migrate.mjs` converts an existing legacy config, `setup.mjs` stands up a
+brand-new v2 `.solopreneur.json` with a SINGLE `private` target and — unlike the
+migrator — talks to Vercel, provisioning the target project's protection before
+writing a config that claims the target is private.
+
+```bash
+node scripts/setup.mjs                                  # prompts for everything
+node scripts/setup.mjs --project my-private-previews    # preset the project name
+node scripts/setup.mjs --root notes/previews --force    # custom root; replace an existing v2 config
+```
+
+The flow, in order:
+
+- **First-run detection.** It resolves via `config-resolve.mjs`. `mode: "v2"` is
+  an idempotent no-op — it prints the existing config path and exits 0 without
+  prompting or touching anything. `mode: "legacy"` points at the migrator (which
+  preserves what you already set) and exits. Only `mode: "none"` — or `--force` —
+  proceeds. `--force` will replace this script's own v2 config, but never
+  overwrites a `.solopreneur.json` that configures another feature.
+- **Propose, then confirm.** Before anything happens it shows the config path,
+  the preview `root`, the `active/` and `archive/` dirs, the single target
+  (`private`, visibility `private`), and the Vercel project. **Nothing is written
+  and no Vercel mutation happens until you confirm.**
+- **Choose the project.** It asks whether to create a new Vercel project or link
+  an existing one. Both are supported; an existing name is resolved to its
+  canonical id via the same GET the protection module uses.
+- **Provision FIRST, write LAST (fail closed).** The Vercel create/link and the
+  applicable protection steps run before a single byte of config is written. If
+  provisioning or verification fails, it exits non-zero having written nothing —
+  a config that lies about protection is worse than no config. The written config
+  is then proven **discoverable and effective**: it is resolved by walking up
+  from a content path (not by pointing `$SOLOPRENEUR_CONFIG` at it) and must come
+  back `mode: "v2"` with the expected root and target; a config that does not
+  resolve is removed (schema-valid ≠ resolvable).
+
+### Setup vs. first-publish: the protection division
+
+A private target's full protection (see the contract above) is
+`ensureProtected` + `removeBareDomain` + a 302 entry-probe. But the bare domain
+`<project>.vercel.app` and the immutable entry URL **do not exist until the
+project's first production deployment**, so the work is split between setup and
+first-publish (`deploy-library.mjs`, a later PR):
+
+- **`ssoProtection` is a project-level setting** — settable and GET-verifiable on
+  a project with zero deployments (verified against the Vercel REST API: the
+  create and update endpoints both accept it, and updating it needs no existing
+  deployment). So setup ALWAYS runs `ensureProtected`, on a freshly created
+  project as much as on an existing one.
+- **Bare-domain removal and the entry-probe are deferred to first publish** on a
+  new or linked-empty project — there is nothing for them to act on yet, and
+  their absence is NOT a hard failure. Setup runs the full hardening only on a
+  POPULATED existing project (and the entry-probe only when it has a production
+  deployment).
+- **Provisioning a populated existing project takes an EXTRA confirmation** — it
+  could disrupt a real site. On confirm it runs `ensureProtected`,
+  `removeBareDomain`, and then TWO SEPARATE checks: the protected entry via
+  `verifyEntryProtected` (302), and bare-domain removal via `removeBareDomain`'s
+  returned status (a 404 = removed). These are not conflated — a removed bare
+  domain is a 404, which `verifyEntryProtected` reads as unprotected.
+
+Both the Vercel calls and the prompting go through injected seams, so the whole
+flow is covered by `node --test` with zero real network and zero real prompts.
+`PREVIEW_PROJECT` is neither read nor written by setup.
 
 ---
