@@ -685,12 +685,18 @@ function jsonIsland(value) {
  * with ours. Restricting to the sidecar also makes the rewrite idempotent: an
  * already-rewritten `/assets/...` tag no longer matches.
  *
+ * The attribute is matched as `\ssrc`, NOT `\bsrc`: `-` is a non-word character, so
+ * a word boundary would also match the `src` inside `data-src`, and a tag like
+ * `<script data-src="./comment-overlay.js" src="./app.js">` would be replaced
+ * wholesale — silently dropping app.js, and making an inert lazy-load tag
+ * executable. Requiring real whitespace pins the match to a genuine attribute.
+ *
  * ponytail: a `>` inside an attribute value before `src` breaks the `[^>]*` scan
  * and the tag is left unrewritten (its excluded per-page copy then 404s). That is
  * the accepted ceiling of regex HTML matching for trusted, generated input — the
  * /preview template emits exactly `<script src="./comment-overlay.js"></script>`.
  */
-const OVERLAY_TAG_RE = /<script\b[^>]*\bsrc\s*=\s*["'](?:\.\/)?comment-overlay\.js["'][^>]*>\s*<\/script>/gi;
+const OVERLAY_TAG_RE = /<script\b[^>]*\ssrc\s*=\s*["'](?:\.\/)?comment-overlay\.js["'][^>]*>\s*<\/script>/gi;
 
 /**
  * Rewrite an existing comment-overlay tag to the shared staging asset and stamp
@@ -709,8 +715,11 @@ function rewriteOverlayTag(html, id) {
     // rewritten tag run synchronously before <body> exists, and the overlay
     // appends to document.body during its parse-time execution. `async` is
     // carried for the same reason. `data-preview-id` is (re)set by us regardless.
-    const defer = /\bdefer\b/i.test(tag) ? ' defer' : '';
-    const asyncAttr = /\basync\b/i.test(tag) ? ' async' : '';
+    // Same `\s`-not-`\b` discipline as OVERLAY_TAG_RE: a word boundary would let
+    // `data-defer` / `data-async` register as the real boolean attribute. The
+    // trailing class covers the forms a bare attribute can end in (` `, `>`, `/`, `=`).
+    const defer = /\sdefer[\s/>=]/i.test(tag) ? ' defer' : '';
+    const asyncAttr = /\sasync[\s/>=]/i.test(tag) ? ' async' : '';
     return `<script src="/assets/comment-overlay.js" data-preview-id="${id}"${defer}${asyncAttr}></script>`;
   });
 }

@@ -235,6 +235,26 @@ for (const [label, src] of [
   });
 }
 
+test('a prefixed attribute (data-src) is not mistaken for src — the real script survives', () => {
+  // `-` is a non-word char, so a \b boundary would match inside `data-src` and the
+  // whole tag would be replaced, silently dropping app.js.
+  const root = tmp();
+  const html = '<html><body>a<script data-src="./comment-overlay.js" src="./app.js"></script></body></html>';
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.ok(entry.includes('src="./app.js"'), 'the real script must survive');
+  assert.doesNotMatch(entry, /\/assets\/comment-overlay\.js/, 'must not rewrite on a data-src match');
+});
+
+test('a data-src-only tag is left inert (never made executable)', () => {
+  const root = tmp();
+  const html = '<html><body>a<script data-src="./comment-overlay.js"></script></body></html>';
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.ok(entry.includes('data-src="./comment-overlay.js"'), 'the inert tag must survive as authored');
+  assert.doesNotMatch(entry, /src="\/assets\/comment-overlay\.js"/, 'must not become an executable overlay tag');
+});
+
 test('a bare (path-less) comment-overlay.js src is still rewritten', () => {
   const root = tmp();
   const html = '<html><body>a<script src="comment-overlay.js"></script></body></html>';
