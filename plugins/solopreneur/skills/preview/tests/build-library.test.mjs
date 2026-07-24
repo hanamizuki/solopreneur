@@ -286,6 +286,19 @@ test('a shape-valid but impossible timestamp instant is rejected', () => {
   assert.throws(() => build(root, ['active']), isBuildError(/not a real ISO 8601 instant/));
 });
 
+test('an overflowed calendar date (Feb 30) is rejected', () => {
+  const root = tmp();
+  // Date.parse silently rolls Feb 30 to Mar 2 instead of returning NaN.
+  writeItem(root, 'active', 'a', { over: { updatedAt: '2026-02-30T00:00:00Z' } });
+  assert.throws(() => build(root, ['active']), isBuildError(/not a real calendar date/));
+});
+
+test('a valid leap day (Feb 29 of a leap year) is accepted', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', { over: { createdAt: '2024-02-29T00:00:00Z', updatedAt: '2024-02-29T00:00:00Z' } });
+  assert.equal(build(root, ['active']).directory.items.length, 1);
+});
+
 // --- duplicate id -----------------------------------------------------------
 
 test('a duplicate id across active and archive aborts, naming BOTH files', () => {

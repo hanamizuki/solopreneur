@@ -225,8 +225,24 @@ function validatePreviewMeta(meta, file) {
   // a value that is not a real instant. Guarded on `typeof string` so a missing or
   // wrong-typed field reports its schema error above rather than a parse error too.
   for (const key of ['createdAt', 'updatedAt']) {
-    if (typeof meta[key] === 'string' && Number.isNaN(Date.parse(meta[key]))) {
-      errors.push(`${key}: ${JSON.stringify(meta[key])} is not a real ISO 8601 instant`);
+    const value = meta[key];
+    if (typeof value !== 'string') continue; // a missing / mistyped field is a schema error above
+    if (Number.isNaN(Date.parse(value))) {
+      errors.push(`${key}: ${JSON.stringify(value)} is not a real ISO 8601 instant`);
+      continue;
+    }
+    // Date.parse ACCEPTS an overflowed calendar date (Feb 30 rolls to Mar 2) rather
+    // than returning NaN, which would sort by the rolled instant while publishing
+    // the impossible string. Rebuild the written Y-M-D as a UTC date and confirm it
+    // did not roll over. (Only the calendar date can overflow silently — an
+    // out-of-range time or offset already fails the NaN check above.)
+    const ymd = /^(\d{4})-(\d{2})-(\d{2})T/.exec(value);
+    if (ymd) {
+      const [y, mo, d] = [Number(ymd[1]), Number(ymd[2]), Number(ymd[3])];
+      const dt = new Date(Date.UTC(y, mo - 1, d));
+      if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {
+        errors.push(`${key}: ${JSON.stringify(value)} is not a real calendar date`);
+      }
     }
   }
   if (errors.length) throw new BuildError(`invalid preview.json: ${file}\n  ${errors.join('\n  ')}`);
