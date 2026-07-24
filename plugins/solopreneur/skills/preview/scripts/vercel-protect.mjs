@@ -178,18 +178,36 @@ export async function ensureProtected({ projectId, teamId, deps, deploymentType 
 }
 
 /**
- * Remove the world-readable bare domain `<project>.vercel.app` (Gate A fact 1).
- * A 404 means it is already absent, which is success — not an error. Any other
- * non-2xx status throws.
+ * Remove the world-readable bare domain `<name>.vercel.app` (Gate A fact 1),
+ * where `<name>` is the project's OWN canonical name fetched from `projectId` —
+ * NOT a caller-supplied string. A DELETE of a domain that is not attached to
+ * `projectId` returns the SAME 404 as an already-absent one, so trusting a
+ * caller's `project` string would let a stale or mismatched identifier falsely
+ * confirm removal while the project's real bare domain stays exposed. Deriving
+ * the domain from the fetched name makes a 404 unambiguous: `projectId`'s own
+ * bare domain is absent. An optionally-passed `project` is cross-checked against
+ * the fetched name and a mismatch throws — a caller-side identity bug is surfaced
+ * rather than masked.
  *
- * The returned `status` IS the removal signal a caller checks: the domain is the
- * deterministic `<project>.vercel.app`, so 404 (not attached) or 2xx (removed)
- * both mean it is gone — there is no "wrong domain" ambiguity. Do NOT validate
- * this with `verifyEntryProtected`; that checks a protected ENTRY (302/401),
- * whereas a removed bare domain is a 404, which it would read as unprotected.
+ * A 404 (already absent) or a 2xx (removed) is success; any other status throws.
+ * Do NOT validate removal with `verifyEntryProtected` — that checks a protected
+ * ENTRY (302/401), whereas a removed bare domain is a 404, read there as naked.
  */
 export async function removeBareDomain({ projectId, teamId, project, deps }) {
-  const domain = `${project}.vercel.app`;
+  const fetched = await deps.getProject({ projectId, teamId });
+  const name = fetched?.name;
+  if (!name) {
+    throw new VercelProtectError(
+      `could not resolve the canonical name of project ${JSON.stringify(projectId)} to remove its bare domain`,
+    );
+  }
+  if (project !== undefined && project !== name) {
+    throw new VercelProtectError(
+      `bare-domain identity mismatch: caller passed project ${JSON.stringify(project)} but ${JSON.stringify(projectId)} `
+      + `is named ${JSON.stringify(name)} — refusing to delete a domain that may not be this project's.`,
+    );
+  }
+  const domain = `${name}.vercel.app`;
   const { status } = await deps.deleteDomain({ projectId, teamId, domain });
   if (status === 404) return { domain, status, removed: false };
   if (status >= 200 && status < 300) return { domain, status, removed: true };

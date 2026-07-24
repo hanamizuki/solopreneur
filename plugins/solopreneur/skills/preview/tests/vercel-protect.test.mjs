@@ -235,26 +235,51 @@ test('ensureProtected refuses any non-legacy enum such as "all"', async () => {
 
 // --- removeBareDomain -------------------------------------------------------
 
-test('removeBareDomain tolerates a 404 as success and targets <project>.vercel.app', async () => {
+test('removeBareDomain derives the domain from the canonical name and tolerates a 404', async () => {
   const seen = [];
-  const deps = { deleteDomain: async ({ domain }) => { seen.push(domain); return { status: 404 }; } };
+  const deps = {
+    getProject: async () => ({ name: 'demo-previews' }),
+    deleteDomain: async ({ domain }) => { seen.push(domain); return { status: 404 }; },
+  };
   const result = await removeBareDomain({ ...args, project: 'demo-previews', deps });
-  assert.deepEqual(seen, ['demo-previews.vercel.app']);
+  assert.deepEqual(seen, ['demo-previews.vercel.app']); // built from the FETCHED name
   assert.equal(result.removed, false); // already absent
   assert.equal(result.status, 404);
 });
 
 test('removeBareDomain reports a 2xx removal', async () => {
-  const deps = { deleteDomain: async () => ({ status: 200 }) };
-  const result = await removeBareDomain({ ...args, project: 'demo-previews', deps });
-  assert.equal(result.removed, true);
+  const deps = { getProject: async () => ({ name: 'demo-previews' }), deleteDomain: async () => ({ status: 200 }) };
+  assert.equal((await removeBareDomain({ ...args, project: 'demo-previews', deps })).removed, true);
 });
 
 test('removeBareDomain throws on an unexpected status', async () => {
-  const deps = { deleteDomain: async () => ({ status: 500 }) };
+  const deps = { getProject: async () => ({ name: 'demo-previews' }), deleteDomain: async () => ({ status: 500 }) };
   await assert.rejects(
     removeBareDomain({ ...args, project: 'demo-previews', deps }),
     (err) => err instanceof VercelProtectError && /status 500/.test(err.message),
+  );
+});
+
+test('removeBareDomain refuses (no DELETE) when the passed project disagrees with the project id', async () => {
+  // A 404 from a mismatched (projectId, project) pair would otherwise falsely
+  // confirm removal while the project's REAL bare domain stays exposed.
+  const seen = [];
+  const deps = {
+    getProject: async () => ({ name: 'real-name' }),
+    deleteDomain: async ({ domain }) => { seen.push(domain); return { status: 404 }; },
+  };
+  await assert.rejects(
+    removeBareDomain({ ...args, project: 'stale-name', deps }),
+    (err) => err instanceof VercelProtectError && /identity mismatch/.test(err.message),
+  );
+  assert.deepEqual(seen, [], 'must not issue a DELETE on a mismatched identity');
+});
+
+test('removeBareDomain throws when the canonical name cannot be resolved', async () => {
+  const deps = { getProject: async () => ({}), deleteDomain: async () => ({ status: 404 }) };
+  await assert.rejects(
+    removeBareDomain({ ...args, project: 'demo-previews', deps }),
+    (err) => err instanceof VercelProtectError && /could not resolve the canonical name/.test(err.message),
   );
 });
 
