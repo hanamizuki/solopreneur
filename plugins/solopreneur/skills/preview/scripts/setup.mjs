@@ -7,7 +7,7 @@
  * Requires Node.js >= 20.
  *
  * Usage:
- *   setup.mjs [--root <path>] [--project <name>] [--team <teamId>] [--force]
+ *   setup.mjs [--root <path>] [--project <name>] [--force]
  *
  * Output: the proposal and progress on stdout; every error on stderr, exit 1 on
  *   any failure. Nothing is written and no Vercel mutation happens until the
@@ -123,6 +123,75 @@ function isUnder(child, parent) {
 }
 
 /**
+ * The physical path a (possibly not-yet-created) target resolves to: realpath the
+ * deepest existing ancestor and re-append the missing tail. A lexical path is
+ * fooled by an in-repo symlink that leaves the repo (its realpath'd ancestor is
+ * already outside) and by a component that is actually a file (realpath raises
+ * ENOTDIR); both must be refused BEFORE Vercel is provisioned. A DANGLING symlink
+ * is refused rather than stepped over — it exists yet its target is absent, so
+ * ascending past it lexically could let a link pointing outside pass as contained
+ * once its target appears. Mirrors config-migrate.mjs's `physicalize`.
+ */
+function physicalize(target) {
+  const tail = [];
+  for (let cur = target; ;) {
+    try {
+      return path.join(fs.realpathSync(cur), ...tail);
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        throw new SetupError(`the preview root is unusable: ${cur}\n  ${err.message}`);
+      }
+      try {
+        fs.readlinkSync(cur);
+        throw new SetupError(`the preview root passes through a dangling symlink: ${cur}`);
+      } catch (linkErr) {
+        if (linkErr instanceof SetupError) throw linkErr;
+        // not a symlink — a genuinely missing component; keep ascending
+      }
+      const parent = path.dirname(cur);
+      if (parent === cur) return path.join(cur, ...tail);
+      tail.unshift(path.basename(cur));
+      cur = parent;
+    }
+  }
+}
+
+/**
+ * The nearest `.solopreneur.json` strictly between the physical preview `root`
+ * and the `anchor` that would SHADOW the config setup writes at the anchor — one
+ * carrying a `preview` block (the resolver stops there walking up from content),
+ * or one present-but-broken (fatal to the resolver, so resolution stops there
+ * too). A preview-less file configures another feature and is skipped, exactly as
+ * the resolver's walk-up skips it. Returns the file path or null. Mirrors
+ * config-migrate.mjs's `nestedShadow`: it lets setup refuse a guaranteed-
+ * undiscoverable placement BEFORE provisioning Vercel, not after.
+ */
+function nestedShadow(root, anchor) {
+  // Start at the deepest EXISTING directory at or under the root, so a not-yet-
+  // created root is covered by scanning its existing ancestors.
+  let dir = root;
+  while (dir !== anchor && isUnder(dir, anchor) && !fs.existsSync(dir)) dir = path.dirname(dir);
+  for (; dir !== anchor && isUnder(dir, anchor); dir = path.dirname(dir)) {
+    const file = path.join(dir, V2_FILENAME);
+    let raw;
+    try {
+      if (!fs.statSync(file).isFile()) return file; // a non-regular file is fatal to the resolver
+      raw = fs.readFileSync(file, 'utf8');
+    } catch (err) {
+      if (err.code === 'ENOENT' || err.code === 'ENOTDIR') continue; // nothing here
+      return file; // present but unreadable — fatal to the resolver
+    }
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch { return file; } // malformed — fatal
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && Object.hasOwn(parsed, 'preview')) {
+      return file; // a preview block here is found first and shadows the anchor config
+    }
+    // a valid config without a preview block configures another feature — skip it
+  }
+  return null;
+}
+
+/**
  * Run git under the current working directory, returning stdout with only its
  * trailing newline(s) stripped, or null. Never throws: git may be absent, the
  * directory may not be a repo, an ownership refusal also lands here — each has to
@@ -203,18 +272,17 @@ function writeAtomic(dest, text) {
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
-const USAGE = `usage: ${SELF} [--root <path>] [--project <name>] [--team <teamId>] [--force]
+const USAGE = `usage: ${SELF} [--root <path>] [--project <name>] [--force]
 
   --root <path>      content root for the Library (default: ${DEFAULT_ROOT})
   --project <name>   Vercel project name (else you are prompted)
-  --team <teamId>    Vercel team scope (default: your personal scope)
   --force            set up a fresh config even if one already governs here`;
 
 // ponytail: hand-rolled rather than node:util parseArgs, for the reason
 // config-resolve.mjs gives — parseArgs only became stable in 20.16, and this
 // file's declared floor is 20, where it warns onto the stderr reserved for errors.
 function parseArgs(argv) {
-  const opts = { root: undefined, project: undefined, team: undefined, force: false, help: false };
+  const opts = { root: undefined, project: undefined, force: false, help: false };
   const valueOf = (arg, name, i) => {
     if (arg.startsWith(`${name}=`)) return { value: arg.slice(name.length + 1), next: i };
     const value = argv[i + 1];
@@ -240,23 +308,9 @@ function parseArgs(argv) {
       const { value, next } = valueOf(arg, '--root', i); opts.root = value; i = next;
     } else if (arg === '--project' || arg.startsWith('--project=')) {
       const { value, next } = valueOf(arg, '--project', i); opts.project = value; i = next;
-    } else if (arg === '--team' || arg.startsWith('--team=')) {
-      const { value, next } = valueOf(arg, '--team', i); opts.team = value; i = next;
     } else {
       throw new SetupError(`unknown argument: ${arg}\n${USAGE}`);
     }
-  }
-  // A team scope is applied by `?teamId=` only when the value is a `team_…` id
-  // (mirroring vercel-protect.mjs / deploy.sh). A slug or any other value would
-  // otherwise be SILENTLY dropped, provisioning the user's PERSONAL scope instead
-  // of the team they named — a wrong-scope footgun for a provisioning tool. Reject
-  // it loudly rather than guess.
-  if (opts.team !== undefined && !opts.team.startsWith('team_')) {
-    throw new SetupError(
-      `--team must be a Vercel team id starting with "team_", got ${JSON.stringify(opts.team)}\n`
-      + '  a team slug is not accepted — use the team_… id from your Vercel team settings\n'
-      + `${USAGE}`,
-    );
   }
   return opts;
 }
@@ -416,16 +470,35 @@ export async function main({ argv = [], io, makeDeps }) {
   const activeDir = path.join(rootAbs, 'active');
   const archiveDir = path.join(rootAbs, 'archive');
 
-  // The config lands at `dest` (under `anchor`) and is found by walking UP from a
-  // content path. That only works when the root sits at or under `anchor`; an
-  // absolute root elsewhere, or one escaping via `..`, would leave a config no
-  // walk-up could ever reach — and the discoverability check would catch it only
-  // AFTER Vercel was provisioned and the prior config (under --force) already
-  // overwritten. Refuse it up front, before any prompt or Vercel call.
-  if (!isUnder(rootAbs, anchor)) {
+  // Validate the root's PHYSICAL placement BEFORE any prompt or Vercel call, so
+  // setup never provisions Vercel — or writes content dirs outside the repo — for
+  // a placement the config walk-up could never discover. The config is found only
+  // by walking UP from a content path to `dest`, so the root must sit physically
+  // under `anchor`, be a directory (or not exist yet), and have no nearer
+  // `.solopreneur.json` shadowing it. The lexical `rootAbs` is not enough — an
+  // in-repo symlink can leave the repo and a component can be a file; physicalize
+  // resolves both. These mirror config-migrate.mjs's pre-write checks.
+  const physicalRoot = physicalize(rootAbs);
+  if (!isUnder(physicalRoot, anchor)) {
     throw new SetupError(
       `the preview root must sit under ${anchor}\n`
-      + `  ${rootAbs} is outside it — a config at ${dest} could never be discovered from there`,
+      + `  ${physicalRoot} is outside it — a config at ${dest} could never be discovered from there`,
+    );
+  }
+  try {
+    if (!fs.statSync(physicalRoot).isDirectory()) {
+      throw new SetupError(`the preview root is a file, not a directory: ${physicalRoot}`);
+    }
+  } catch (err) {
+    if (err instanceof SetupError) throw err;
+    if (err.code !== 'ENOENT') throw new SetupError(`cannot inspect the preview root: ${physicalRoot}\n  ${err.message}`);
+    // ENOENT — the root does not exist yet; setup creates it after provisioning.
+  }
+  const shadow = nestedShadow(physicalRoot, anchor);
+  if (shadow) {
+    throw new SetupError(
+      `a ${V2_FILENAME} nearer the content than ${dest} would shadow it\n`
+      + `  ${shadow} — remove it, or choose a root not beneath it`,
     );
   }
 
@@ -441,7 +514,12 @@ export async function main({ argv = [], io, makeDeps }) {
   if (!create && !link) {
     throw new SetupError(`unrecognized choice ${JSON.stringify(choice)} — answer "new" or "existing"`);
   }
-  const teamId = opts.team;
+  // Personal scope only. Team-scoped provisioning needs the target-identity
+  // contract — projectId + teamId persisted per target (pr1 finding F9), a
+  // coordinated schema + resolver + deploy-library change: a name-only config in
+  // a team scope cannot tell a team project from a same-named personal one, so
+  // team support is deferred to that work rather than written ambiguously here.
+  const teamId = undefined;
 
   // 2. Propose — show everything BEFORE anything happens.
   io.print(`${[
@@ -451,7 +529,7 @@ export async function main({ argv = [], io, makeDeps }) {
     `  collections:     active  -> ${activeDir}`,
     `                   archive -> ${archiveDir}`,
     '  target:          private (visibility: private)',
-    `  Vercel project:  ${projectName}  (${create ? 'create new' : 'link existing'}${teamId ? `, team ${teamId}` : ', personal scope'})`,
+    `  Vercel project:  ${projectName}  (${create ? 'create new' : 'link existing'}, personal scope)`,
   ].join('\n')}\n`);
 
   // 4. Confirm gate — before ANY Vercel call or disk write.

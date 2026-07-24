@@ -507,18 +507,19 @@ test('--force preserves sibling top-level keys when replacing an existing v2 con
   assert.deepEqual(cfg.todos, { backlog: 'todos/backlog' }, 'the sibling feature config survived --force');
 });
 
-test('--force restores the prior config byte-for-byte when post-write verification fails', async () => {
+test('--force with a nested shadow refuses before provisioning and leaves the prior config intact', async () => {
   const s = scenario();
   writeJson(s.dest, { schemaVersion: 2, preview: v2('old-project').preview, todos: { backlog: 'x' } });
   const priorText = fs.readFileSync(s.dest, 'utf8');
-  // A nested .solopreneur.json between the content root and the repo root is what
-  // the resolver finds first walking up from content, so step-7 verification
-  // fails — and a failed re-setup must NOT delete the config that worked before.
+  // A nested .solopreneur.json between the root and the repo root would shadow the
+  // config setup writes. It is caught BEFORE provisioning, so a failed re-setup
+  // never mutates Vercel and never touches the config that worked before.
   writeJson(path.join(s.repo, 'docs', '.solopreneur.json'), v2('nested-shadow'));
 
-  const { error } = await runMain(['--project', 'my-private-previews', '--force'], ['new', 'y'], fakeDeps());
-  assert.ok(error instanceof SetupError, 'expected a verification failure');
-  assert.equal(fs.readFileSync(s.dest, 'utf8'), priorText, 'the prior config was restored, not deleted');
+  const { error, deps } = await runMain(['--project', 'my-private-previews', '--force'], [], fakeDeps());
+  assert.ok(error instanceof SetupError && /shadow/.test(error.message), `got ${error}`);
+  assert.deepEqual(deps.calls.createProject, [], 'no Vercel mutation');
+  assert.equal(fs.readFileSync(s.dest, 'utf8'), priorText, 'the prior config is untouched');
 });
 
 // --- root containment: refuse an undiscoverable root before provisioning ----
@@ -540,23 +541,23 @@ test('a --root escaping the anchor via .. is refused before any Vercel call', as
   assert.deepEqual(deps.calls.createProject, []);
 });
 
-// --- --team validation -----------------------------------------------------
-
-test('a --team that is not a team_ id is rejected (never silently personal scope)', async () => {
-  scenario();
-  const { error } = await runMain(['--project', 'p', '--team', 'my-slug'], [], fakeDeps());
-  assert.ok(error instanceof SetupError && /team_/.test(error.message), `got ${error}`);
+test('an in-repo symlink --root resolving outside the repo is refused (physical, not lexical)', async () => {
+  const s = scenario();
+  const outside = tmp();
+  fs.symlinkSync(outside, path.join(s.repo, 'link'), 'dir');
+  // Lexically `link` is under the repo, but it physically escapes — and mkdirSync
+  // would follow it and write OUTSIDE the repo. The physical check catches it.
+  const { error, deps } = await runMain(['--project', 'p', '--root', 'link'], [], fakeDeps());
+  assert.ok(error instanceof SetupError && /must sit under|outside/.test(error.message), `got ${error}`);
+  assert.deepEqual(deps.calls.createProject, [], 'refused before provisioning');
 });
 
-test('a valid team_ id is accepted and threaded to Vercel', async () => {
+test('a --root that is an existing regular file is refused (no ENOTDIR crash after provisioning)', async () => {
   const s = scenario();
-  const deps = fakeDeps();
-  const { code, error, io } = await runMain(['--project', 'my-private-previews', '--team', 'team_abc'], ['new', 'y'], deps);
-  assert.ifError(error);
-  assert.equal(code, 0);
-  assert.ok(io.text().includes('team team_abc'), io.text());
-  assert.equal(deps.calls.createProject[0].teamId, 'team_abc', 'the team id reaches Vercel');
-  assert.ok(fs.existsSync(s.dest));
+  fs.writeFileSync(path.join(s.repo, 'afile'), 'not a directory\n');
+  const { error, deps } = await runMain(['--project', 'p', '--root', 'afile'], [], fakeDeps());
+  assert.ok(error instanceof SetupError && /not a directory|file/.test(error.message), `got ${error}`);
+  assert.deepEqual(deps.calls.createProject, []);
 });
 
 // --- CLI surface -----------------------------------------------------------
