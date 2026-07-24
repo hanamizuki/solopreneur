@@ -192,13 +192,26 @@ is the review surface, and it must not show a proposal that only fails after
 `--write`. A missing root is fine; a fresh setup creates it later.
 
 **Physical paths, not lexical, everywhere the resolver uses them.** The root
-containment check realpaths the root before judging it in-repo, so an in-repo
-symlink that physically escapes the tree is refused rather than written as an
-undiscoverable config — the resolver realpaths content, so a lexical check would
-disagree with it exactly there. Legacy sources are deduped by physical file
-identity too: a symlinked `CLAUDE_CONFIG_DIR` aliasing `~/.claude` would
-otherwise back the one file up twice onto the same `.backup-<stamp>` path, and
-the second `COPYFILE_EXCL` would fail EEXIST and roll the whole migration back.
+containment check physicalizes the root before judging it in-repo — realpathing
+the deepest existing ancestor and re-appending the missing tail — so an in-repo
+symlink that physically escapes the tree, *and* a not-yet-created root under such
+a symlinked ancestor, are both refused rather than written as an undiscoverable
+config. The resolver realpaths content, so a lexical check would disagree with it
+exactly there. Legacy sources are deduped by physical file identity too: a
+symlinked `CLAUDE_CONFIG_DIR` aliasing `~/.claude` would otherwise back the one
+file up twice onto the same `.backup-<stamp>` path, and the second
+`COPYFILE_EXCL` would fail EEXIST and roll the whole migration back.
+
+**A v2 config nearer the content than the repo root is refused.** The migrated
+config lands at the repo root, but the resolver finds the *nearest* config
+walking up from content — so a pre-existing `.solopreneur.json` with a preview
+block between the root and the repo root would shadow it. Resolving from the root
+before writing reports what already wins there; a nested hit (strictly below the
+destination) means the migration would be inert, so it refuses. Configs at or
+above the destination are the shadow check's job, and the user-global
+`~/.config/solopreneur/config.json` is explicitly excluded from that positional
+check — it is a lower layer a repo-local file overrides no matter where the repo
+sits, even directly under `~/.config/solopreneur/`.
 
 **Legacy files are classified before reading, and every config-derived string in
 the report is quoted.** A FIFO or a device symlink at a config path would block

@@ -311,6 +311,46 @@ test('an in-repo symlink root pointing outside the repo is refused', () => {
   assert.ok(!fs.existsSync(s.dest));
 });
 
+test('a not-yet-existing root under a symlink pointing outside is refused', () => {
+  // `link/new` where `link -> outside` and `new` does not exist yet: realpath of
+  // the leaf throws ENOENT, so a naive fallback keeps the lexical in-repo path
+  // and the containment check wrongly passes. Physicalizing the existing
+  // ancestor catches it.
+  const s = scenario({});
+  const outside = mkdirp(s.root, 'outside');
+  fs.symlinkSync(outside, path.join(s.repo, 'link'), 'dir');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'link/new' } } },
+  });
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('outside the repository'), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
+});
+
+test('a nested v2 config already covering the root is refused', () => {
+  // A `.solopreneur.json` with a preview block between the root and the repo
+  // root is what the resolver finds first when walking up from content, so the
+  // repo-root config would be inert. Resolving from cwd never walks down to it,
+  // so the destination check alone cannot catch this.
+  const s = scenario({});
+  const previews = mkdirp(s.repo, 'docs', 'preview');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
+  });
+  // A pre-existing v2 config at docs/, nearer to the content than the repo root.
+  writeJson(path.join(s.repo, 'docs', '.solopreneur.json'), v2('already-here'));
+  mkdirp(previews, 'item');
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('nearer than the repo root'), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
+});
+
 test('a root that is a regular file is rejected in the dry run, not just at --write', () => {
   const s = scenario({});
   writeJson(s.legacyFile, {
@@ -656,6 +696,24 @@ test('a user-global v2 config does not block a repo-local migration', () => {
 
   const out = migrate(s, ['--target-project', 'p']);
   assert.ok(out.stdout.includes(`destination: ${s.dest}`), out.stdout);
+});
+
+test('a repo living under ~/.config/solopreneur is not blocked by the global config', () => {
+  // The global config's directory positionally contains a repo checked out
+  // beneath it, but it is still the lower-priority user-global layer a
+  // repo-local file overrides — so it must not read as an enclosing scope.
+  const home = tmp();
+  const repo = mkdirp(home, '.config', 'solopreneur', 'repo');
+  git(repo, ['init', '-q', '-b', 'main']);
+  writeJson(path.join(home, '.config', 'solopreneur', 'config.json'), v2('user-global'));
+  const configDir = mkdirp(tmp(), 'agent-config');
+  writeJson(path.join(configDir, 'solopreneur.json'), {
+    default: { preview: { projects: { default: 'p' } } },
+  });
+
+  const out = run(['--target-project', 'p'], { cwd: repo, home, env: { CLAUDE_CONFIG_DIR: configDir } });
+  assert.equal(out.status, 0, out.stderr);
+  assert.ok(out.stdout.includes(`destination: ${path.join(repo, '.solopreneur.json')}`), out.stdout);
 });
 
 test('the destination is the repo root even when run from a subdirectory', () => {

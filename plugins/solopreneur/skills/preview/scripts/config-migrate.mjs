@@ -101,6 +101,28 @@ function isUnder(child, parent) {
   return !path.isAbsolute(rel);
 }
 
+/**
+ * The physical path a (possibly not-yet-existing) path will resolve to: realpath
+ * the deepest existing ancestor and re-append the missing tail. A plain
+ * `realpathSync` throws on a path whose leaf does not exist yet, which loses the
+ * one thing that matters here — whether a not-yet-created root sits under a
+ * symlinked ancestor that leaves the repository.
+ */
+function physicalize(target) {
+  const tail = [];
+  for (let cur = target; ;) {
+    try {
+      return path.join(fs.realpathSync(cur), ...tail);
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+      const parent = path.dirname(cur);
+      if (parent === cur) return target; // reached the filesystem root existing nowhere
+      tail.unshift(path.basename(cur));
+      cur = parent;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Reading legacy configs
 // ---------------------------------------------------------------------------
@@ -630,7 +652,16 @@ function assertNotShadowing(resolved, dest) {
       + `  a new ${V2_FILENAME} at ${dest} would be ignored while it is set — unset it first`,
     );
   }
-  if (resolved.mode !== 'v2' || !isUnder(path.dirname(dest), path.dirname(resolved.configPath))) return;
+  if (resolved.mode !== 'v2') return;
+  // The user-global config (resolver layer 3) is a LOWER layer that a repo-local
+  // file overrides no matter where either sits — so it must never block a
+  // migration, even when the repo happens to live under `~/.config/solopreneur/`
+  // and the positional test would otherwise read it as an enclosing scope. Only
+  // a walk-up config (layer 2) genuinely shadows, and only when it is at or
+  // above the destination.
+  const globalConfig = path.join(os.homedir(), '.config', 'solopreneur', 'config.json');
+  if (resolved.configPath === globalConfig) return;
+  if (!isUnder(path.dirname(dest), path.dirname(resolved.configPath))) return;
   throw new ConfigError(
     `refusing to migrate: a v2 config already covers this scope\n  config: ${resolved.configPath}\n`
     + `  a new ${V2_FILENAME} at ${dest} would shadow it — move or delete that one first`,
@@ -711,19 +742,13 @@ function main(argv) {
   // matching how the resolver resolves it.
   const lexicalRoot = path.resolve(realDestDir, root);
 
-  // A root that exists but is a regular file will never resolve (the resolver
-  // requires a directory). Catch it here so the DRY RUN says so, instead of a
-  // clean-looking proposal that only fails after --write. A missing root is
-  // fine — a fresh setup creates it later, and it keeps its lexical path for the
-  // containment check below.
-  let physicalRoot = lexicalRoot;
+  // Judge the root by where it PHYSICALLY lands, existing or not: an in-repo
+  // symlink pointing outside, and a not-yet-created root under such a symlinked
+  // ancestor, both have to be caught. The resolver realpaths content, so a
+  // lexical-only check would pass here and still produce an undiscoverable config.
+  const physicalRoot = physicalize(lexicalRoot);
   let rootExists = false;
   try {
-    // realpath so an in-repo symlink pointing OUTSIDE the repo is judged by
-    // where it physically lands — the resolver realpaths content too, so a
-    // lexical-only check would pass here and still produce an undiscoverable
-    // config.
-    physicalRoot = fs.realpathSync(lexicalRoot);
     if (!fs.statSync(physicalRoot).isDirectory()) {
       throw new ConfigError(
         `the legacy preview root is not a directory, so the migrated config would not resolve\n`
@@ -733,8 +758,9 @@ function main(argv) {
     rootExists = true;
   } catch (err) {
     if (err instanceof ConfigError) throw err;
+    // A missing root is fine — a fresh setup creates it later.
     if (err.code !== 'ENOENT') {
-      throw new ConfigError(`cannot inspect the legacy preview root: ${lexicalRoot}\n  ${err.message}`);
+      throw new ConfigError(`cannot inspect the legacy preview root: ${physicalRoot}\n  ${err.message}`);
     }
   }
 
@@ -752,6 +778,29 @@ function main(argv) {
       + `  ${legacyPath !== null ? `it comes from ${pathLayer.where} in ${pathLayer.file}` : ''}\n`
       + `  place a ${V2_FILENAME} at an ancestor of that root by hand instead`,
     );
+  }
+
+  // A v2 config already sitting BETWEEN the root and the repo root would be the
+  // one the resolver finds first when walking up from content — the repo-root
+  // config we are about to write would be silently shadowed by it. `resolveConfig`
+  // anchored at the root reports exactly what wins there today; a nested hit
+  // (strictly below the destination) means the migration would be inert. Configs
+  // at or above the destination are `assertNotShadowing`'s job and are ignored
+  // here; a containment error from some ancestor's narrower root is theirs too.
+  if (rootExists) {
+    let nested = null;
+    try {
+      const existing = resolveConfig({ from: physicalRoot });
+      const dir = existing.mode === 'v2' ? path.dirname(existing.configPath) : null;
+      if (dir && dir !== realDestDir && isUnder(dir, realDestDir)) nested = existing.configPath;
+    } catch { /* an ancestor's containment error is assertNotShadowing's concern */ }
+    if (nested) {
+      throw new ConfigError(
+        `a v2 config already covers the preview root, nearer than the repo root\n  config: ${nested}\n`
+        + `  content under ${physicalRoot} would resolve to it, not to a new ${V2_FILENAME} at the repo root\n`
+        + `  migrate that scope where it lives, or remove it first`,
+      );
+    }
   }
 
   const rootNote = legacyPath !== null
