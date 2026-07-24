@@ -278,6 +278,14 @@ test('a timestamp without a timezone is rejected', () => {
   assert.throws(() => build(root, ['active']), isBuildError(/updatedAt/));
 });
 
+test('a shape-valid but impossible timestamp instant is rejected', () => {
+  const root = tmp();
+  // Matches the digit pattern (two-digit fields + a Z) but is not a real instant,
+  // so Date.parse returns NaN — the semantic check must reject it.
+  writeItem(root, 'active', 'a', { over: { updatedAt: '2026-99-99T99:99:99Z' } });
+  assert.throws(() => build(root, ['active']), isBuildError(/not a real ISO 8601 instant/));
+});
+
 // --- duplicate id -----------------------------------------------------------
 
 test('a duplicate id across active and archive aborts, naming BOTH files', () => {

@@ -219,6 +219,16 @@ function validate(value, schema, where, errors) {
 function validatePreviewMeta(meta, file) {
   const errors = [];
   validate(meta, loadSchema(), '', errors);
+  // The schema pattern checks timestamp SHAPE and a timezone, not semantics — it
+  // admits impossible instants (`2026-99-99T…Z`, `…+99:99`) that Date.parse then
+  // rejects as NaN. Catch those here so the catalog never sorts on, or publishes,
+  // a value that is not a real instant. Guarded on `typeof string` so a missing or
+  // wrong-typed field reports its schema error above rather than a parse error too.
+  for (const key of ['createdAt', 'updatedAt']) {
+    if (typeof meta[key] === 'string' && Number.isNaN(Date.parse(meta[key]))) {
+      errors.push(`${key}: ${JSON.stringify(meta[key])} is not a real ISO 8601 instant`);
+    }
+  }
   if (errors.length) throw new BuildError(`invalid preview.json: ${file}\n  ${errors.join('\n  ')}`);
 }
 
