@@ -129,7 +129,14 @@ function physicalize(target) {
           + `  ${path.relative(cur, target) || '.'} cannot exist beneath a file`,
         );
       }
-      if (err.code !== 'ENOENT') throw err;
+      // Any other resolution failure — an unreadable component (EACCES), a
+      // symlink loop (ELOOP), a name too long — is an environmental problem with
+      // a user-configured root, so it gets the same clean refusal as the cases
+      // above rather than escaping the CLI's ConfigError-only catch as a raw
+      // stack trace. Only ENOENT continues below (a genuinely missing component).
+      if (err.code !== 'ENOENT') {
+        throw new ConfigError(`cannot resolve the legacy preview root: ${cur}\n  ${err.message}`);
+      }
       try {
         fs.readlinkSync(cur);
         throw new ConfigError(`the legacy preview root passes through a dangling symlink: ${cur}`);

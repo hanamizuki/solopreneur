@@ -423,6 +423,27 @@ test('a nested config that is valid JSON but not an object is refused', () => {
   assert.ok(!fs.existsSync(s.dest));
 });
 
+test('a root through an unreadable directory fails cleanly, not with a stack trace', { skip: process.getuid?.() === 0 ? 'root ignores mode bits' : false }, () => {
+  // realpath raises EACCES crossing a 0o000 component; that must become a clean
+  // refusal, not escape the CLI's ConfigError-only catch as a raw stack trace.
+  const s = scenario({});
+  const locked = mkdirp(s.repo, 'locked');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'locked/inner' } } },
+  });
+  const mode = fs.statSync(locked).mode;
+  fs.chmodSync(locked, 0o000);
+  try {
+    const result = run(['--target-project', 'p'], { cwd: s.repo, home: s.home, env: s.env });
+    assertFailed(result);
+    assert.ok(!result.stderr.includes('node:fs'), result.stderr);
+    assert.ok(result.stderr.startsWith('config-migrate.mjs:'), result.stderr);
+  } finally {
+    fs.chmodSync(locked, mode);
+  }
+});
+
 test('a root passing through a regular file fails cleanly, not with a stack trace', () => {
   const s = scenario({});
   mkdirp(s.repo, 'docs');
