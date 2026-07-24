@@ -389,6 +389,15 @@ function fingerprintItem(itemDirReal) {
         if (!isUnder(real, itemDirReal)) {
           throw new BuildError(`a symlink escapes its preview directory: ${abs} -> ${real}`);
         }
+        // The exclusion rule checks the entry NAME, so a symlink with a safe name
+        // that TARGETS an excluded path (`env -> .env`, `meta.json -> preview.json`,
+        // `d -> .vercel/project.json`) would slip a hidden file's content into the
+        // deployment under an innocuous name, defeating the "nothing hidden" and
+        // "preview.json is not copied" guarantees. Reject a link whose target has
+        // ANY excluded segment within the item — not just an excluded basename.
+        if (path.relative(itemDirReal, real).split(path.sep).some(isExcluded)) {
+          throw new BuildError(`a symlink aliases an excluded path: ${abs} -> ${real}`);
+        }
         const st = fs.statSync(abs);
         if (st.isDirectory()) { walk(abs, rel); continue; }
         if (!st.isFile()) throw new BuildError(`refusing a non-regular file (device/socket/pipe): ${abs}`);

@@ -471,6 +471,21 @@ test('a contained symlink is followed and copied', () => {
   assert.equal(readStaged(result.stagingDir, 'p', 'a', 'link.txt'), 'hello');
 });
 
+test('a symlink aliasing an excluded secret file is rejected', () => {
+  const root = tmp();
+  const itemDir = writeItem(root, 'active', 'a');
+  fs.writeFileSync(path.join(itemDir, '.env'), 'SECRET=1'); // excluded dotfile
+  fs.symlinkSync(path.join(itemDir, '.env'), path.join(itemDir, 'env')); // safe name -> excluded target
+  assert.throws(() => build(root, ['active']), isBuildError(/aliases an excluded path/));
+});
+
+test('a symlink aliasing preview.json is rejected', () => {
+  const root = tmp();
+  const itemDir = writeItem(root, 'active', 'a');
+  fs.symlinkSync(path.join(itemDir, 'preview.json'), path.join(itemDir, 'meta.json')); // would leak metadata
+  assert.throws(() => build(root, ['active']), isBuildError(/aliases an excluded path/));
+});
+
 test('a directory symlink cycle is rejected', () => {
   const root = tmp();
   const itemDir = writeItem(root, 'active', 'a');
