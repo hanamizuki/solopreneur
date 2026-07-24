@@ -473,6 +473,24 @@ test('two filenames that normalize to the same NFC path abort', (t) => {
   assert.throws(() => build(root, ['active']), isBuildError(/normalize to the same path/));
 });
 
+test('a file and a directory that normalize to the same path abort', (t) => {
+  const root = tmp();
+  const itemDir = writeItem(root, 'active', 'a', { files: { 'index.html': '<body>x</body>' } });
+  try {
+    fs.writeFileSync(path.join(itemDir, 'é'), 'file'); // precomposed U+00E9 as a FILE
+    fs.mkdirSync(path.join(itemDir, 'é')); // e + combining accent as a DIRECTORY
+    fs.writeFileSync(path.join(itemDir, 'é', 'child.txt'), 'data');
+  } catch {
+    t.skip('filesystem normalizes unicode filenames - cannot construct the collision here');
+    return;
+  }
+  if (fs.readdirSync(itemDir).filter((n) => n.normalize('NFC') === 'é').length < 2) {
+    t.skip('filesystem normalizes unicode filenames - cannot construct the collision here');
+    return;
+  }
+  assert.throws(() => build(root, ['active']), isBuildError(/normalize to the same path/));
+});
+
 // --- torn-snapshot guard ----------------------------------------------------
 
 test('a source file rewritten between scan and copy aborts', () => {
@@ -534,6 +552,23 @@ test('the size report counts files and bytes per collection', () => {
   assert.equal(sizeReport.totalFiles, 3);
   assert.equal(sizeReport.totalBytes, 12);
   assert.deepEqual(sizeReport.warnings, []);
+});
+
+test('a collection key inherited from Object.prototype does not pollute or vanish from the report', () => {
+  const root = tmp();
+  const dir = path.join(root, 'ctor-coll', 'a'); // the `constructor` collection's path dir
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'preview.json'), JSON.stringify(makeMeta('a')));
+  fs.writeFileSync(path.join(dir, 'index.html'), '<body>x</body>');
+  // `{ constructor: … }` is a real own property (only `__proto__` is special in a
+  // literal); config-resolve accepts such an own collection key, and the size
+  // report must bucket it without reading Object.prototype's `constructor`.
+  const collections = { ...COLLECTIONS, constructor: { path: 'ctor-coll', label: 'Ctor' } };
+  const result = buildLibrary({ root, collections, include: ['constructor'], gitCommit: () => null });
+  stagings.push(result.stagingDir);
+  assert.equal(result.sizeReport.collections.constructor.files, 1); // bucketed, not dropped
+  assert.equal(result.sizeReport.totalFiles, 1);
+  assert.equal(Object.prototype.files, undefined); // Object.prototype was not polluted
 });
 
 test('a git source commit is projected when available, omitted otherwise', () => {

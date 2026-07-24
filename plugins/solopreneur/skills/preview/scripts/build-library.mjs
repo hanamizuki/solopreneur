@@ -397,6 +397,25 @@ function fingerprintItem(itemDirReal) {
   };
 
   walk(itemDirReal, '');
+
+  // The file/file variant of an NFC collision is caught in addFile; this catches
+  // the file/directory variant — a file whose normalized path is an ANCESTOR
+  // directory of another file's (e.g. a file `x` and a directory `x` holding
+  // `x/child`, distinct only by Unicode form on a preserving FS). They do not
+  // share a fingerprint key, so they would collide only at copy time as a raw
+  // EEXIST/ENOTDIR; reject them here with the same clean message instead.
+  for (const rel of fingerprint.keys()) {
+    const parts = rel.split('/');
+    for (let i = 1; i < parts.length; i += 1) {
+      const ancestor = parts.slice(0, i).join('/');
+      if (fingerprint.has(ancestor)) {
+        throw new BuildError(
+          `a file and a directory normalize to the same path ${JSON.stringify(ancestor)} in a preview — `
+          + 'rename one so the names differ after Unicode NFC normalization.',
+        );
+      }
+    }
+  }
   return { files, fingerprint };
 }
 
@@ -662,7 +681,12 @@ export function projectDirectory(items, generatedAt, commit) {
 
 /** File count + total bytes per collection, with a warning past the thresholds. */
 function buildSizeReport(items) {
-  const collections = {};
+  // Null prototype: a collection key can be an arbitrary string, and a config may
+  // (via JSON.parse) carry an own `__proto__` / `constructor` / `toString` key. On
+  // a plain `{}` accumulator `collections[key] ??= …` would read the INHERITED
+  // member for those, skip the assignment, and mutate Object.prototype (pollution)
+  // while dropping the collection from the report. Same guard config-migrate uses.
+  const collections = Object.create(null);
   let totalFiles = 0;
   let totalBytes = 0;
   for (const item of items) {
