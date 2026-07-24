@@ -323,14 +323,23 @@ function readPreviewJson(file) {
     throw new BuildError(`preview.json is a symlink: ${file}\n  the metadata sidecar must be a regular file, not a symlink.`);
   }
   if (!lst.isFile()) throw new BuildError(`preview.json is not a regular file: ${file}`);
+  let buf;
+  try {
+    buf = fs.readFileSync(file);
+  } catch (err) {
+    throw new BuildError(`cannot read preview.json: ${file}\n  ${err.message}`);
+  }
   let parsed;
   try {
-    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    parsed = JSON.parse(buf.toString('utf8'));
   } catch (err) {
     throw new BuildError(`malformed JSON in preview.json: ${file}\n  ${err.message}`);
   }
   if (!isObject(parsed)) throw new BuildError(`preview.json is not an object: ${file}`);
-  return parsed;
+  // Return the sidecar's content hash too, so the torn-snapshot guard can detect a
+  // mid-build rewrite of preview.json — the file that drives every published
+  // metadata field — even though it is excluded from the content walk.
+  return { meta: parsed, hash: sha256(buf) };
 }
 
 /**
@@ -505,7 +514,7 @@ function scanCollections(rootReal, collections, include) {
       }
 
       const metaFile = path.join(itemDirReal, 'preview.json');
-      const meta = readPreviewJson(metaFile);
+      const { meta, hash: metaHash } = readPreviewJson(metaFile);
       validatePreviewMeta(meta, metaFile);
       assertSlug(meta.id, metaFile); // defense in depth; the schema pattern already enforced it
 
@@ -549,6 +558,7 @@ function scanCollections(rootReal, collections, include) {
         entry,
         files,
         fingerprint,
+        metaHash,
         contentHash: computeContentHash(fingerprint, meta),
       };
       items.push(item);
@@ -687,6 +697,24 @@ function copyItem(item, stagingDir, injectEntry) {
     throw new BuildError(
       `torn snapshot: the source of ${JSON.stringify(item.id)} changed between scan and copy\n`
       + '  a file was added, removed, or rewritten; aborting rather than publish an inconsistent item.',
+    );
+  }
+
+  // preview.json is excluded from the content walk (and never copied), so the
+  // fingerprint above cannot see a mid-build rewrite of the sidecar — yet it drives
+  // every published metadata field (title / revision / contentHash / supersededBy)
+  // from the phase-1 `item.meta` snapshot. Re-hash it and abort if it changed, so a
+  // metadata-only mid-build edit is a torn snapshot too. A vanished sidecar counts.
+  let freshMetaHash;
+  try {
+    freshMetaHash = sha256File(item.metaFile);
+  } catch {
+    freshMetaHash = null;
+  }
+  if (freshMetaHash !== item.metaHash) {
+    throw new BuildError(
+      `torn snapshot: preview.json of ${JSON.stringify(item.id)} changed between scan and copy\n`
+      + '  the catalog would publish the stale metadata snapshot; aborting.',
     );
   }
 

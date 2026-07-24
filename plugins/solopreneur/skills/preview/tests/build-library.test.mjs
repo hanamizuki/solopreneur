@@ -635,6 +635,19 @@ test('a source file added between scan and copy aborts', () => {
   );
 });
 
+test('a preview.json rewritten between scan and copy aborts', () => {
+  const root = tmp();
+  const itemDir = writeItem(root, 'active', 'a', { files: { 'index.html': '<body>x</body>' } });
+  const metaFile = path.join(itemDir, 'preview.json');
+  assert.throws(
+    () => build(root, ['active'], {
+      // The sidecar (excluded from the content walk) is rewritten mid-build.
+      hooks: { afterFingerprint: () => fs.writeFileSync(metaFile, JSON.stringify(makeMeta('a', { title: 'Rewritten', revision: 99 }))) },
+    }),
+    isBuildError(/torn snapshot/),
+  );
+});
+
 test('a failed build leaves no staging tree behind', () => {
   const root = tmp();
   const itemDir = writeItem(root, 'active', 'a');
