@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "preview.json (schema version 1)",
+  "description": "Per-item sidecar metadata for one preview inside a Library collection. This is a DIFFERENT file from `.solopreneur.json` (the path-scoped config, described by config.schema.json): this one lives at `<collection>/<id>/preview.json` and describes a single preview item. It is local source metadata and is NEVER copied into the deployment — build-library.mjs projects only an allowlist of these fields into directory.json.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "title", "createdAt", "updatedAt", "revision"],
+  "properties": {
+    "schemaVersion": {
+      "description": "Format version of this file. Bumped only on a breaking layout change.",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Stable identifier for this preview. It becomes a route (`/p/<id>/`) and a staging path segment, so it is restricted to a lowercase slug — no `/`, `\\`, `.`, `..`, uppercase, or URL-encoding, all of which would let an id escape its directory or collide once decoded."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-facing title shown in the Library catalog and sidebar."
+    },
+    "createdAt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 8601 timestamp of first creation. Set once and never changed afterwards."
+    },
+    "updatedAt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 8601 timestamp of the latest revision. Advanced whenever `revision` increments. The catalog sorts on this value."
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic revision counter, starting at 1. Incremented by exactly one whenever user-visible content or displayed metadata changes; a content-identical republish or a Share snapshot does not advance it."
+    },
+    "project": {
+      "type": "string",
+      "description": "Optional label grouping this item under a product or workstream. v1 treats it as a display label only — it does not affect routing or grouping."
+    },
+    "sourceRef": {
+      "type": "string",
+      "description": "Optional stable pointer back to the source document (repo/workspace-relative), used only to route agent updates. It is NEVER emitted into the deployment — prefer a stable relative identifier, never a local absolute path."
+    },
+    "entry": {
+      "const": "index.html",
+      "description": "Entry HTML file, relative to the item directory. v1 fixes it to `index.html`; any other value is an explicit error. The field is kept so a future version can widen it without a format change."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional free-form tags. Carried through to the catalog; ordering is preserved as authored."
+    },
+    "supersededBy": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Optional id of the item that supersedes this one. Only valid on an item that lives in the Archive collection, must name another existing item in the same Library, and must not form a cycle. Used to fold an old duplicate under its canonical replacement."
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Optional record of which agent/session produced and last updated this item. The SHAPE is reserved here; build-library.mjs validates only that it is an object and passes it through untouched — provenance resolution and its sanitized projection into directory.json arrive in a later builder change."
+    }
+  }
+}
