@@ -23,11 +23,12 @@
  * the content tree — the staging tree is assembled in a system temp directory,
  * and a failed build removes it rather than leaving a partial snapshot behind.
  *
- * This PR is the scanner + staging producer. Chrome injection (the sidebar,
- * provenance footer and Share UI) is a LATER change: `injectEntry` is the seam it
- * plugs into, and this file ships the verbatim-copy default. `findInjectionPoint`
- * is implemented and tested here so that later change only adds injection logic,
- * never restructures the copy.
+ * The scanner + staging producer, plus the chrome the CLI injects: the sidebar,
+ * provenance footer and Share UI ride in via `chromeInject` (the `injectEntry`
+ * seam), the shared assets are copied into `<staging>/assets/`, and the Library
+ * home page is generated from `library-index.html` + `directory.json`.
+ * `buildLibrary`'s default seam stays verbatim (`identityInject`), so a caller
+ * that wants the raw copy — or a test isolating the seam — still gets it.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -38,11 +39,24 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ConfigError, resolveConfig } from './config-resolve.mjs';
+import { resolveProvenance } from './resolve-provenance.mjs';
 
 const SELF = 'build-library.mjs';
 const SCHEMA_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)), 'preview-schema.json',
 );
+
+/**
+ * The plugin's shared front-end assets. The content tree NEVER holds shared
+ * components — this directory is the single source — so the build copies them
+ * into staging and rewrites each entry's overlay tag to the staged copy (see
+ * chromeInject / copyAssets). `library-index.html` is the index template.
+ */
+const ASSETS_DIR = path.join(
+  path.dirname(fileURLToPath(import.meta.url)), '..', 'assets',
+);
+const SHARED_ASSETS = ['preview-shell.js', 'comment-overlay.js'];
+const INDEX_TEMPLATE = path.join(ASSETS_DIR, 'library-index.html');
 
 /** v1 entry file. The schema also pins it; this is the copy the scanner uses. */
 const ENTRY_DEFAULT = 'index.html';
@@ -606,16 +620,19 @@ function validateSupersededBy(items) {
 }
 
 // ---------------------------------------------------------------------------
-// Injection point (prepared for a later change; not applied here)
+// Injection point + chrome injection
+//
+// `findInjectionPoint` locates the seam; `chromeInject` is the real injector
+// the CLI passes. `buildLibrary`'s default stays `identityInject` (verbatim),
+// so a caller that wants the raw copy — or a test isolating the seam — still
+// gets it.
 // ---------------------------------------------------------------------------
 
 /**
- * Locate where entry-page chrome will be injected: immediately before the LAST
+ * Locate where entry-page chrome is injected: immediately before the LAST
  * `</body>` (case-insensitive), or appended at EOF when there is none. A page can
  * legitimately hold the literal string in a script or comment, so the real
- * closing tag is the last one. This PR copies the entry VERBATIM and does not
- * apply the point; it is exported and tested so the later chrome change only adds
- * injection, never restructures the copy.
+ * closing tag is the last one.
  *
  * @returns {{index: number, atEof: boolean}}
  */
@@ -633,6 +650,78 @@ export function findInjectionPoint(html) {
 /** The verbatim-copy default for the chrome-injection seam. */
 const identityInject = (html) => html;
 
+/**
+ * Serialize a value for embedding inside a `<script>` as a JSON island. The
+ * load-bearing escape is `<` -> `<`: every HTML breakout token
+ * (`</script`, `<!--`, `<script`) begins with `<`, so neutralizing it makes them
+ * unrepresentable in the script's raw text — true for both a
+ * `type="application/json"` island and a plain inline script. `>` / `&` and the
+ * JS line separators are escaped too as belt-and-suspenders. `JSON.parse` decodes
+ * the escapes back, so the value round-trips. Same "structure comes from
+ * JSON.stringify, never string concatenation" discipline directory.json uses,
+ * extended to a script context.
+ */
+function jsonIsland(value) {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+/**
+ * Match a per-page comment-overlay script tag, tolerant of quoting, extra
+ * attributes and whitespace: `<script … src="….comment-overlay.js" …></script>`.
+ * The per-page copy is excluded from staging, so its tag is REWRITTEN (never
+ * duplicated) to the shared staging asset.
+ */
+const OVERLAY_TAG_RE = /<script\b[^>]*\bsrc\s*=\s*["'][^"']*comment-overlay\.js["'][^>]*>\s*<\/script>/gi;
+
+/**
+ * Rewrite an existing comment-overlay tag to the shared staging asset and stamp
+ * the trusted preview id as a data attribute (the overlay reads it via
+ * `document.currentScript` to namespace its localStorage key per preview). The id
+ * is a validated lowercase slug (`^[a-z0-9-]+$`), inert in an HTML attribute, so
+ * it needs no further escaping. When no overlay tag exists (a hand-authored
+ * entry) the html is returned unchanged — a second tag is NEVER added (the
+ * overlay is a bare IIFE; a double-inject would double-initialize, and its own
+ * guard is a backstop, not a license).
+ */
+function rewriteOverlayTag(html, id) {
+  return html.replace(
+    OVERLAY_TAG_RE,
+    `<script src="/assets/comment-overlay.js" data-preview-id="${id}"></script>`,
+  );
+}
+
+/**
+ * The real chrome-injection seam the CLI uses. For one entry: rewrite its overlay
+ * tag to the shared asset, then inject — at the prepared injection point — a JSON
+ * island carrying the item's display metadata + resolved provenance, followed by
+ * the preview-shell script. All metadata is embedded via `jsonIsland` (escaped),
+ * never concatenated, so no title / agent value can forge markup. The content
+ * hash was computed from the source BEFORE this runs, so injected chrome never
+ * changes it.
+ */
+export function chromeInject(html, item) {
+  assertSlug(item.id, item.metaFile); // the id becomes an HTML attribute + route
+  const rewritten = rewriteOverlayTag(html, item.id);
+  const data = {
+    id: item.id,
+    title: item.meta.title,
+    revision: item.meta.revision,
+    createdAt: item.meta.createdAt,
+    updatedAt: item.meta.updatedAt,
+    contentHash: item.contentHash,
+    provenance: resolveProvenance(item.meta.provenance),
+  };
+  const island = `<script id="preview-shell-data" type="application/json">${jsonIsland(data)}</script>`;
+  const shellTag = '<script src="/assets/preview-shell.js"></script>';
+  const { index } = findInjectionPoint(rewritten);
+  return `${rewritten.slice(0, index)}${island}\n${shellTag}\n${rewritten.slice(index)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Copying (with the torn-snapshot guard)
 // ---------------------------------------------------------------------------
@@ -648,10 +737,10 @@ const identityInject = (html) => html;
  * rewritten content", so the content itself is fingerprinted.
  *
  * Chrome injection runs AFTER the guard, so the guard only ever validates the
- * verbatim copy. The default is identity (verbatim); a later change replaces
- * `injectEntry` to add preview-shell.js and rewrite the comment-overlay tag. The
- * content hash was computed from the source fingerprint before any of this, so
- * injected chrome never changes it.
+ * verbatim copy. The default is identity (verbatim); the CLI passes `chromeInject`,
+ * which rewrites the comment-overlay tag and adds preview-shell.js. The content
+ * hash was computed from the source fingerprint before any of this, so injected
+ * chrome never changes it.
  */
 function copyItem(item, stagingDir, injectEntry) {
   assertSlug(item.id, item.metaFile); // the id is about to become a path segment
@@ -812,6 +901,39 @@ function defaultGitCommit(dir) {
 }
 
 // ---------------------------------------------------------------------------
+// Library assembly (shared assets + index)
+// ---------------------------------------------------------------------------
+
+/**
+ * Copy the shared front-end assets into `<staging>/assets/`. The single source
+ * is the plugin's assets dir — the content tree never holds these — so a
+ * rewritten overlay tag and the injected preview-shell script resolve to one
+ * deployed copy. Absolute `/assets/...` refs work because the staging root is
+ * the deployment root.
+ */
+function copyAssets(stagingDir) {
+  const dest = path.join(stagingDir, 'assets');
+  fs.mkdirSync(dest, { recursive: true });
+  for (const name of SHARED_ASSETS) {
+    fs.copyFileSync(path.join(ASSETS_DIR, name), path.join(dest, name));
+  }
+}
+
+/**
+ * Generate `<staging>/index.html` from the library-index template + the
+ * projected directory. The catalog is embedded as an escaped JSON island via a
+ * FUNCTION replacer, so any `$` in the JSON is inserted literally (a string
+ * replacement would interpret `$&` / `$1`); the template's own script renders
+ * the active/archive sections from it.
+ */
+function generateIndex(stagingDir, directory) {
+  const template = fs.readFileSync(INDEX_TEMPLATE, 'utf8');
+  const island = jsonIsland(directory);
+  const html = template.replace('__DIRECTORY_JSON__', () => island);
+  fs.writeFileSync(path.join(stagingDir, 'index.html'), html);
+}
+
+// ---------------------------------------------------------------------------
 // The build
 // ---------------------------------------------------------------------------
 
@@ -856,6 +978,13 @@ export function buildLibrary({ root, collections, include, gitCommit = defaultGi
     // directory.json is always produced with JSON.stringify, never string
     // concatenation, so no metadata value can forge structure.
     fs.writeFileSync(path.join(stagingDir, 'directory.json'), `${JSON.stringify(directory, null, 2)}\n`);
+
+    // Library assembly, independent of per-entry chrome: the shared assets have
+    // a single source (the plugin), and the index is generated from its template
+    // + the projected directory. Done here so a verbatim build (default
+    // injectEntry) still produces a navigable Library home + sidebar assets.
+    copyAssets(stagingDir);
+    generateIndex(stagingDir, directory);
 
     return { stagingDir, directory, sizeReport: buildSizeReport(items) };
   } catch (err) {
@@ -910,6 +1039,7 @@ function main(argv) {
     root: resolved.root,
     collections: resolved.collections,
     include: resolved.target.include,
+    injectEntry: chromeInject,
   });
 
   if (asJson) {

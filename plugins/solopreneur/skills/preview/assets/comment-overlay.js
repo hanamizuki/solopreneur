@@ -15,32 +15,145 @@
 (function () {
   "use strict";
 
-  // v2: each comment gains { id, anchor:{exact,prefix,suffix} }.
-  // v1 data (no anchor) still loads — it just renders as a detached
-  // panel card (cannot place a marker), never discarded, never crashes.
-  const STORAGE_KEY = "preview_comments_v2";
-  const LEGACY_KEY = "preview_comments_v1";
+  // ===================================================================
+  // Pure, DOM-free helpers (per-ID storage + Node unit-test seam)
+  // ===================================================================
+  // Comments persist PER PREVIEW ID so that two previews served from one
+  // Library origin (/p/<id>/) never share or overwrite a single blob.
+  // The id is injected by the builder as a trusted data attribute on
+  // this script tag (data-preview-id) and read via
+  // document.currentScript below.
+  //
+  // v3 is the per-ID schema. The global v2 key (preview_comments_v2)
+  // predates per-ID and cannot be attributed to any single preview, so
+  // it is NEVER auto-adopted — loadComments reads ONLY the v3 key. A
+  // manual import path is offered instead (see
+  // window.__previewCommentOverlay near the bottom).
+  const LEGACY_V2_KEY = "preview_comments_v2";
+
+  function storageKeyFor(id) {
+    return "preview_comments_v3:" + (id || "");
+  }
+  // The diff/clean toggle is namespaced the same way, so one preview's
+  // "show edits" preference does not leak onto another on the same origin.
+  function diffCleanKeyFor(id) {
+    return "preview_diff_clean_v1:" + (id || "");
+  }
+
+  // Read ONLY the given key — no v1/v2 fallback. A non-array or a parse
+  // failure yields [] (never throws, never silently adopts a legacy blob).
+  function loadComments(storage, key) {
+    if (!storage) return [];
+    try {
+      const parsed = JSON.parse(storage.getItem(key) || "null");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // Persist and REPORT success/failure — never swallow. setItem throws
+  // synchronously on quota (QuotaExceededError) or blocked storage
+  // (SecurityError); the caller surfaces a visible error + export hatch
+  // rather than render a false success and silently lose a comment.
+  function tryPersist(storage, key, value) {
+    if (!storage) return false;
+    try {
+      storage.setItem(key, value);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Is there a non-empty legacy global v2 blob worth offering to import?
+  function hasLegacyV2(storage) {
+    if (!storage) return false;
+    try {
+      const parsed = JSON.parse(storage.getItem(LEGACY_V2_KEY) || "null");
+      return Array.isArray(parsed) && parsed.length > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Double-load guard: a second include of this bare IIFE would
+  // re-initialize everything (two sets of buttons/listeners). Mark the
+  // global on first run; a re-run returns true and the caller no-ops.
+  function alreadyInitialized(root) {
+    if (!root) return false;
+    if (root.__previewCommentOverlayLoaded) return true;
+    root.__previewCommentOverlayLoaded = true;
+    return false;
+  }
+
+  // Node unit-test seam: expose the pure helpers when imported as a
+  // CommonJS module. Browsers (where `module` is undeclared) skip this;
+  // `typeof` on an undeclared identifier is safe (no ReferenceError).
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+      storageKeyFor,
+      diffCleanKeyFor,
+      loadComments,
+      tryPersist,
+      hasLegacyV2,
+      alreadyInitialized,
+    };
+  }
+
+  // Everything below touches the DOM. Under Node (no document) stop here
+  // — the pure helpers above are already exported. This early return is
+  // legal because it sits INSIDE the IIFE, not at script top level.
+  if (typeof document === "undefined") return;
+
+  // Guard a double-inject (the overlay is a shared staging asset; a page
+  // that includes it twice must not initialize twice).
+  if (alreadyInitialized(window)) return;
+
+  // localStorage access itself can throw (SecurityError in a
+  // blocked-cookie / sandboxed context), so resolve it once behind a
+  // guard and pass the (possibly null) handle to the storage helpers.
+  let LS = null;
+  try {
+    LS = window.localStorage;
+  } catch (_) {
+    LS = null;
+  }
+
+  // The builder injects the preview id as a trusted data attribute on
+  // this script tag. document.currentScript IS this <script> during the
+  // classic script's synchronous execution (it is null in later
+  // callbacks, so it must be read now). Absent (a hand-authored preview
+  // not built by the Library) -> empty id -> a single un-namespaced
+  // store, which is fine for a standalone one-page preview.
+  const PREVIEW_ID =
+    (document.currentScript &&
+      document.currentScript.dataset &&
+      document.currentScript.dataset.previewId) ||
+    "";
+  const STORAGE_KEY = storageKeyFor(PREVIEW_ID);
+  const DIFF_CLEAN_KEY = diffCleanKeyFor(PREVIEW_ID);
   const CTX = 32; // chars of prefix/suffix context captured for anchoring
   const DESKTOP_MIN = 1024; // px; >= is margin layer, < is bottom sheet
   const CARD_GAP = 12; // px vertical gap between cascaded margin cards
 
-  let comments = [];
-  try {
-    comments = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    if (!Array.isArray(comments)) comments = null;
-  } catch (_) {
-    comments = null;
-  }
-  if (comments == null) {
-    // First load under v2: migrate any v1 data so existing review
-    // sessions don't silently lose comments. v1 entries have no anchor,
-    // so they degrade to detached cards (handled downstream).
-    comments = [];
+  // v2: each comment gains { id, anchor:{exact,prefix,suffix} }. A stored
+  // entry with no anchor still loads — it renders as a detached panel
+  // card (cannot place a marker), never discarded, never crashes.
+  let comments = loadComments(LS, STORAGE_KEY);
+
+  // The legacy global v2 blob is NEVER auto-adopted (it cannot be
+  // attributed to this preview). If one exists and this preview has no
+  // comments yet, hint that a manual import is available.
+  if (hasLegacyV2(LS) && comments.length === 0) {
     try {
-      const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || "[]");
-      if (Array.isArray(legacy)) comments = legacy;
+      console.info(
+        "[preview] Found legacy comments (preview_comments_v2). Not imported " +
+          "automatically. Run window.__previewCommentOverlay.importLegacyV2() " +
+          "to import them into this preview."
+      );
     } catch (_) {
-      comments = [];
+      /* console may be unavailable */
     }
   }
 
@@ -65,14 +178,59 @@
   }
 
   const save = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(comments));
-    } catch (_) {
-      /* storage blocked — UI still works for this session */
+    // Never swallow a write failure: a comment kept only in memory is one
+    // reload away from being lost. tryPersist reports success/failure; on
+    // failure we surface a visible banner with an export escape hatch
+    // instead of rendering a false success.
+    if (!tryPersist(LS, STORAGE_KEY, JSON.stringify(comments))) {
+      showWriteError();
     }
     updateBadge();
     renderPanel();
   };
+
+  // Surface a storage write failure (quota exceeded / blocked storage)
+  // instead of swallowing it. A comment kept only in memory is one reload
+  // away from being lost, so tell the user and offer an immediate export
+  // escape hatch. Shown once; a repeat failure while it is up is a no-op.
+  let writeErrorBanner = null;
+  function showWriteError() {
+    if (writeErrorBanner) return; // already visible
+    const bar = el(
+      "div",
+      "position:fixed;top:0;left:0;right:0;z-index:10020;background:#7f1d1d;color:#fff;padding:10px 14px;font:500 13px system-ui,sans-serif;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.25)",
+      { attrs: { "data-cmt-ui": "1", role: "alert" } }
+    );
+    bar.appendChild(
+      el("span", "", {
+        text: "Couldn't save your comments to this browser (storage full or blocked). Export now so you don't lose them.",
+      })
+    );
+    const exportNow = el(
+      "button",
+      "padding:5px 12px;border:none;border-radius:6px;background:#fff;color:#7f1d1d;font:600 13px system-ui,sans-serif;cursor:pointer",
+      { text: "Export now" }
+    );
+    const dismiss = el(
+      "button",
+      "padding:5px 10px;border:1px solid rgba(255,255,255,.6);border-radius:6px;background:transparent;color:#fff;font:500 13px system-ui,sans-serif;cursor:pointer",
+      { text: "Dismiss" }
+    );
+    const clear = () => {
+      if (writeErrorBanner) {
+        writeErrorBanner.remove();
+        writeErrorBanner = null;
+      }
+    };
+    exportNow.addEventListener("click", () => {
+      clear();
+      showExportModal(buildMarkdown());
+    });
+    dismiss.addEventListener("click", clear);
+    bar.append(exportNow, dismiss);
+    document.body.appendChild(bar);
+    writeErrorBanner = bar;
+  }
 
   // Tell password managers (1Password / LastPass / Bitwarden /
   // browser-native) to skip any <textarea> these are applied to. Without
@@ -1452,12 +1610,12 @@
   // ===================================================================
   // Diff / clean toggle (unchanged behavior; lives in the float cluster)
   // ===================================================================
-  const DIFF_CLEAN_KEY = "preview_diff_clean_v1";
+  // DIFF_CLEAN_KEY is defined at the top, namespaced by preview id.
   const hasDiff = !!document.querySelector("del, ins");
 
   let diffClean = false;
   try {
-    diffClean = localStorage.getItem(DIFF_CLEAN_KEY) === "1";
+    diffClean = !!LS && LS.getItem(DIFF_CLEAN_KEY) === "1";
   } catch (_) {
     diffClean = false;
   }
@@ -1478,11 +1636,9 @@
 
   diffBtn.addEventListener("click", () => {
     const clean = document.body.classList.toggle("diff-clean");
-    try {
-      localStorage.setItem(DIFF_CLEAN_KEY, clean ? "1" : "0");
-    } catch (_) {
-      /* storage blocked — toggle still works for this session */
-    }
+    // Diff-clean is a non-critical UI preference, so a failed write is not
+    // surfaced (unlike a comment) — the toggle still works this session.
+    tryPersist(LS, DIFF_CLEAN_KEY, clean ? "1" : "0");
     updateDiffBtn();
     // Diff toggle changes which text is present; re-anchor markers so
     // they track the now-visible content.
@@ -1542,6 +1698,44 @@
     placeToolButtons();
     updateDiffBtn();
   }
+
+  // ===================================================================
+  // Manual import / export API (the non-silent legacy path)
+  // ===================================================================
+  // The global v2 blob is never adopted automatically (see loadComments).
+  // These let a user pull it in ON PURPOSE, or move comments between
+  // previews, without ever silently attributing an un-attributable blob.
+  window.__previewCommentOverlay = window.__previewCommentOverlay || {};
+  window.__previewCommentOverlay.exportJSON = function () {
+    return JSON.stringify(comments);
+  };
+  window.__previewCommentOverlay.importJSON = function (json) {
+    let incoming;
+    try {
+      incoming = typeof json === "string" ? JSON.parse(json) : json;
+    } catch (_) {
+      return false;
+    }
+    if (!Array.isArray(incoming)) return false;
+    incoming.forEach((c) => {
+      if (c && !c.id) c.id = newId();
+    });
+    comments = incoming;
+    placeAllMarkers();
+    save();
+    return true;
+  };
+  window.__previewCommentOverlay.importLegacyV2 = function () {
+    if (!LS) return false;
+    let legacy;
+    try {
+      legacy = JSON.parse(LS.getItem(LEGACY_V2_KEY) || "null");
+    } catch (_) {
+      return false;
+    }
+    if (!Array.isArray(legacy)) return false;
+    return window.__previewCommentOverlay.importJSON(legacy);
+  };
 
   // ===================================================================
   // Boot + re-anchor lifecycle

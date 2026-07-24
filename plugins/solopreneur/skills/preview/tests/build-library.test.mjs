@@ -24,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildLibrary, findInjectionPoint, projectDirectory, BuildError } from '../scripts/build-library.mjs';
+import { buildLibrary, findInjectionPoint, chromeInject, projectDirectory, BuildError } from '../scripts/build-library.mjs';
 
 const SCRIPT = path.join(
   path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'build-library.mjs',
@@ -189,6 +189,124 @@ test('the content hash is computed BEFORE chrome injection', () => {
   assert.doesNotMatch(readStaged(plain.stagingDir, 'p', 'a', 'index.html'), /\/\*chrome\*\//);
   // ...but the content hash did not, because it is taken from the source before it.
   assert.equal(itemById(chromed.directory, 'a').contentHash, itemById(plain.directory, 'a').contentHash);
+});
+
+// --- chrome injection (preview-shell + overlay rewrite + assets + index) -----
+
+const CHROME = { injectEntry: chromeInject };
+
+test('an existing comment-overlay tag is REWRITTEN to the staging asset, never duplicated', () => {
+  const root = tmp();
+  const html = '<!doctype html><html><body><h1>a</h1>\n<script src="./comment-overlay.js"></script>\n</body></html>';
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  // exactly ONE overlay reference, pointing at the shared staging asset
+  assert.equal((entry.match(/comment-overlay\.js/g) || []).length, 1, 'must not duplicate the overlay tag');
+  assert.match(entry, /<script src="\/assets\/comment-overlay\.js" data-preview-id="a"><\/script>/);
+  assert.doesNotMatch(entry, /\.\/comment-overlay\.js/, 'the relative per-page path must be gone');
+});
+
+test('the overlay rewrite tolerates single quotes and extra attributes', () => {
+  const root = tmp();
+  const html = "<html><body>a<script defer src='./comment-overlay.js' data-x='1'></script></body></html>";
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.equal((entry.match(/comment-overlay\.js/g) || []).length, 1);
+  assert.match(entry, /src="\/assets\/comment-overlay\.js" data-preview-id="a"/);
+});
+
+test('preview-shell (data island + script) is injected at the seam, before </body>', () => {
+  const root = tmp();
+  const html = '<html><body>a<script src="./comment-overlay.js"></script></body></html>';
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.match(entry, /<script id="preview-shell-data" type="application\/json">/);
+  assert.match(entry, /<script src="\/assets\/preview-shell\.js"><\/script>/);
+  assert.ok(entry.indexOf('preview-shell.js') < entry.lastIndexOf('</body>'), 'injected before the closing body tag');
+});
+
+test('an entry with NO overlay tag gets the shell but no overlay tag is ADDED', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', { files: { 'index.html': '<html><body>bare</body></html>' } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.doesNotMatch(entry, /comment-overlay\.js/, 'no overlay tag is added when the source had none');
+  assert.match(entry, /preview-shell\.js/);
+});
+
+test('the injected shell data island carries resolved provenance + the item contentHash', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', {
+    over: {
+      provenance: {
+        createdBy: { agent: 'Builder Claude', platform: 'claude' },
+        lastUpdatedBy: { agent: 'Builder Claude', platform: 'claude' },
+      },
+    },
+    files: { 'index.html': '<html><body>a</body></html>' },
+  });
+  const result = build(root, ['active'], CHROME);
+  const entry = readStaged(result.stagingDir, 'p', 'a', 'index.html');
+  const island = entry.match(/<script id="preview-shell-data" type="application\/json">([\s\S]*?)<\/script>/)[1];
+  const data = JSON.parse(island);
+  // creator == updater collapses to producedBy (the resolve-provenance shape)
+  assert.equal(data.provenance.producedBy.agent, 'Builder Claude');
+  assert.ok(!('createdBy' in data.provenance));
+  assert.equal(data.contentHash, itemById(result.directory, 'a').contentHash);
+  assert.equal(data.id, 'a');
+});
+
+test('a raw session id in provenance never reaches the injected island', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', {
+    over: {
+      provenance: { createdBy: { agent: 'X', platform: 'claude', payload: { session_id: 'SECRET-SESSION-xyz', session_title: 'ok' } } },
+    },
+    files: { 'index.html': '<html><body>a</body></html>' },
+  });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.ok(!entry.includes('SECRET-SESSION-xyz'), 'resolve-provenance must have dropped the raw session id');
+});
+
+test('a hostile title cannot break out of the injected data island (< is escaped)', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', {
+    over: { title: 'pwn</script><script>alert(1)</script>' },
+    files: { 'index.html': '<html><body>a</body></html>' },
+  });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  // The literal breakout sequence must not appear; `<` is escaped to <.
+  assert.doesNotMatch(entry, /pwn<\/script>/);
+  const island = entry.match(/<script id="preview-shell-data" type="application\/json">([\s\S]*?)<\/script>/)[1];
+  // The island still round-trips to the real title via JSON.parse.
+  assert.equal(JSON.parse(island).title, 'pwn</script><script>alert(1)</script>');
+});
+
+test('shared assets are copied from the plugin into <staging>/assets/', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  const { stagingDir } = build(root, ['active'], CHROME);
+  assert.ok(stagedExists(stagingDir, 'assets', 'preview-shell.js'));
+  assert.ok(stagedExists(stagingDir, 'assets', 'comment-overlay.js'));
+});
+
+test('the library index is generated from the template + directory.json', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'keep');
+  writeItem(root, 'archive', 'old', { over: { updatedAt: '2026-01-01T00:00:00Z' } });
+  const { stagingDir } = build(root, ['active', 'archive'], CHROME);
+  const idx = readStaged(stagingDir, 'index.html');
+  assert.doesNotMatch(idx, /__DIRECTORY_JSON__/, 'the placeholder token must be replaced');
+  const island = idx.match(/<script id="directory-data" type="application\/json">([\s\S]*?)<\/script>/)[1];
+  const data = JSON.parse(island);
+  assert.deepEqual(data.items.map((i) => i.id).sort(), ['keep', 'old']);
+});
+
+test('assets + index are produced even on a verbatim (default) build', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  const { stagingDir } = build(root, ['active']); // default injectEntry (identity)
+  assert.ok(stagedExists(stagingDir, 'assets', 'preview-shell.js'));
+  assert.ok(stagedExists(stagingDir, 'index.html'));
 });
 
 // --- sanitization (the crown-jewel guarantee) -------------------------------
