@@ -188,12 +188,12 @@ function validate(value, schema, defs, where, errors) {
   }
   if ('required' in schema && isObject(value)) {
     for (const key of schema.required) {
-      if (!(key in value)) errors.push(`${where === '' ? key : `${where}.${key}`}: required but missing`);
+      if (!Object.hasOwn(value, key)) errors.push(`${where === '' ? key : `${where}.${key}`}: required but missing`);
     }
   }
   if ('properties' in schema && isObject(value)) {
     for (const [key, sub] of Object.entries(schema.properties)) {
-      if (key in value) validate(value[key], sub, defs, where === '' ? key : `${where}.${key}`, errors);
+      if (Object.hasOwn(value, key)) validate(value[key], sub, defs, where === '' ? key : `${where}.${key}`, errors);
     }
   }
   // Covers the map-shaped objects (`targets`), where every entry shares one
@@ -295,7 +295,7 @@ function findAncestorConfig(anchorDir) {
     const config = readJsonIfPresent(file);
     if (config !== undefined) {
       assertConfigObject(config, file);
-      if ('preview' in config) return { file, config };
+      if (Object.hasOwn(config, 'preview')) return { file, config };
     }
     if (path.dirname(dir) === dir) return null;
   }
@@ -346,8 +346,9 @@ function resolveV2(file, config) {
     );
   }
   // `include` names collection keys, so an entry with no declared collection
-  // would hand the builder a key that resolves to nothing.
-  const unknown = target.include.filter((key) => !(key in preview.collections));
+  // would hand the builder a key that resolves to nothing. `Object.hasOwn`, not
+  // `in`: `in` walks the prototype chain, so `"constructor"` would pass.
+  const unknown = target.include.filter((key) => !Object.hasOwn(preview.collections, key));
   if (unknown.length) {
     throw new ConfigError(
       `invalid config: ${file}\n  preview.targets.${name}.include: no such collection: ${unknown.join(', ')}`
@@ -382,7 +383,11 @@ function resolveV2(file, config) {
  */
 function isUnder(child, parent) {
   const rel = path.relative(parent, child);
-  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  if (rel === '') return true;
+  // Only a real parent segment escapes: a plain `startsWith('..')` would also
+  // reject a legitimately-nested directory whose name begins with two dots.
+  if (rel === '..' || rel.startsWith(`..${path.sep}`)) return false;
+  return !path.isAbsolute(rel);
 }
 
 // Legacy files are described, never converted. Reporting the raw subtrees keeps
@@ -444,11 +449,15 @@ export function resolveConfig({ from } = {}) {
   // pointed at a file, a problem with that file is the answer.
   const explicit = process.env.SOLOPRENEUR_CONFIG;
   if (explicit) {
-    const abs = path.resolve(explicit);
-    const config = readJsonIfPresent(abs);
-    if (config === undefined) throw new ConfigError(`$SOLOPRENEUR_CONFIG does not exist: ${abs}`);
-    // realpath so configPath is physical here too, matching the walk-up layers.
-    const file = fs.realpathSync(abs);
+    // Deliberately NOT realpath'd. A relative `root` resolves against the
+    // directory of the file that declared it, so realpathing a symlinked config
+    // here would silently rebase `root` onto the link target's directory — and
+    // the walk-up layers, which keep the path the file was found at, would
+    // resolve the very same config differently. Consistency between layers
+    // matters more than a cosmetically physical `configPath`.
+    const file = path.resolve(explicit);
+    const config = readJsonIfPresent(file);
+    if (config === undefined) throw new ConfigError(`$SOLOPRENEUR_CONFIG does not exist: ${file}`);
     assertConfigObject(config, file);
     validateV2(config, file);
     return decide(resolveV2(file, config));
@@ -466,7 +475,7 @@ export function resolveConfig({ from } = {}) {
   const globalConfig = readJsonIfPresent(globalFile);
   if (globalConfig !== undefined) {
     assertConfigObject(globalConfig, globalFile);
-    if ('preview' in globalConfig) {
+    if (Object.hasOwn(globalConfig, 'preview')) {
       validateV2(globalConfig, globalFile);
       return decide(resolveV2(globalFile, globalConfig));
     }

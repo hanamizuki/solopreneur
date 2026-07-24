@@ -156,6 +156,26 @@ test('$SOLOPRENEUR_CONFIG without a preview block errors, never falls through', 
   assert.ok(result.stderr.includes('preview'), result.stderr);
 });
 
+test('a symlinked $SOLOPRENEUR_CONFIG resolves root the same way the walk-up would', () => {
+  const root = tmp();
+  const real = mkdirp(root, 'real');
+  const target = writeJson(path.join(real, '.solopreneur.json'), v2('link-project'));
+  const declared = mkdirp(root, 'declared');
+  const link = path.join(declared, '.solopreneur.json');
+  fs.symlinkSync(target, link);
+  mkdirp(declared, 'previews');
+  mkdirp(real, 'previews');
+
+  // A relative root resolves against the directory of the file that DECLARED
+  // it. Realpathing the config here would rebase it onto the link target's
+  // directory, so naming the same file explicitly would answer differently
+  // from finding it by walking up.
+  const out = runJson([], { cwd: declared, env: { SOLOPRENEUR_CONFIG: link } });
+  const viaWalkUp = runJson(['--from', path.join(declared, 'previews')]);
+  assert.equal(out.root, path.join(declared, 'previews'));
+  assert.equal(out.root, viaWalkUp.root);
+});
+
 // --- layer 2: ancestor walk-up ---------------------------------------------
 
 test('the nearest ancestor config wins over a farther one', () => {
@@ -345,6 +365,44 @@ test('an include entry with no declared collection exits non-zero', () => {
   const result = run(['--from', mkdirp(repo, 'sub')]);
   assertFailed(result);
   assert.ok(result.stderr.includes('nope'), result.stderr);
+});
+
+test('an include entry inherited from Object.prototype is still rejected', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('p', { root: '.' });
+  // `"constructor" in collections` is true via the prototype chain, so an
+  // own-property check is what makes this fail.
+  config.preview.targets.private.include = ['active', 'constructor'];
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const result = run(['--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes('constructor'), result.stderr);
+});
+
+test('an extra collection is validated like the named ones', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('p', { root: '.' });
+  config.preview.collections.docs = 'not-a-collection';
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const result = run(['--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes('docs'), result.stderr);
+});
+
+test('a directory whose name starts with .. is inside the root', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  writeJson(path.join(repo, '.solopreneur.json'), v2('dotdot-project'));
+  // `path.relative` returns "..draft/item" here, which a plain startsWith('..')
+  // would read as an escape.
+  const anchor = mkdirp(repo, 'previews', '..draft', 'item');
+
+  const out = runJson(['--from', anchor]);
+  assert.equal(out.root, path.join(repo, 'previews'));
 });
 
 test('a wrong schemaVersion exits non-zero', () => {

@@ -37,12 +37,13 @@
     },
     "collections": {
       "type": "object",
-      "description": "Local content lifecycle buckets. v1 fixes the set to `active` and `archive`; the schema stays open so a third can be added later without a format change.",
+      "description": "Local content lifecycle buckets. v1 fixes the set to `active` and `archive`; the schema stays open so a third can be added later without a format change. Staying open does not mean unvalidated — any additional collection must have the same shape as the two named ones.",
       "required": ["active", "archive"],
       "properties": {
         "active": { "$ref": "#/$defs/collection" },
         "archive": { "$ref": "#/$defs/collection" }
-      }
+      },
+      "additionalProperties": { "$ref": "#/$defs/collection" }
     },
     "collection": {
       "type": "object",
