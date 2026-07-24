@@ -343,6 +343,18 @@ registered here by hand:
 - `preview/scripts/config-resolve.mjs` — `legacyPreviewValues()` and the
   layer 4/5 file locations restate this file's legacy layout in JavaScript. It
   only ever **reads and reports** that layout; it never writes a legacy file.
+- `preview/scripts/config-migrate.mjs` — its own `legacyPreviewValues()`, plus
+  two readers that restate the **two different cascades** described above:
+  `readPerKey()` mirrors `deploy.sh:read_preview_config` (file-major —
+  `repos[<rk>]` then `default` *within* each file) for `projects.<bucket>` and
+  `autoProtect`, and `readPath()` mirrors `read_solopreneur_config preview`
+  (subtree-major — the whole `preview` subtree from the first layer that has
+  one, then `.path` else `.paths[<rk>]` from that one subtree) for the preview
+  path. `repoKey()` mirrors `deploy.sh:_preview_repo_key`. All of it **reads
+  only**: the legacy file is never written, and `--write` copies it aside
+  before creating the separate v2 file. Keep these in sync when either cascade
+  changes — answering the way only one of them does would migrate a setting the
+  user never set.
 
 ---
 
@@ -481,6 +493,65 @@ Tests live in the skill's `tests/` directory: `node --test` from
 `skills/preview`. (A bare directory argument does not work — since Node 22.6
 the positional arguments are glob patterns, so `node --test tests/` matches the
 directory itself and fails; use `node --test tests/*.test.mjs` to run just that
-suite.)
+suite.) `.github/workflows/validate-preview-tests.yml` runs that suite on every
+pull request and every push to `main`, on the declared floor (Node 20) and on
+the current Active LTS.
+
+## Migrating from the legacy config
+
+`scripts/config-migrate.mjs` in the `preview` skill turns whatever the legacy
+`solopreneur.json` already says into a proposed v2 `.solopreneur.json`.
+
+```bash
+node scripts/config-migrate.mjs                                    # dry run, lists candidates
+node scripts/config-migrate.mjs --target-project my-previews       # dry run, full diff
+node scripts/config-migrate.mjs --target-project my-previews --write
+```
+
+**The legacy file is read-only, permanently.** The migrator never rewrites it,
+never merges into it, and leaves it byte-identical — asserted by a test that
+compares its bytes before and after a `--write`. That is what makes rollback
+"delete the new file", and it is why the two files coexist for as long as the
+user wants rather than one replacing the other.
+
+What it reads: `${CLAUDE_CONFIG_DIR}/solopreneur.json`,
+`~/.claude/solopreneur.json`, and any file named with `--legacy-config <path>`
+(repeatable, and outranking both default locations). There is no built-in
+inventory of anywhere else — looking further always takes the flag.
+
+Rules worth knowing before running it:
+
+- **The default mode is a dry run.** It prints the legacy values it found, the
+  candidate projects, the exact destination path and a full unified diff of the
+  proposed file, and writes nothing.
+- **The target project is never inferred.** `--target-project` is required, and
+  the legacy bucket names (`default` / `keep` / `public`) are treated as opaque
+  provenance — none of them implies which project to adopt. Without the flag the
+  run exits non-zero listing every candidate and where it came from. A single
+  candidate is still not a decision.
+- **`autoProtect` maps to `visibility: "private"` in every case.** `true` and
+  absent map there for the obvious reason; `false` maps there too, with a
+  warning on both stdout and stderr. Turning a target `public` is never a
+  migration side effect — it takes a deliberate hand edit afterwards.
+- **`preview.root` follows the legacy cascades exactly**, including their
+  shadowing: a `preview` subtree that wins the lookup but carries no path means
+  "no configured path" even when a lower layer has one, because the legacy
+  reader does not see that lower layer either. When nothing names a path, the
+  root defaults to SKILL.md's documented `docs/preview`, and the report says so.
+- **The new file lands at the git toplevel** (or the working directory outside a
+  repo), because a legacy path is stored relative to the repo root and a v2
+  relative `root` resolves against the directory of the file declaring it.
+- **`--write` backs up first**, copying each legacy file it read to
+  `<file>.backup-<UTC timestamp>` (never overwriting an existing backup), then
+  writes the v2 file through a same-directory temp that is validated with
+  `config-resolve.mjs` before being `rename`d into place.
+- **Refusals are clean no-ops**: nothing is written when the destination already
+  exists, when a v2 config at or above the destination would be shadowed, or
+  when there is no legacy preview config to migrate. A user-global
+  `~/.config/solopreneur/config.json` does *not* block a repo-local migration —
+  it is a lower layer that a repo-local file is meant to win over.
+
+`PREVIEW_PROJECT` is neither read nor changed by the migrator; it stays the
+highest-priority override for the legacy per-page flow.
 
 ---

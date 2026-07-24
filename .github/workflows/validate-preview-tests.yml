@@ -1,0 +1,64 @@
+name: Validate preview tests
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/solopreneur/skills/preview/**'
+      - 'plugins/solopreneur/shared/**'
+      - '.github/workflows/validate-preview-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/solopreneur/skills/preview/**'
+      - 'plugins/solopreneur/shared/**'
+      - '.github/workflows/validate-preview-tests.yml'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      # The matrix leg has to be part of the group, as in validate-vendored.yml:
+      # without it the two Node jobs share one group and cancel each other,
+      # leaving one version silently untested.
+      group: validate-preview-tests-${{ github.ref }}-${{ matrix.node }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        # '20' is the floor both scripts declare in their headers, and testing
+        # only a modern Node would let a floor break ship green. '24' is the
+        # current Active LTS. Both verified passing locally, as is Node 26.
+        node: ['20', '24']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Install Node ${{ matrix.node }}
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: ${{ matrix.node }}
+          # Deliberately no `cache:` — it keys the cache on a lockfile and hard
+          # errors when there is none. This repo ships no package.json anywhere,
+          # and the suite uses Node built-ins only, so there is nothing to cache.
+
+      - name: Run the preview skill test suite
+        working-directory: plugins/solopreneur/skills/preview
+        run: |
+          # NOT `node --test tests/`: since Node 22.6 the positional arguments
+          # are glob patterns rather than paths, so a bare directory matches
+          # itself and Node then tries to execute the directory as a test file —
+          # the run fails having executed nothing. The shell expands the form
+          # below to real file paths on every version this matrix covers.
+          if ! node --test tests/*.test.mjs; then
+            echo
+            echo "::error::The preview skill's test suite failed on Node ${{ matrix.node }}."
+            echo "::error::Reproduce with: cd plugins/solopreneur/skills/preview && node --test tests/*.test.mjs"
+            exit 1
+          fi
