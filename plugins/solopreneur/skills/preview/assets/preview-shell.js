@@ -449,10 +449,15 @@
   // explicitly because `all` does not reset it. All chrome fonts/colors
   // are declared here, inside the shadow root, so nothing leaks either way.
   const STYLE = `<style>
-  /* "all: initial" resets the host to display:inline, which would put a block
-     footer inside an inline box; restore block so the in-flow footer lays out
-     normally. */
-  :host { all: initial; display: block; }
+  /* Reset the host and, crucially, make the reset win. Shadow DOM isolates
+     DESCENDANTS, not the host itself: a light-DOM rule that matches the host
+     (e.g. body > div { display:none }) outranks a NORMAL :host rule, so a
+     preview's own CSS could hide or move the whole chrome. Important :host
+     declarations beat important outer declarations, so important gives the
+     reset the precedence the isolation guarantee needs. "all: initial" would
+     otherwise leave the host display:inline (a block footer in an inline box),
+     so display:block is restored. */
+  :host { all: initial !important; display: block !important; }
   * { box-sizing: border-box; }
   .ps-wrap {
     direction: ltr;

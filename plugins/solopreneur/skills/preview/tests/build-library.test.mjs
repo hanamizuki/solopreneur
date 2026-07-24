@@ -255,6 +255,45 @@ test('a data-src-only tag is left inert (never made executable)', () => {
   assert.doesNotMatch(entry, /src="\/assets\/comment-overlay\.js"/, 'must not become an executable overlay tag');
 });
 
+test('a > inside a quoted attribute value does not defeat the rewrite', () => {
+  const root = tmp();
+  const html = '<html><body>a<script src="./comment-overlay.js" data-note="a>b"></script></body></html>';
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.match(entry, /<script src="\/assets\/comment-overlay\.js" data-preview-id="a"><\/script>/);
+  assert.equal((entry.match(/comment-overlay\.js/g) || []).length, 1);
+});
+
+test('the sidecar filename hidden inside another attribute value is not extracted as src', () => {
+  // The real src is app.js; comment-overlay.js only appears inside data-config.
+  const root = tmp();
+  const html = `<html><body>a<script data-config='x src="./comment-overlay.js"' src="./app.js"></script></body></html>`;
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.ok(entry.includes('src="./app.js"'), 'the real app script must survive');
+  assert.doesNotMatch(entry, /\/assets\/comment-overlay\.js/, 'the embedded filename must not trigger a rewrite');
+});
+
+test('an inline script whose body mentions comment-overlay.js is untouched', () => {
+  const root = tmp();
+  const html = '<html><body>a<script>var s = "./comment-overlay.js";</script></body></html>';
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.ok(entry.includes('var s = "./comment-overlay.js";'), 'the inline body must survive');
+  assert.doesNotMatch(entry, /\/assets\/comment-overlay\.js/);
+});
+
+test('rewriting is idempotent — an already-staged /assets tag is not touched again', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', {
+    files: { 'index.html': '<html><body>a<script src="./comment-overlay.js"></script></body></html>' },
+  });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  // The built entry already points at /assets/comment-overlay.js; re-running the
+  // injector over it must not rewrite or duplicate the tag.
+  assert.equal((chromeInject(entry, { id: 'a', metaFile: 'x', meta: { title: 'T', revision: 1, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' }, contentHash: 'sha256:x' }).match(/\/assets\/comment-overlay\.js/g) || []).length, 1);
+});
+
 test('a bare (path-less) comment-overlay.js src is still rewritten', () => {
   const root = tmp();
   const html = '<html><body>a<script src="comment-overlay.js"></script></body></html>';

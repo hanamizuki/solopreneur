@@ -679,49 +679,79 @@ function jsonIsland(value) {
  * The src must be exactly the LOCAL SIDECAR — a bare `comment-overlay.js` or
  * `./comment-overlay.js`, the sibling file the exclusion rule drops from staging.
  * Nothing else is ours to touch: a third-party `./vendor/acme-comment-overlay.js`,
- * a remote `https://cdn.example.com/comment-overlay.js`, or an absolute
- * `/assets/comment-overlay.js` are all left alone. A looser pattern (anything
- * merely ENDING in the filename) would silently replace someone else's script
- * with ours. Restricting to the sidecar also makes the rewrite idempotent: an
- * already-rewritten `/assets/...` tag no longer matches.
- *
- * The attribute is matched as `\ssrc`, NOT `\bsrc`: `-` is a non-word character, so
- * a word boundary would also match the `src` inside `data-src`, and a tag like
- * `<script data-src="./comment-overlay.js" src="./app.js">` would be replaced
- * wholesale — silently dropping app.js, and making an inert lazy-load tag
- * executable. Requiring real whitespace pins the match to a genuine attribute.
- *
- * ponytail: a `>` inside an attribute value before `src` breaks the `[^>]*` scan
- * and the tag is left unrewritten (its excluded per-page copy then 404s). That is
- * the accepted ceiling of regex HTML matching for trusted, generated input — the
- * /preview template emits exactly `<script src="./comment-overlay.js"></script>`.
+ * a remote `https://cdn.example.com/comment-overlay.js`, an absolute
+ * `/assets/comment-overlay.js`, or the same filename hiding in a `data-src` /
+ * another attribute value are all left alone. Restricting to the sidecar also
+ * makes the rewrite idempotent: an already-rewritten `/assets/...` tag is skipped.
  */
-const OVERLAY_TAG_RE = /<script\b[^>]*\ssrc\s*=\s*["'](?:\.\/)?comment-overlay\.js["'][^>]*>\s*<\/script>/gi;
+const SIDECAR_SRC = new Set(['comment-overlay.js', './comment-overlay.js']);
 
 /**
- * Rewrite an existing comment-overlay tag to the shared staging asset and stamp
- * the trusted preview id as a data attribute (the overlay reads it via
+ * Parse a start-tag's attribute text into a lowercased name -> value map, quote
+ * aware. A boolean attribute (`defer`) maps to `''`. First occurrence wins. This
+ * is deliberately a SMALL attribute reader, not an HTML parser — it is only ever
+ * fed the inside of one `<script …>` start tag by rewriteOverlayTag.
+ */
+function parseAttrs(text) {
+  const attrs = new Map();
+  const re = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    if (m.index === re.lastIndex) re.lastIndex += 1; // guard against a zero-width match
+    const name = m[1].toLowerCase();
+    if (!attrs.has(name)) attrs.set(name, m[2] ?? m[3] ?? m[4] ?? '');
+  }
+  return attrs;
+}
+
+/**
+ * Rewrite the LOCAL comment-overlay sidecar `<script>` to the shared staging asset
+ * and stamp the trusted preview id as a data attribute (the overlay reads it via
  * `document.currentScript` to namespace its localStorage key per preview). The id
- * is a validated lowercase slug (`^[a-z0-9-]+$`), inert in an HTML attribute, so
- * it needs no further escaping. When no overlay tag exists (a hand-authored
- * entry) the html is returned unchanged — a second tag is NEVER added (the
- * overlay is a bare IIFE; a double-inject would double-initialize, and its own
- * guard is a backstop, not a license).
+ * is a validated lowercase slug (`^[a-z0-9-]+$`), inert in an HTML attribute.
+ *
+ * A regex cannot reliably decide this — `src` text can hide inside another quoted
+ * attribute value, `data-src` looks like `src`, and a `>` inside a value defeats a
+ * `[^>]*` scan — so the empty external `<script …></script>` element is located by
+ * a quote-aware scan for the end of its start tag, and its attributes are parsed
+ * (also quote-aware) before deciding. Only a genuine `src` equal to the sidecar is
+ * rewritten; everything else is left byte-for-byte untouched, so a second tag is
+ * NEVER added (the overlay is a bare IIFE whose own double-load guard is a
+ * backstop, not a license). The original tag's `defer` / `async` are preserved —
+ * a hand-authored `<head>` overlay with `defer` must not become a synchronous
+ * script that runs before `<body>` exists (the overlay appends to document.body).
  */
 function rewriteOverlayTag(html, id) {
-  return html.replace(OVERLAY_TAG_RE, (tag) => {
-    // Preserve the original tag's load-timing attributes. A hand-authored entry
-    // may place the overlay in <head> with `defer`; dropping it would make the
-    // rewritten tag run synchronously before <body> exists, and the overlay
-    // appends to document.body during its parse-time execution. `async` is
-    // carried for the same reason. `data-preview-id` is (re)set by us regardless.
-    // Same `\s`-not-`\b` discipline as OVERLAY_TAG_RE: a word boundary would let
-    // `data-defer` / `data-async` register as the real boolean attribute. The
-    // trailing class covers the forms a bare attribute can end in (` `, `>`, `/`, `=`).
-    const defer = /\sdefer[\s/>=]/i.test(tag) ? ' defer' : '';
-    const asyncAttr = /\sasync[\s/>=]/i.test(tag) ? ' async' : '';
-    return `<script src="/assets/comment-overlay.js" data-preview-id="${id}"${defer}${asyncAttr}></script>`;
-  });
+  const open = /<script\b/gi;
+  let out = '';
+  let last = 0;
+  for (let m = open.exec(html); m; m = open.exec(html)) {
+    const tagStart = m.index;
+    // Find the end `>` of the start tag, skipping any `>` inside a quoted value.
+    let i = open.lastIndex;
+    let quote = null;
+    for (; i < html.length; i += 1) {
+      const ch = html[i];
+      if (quote) { if (ch === quote) quote = null; }
+      else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '>') break;
+    }
+    if (i >= html.length) break; // unterminated start tag — leave the remainder as-is
+    // Only an EMPTY external script (immediately followed by </script>) is a
+    // sidecar tag; an inline script with a body is never rewritten.
+    const close = /^\s*<\/script\s*>/i.exec(html.slice(i + 1));
+    if (close) {
+      const attrs = parseAttrs(html.slice(open.lastIndex, i));
+      if (SIDECAR_SRC.has((attrs.get('src') ?? '').trim())) {
+        const defer = attrs.has('defer') ? ' defer' : '';
+        const asyncAttr = attrs.has('async') ? ' async' : '';
+        out += html.slice(last, tagStart)
+          + `<script src="/assets/comment-overlay.js" data-preview-id="${id}"${defer}${asyncAttr}></script>`;
+        last = i + 1 + close[0].length;
+        open.lastIndex = last;
+      }
+    }
+  }
+  return out + html.slice(last);
 }
 
 /**
