@@ -162,9 +162,15 @@ function fakeDeps({
   probeStatus = 302,
   name = 'my-private-previews',
   deploymentUrl = 'my-private-previews-abc123-team.vercel.app',
+  accountId = undefined,
+  resolvedId,
 } = {}) {
   let state = sso;
   const id = `prj_${name}`;
+  // The id getProject reports for the identity read-back (F9). Defaults to the
+  // canonical id; pass `resolvedId: null` to model a project object with no id, so
+  // resolveIdentity yields a name-only config without ever inventing one.
+  const identityId = resolvedId === undefined ? id : resolvedId;
   const calls = { getProject: [], patch: [], delete: [], listDomains: [], probe: [], createProject: [], getDeployment: [] };
   return {
     calls,
@@ -172,11 +178,14 @@ function fakeDeps({
     // the same project, so the fake returns a stable identity regardless of the
     // argument — otherwise removeBareDomain's identity guard (name from the id
     // must match the name it was passed) would trip on the fake, not on real code.
+    // `accountId` is the project owner (a `team_…` id when team-owned); it is what
+    // resolveIdentity reads back as the target's teamId.
     getProject: async (a) => {
       calls.getProject.push(a);
       return {
-        id,
+        id: identityId,
         name,
+        accountId,
         ssoProtection: state === null ? null : { deploymentType: state },
         targets: productionDeploymentId ? { production: { id: productionDeploymentId } } : {},
       };
@@ -337,6 +346,74 @@ test('the project name can be supplied at the prompt when --project is absent', 
   assert.ifError(error);
   assert.equal(code, 0);
   assert.equal(readConfig(s.dest).preview.targets.private.project, 'my-private-previews');
+});
+
+// --- target identity (F9) --------------------------------------------------
+
+test('a create binds the real projectId and no teamId for a personal-scope project', async () => {
+  const s = scenario();
+  const deps = fakeDeps(); // personal: getProject reports an id, no team accountId
+
+  const { code, error } = await runMain(['--project', 'my-private-previews'], ['new', 'y'], deps);
+  assert.ifError(error);
+  assert.equal(code, 0);
+  const target = readConfig(s.dest).preview.targets.private;
+  assert.equal(target.projectId, 'prj_my-private-previews', 'the real projectId is written');
+  assert.ok(!('teamId' in target), 'personal scope fabricates no teamId');
+});
+
+test('a --team create binds projectId + teamId read back from the project owner', async () => {
+  const s = scenario();
+  const deps = fakeDeps({ accountId: 'team_abc123' });
+
+  const { code, error } = await runMain(
+    ['--project', 'my-private-previews', '--team', 'team_abc123'], ['new', 'y'], deps,
+  );
+  assert.ifError(error);
+  assert.equal(code, 0);
+  const target = readConfig(s.dest).preview.targets.private;
+  assert.equal(target.projectId, 'prj_my-private-previews');
+  assert.equal(target.teamId, 'team_abc123', 'the team scope is bound into the target');
+  // The scope was threaded into the Vercel calls, not merely written to disk.
+  assert.equal(deps.calls.createProject[0].teamId, 'team_abc123', 'createProject ran on the team');
+});
+
+test('setup never fabricates identity: an unresolvable id yields a name-only config', async () => {
+  const s = scenario();
+  // Protection still succeeds (createProject returns an id, ssoProtection is the
+  // legacy enum), but the identity read-back gets a project object with no id.
+  const deps = fakeDeps({ resolvedId: null });
+
+  const { code, error } = await runMain(['--project', 'my-private-previews'], ['new', 'y'], deps);
+  assert.ifError(error);
+  assert.equal(code, 0);
+  const target = readConfig(s.dest).preview.targets.private;
+  assert.ok(!('projectId' in target), 'no id resolved → no projectId written');
+  assert.ok(!('teamId' in target), 'and never a teamId without a projectId');
+  assert.equal(target.project, 'my-private-previews', 'the name-only target is still written');
+});
+
+test('an invalid --team (not a "team_" id) is refused before any Vercel call', async () => {
+  const s = scenario();
+  const deps = fakeDeps();
+
+  const { code, error } = await runMain(['--project', 'p', '--team', 'not-a-team'], [], deps);
+  assert.equal(code, undefined);
+  assert.ok(error instanceof SetupError && /team_/.test(error.message), `got ${error}`);
+  assert.deepEqual(deps.calls.createProject, [], 'refused before provisioning');
+  assert.ok(!fs.existsSync(s.dest));
+});
+
+test('a bare --team "team_" (prefix only, no id) is refused before any Vercel call', async () => {
+  const s = scenario();
+  const deps = fakeDeps();
+
+  // The prefix alone is malformed — it would reach Vercel as "?teamId=team_".
+  const { code, error } = await runMain(['--project', 'p', '--team', 'team_'], [], deps);
+  assert.equal(code, undefined);
+  assert.ok(error instanceof SetupError && /team_/.test(error.message), `got ${error}`);
+  assert.deepEqual(deps.calls.createProject, [], 'refused before provisioning');
+  assert.ok(!fs.existsSync(s.dest));
 });
 
 // --- fail-closed ordering --------------------------------------------------
