@@ -672,11 +672,23 @@ function jsonIsland(value) {
 
 /**
  * Match a per-page comment-overlay script tag, tolerant of quoting, extra
- * attributes and whitespace: `<script … src="….comment-overlay.js" …></script>`.
+ * attributes and whitespace: `<script … src="./comment-overlay.js" …></script>`.
  * The per-page copy is excluded from staging, so its tag is REWRITTEN (never
  * duplicated) to the shared staging asset.
+ *
+ * The filename must be a WHOLE path segment — `(?:[^"']*\/)?` requires whatever
+ * precedes it to end in `/` — so `./comment-overlay.js` and a bare
+ * `comment-overlay.js` match, while an unrelated third-party
+ * `./vendor/acme-comment-overlay.js` does NOT and is left alone. Without that
+ * boundary any src merely ENDING in the name would be silently rewritten to our
+ * asset, dropping someone else's script.
+ *
+ * ponytail: a `>` inside an attribute value before `src` breaks the `[^>]*` scan
+ * and the tag is left unrewritten (its excluded per-page copy then 404s). That is
+ * the accepted ceiling of regex HTML matching for trusted, generated input — the
+ * /preview template emits exactly `<script src="./comment-overlay.js"></script>`.
  */
-const OVERLAY_TAG_RE = /<script\b[^>]*\bsrc\s*=\s*["'][^"']*comment-overlay\.js["'][^>]*>\s*<\/script>/gi;
+const OVERLAY_TAG_RE = /<script\b[^>]*\bsrc\s*=\s*["'](?:[^"']*\/)?comment-overlay\.js["'][^>]*>\s*<\/script>/gi;
 
 /**
  * Rewrite an existing comment-overlay tag to the shared staging asset and stamp

@@ -223,14 +223,24 @@
     const closeBtn = root.querySelector("#ps-sidebar-close");
     const archiveToggle = root.querySelector("#ps-archive-toggle");
 
+    // A closed sidebar is only translated off-screen, so without `inert` its
+    // links / close button / archive toggle would stay in the Tab order and
+    // exposed to assistive tech — invisible controls a keyboard user lands on
+    // mid-page. `inert` is the native fix (no focus, no AT, no clicks); it
+    // starts set in the markup and is cleared only while open. Browsers without
+    // `inert` simply ignore it, which is no worse than not having it.
     const open = () => {
       sidebar.classList.add("open");
       scrim.classList.add("open");
+      sidebar.inert = false;
+      sidebar.removeAttribute("inert");
       icon.setAttribute("aria-expanded", "true");
     };
     const close = () => {
       sidebar.classList.remove("open");
       scrim.classList.remove("open");
+      sidebar.inert = true;
+      sidebar.setAttribute("inert", "");
       icon.setAttribute("aria-expanded", "false");
     };
     icon.addEventListener("click", () => (sidebar.classList.contains("open") ? close() : open()));
@@ -439,7 +449,10 @@
   // explicitly because `all` does not reset it. All chrome fonts/colors
   // are declared here, inside the shadow root, so nothing leaks either way.
   const STYLE = `<style>
-  :host { all: initial; }
+  /* "all: initial" resets the host to display:inline, which would put a block
+     footer inside an inline box; restore block so the in-flow footer lays out
+     normally. */
+  :host { all: initial; display: block; }
   * { box-sizing: border-box; }
   .ps-wrap {
     direction: ltr;
@@ -567,7 +580,7 @@
     </svg>
   </button>
   <div id="ps-scrim" data-cmt-ui="1"></div>
-  <nav id="ps-sidebar" aria-label="Preview library" data-cmt-ui="1">
+  <nav id="ps-sidebar" aria-label="Preview library" data-cmt-ui="1" inert>
     <div class="ps-sidebar-head">
       <span class="ps-sidebar-title">Library</span>
       <button id="ps-sidebar-close" type="button" aria-label="Close">✕</button>

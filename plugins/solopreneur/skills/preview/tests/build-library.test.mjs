@@ -215,6 +215,26 @@ test('the overlay rewrite tolerates single quotes and extra attributes', () => {
   assert.match(entry, /src="\/assets\/comment-overlay\.js" data-preview-id="a"/);
 });
 
+test('a third-party script merely ENDING in comment-overlay.js is left alone', () => {
+  // The filename must be a whole path segment: rewriting someone else's
+  // `acme-comment-overlay.js` to our asset would silently drop their script.
+  const root = tmp();
+  const html = '<html><body>a<script src="./vendor/acme-comment-overlay.js"></script></body></html>';
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.match(entry, /src="\.\/vendor\/acme-comment-overlay\.js"/, 'the third-party src must survive untouched');
+  assert.doesNotMatch(entry, /\/assets\/comment-overlay\.js/, 'must not be rewritten to our shared asset');
+});
+
+test('a bare (path-less) comment-overlay.js src is still rewritten', () => {
+  const root = tmp();
+  const html = '<html><body>a<script src="comment-overlay.js"></script></body></html>';
+  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
+  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+  assert.match(entry, /<script src="\/assets\/comment-overlay\.js" data-preview-id="a"><\/script>/);
+  assert.equal((entry.match(/comment-overlay\.js/g) || []).length, 1);
+});
+
 test('the overlay rewrite preserves a defer attribute from the original tag', () => {
   // A hand-authored entry may place the overlay in <head> with defer; dropping it
   // would make the rewritten tag run before <body> exists and the overlay crash.
