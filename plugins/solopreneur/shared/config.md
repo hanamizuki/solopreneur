@@ -679,4 +679,128 @@ Both the Vercel calls and the prompting go through injected seams, so the whole
 flow is covered by `node --test` with zero real network and zero real prompts.
 `PREVIEW_PROJECT` is neither read nor written by setup.
 
+## Building the Library
+
+`scripts/build-library.mjs` turns a resolved target's collections into a
+deployable staging tree. It builds; it does not deploy (that is a later script).
+The CLI resolves config through `config-resolve.mjs`; the core `buildLibrary`
+takes the resolved `root` / `collections` / `include` as input.
+
+```bash
+node scripts/build-library.mjs --from "$DIR"          # human report
+node scripts/build-library.mjs --json --from "$DIR"   # machine-readable result
+```
+
+### `preview.json` — the per-item sidecar
+
+Each preview item carries a `preview.json` at `<collection>/<id>/preview.json`.
+This is a **different file** from `.solopreneur.json`; it is described by
+`scripts/preview-schema.json` (Draft 2020-12), which the builder interprets with
+the same small-interpreter discipline `config-resolve.mjs` uses over
+`config.schema.json`.
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "id": "2026-07-24-my-note",   // lowercase slug [a-z0-9-]+, == the directory name
+  "title": "My note",
+  "createdAt": "2026-07-24T14:30:00+08:00",
+  "updatedAt": "2026-07-24T16:42:00+08:00",
+  "revision": 4,                 // integer >= 1
+  "project": "my-product",       // optional label
+  "entry": "index.html",         // optional; v1 fixes it to index.html
+  "tags": ["note"],              // optional
+  "supersededBy": "…",           // optional; Archive item only, no cycles
+  "provenance": { }              // optional; validated as an object, passed through
+}
+```
+
+Rules the builder enforces:
+
+- **Required**: `schemaVersion` (const 1), `id`, `title`, `createdAt`,
+  `updatedAt`, `revision`.
+- **`createdAt` / `updatedAt` are ISO 8601 with a mandatory timezone** (`Z` or
+  `±HH:MM`) and at most millisecond precision. The catalog sorts on `updatedAt` as a
+  parsed instant, so a zone-less timestamp (ambiguous, machine-timezone-dependent to
+  parse), a sub-millisecond one (the sort resolves to ms), or an impossible
+  calendar date (`2026-02-30`) is rejected.
+- **`id` is a lowercase slug** `^[a-z0-9-]+$` — it becomes the `/p/<id>/` route
+  and a staging path segment, so `/`, `\`, `.`, `..`, uppercase and URL-encoding
+  are rejected. The **directory name must equal the id**.
+- **`entry`** is fixed to `index.html` in v1 (any other value is an explicit
+  error), and the file must exist.
+- **`id` is unique across ALL included collections** — a collision aborts the
+  build naming BOTH files, so two machines colliding on a slug cannot silently
+  wedge it.
+- **`supersededBy`**, if present, names another existing item, is only valid on an
+  Archive item, and must not cycle. It folds an archived duplicate under its
+  replacement.
+- **`provenance`** is validated as an object and passed through. Provenance
+  RESOLUTION (turning raw session data into sanitized display values) is a
+  separate, later change.
+
+`preview.json` is **local source metadata and is never copied into the
+deployment** — the builder projects only an allowlist of its fields.
+
+### Route mapping and staging tree
+
+The collection does **not** appear in the route: `<collection>/<id>/` maps to
+`/p/<id>/`, so archiving is a plain `mv` that does not break links. The staging
+tree is assembled in a system temp directory (nothing is written into the content
+tree):
+
+```text
+<staging>/
+├── directory.json
+└── p/
+    └── <id>/            # each item's content files, verbatim
+```
+
+### `contentHash` and the sanitization guarantee
+
+The builder computes a `sha256` **`contentHash`** per item over a canonical
+payload = the item's source files (posix relpath + sha256, sorted,
+NFC-normalized) plus the intrinsic display metadata — computed BEFORE any chrome
+injection, so the same revision hashes identically as a Library page or a Share
+snapshot. The `collection` is **not** hashed (archiving must not look like a
+content change). It is a derived value and is **never written back** into
+`preview.json`.
+
+`directory.json` is the whole catalog, built by **picking** an allowlist per item
+(never spreading the raw metadata), sorted `updatedAt` DESC then `id` ASC:
+
+- Per item: `id`, `title`, `createdAt`, `updatedAt`, `revision`, `project`,
+  `tags`, `collection`, validated `supersededBy`, `contentHash`.
+- Document-level: `generatedAt`, and `source.commit` when the root is in a git
+  repo.
+
+**Never emitted**: `sourceRef`, provenance, raw session ids, transcript paths, or
+any absolute local path. `directory.json` is always produced via `JSON.stringify`,
+never string concatenation.
+
+### Hardening
+
+- **Containment**: every item directory and file is realpath'd and asserted inside
+  the preview root / item dir; a symlink escaping its preview dir, a
+  directory-symlink cycle, and a device / socket / FIFO are all rejected.
+- **Exclusions**: one case-insensitive predicate drops every dotfile and dotdir
+  (`.vercel/` with its `project.json`, `.git/`, `.env*`, `.DS_Store`, and any
+  accidental `.netrc` / `.git-credentials` / `.npmrc`) plus the non-hidden
+  `preview.json` and the per-page `comment-overlay.js`. The same predicate feeds
+  the scan, the fingerprint, the hash and the copy, so they cannot drift.
+- **Torn-snapshot guard**: a shared working tree may auto-sync mid-build, so the
+  builder fingerprints every file up front and re-hashes each staged copy; a file
+  rewritten or removed between scan and copy aborts rather than publish a torn
+  snapshot.
+- **Framework assets have a single source** — the plugin's `skills/preview/assets/`.
+  The content tree never holds shared components; the per-page `comment-overlay.js`
+  is excluded so a later change can point the tag at the shared staging asset.
+- **Injection is prepared, not applied**: `findInjectionPoint` locates the last
+  `</body>` (with an EOF fallback) and the `injectEntry` seam defaults to verbatim
+  copy, running after the torn-snapshot guard. Chrome (sidebar, provenance footer,
+  Share UI) is a later change.
+
+Tests live in `tests/build-library.test.mjs`; run them the same way as the rest —
+`node --test tests/*.test.mjs` from `skills/preview`.
+
 ---
