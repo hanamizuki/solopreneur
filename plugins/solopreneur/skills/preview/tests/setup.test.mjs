@@ -404,6 +404,18 @@ test('an invalid --team (not a "team_" id) is refused before any Vercel call', a
   assert.ok(!fs.existsSync(s.dest));
 });
 
+test('a bare --team "team_" (prefix only, no id) is refused before any Vercel call', async () => {
+  const s = scenario();
+  const deps = fakeDeps();
+
+  // The prefix alone is malformed — it would reach Vercel as "?teamId=team_".
+  const { code, error } = await runMain(['--project', 'p', '--team', 'team_'], [], deps);
+  assert.equal(code, undefined);
+  assert.ok(error instanceof SetupError && /team_/.test(error.message), `got ${error}`);
+  assert.deepEqual(deps.calls.createProject, [], 'refused before provisioning');
+  assert.ok(!fs.existsSync(s.dest));
+});
+
 // --- fail-closed ordering --------------------------------------------------
 
 test('a provisioning failure writes no config and exits non-zero', async () => {

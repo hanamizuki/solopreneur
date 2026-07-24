@@ -462,14 +462,16 @@ export async function main({ argv = [], io, makeDeps }) {
   if (opts.help) { io.print(`${USAGE}\n`); return 0; }
 
   // Team-scope (F9): --team names the Vercel team every Vercel call runs on behalf
-  // of; omitted → personal scope. A team id is "team_…" — reject anything else up
-  // front, before any prompt or Vercel call, so a typo cannot silently provision in
-  // the personal account. This scope is threaded through provisioning; the teamId
-  // PERSISTED to config is read back from the project's owner (resolveIdentity), not
-  // from this flag. Lifts PR #137's personal-scope-only limitation.
+  // of; omitted → personal scope. A team id is "team_" + a non-empty id — require
+  // the suffix, not just the prefix, so a bare "team_" cannot slip through and reach
+  // Vercel as "?teamId=team_" (a malformed scope). Rejected up front, before any
+  // prompt or Vercel call, so a typo cannot silently provision in the personal
+  // account. This scope is threaded through provisioning; the teamId PERSISTED to
+  // config is read back from the project's owner (resolveIdentity), not from this
+  // flag. Lifts PR #137's personal-scope-only limitation.
   const teamId = opts.team;
-  if (teamId !== undefined && !teamId.startsWith('team_')) {
-    throw new SetupError(`--team must be a Vercel team id (starts with "team_"), got ${JSON.stringify(teamId)}`);
+  if (teamId !== undefined && !/^team_.+$/.test(teamId)) {
+    throw new SetupError(`--team must be a Vercel team id ("team_" + id), got ${JSON.stringify(teamId)}`);
   }
 
   // 1. First-run detection. resolveConfig with NO `from` anchors at the cwd and
