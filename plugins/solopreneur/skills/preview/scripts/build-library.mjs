@@ -353,13 +353,19 @@ function readPreviewJson(file) {
 function fingerprintItem(itemDirReal) {
   const files = [];
   const fingerprint = new Map();
-  const visited = new Set();
+  // Realpaths of the directories on the CURRENT recursion path (an ancestor stack),
+  // NOT a global visited set: a true cycle is a directory that reaches ITSELF
+  // through an ancestor, whereas two sibling aliases to the same real dir (an
+  // exported `assets-link -> assets`) are legitimate and each get copied.
+  // ponytail: a pathological graph of cross-linked directory symlinks could re-walk
+  // a shared subtree repeatedly — not a concern for real previews (HTML + assets),
+  // and a genuine ancestor cycle is still caught before it can loop.
+  const stack = new Set();
 
   const walk = (dirAbs, relPrefix) => {
-    // Guard directory symlink cycles by the physical identity of each dir entered.
     const canon = fs.realpathSync(dirAbs);
-    if (visited.has(canon)) throw new BuildError(`symlink cycle under the preview directory: ${dirAbs}`);
-    visited.add(canon);
+    if (stack.has(canon)) throw new BuildError(`symlink cycle under the preview directory: ${dirAbs}`);
+    stack.add(canon);
 
     for (const dirent of fs.readdirSync(dirAbs, { withFileTypes: true })) {
       const name = dirent.name;
@@ -396,6 +402,7 @@ function fingerprintItem(itemDirReal) {
       if (!dirent.isFile()) throw new BuildError(`refusing a non-regular file (device/socket/pipe): ${abs}`);
       addFile(abs, rel, fs.statSync(abs).size);
     }
+    stack.delete(canon); // pop on exit — a later sibling alias to this dir is not a cycle
   };
   const addFile = (abs, rel, size) => {
     // NFC-normalize only the fingerprint/dedup KEY, so the same non-ASCII filename

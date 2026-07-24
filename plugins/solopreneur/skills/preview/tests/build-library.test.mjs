@@ -528,6 +528,15 @@ test('a directory symlink cycle is rejected', () => {
   assert.throws(() => build(root, ['active']), isBuildError(/cycle/));
 });
 
+test('a directory alias (symlink to a sibling real dir) is not a false cycle', () => {
+  const root = tmp();
+  const itemDir = writeItem(root, 'active', 'a', { files: { 'index.html': '<body>x</body>', 'assets/app.js': 'CODE' } });
+  fs.symlinkSync(path.join(itemDir, 'assets'), path.join(itemDir, 'assets-link')); // alias, not a cycle
+  const result = build(root, ['active']);
+  assert.equal(readStaged(result.stagingDir, 'p', 'a', 'assets/app.js'), 'CODE');
+  assert.equal(readStaged(result.stagingDir, 'p', 'a', 'assets-link/app.js'), 'CODE'); // alias also staged
+});
+
 test('a FIFO in a preview directory is rejected', () => {
   const root = tmp();
   const itemDir = writeItem(root, 'active', 'a');
