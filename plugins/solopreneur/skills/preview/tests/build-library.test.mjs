@@ -132,6 +132,15 @@ test('findInjectionPoint falls back to EOF when there is no </body>', () => {
   assert.equal(point.index, html.length);
 });
 
+test('findInjectionPoint is not shifted by Unicode case-folding length changes', () => {
+  // 'İ' lowercases to a 2-code-unit sequence, so an index taken from a lowercased
+  // copy would be off; the point must be the tag's offset in the ORIGINAL string.
+  const html = 'İİİ</BODY>';
+  const point = findInjectionPoint(html);
+  assert.equal(point.index, html.indexOf('</BODY>'));
+  assert.equal(html.slice(point.index), '</BODY>');
+});
+
 test('the entry is copied verbatim — no chrome is injected in this build', () => {
   const root = tmp();
   const html = '<html><body><h1>a</h1></body></html>';
@@ -567,6 +576,18 @@ test('a source file removed between scan and copy aborts', () => {
   );
 });
 
+test('a source file added between scan and copy aborts', () => {
+  const root = tmp();
+  const itemDir = writeItem(root, 'active', 'a', { files: { 'index.html': '<body>x</body>' } });
+  assert.throws(
+    () => build(root, ['active'], {
+      // late.png (e.g. an asset index.html references) arrives after the scan.
+      hooks: { afterFingerprint: () => fs.writeFileSync(path.join(itemDir, 'late.png'), 'newasset') },
+    }),
+    isBuildError(/torn snapshot/),
+  );
+});
+
 test('a failed build leaves no staging tree behind', () => {
   const root = tmp();
   const itemDir = writeItem(root, 'active', 'a');
@@ -592,6 +613,13 @@ test('a missing collection directory is treated as empty, not an error', () => {
   const root = tmp();
   writeItem(root, 'active', 'a'); // no archive/ dir exists at all
   assert.equal(build(root, ['active', 'archive']).directory.items.length, 1);
+});
+
+test('a dangling collection symlink is rejected, not read as empty', () => {
+  const root = tmp();
+  fs.symlinkSync(path.join(root, 'no-such-target'), path.join(root, 'active')); // active -> nowhere
+  fs.mkdirSync(path.join(root, 'archive'), { recursive: true });
+  assert.throws(() => build(root, ['active', 'archive']), isBuildError(/broken symlink/));
 });
 
 test('the size report counts files and bytes per collection', () => {

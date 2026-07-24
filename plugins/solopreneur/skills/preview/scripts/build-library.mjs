@@ -473,7 +473,19 @@ function scanCollections(rootReal, collections, include) {
     try {
       collReal = fs.realpathSync(collLexical);
     } catch (err) {
-      if (err.code === 'ENOENT') continue; // an empty / not-yet-created collection
+      if (err.code === 'ENOENT') {
+        // realpath ENOENT is either "no such collection directory" (fine — an
+        // empty or not-yet-created collection) or "the collection path is a
+        // DANGLING symlink" (a broken content tree that must not read as silently
+        // empty). lstat tells them apart: it succeeds on a dangling link and
+        // ENOENTs on true absence — the same test config-resolve uses.
+        try {
+          fs.lstatSync(collLexical);
+        } catch {
+          continue; // truly absent
+        }
+        throw new BuildError(`collection ${JSON.stringify(key)} is a broken symlink: ${collLexical}`);
+      }
       throw new BuildError(`cannot resolve collection ${JSON.stringify(key)}: ${collLexical}\n  ${err.message}`);
     }
     if (!isUnder(collReal, rootReal)) {
@@ -604,9 +616,14 @@ function validateSupersededBy(items) {
  * @returns {{index: number, atEof: boolean}}
  */
 export function findInjectionPoint(html) {
-  const idx = html.toLowerCase().lastIndexOf('</body>');
-  if (idx === -1) return { index: html.length, atEof: true };
-  return { index: idx, atEof: false };
+  // Match the ORIGINAL string with a case-insensitive regex, not a lowercased
+  // copy: some characters change UTF-16 length when lowercased (`İ` -> `i̇`), so an
+  // index taken from `toLowerCase()` would be shifted off the real tag position.
+  const re = /<\/body>/gi;
+  let index = -1;
+  for (let m = re.exec(html); m !== null; m = re.exec(html)) index = m.index;
+  if (index === -1) return { index: html.length, atEof: true };
+  return { index, atEof: false };
 }
 
 /** The verbatim-copy default for the chrome-injection seam. */
@@ -663,6 +680,20 @@ function copyItem(item, stagingDir, injectEntry) {
         + '  the staged bytes differ from the single-scan fingerprint, so the deployment would be inconsistent — aborting rather than publish a half-updated item.',
       );
     }
+  }
+
+  // The loop above verified the staged bytes match the scan, but it only sees the
+  // phase-1 file list — a background sync that ADDS a source file after the scan
+  // (an asset index.html references, say) would be omitted, publishing an
+  // incomplete item. Re-fingerprint the source and abort if it no longer matches
+  // the single scan (a file added, removed, or rewritten).
+  const fresh = fingerprintItem(item.itemDirReal).fingerprint;
+  if (fresh.size !== item.fingerprint.size
+      || [...fresh].some(([rel, hex]) => item.fingerprint.get(rel) !== hex)) {
+    throw new BuildError(
+      `torn snapshot: the source of ${JSON.stringify(item.id)} changed between scan and copy\n`
+      + '  a file was added, removed, or rewritten; aborting rather than publish an inconsistent item.',
+    );
   }
 
   const entryTarget = path.join(dest, item.entry);
