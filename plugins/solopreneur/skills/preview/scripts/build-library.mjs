@@ -262,7 +262,6 @@ function stableStringify(value) {
  */
 function computeContentHash(fingerprint, meta) {
   const files = [...fingerprint.entries()]
-    .map(([rel, hex]) => [rel, hex])
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   const hashedMeta = { id: meta.id, title: meta.title, createdAt: meta.createdAt, updatedAt: meta.updatedAt, revision: meta.revision };
   for (const key of ['project', 'tags', 'supersededBy']) {
@@ -275,20 +274,41 @@ function computeContentHash(fingerprint, meta) {
 // Scanning + fingerprinting
 // ---------------------------------------------------------------------------
 
-/** Read one `preview.json`, rejecting a non-regular file before reading it. */
-function readPreviewJson(file) {
-  let stat;
+/**
+ * Read one `preview.json`. The sidecar gets the SAME containment as content
+ * files: a symlinked metadata file is realpath'd and must resolve inside its item
+ * directory (`containerReal`) — otherwise a bare `statSync` would FOLLOW an
+ * escaping link and the builder would emit out-of-tree title / dates / hash,
+ * quietly breaking the containment guarantee for the one file that drives every
+ * item's metadata. A non-regular file (a FIFO would block `readFileSync` forever)
+ * is rejected before any read.
+ */
+function readPreviewJson(file, containerReal) {
+  let lst;
   try {
-    stat = fs.statSync(file);
+    lst = fs.lstatSync(file);
   } catch (err) {
     if (err.code === 'ENOENT') {
       throw new BuildError(`missing preview.json: ${file}\n  every item directory under a collection must carry a preview.json.`);
     }
     throw new BuildError(`cannot read preview.json: ${file}\n  ${err.message}`);
   }
-  // Classify before reading: a FIFO or a symlink to a device would otherwise
-  // block readFileSync forever waiting for a writer.
-  if (!stat.isFile()) throw new BuildError(`preview.json is not a regular file: ${file}`);
+  // lstat, then realpath a symlink and assert containment — mirrors the content
+  // walk in fingerprintItem so the metadata file cannot escape where content cannot.
+  if (lst.isSymbolicLink()) {
+    let real;
+    try {
+      real = fs.realpathSync(file);
+    } catch (err) {
+      throw new BuildError(`preview.json is a broken symlink: ${file}\n  ${err.message}`);
+    }
+    if (!isUnder(real, containerReal)) {
+      throw new BuildError(`preview.json escapes its preview directory: ${file} -> ${real}`);
+    }
+  }
+  // Follows a contained symlink; a FIFO or device (even via a link) is not a
+  // regular file and is rejected before readFileSync, which would block on a pipe.
+  if (!fs.statSync(file).isFile()) throw new BuildError(`preview.json is not a regular file: ${file}`);
   let parsed;
   try {
     parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -360,6 +380,18 @@ function fingerprintItem(itemDirReal) {
     // as the OS gave it, for reading; only the derived `rel` used in the hash and
     // the staging path is normalized, so both agree.
     const relNfc = rel.normalize('NFC');
+    // Two distinct source names that normalize to the SAME NFC path (possible on a
+    // normalization-preserving filesystem such as Linux ext4) would otherwise
+    // collide on one fingerprint key and one staging path — silently dropping a
+    // file while the torn-snapshot guard still matched the survivor. Abort rather
+    // than coalesce, so the normalization that buys cross-platform stability can
+    // never cost an asset.
+    if (fingerprint.has(relNfc)) {
+      throw new BuildError(
+        `two files normalize to the same path ${JSON.stringify(relNfc)} in a preview — `
+        + 'rename one so the names differ after Unicode NFC normalization.',
+      );
+    }
     files.push({ abs, rel: relNfc, size });
     fingerprint.set(relNfc, sha256File(abs));
   };
@@ -413,7 +445,7 @@ function scanCollections(rootReal, collections, include) {
       }
 
       const metaFile = path.join(itemDirReal, 'preview.json');
-      const meta = readPreviewJson(metaFile);
+      const meta = readPreviewJson(metaFile, itemDirReal);
       validatePreviewMeta(meta, metaFile);
       assertSlug(meta.id, metaFile); // defense in depth; the schema pattern already enforced it
 
@@ -599,13 +631,15 @@ function copyItem(item, stagingDir, injectEntry) {
  * Sorted `updatedAt` DESC then `id` ASC so the catalog order is stable across
  * machines even when two items share a timestamp.
  */
-function projectDirectory(items, generatedAt, commit) {
+export function projectDirectory(items, generatedAt, commit) {
   const rows = items.map((item) => {
     const m = item.meta;
     const row = { id: item.id, title: m.title, createdAt: m.createdAt };
-    // Defensive legacy-display tolerance (the documented `updatedAt ?? createdAt`,
-    // `revision ?? 1`): the schema requires both, but the projection tolerates a
-    // hand-migrated item missing them rather than emitting null into the catalog.
+    // ponytail: task-mandated legacy-display tolerance (`updatedAt ?? createdAt`,
+    // `revision ?? 1`). Today the schema requires both, so via buildLibrary this
+    // fallback is unreachable — it guards the directory.json contract against a
+    // future where the schema relaxes them for real legacy items, and is covered
+    // by a direct projectDirectory test rather than a validated build.
     row.updatedAt = m.updatedAt ?? m.createdAt;
     row.revision = m.revision ?? 1;
     if (m.project !== undefined) row.project = m.project;

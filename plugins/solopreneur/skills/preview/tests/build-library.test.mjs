@@ -24,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildLibrary, findInjectionPoint, BuildError } from '../scripts/build-library.mjs';
+import { buildLibrary, findInjectionPoint, projectDirectory, BuildError } from '../scripts/build-library.mjs';
 
 const SCRIPT = path.join(
   path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'build-library.mjs',
@@ -449,6 +449,30 @@ test('a FIFO in a preview directory is rejected', () => {
   assert.throws(() => build(root, ['active']), isBuildError(/non-regular file/));
 });
 
+test('a preview.json symlinked outside the item directory is rejected', () => {
+  const root = tmp();
+  const external = path.join(tmp(), 'evil-preview.json');
+  fs.writeFileSync(external, JSON.stringify(makeMeta('a')));
+  const dir = path.join(root, 'active', 'a');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.symlinkSync(external, path.join(dir, 'preview.json')); // metadata sourced out of tree
+  fs.writeFileSync(path.join(dir, 'index.html'), '<body>x</body>');
+  assert.throws(() => build(root, ['active']), isBuildError(/escapes/));
+});
+
+test('two filenames that normalize to the same NFC path abort', (t) => {
+  const root = tmp();
+  const itemDir = writeItem(root, 'active', 'a', { files: { 'index.html': '<body>x</body>' } });
+  fs.writeFileSync(path.join(itemDir, 'é.txt'), 'one'); // é as one codepoint (NFC)
+  fs.writeFileSync(path.join(itemDir, 'é.txt'), 'two'); // e + combining accent (NFD)
+  // A normalization-insensitive filesystem (APFS/macOS) collapses the two names to
+  // one file, so the collision can only be constructed on a preserving FS (Linux
+  // ext4, i.e. CI). Skip where it cannot exist rather than assert a false pass.
+  const collide = fs.readdirSync(itemDir).filter((n) => n.normalize('NFC') === 'é.txt').length;
+  if (collide < 2) { t.skip('filesystem normalizes unicode filenames — cannot construct the collision here'); return; }
+  assert.throws(() => build(root, ['active']), isBuildError(/normalize to the same path/));
+});
+
 // --- torn-snapshot guard ----------------------------------------------------
 
 test('a source file rewritten between scan and copy aborts', () => {
@@ -525,12 +549,27 @@ test('generatedAt is an ISO-8601 UTC timestamp', () => {
   assert.match(build(root, ['active']).directory.generatedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/);
 });
 
-test('the legacy-display tolerance survives on directory rows', () => {
+test('directory rows carry updatedAt and revision through from a populated item', () => {
   const root = tmp();
   writeItem(root, 'active', 'a');
   const row = itemById(build(root, ['active']).directory, 'a');
   assert.equal(row.updatedAt, '2026-01-02T00:00:00Z');
   assert.equal(row.revision, 1);
+});
+
+test('projectDirectory falls back to createdAt / revision 1 for a field-missing row', () => {
+  // The fallback is unreachable through buildLibrary (the schema requires both
+  // updatedAt and revision), so exercise projectDirectory directly with a
+  // synthetic legacy item that lacks them — real coverage of the fallback branch.
+  const item = {
+    id: 'legacy',
+    collection: 'archive',
+    contentHash: 'sha256:deadbeef',
+    meta: { id: 'legacy', title: 'Legacy', createdAt: '2026-01-01T00:00:00Z' },
+  };
+  const [row] = projectDirectory([item], '2026-01-01T00:00:00Z', null).items;
+  assert.equal(row.updatedAt, '2026-01-01T00:00:00Z'); // fell back to createdAt
+  assert.equal(row.revision, 1); // fell back to 1
 });
 
 // --- CLI (config-resolve wiring) --------------------------------------------
