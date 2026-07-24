@@ -735,9 +735,9 @@ Rules the builder enforces:
 - **`supersededBy`**, if present, names another existing item, is only valid on an
   Archive item, and must not cycle. It folds an archived duplicate under its
   replacement.
-- **`provenance`** is validated as an object and passed through. Provenance
-  RESOLUTION (turning raw session data into sanitized display values) is a
-  separate, later change.
+- **`provenance`** is validated as an object and passed through by the builder.
+  Turning it into sanitized display values for the footer is
+  `scripts/resolve-provenance.mjs` — see "Provenance display" below.
 
 `preview.json` is **local source metadata and is never copied into the
 deployment** — the builder projects only an allowlist of its fields.
@@ -802,5 +802,45 @@ never string concatenation.
 
 Tests live in `tests/build-library.test.mjs`; run them the same way as the rest —
 `node --test tests/*.test.mjs` from `skills/preview`.
+
+## Provenance display
+
+`scripts/resolve-provenance.mjs` turns a `preview.json` `provenance` block —
+`{ createdBy, lastUpdatedBy }` — into display-safe footer values, so the builder
+can show "who produced / who last updated" a preview WITHOUT leaking a raw session
+id, transcript path, or absolute local path onto the deployed page. It is a pure,
+deterministic, **total** module (never throws — a footer resolver degrades to
+"unrecorded", it does not abort a publish) with no I/O and no CLI; the builder's
+`injectEntry` seam imports it.
+
+Each party resolves to `{ agent, platform, sessionTitle }`, where `sessionTitle`
+is **omitted, never guessed**, when unavailable. Priority, first hit wins:
+
+1. **Caller-explicit** — a `sessionTitle` the caller passed in directly (the
+   owning agent knows who it is). Highest, and platform-independent.
+2. **Platform adapter** — deterministic normalization from platform data.
+3. **Missing** — `sessionTitle` absent; the footer reads "unrecorded".
+
+`agent` and `platform` are always the caller's, passed through. Every returned
+object is assembled from the allowlist alone (`agent` / `platform` /
+`sessionTitle`) — the input is never spread — so a raw `session_id`, a
+`transcript_path`, a `payload`, or an absolute path cannot leak, the same "pick,
+never spread" discipline `directory.json` uses.
+
+`resolveProvenance` collapses to `{ producedBy }` when the creator and last
+updater resolve identically (an item no one else has revised), else returns
+`{ createdBy, lastUpdatedBy }` for separate footer lines. It resolves DISPLAY
+values only; the create/update lifecycle (which party is immutable, when
+`lastUpdatedBy` advances) is the item's metadata, owned elsewhere.
+
+**v1 scope — Claude adapter only.** Only the Claude adapter is implemented: from a
+Claude hook-style payload it derives `sessionTitle` from `session_title` (the raw
+`session_id` is never read and never reaches the output). Codex, Hermes and
+OpenClaw have no adapter yet — a preview from those platforms resolves its
+`sessionTitle` to "unrecorded" while its `agent` / `platform` still pass through.
+The `ADAPTERS` map is the clearly-named seam a later PR extends, one function per
+platform.
+
+Tests live in `tests/resolve-provenance.test.mjs`; run them the same way.
 
 ---
