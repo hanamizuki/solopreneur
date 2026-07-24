@@ -262,6 +262,22 @@ test('a tie on updatedAt breaks by id ASC (stable across machines)', () => {
   assert.deepEqual(dir.items.map((i) => i.id), ['apple', 'banana', 'cherry']);
 });
 
+test('the catalog sorts by parsed instant, not lexically, across timezone offsets', () => {
+  const root = tmp();
+  // In UTC 'later' (17:00Z) is newer than 'earlier' (02:00Z), but lexically
+  // '...10:00:00+08:00' sorts AFTER '...09:00:00-08:00' — a string sort gets it wrong.
+  writeItem(root, 'active', 'earlier', { over: { updatedAt: '2026-01-01T10:00:00+08:00' } }); // 02:00Z
+  writeItem(root, 'active', 'later', { over: { updatedAt: '2026-01-01T09:00:00-08:00' } }); // 17:00Z
+  const ids = build(root, ['active']).directory.items.map((i) => i.id);
+  assert.deepEqual(ids, ['later', 'earlier']); // newer instant first
+});
+
+test('a timestamp without a timezone is rejected', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', { over: { updatedAt: '2026-01-01T00:00:00' } }); // no Z / offset
+  assert.throws(() => build(root, ['active']), isBuildError(/updatedAt/));
+});
+
 // --- duplicate id -----------------------------------------------------------
 
 test('a duplicate id across active and archive aborts, naming BOTH files', () => {

@@ -668,8 +668,17 @@ export function projectDirectory(items, generatedAt, commit) {
     row.contentHash = item.contentHash;
     return row;
   });
+  // Sort by the parsed INSTANT, not lexically: two valid ISO timestamps with
+  // different offsets order wrong as strings (`…10:00+08:00` is older in UTC than
+  // `…09:00-08:00` yet sorts after it). The schema requires a timezone on every
+  // timestamp, so Date.parse is unambiguous and machine-independent; an
+  // unparseable value (only reachable through a direct projectDirectory call with
+  // unvalidated data) sorts last, keeping the order total and deterministic.
+  const instant = (s) => { const t = Date.parse(s); return Number.isNaN(t) ? -Infinity : t; };
   rows.sort((a, b) => {
-    if (a.updatedAt !== b.updatedAt) return a.updatedAt < b.updatedAt ? 1 : -1; // DESC
+    const ta = instant(a.updatedAt);
+    const tb = instant(b.updatedAt);
+    if (ta !== tb) return tb - ta; // updatedAt DESC (newer first)
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; // id ASC
   });
 

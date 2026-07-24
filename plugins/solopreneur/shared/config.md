@@ -719,6 +719,9 @@ Rules the builder enforces:
 
 - **Required**: `schemaVersion` (const 1), `id`, `title`, `createdAt`,
   `updatedAt`, `revision`.
+- **`createdAt` / `updatedAt` are ISO 8601 with a mandatory timezone** (`Z` or
+  `±HH:MM`). The catalog sorts on `updatedAt` as a parsed instant, so a zone-less
+  timestamp — ambiguous, and machine-timezone-dependent to parse — is rejected.
 - **`id` is a lowercase slug** `^[a-z0-9-]+$` — it becomes the `/p/<id>/` route
   and a staging path segment, so `/`, `\`, `.`, `..`, uppercase and URL-encoding
   are rejected. The **directory name must equal the id**.

@@ -175,10 +175,11 @@ convert a mid-copy ENOENT into a clean torn-snapshot abort rather than a raw cra
   copied page references a script that is not there yet. That is by design — the
   later chrome change rewrites the tag to the shared staging asset. This PR does
   not deploy, so nothing 404s in the meantime.
-- **Sort is lexical.** `updatedAt` DESC is a string sort — deterministic across
-  machines (the stated guarantee), and chronological when timestamps share a
-  format. The schema does not force UTC because the documented item format carries
-  offsets; the `id` ASC tie-break gives a total order regardless.
+- **Sort is by parsed instant.** `updatedAt` DESC compares `Date.parse` values, not
+  strings, so mixed-offset ISO timestamps order chronologically (a lexical sort
+  puts `…10:00+08:00` after `…09:00-08:00` even though it is older in UTC). The
+  schema requires a timezone on every timestamp, so the parse is unambiguous and
+  machine-independent; the `id` ASC tie-break gives a total order for equal instants.
 - **Staging handoff.** On success the staging tree is left in `os.tmpdir()` and its
   path is printed; the deploy step owns consuming and removing it. On any failure
   the builder removes its own partial tree.
