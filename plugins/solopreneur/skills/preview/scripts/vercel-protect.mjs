@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Vercel deployment-protection helpers — the "Gate A recipe".
  *
@@ -26,13 +25,19 @@
  *
  * IMPORTANT for callers: `ensureProtected` resolving does NOT mean the
  * deployment is anonymously unreadable. Under the legacy enum the bare domain
- * is still 200 (fact 1). Full protection of a private target is the
- * COMPOSITION `ensureProtected` + `removeBareDomain` + `verifyEntryProtected`
- * (probing BOTH the protected entry and the bare domain), and the durable
- * guarantee is the anonymous probe — not the config GET, which fact 2 shows can
- * be silently nulled afterwards. This module provides the primitives; the
- * orchestration lives in its consumers (`setup.mjs` and `deploy-library.mjs`,
- * later PRs). It has no in-plugin caller yet.
+ * is still 200 (fact 1). Full protection of a private target is the COMPOSITION
+ * `ensureProtected` + `removeBareDomain` + `verifyEntryProtected`, but the two
+ * probes check DIFFERENT things:
+ *   - `verifyEntryProtected` probes the PROTECTED ENTRY (the scope alias / the
+ *     immutable URL), where a 302/401 means protected. Do NOT point it at the
+ *     bare domain — a removed bare domain returns 404, which is neither a 302/401
+ *     nor a naked 200, so it cannot validate bare-domain removal.
+ *   - the bare domain being gone is confirmed by `removeBareDomain` itself,
+ *     which returns the DELETE status (404 already-absent, or 2xx removed).
+ * The durable guarantee is the anonymous ENTRY probe — not the config GET, which
+ * fact 2 shows can be silently nulled afterwards. This module provides the
+ * primitives; the orchestration lives in its consumers (`setup.mjs` and
+ * `deploy-library.mjs`, later PRs). It has no in-plugin caller yet.
  *
  * All network I/O goes through an injected `deps` object so the logic is
  * testable with zero real network. `makeDefaultDeps()` builds the production
@@ -61,9 +66,6 @@ export const LEGACY_PROTECTION = 'all_except_custom_domains';
  * `ensureProtected` refuses to set it.
  */
 export const WEAKER_PROTECTION = 'prod_deployment_urls_and_all_previews';
-
-/** Statuses that count as "an anonymous request was challenged" (protected). */
-const PROTECTED_STATUSES = new Set([302, 401]);
 
 /**
  * A protection operation that could not be completed safely. Thrown for every
@@ -116,8 +118,17 @@ export async function ensureProtected({ projectId, teamId, deps, deploymentType 
   const snapshot = await snapshotSsoProtection({ projectId, teamId, deps });
 
   // The PATCH echo cannot be trusted (fact 2) — issue it, then GET the real
-  // state and believe that.
-  await deps.patchSsoProtection({ projectId, teamId, deploymentType: LEGACY_PROTECTION });
+  // state and believe that. A PATCH that THROWS (an indeterminate result — e.g. a
+  // timeout AFTER Vercel already processed the request and nulled protection) is
+  // deliberately swallowed here: the verifying GET below is the source of truth
+  // and drives the same restore / fail-closed handling as a returned-but-rejected
+  // PATCH, so a throw can never bypass the restore and leave a project naked. (If
+  // the network is truly down the GET throws too, and we fail closed.)
+  try {
+    await deps.patchSsoProtection({ projectId, teamId, deploymentType: LEGACY_PROTECTION });
+  } catch {
+    // fall through to the verifying GET — never report success on an unverified PATCH
+  }
   const actual = await snapshotSsoProtection({ projectId, teamId, deps });
 
   if (actual === LEGACY_PROTECTION) return; // verified by GET, not by the echo
@@ -158,9 +169,11 @@ export async function ensureProtected({ projectId, teamId, deps, deploymentType 
  * A 404 means it is already absent, which is success — not an error. Any other
  * non-2xx status throws.
  *
- * Note: a 404 also results from a wrong project/domain, so a caller that must be
- * certain the real bare domain is gone should follow this with an anonymous
- * `verifyEntryProtected` of the bare URL. That composition lives in the caller.
+ * The returned `status` IS the removal signal a caller checks: the domain is the
+ * deterministic `<project>.vercel.app`, so 404 (not attached) or 2xx (removed)
+ * both mean it is gone — there is no "wrong domain" ambiguity. Do NOT validate
+ * this with `verifyEntryProtected`; that checks a protected ENTRY (302/401),
+ * whereas a removed bare domain is a 404, which it would read as unprotected.
  */
 export async function removeBareDomain({ projectId, teamId, project, deps }) {
   const domain = `${project}.vercel.app`;
@@ -178,7 +191,9 @@ export async function removeBareDomain({ projectId, teamId, project, deps }) {
  */
 export async function verifyEntryProtected(url, { deps }) {
   const { status } = await deps.probe(url);
-  return PROTECTED_STATUSES.has(status);
+  // Only an auth challenge counts as protected: 302 (Vercel's SSO redirect) or
+  // 401. A 200 is naked, and any other or unconfirmable status fails closed.
+  return status === 302 || status === 401;
 }
 
 /**
@@ -219,9 +234,9 @@ const ssoBody = (deploymentType) =>
 
 /**
  * Read the Vercel CLI auth token the way deploy.sh:230-238 does — the macOS
- * auth.json first, then the Linux/XDG default. Rejects a token carrying a quote
- * or newline, which could otherwise break out of the curl config line it is
- * written into.
+ * auth.json first, then the Linux/XDG default. (The illegal-character guard lives
+ * at authInput construction in makeDefaultDeps, so it covers the injected-token
+ * path too.)
  */
 function readCliToken() {
   const files = [
@@ -235,10 +250,7 @@ function readCliToken() {
     } catch {
       continue; // not present / unreadable — try the next location
     }
-    if (token) {
-      if (/["\r\n]/.test(token)) throw new VercelProtectError(`Vercel token in ${file} contains an illegal character`);
-      return token;
-    }
+    if (token) return token;
   }
   throw new VercelProtectError(`${SELF}: no Vercel CLI auth token found (run \`vercel login\`)`);
 }
@@ -254,20 +266,50 @@ function spawnCurl(args, input) {
  */
 export function makeDefaultDeps({ token, run = spawnCurl } = {}) {
   const authToken = token ?? readCliToken();
+  // Reject a token carrying a character that could break out of the `header = "…"`
+  // curl-config line below — defense-in-depth covering BOTH the injected-token and
+  // the auth.json paths. Vercel tokens are alphanumeric, so a hit means the source
+  // is malformed (fail closed), not that we should try to escape it.
+  if (/["\r\n\\]/.test(authToken)) {
+    throw new VercelProtectError(`${SELF}: Vercel token contains an illegal character`);
+  }
   // The token lives ONLY here, written to curl's stdin config — never in argv.
   const authInput = `header = "Authorization: Bearer ${authToken}"\n`;
-  const base = ['-sS', '-m', '30', '--config', '-'];
+  // `-q` first: ignore an ambient ~/.curlrc that could add `-L` (which would make
+  // a probe follow a protected 302 to a 200 and misread it as naked) or inject
+  // credentials. `--config -` still loads OUR auth header from stdin.
+  const base = ['-q', '-sS', '-m', '30', '--config', '-'];
 
-  // Authenticated call that throws on any transport failure (curl missing,
-  // timeout, non-zero exit) — a failed API call is an error, never "no value".
-  const apiText = (args) => {
-    const res = run([...base, ...args], authInput);
+  // One authenticated request. Throws on any TRANSPORT failure (curl missing,
+  // timeout, non-zero exit) — a failed call is an error, never "no value". curl
+  // exits 0 even on an HTTP error, so the HTTP status is captured (appended by -w
+  // on its own line) and returned alongside the body for the caller to police.
+  const request = (args) => {
+    const res = run([...base, '-w', '\n%{http_code}', ...args], authInput);
     if (res.error) throw new VercelProtectError(`${SELF}: curl could not run: ${res.error.message}`);
     if (res.status !== 0) throw new VercelProtectError(`${SELF}: curl exited ${res.status}: ${(res.stderr || '').trim()}`);
-    return res.stdout ?? '';
+    const out = res.stdout ?? '';
+    const nl = out.lastIndexOf('\n');
+    return { httpStatus: Number(out.slice(nl + 1)) || 0, body: nl >= 0 ? out.slice(0, nl) : out };
   };
-  const apiJson = (args) => JSON.parse(apiText(args) || '{}');
-  const apiStatus = (args) => Number(apiText(['-o', '/dev/null', '-w', '%{http_code}', ...args])) || 0;
+  // JSON call: an HTTP error body is NOT valid data — a 401/404/429/5xx would
+  // otherwise parse as an empty project and read as "safe" (fail OPEN) — so throw
+  // on non-2xx, and wrap the parse so a non-JSON body throws a VercelProtectError
+  // rather than a raw SyntaxError (honoring the documented error contract).
+  const apiJson = (args) => {
+    const { httpStatus, body } = request(args);
+    if (httpStatus < 200 || httpStatus >= 300) {
+      throw new VercelProtectError(`${SELF}: Vercel API returned HTTP ${httpStatus}: ${body.slice(0, 200)}`);
+    }
+    try {
+      return JSON.parse(body || '{}');
+    } catch (err) {
+      throw new VercelProtectError(`${SELF}: Vercel API returned unparseable JSON (HTTP ${httpStatus}): ${err.message}`);
+    }
+  };
+  // DELETE reports its status uninterpreted — removeBareDomain treats 404 as
+  // "already gone", so this must NOT throw on 4xx the way apiJson does.
+  const apiStatus = (args) => request(['-o', '/dev/null', ...args]).httpStatus;
 
   return {
     getProject: ({ projectId, teamId }) =>
@@ -290,11 +332,11 @@ export function makeDefaultDeps({ token, run = spawnCurl } = {}) {
     },
 
     probe: (url) => {
-      // Anonymous — no auth config, redirects NOT followed (no -L) so we observe
-      // the 302 itself rather than chase it to the SSO page (which would 200).
-      // Any transport failure fails CLOSED to status 0 → verifyEntryProtected
-      // reads it as unprotected, never as "confirmed safe".
-      const res = run(['-sS', '-m', '15', '-o', '/dev/null', '-w', '%{http_code}', url], '');
+      // Anonymous — `-q` ignores ~/.curlrc, no auth config, and redirects are NOT
+      // followed (no -L) so we observe the 302 itself rather than chase it to the
+      // SSO page (which would 200). Any transport failure fails CLOSED to status 0
+      // → verifyEntryProtected reads it as unprotected, never "confirmed safe".
+      const res = run(['-q', '-sS', '-m', '15', '-o', '/dev/null', '-w', '%{http_code}', url], '');
       if (res.error || res.status !== 0) return { status: 0 };
       return { status: Number(res.stdout) || 0 };
     },

@@ -32,10 +32,12 @@ import {
  * A fake `deps` for the ssoProtection functions. The stored value is scriptable:
  * `onPatch(current, requested)` returns what the project should hold AFTER a
  * PATCH — default is "the PATCH takes". `echo` overrides the PATCH RESPONSE body
- * so a test can make the echo disagree with the stored value on purpose. Every
+ * so a test can make the echo disagree with the stored value on purpose.
+ * `throwOnPatch(requested)` models an INDETERMINATE PATCH: the state still
+ * mutates (Vercel processed it) but the call then throws (curl timed out). Every
  * GET and PATCH is recorded so order and arguments can be asserted.
  */
-function ssoFake({ current = LEGACY_PROTECTION, onPatch, echo } = {}) {
+function ssoFake({ current = LEGACY_PROTECTION, onPatch, echo, throwOnPatch } = {}) {
   const state = { value: current };
   const patched = [];
   let gets = 0;
@@ -52,6 +54,11 @@ function ssoFake({ current = LEGACY_PROTECTION, onPatch, echo } = {}) {
     patchSsoProtection: async ({ deploymentType }) => {
       patched.push(deploymentType);
       state.value = onPatch ? onPatch(state.value, deploymentType) : deploymentType;
+      // Indeterminate PATCH: the mutation above already happened (Vercel processed
+      // it) but curl threw, so the module must fall through to the verifying GET.
+      if (throwOnPatch && throwOnPatch(deploymentType)) {
+        throw new Error('simulated curl timeout after the PATCH was processed');
+      }
       const echoed = echo !== undefined ? echo : state.value;
       return { ssoProtection: echoed === null ? null : { deploymentType: echoed } };
     },
@@ -124,6 +131,46 @@ test('ensureProtected restores the snapshot and throws when the PATCH nulls it',
   assert.deepEqual(deps.patched, [LEGACY_PROTECTION, snapshot]);
   // Fail-closed outcome: the project is left with a value, never null.
   assert.equal(await snapshotSsoProtection({ ...args, deps }), snapshot);
+});
+
+test('ensureProtected still restores when an indeterminate PATCH throws after nulling', async () => {
+  // Vercel processed the PATCH (nulling protection) but curl then timed out and
+  // threw. Swallowing the throw and GET-verifying must still restore + fail closed
+  // — a throw can never bypass the restore and leave the project naked.
+  const snapshot = WEAKER_PROTECTION; // distinct so the restore PATCH is unambiguous
+  const deps = ssoFake({
+    current: snapshot,
+    onPatch: (cur, req) => (req === LEGACY_PROTECTION ? null : req),
+    throwOnPatch: (req) => req === LEGACY_PROTECTION,
+  });
+  await assert.rejects(
+    ensureProtected({ ...args, deps }),
+    (err) => err instanceof VercelProtectError && /could not protect/.test(err.message),
+  );
+  assert.deepEqual(deps.patched, [LEGACY_PROTECTION, snapshot]); // attempt, then restore
+  assert.equal(await snapshotSsoProtection({ ...args, deps }), snapshot); // never left null
+});
+
+test('ensureProtected reports success when an indeterminate PATCH actually took', async () => {
+  // The PATCH threw (timeout) but Vercel had already applied the legacy enum; the
+  // verifying GET sees it, and the GET is the source of truth → success.
+  const deps = ssoFake({ current: null, onPatch: () => LEGACY_PROTECTION, throwOnPatch: () => true });
+  await ensureProtected({ ...args, deps }); // resolves, no throw
+  assert.deepEqual(deps.patched, [LEGACY_PROTECTION]);
+});
+
+test('ensureProtected fails closed on a fresh naked project whose PATCH is rejected', async () => {
+  // snapshot is null (fresh project) and the PATCH is rejected + leaves it null:
+  // there is no prior value to restore, so it must throw the explicit UNPROTECTED
+  // error and must NOT issue a (meaningless) restore PATCH.
+  const deps = ssoFake({ current: null, onPatch: () => null });
+  await assert.rejects(
+    ensureProtected({ ...args, deps }),
+    (err) => err instanceof VercelProtectError
+      && /could not protect/.test(err.message)
+      && /no prior value|UNPROTECTED/.test(err.message),
+  );
+  assert.deepEqual(deps.patched, [LEGACY_PROTECTION]); // only the attempt — no restore
 });
 
 test('ensureProtected refuses the documented weaker enum, without any I/O', async () => {
@@ -214,7 +261,7 @@ test('makeDefaultDeps passes the token via curl stdin config, never in argv', as
   const seen = [];
   const run = (argv, input) => {
     seen.push({ argv, input });
-    return { status: 0, stdout: `{"ssoProtection":{"deploymentType":"${LEGACY_PROTECTION}"}}`, stderr: '', error: null };
+    return { status: 0, stdout: `{"ssoProtection":{"deploymentType":"${LEGACY_PROTECTION}"}}\n200`, stderr: '', error: null };
   };
   const deps = makeDefaultDeps({ token: 'SUPER-SECRET-TOKEN', run });
   await deps.getProject({ projectId: 'prj_demo', teamId: 'team_demo' });
@@ -223,6 +270,7 @@ test('makeDefaultDeps passes the token via curl stdin config, never in argv', as
   assert.ok(!call.argv.some((a) => a.includes('SUPER-SECRET-TOKEN')), `token leaked into argv: ${JSON.stringify(call.argv)}`);
   assert.ok(call.input.includes('SUPER-SECRET-TOKEN'), 'token must be passed via stdin config');
   assert.ok(call.argv.includes('--config'), 'curl must read the auth header from a config on stdin');
+  assert.equal(call.argv[0], '-q', 'curl must ignore an ambient ~/.curlrc');
   // A team-scoped id becomes a query param; a personal scope would not.
   assert.ok(call.argv.some((a) => a.includes('teamId=team_demo')), 'teamId query param missing');
 });
@@ -240,4 +288,55 @@ test('makeDefaultDeps probe is anonymous (no token) and fails closed on curl err
   assert.equal(call.input, '', 'the anonymous probe must not send the auth config');
   assert.ok(!call.argv.includes('--config'), 'the probe must not read the auth token');
   assert.ok(!call.argv.includes('-L'), 'the probe must not follow redirects (it observes the 302 itself)');
+  assert.equal(call.argv[0], '-q', 'the probe must ignore an ambient ~/.curlrc');
+});
+
+test('makeDefaultDeps throws a VercelProtectError on a non-2xx HTTP status', async () => {
+  // curl exits 0 on an HTTP error, so the module must police the status itself —
+  // otherwise a 401/404/429/5xx error body would parse as an empty (falsely
+  // "safe", adoptable) project and inventoryProject would fail OPEN.
+  const run = () => ({ status: 0, stdout: '{"error":{"code":"forbidden"}}\n403', stderr: '', error: null });
+  const deps = makeDefaultDeps({ token: 't', run });
+  await assert.rejects(
+    async () => deps.getProject({ projectId: 'p' }),
+    (err) => err instanceof VercelProtectError && /HTTP 403/.test(err.message),
+  );
+});
+
+test('makeDefaultDeps parses the body on a 2xx and keeps deleteDomain 404 tolerant', async () => {
+  const okDeps = makeDefaultDeps({
+    token: 't',
+    run: () => ({ status: 0, stdout: `{"ssoProtection":{"deploymentType":"${LEGACY_PROTECTION}"}}\n200`, stderr: '', error: null }),
+  });
+  assert.equal((await okDeps.getProject({ projectId: 'p' })).ssoProtection.deploymentType, LEGACY_PROTECTION);
+
+  // A 404 comes back as a status, NOT a throw — removeBareDomain needs to see it.
+  const nfDeps = makeDefaultDeps({ token: 't', run: () => ({ status: 0, stdout: '\n404', stderr: '', error: null }) });
+  assert.equal((await nfDeps.deleteDomain({ projectId: 'p', domain: 'x.vercel.app' })).status, 404);
+});
+
+test('makeDefaultDeps authenticated calls throw on a transport failure', async () => {
+  // curl missing (res.error) and a curl non-zero exit both mean "no answer" — an
+  // authenticated call must throw, never treat it as empty data.
+  const missing = makeDefaultDeps({ token: 't', run: () => ({ status: null, stdout: '', stderr: '', error: new Error('spawn curl ENOENT') }) });
+  await assert.rejects(
+    async () => missing.getProject({ projectId: 'p' }),
+    (err) => err instanceof VercelProtectError && /could not run/.test(err.message),
+  );
+  const timedOut = makeDefaultDeps({ token: 't', run: () => ({ status: 28, stdout: '', stderr: 'timeout', error: null }) });
+  await assert.rejects(
+    async () => timedOut.getProject({ projectId: 'p' }),
+    (err) => err instanceof VercelProtectError && /exited 28/.test(err.message),
+  );
+});
+
+test('makeDefaultDeps rejects a token carrying an illegal character', () => {
+  // The token is written into a `header = "…"` curl config line; a quote, newline
+  // or backslash could break out of it, so a malformed token fails closed.
+  for (const bad of ['a"b', 'a\nb', 'a\\b']) {
+    assert.throws(
+      () => makeDefaultDeps({ token: bad, run: () => ({}) }),
+      (err) => err instanceof VercelProtectError && /illegal character/.test(err.message),
+    );
+  }
 });

@@ -429,12 +429,15 @@ world-readable:
   clears protection to `null`. `ensureProtected` GET-verifies after every PATCH,
   restores the pre-PATCH snapshot if it was nulled, and fails closed rather than
   report a success it cannot confirm.
-- **Fail closed on an anonymous probe.** `verifyEntryProtected` treats only a
-  302/401 as protected and a 200 (or any unconfirmable status) as naked. The
-  durable guarantee is this probe, run after every provisioning step — not the
-  config GET, which can be nulled afterwards. Full protection of a target is the
-  composition of all three (ensure + remove-bare-domain + probe), so
-  `ensureProtected` resolving alone does not mean the deployment is unreadable.
+- **Fail closed on the anonymous ENTRY probe.** `verifyEntryProtected` probes the
+  protected entry (the scope alias / immutable URL) and treats only a 302/401 as
+  protected, a 200 (or any unconfirmable status) as naked. It is NOT a bare-domain
+  check — a removed bare domain returns 404; bare-domain removal is confirmed by
+  `removeBareDomain`'s returned status instead. The durable guarantee is this entry
+  probe, run after every provisioning step — not the config GET, which can be
+  nulled afterwards. Full protection is the composition of all three (ensure +
+  remove-bare-domain + entry probe), so `ensureProtected` resolving alone does not
+  mean the deployment is unreadable.
 
 `vercel-protect.mjs` is network-testable through an injected `deps` object; its
 production `deps` reads the Vercel CLI token and talks to `api.vercel.com` the
