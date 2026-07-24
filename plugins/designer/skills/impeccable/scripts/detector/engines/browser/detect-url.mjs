@@ -3,9 +3,36 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { finding } from '../../findings.mjs';
-import { filterByProviders } from '../../registry/antipatterns.mjs';
 import { profileFindingsAsync, profileStep, profileStepAsync } from '../../profile/profiler.mjs';
 import { captureVisualContrastCandidate } from '../visual/screenshot-contrast.mjs';
+import { checkContentHiddenAtRest } from '../../rules/checks.mjs';
+
+// Reveal sweep + invisible-text measurement for the content-hidden-at-rest
+// rule. Scrolls through the document with instant jumps (bypasses CSS
+// scroll-behavior: smooth) so IntersectionObserver / scroll reveal handlers
+// get every chance to fire, returns to the top, lets transitions settle,
+// then measures how much text still renders invisible. A healthy
+// reveal-on-scroll page drops to ~0 after the sweep; a page whose reveal
+// script died keeps most of its text at opacity 0.
+async function measureContentHiddenAfterReveal(page) {
+  await page.evaluate(async () => {
+    const step = Math.max(200, Math.floor(window.innerHeight * 0.7));
+    const max = Math.max(
+      document.documentElement.scrollHeight || 0,
+      document.body?.scrollHeight || 0,
+    );
+    for (let y = 0; y <= max; y += step) {
+      window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 40)));
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    await new Promise(resolve => setTimeout(resolve, 700));
+  });
+  return page.evaluate(() => {
+    if (typeof window.impeccableMeasureHiddenText !== 'function') return null;
+    return window.impeccableMeasureHiddenText();
+  });
+}
 
 function serializeDesignSystemForBrowser(designSystem) {
   if (!designSystem?.present) return null;
@@ -158,6 +185,19 @@ async function detectUrl(url, options = {}) {
     ruleId: 'new-page',
     target: url,
   }, () => browser.newPage());
+
+  // Uncaught exceptions and parse errors surface as pageerror events. The
+  // listener must attach before goto: a syntax error fires during the
+  // initial parse, long before the load event. Dedupe by message; a single
+  // broken loop can otherwise throw hundreds of identical errors.
+  const pageErrors = [];
+  if (options?.scriptErrors !== false) {
+    page.on('pageerror', (err) => {
+      const message = String(err?.message || err).split('\n')[0].trim().slice(0, 160);
+      if (message && !pageErrors.includes(message)) pageErrors.push(message);
+    });
+  }
+
   let results = [];
   try {
     await profileStepAsync(profile, {
@@ -213,9 +253,29 @@ async function detectUrl(url, options = {}) {
         return window.impeccableDetect({ decorate: false, serialize: true });
       });
       return serializedGroups.flatMap(({ findings }) =>
-        findings.map(f => ({ id: f.type, snippet: f.detail, ignoreValue: f.ignoreValue || '' }))
+        findings.map(f => ({ id: f.type, snippet: f.detail, ignoreValue: f.ignoreValue || '', severity: f.severity || '' }))
       );
     });
+    // Content invisible at rest: reveal sweep, then re-measure. Runs after
+    // the main scan (which must see the true at-rest state) and before the
+    // visual contrast fallback (the sweep restores scroll to the top).
+    if (options?.contentHidden !== false) {
+      const hiddenFindings = await profileFindingsAsync(profile, {
+        engine: 'browser',
+        phase: 'scan',
+        ruleId: 'content-hidden-at-rest',
+        target: url,
+      }, async () => {
+        const measured = await measureContentHiddenAfterReveal(page);
+        return measured ? checkContentHiddenAtRest(measured) : [];
+      });
+      results.push(...hiddenFindings);
+    }
+
+    for (const message of pageErrors.slice(0, 3)) {
+      results.push({ id: 'script-error', snippet: message });
+    }
+
     const visualFindings = await runVisualContrastFallback(page, serializedGroups, options, profile, url);
     results.push(...visualFindings);
   } finally {
@@ -234,11 +294,14 @@ async function detectUrl(url, options = {}) {
       }, () => browser.close());
     }
   }
-  return filterByProviders(results.map(f => {
+  return results.map(f => {
     const item = finding(f.id, url, f.snippet);
     if (f.ignoreValue) item.ignoreValue = f.ignoreValue;
+    // Per-finding severity promotion (e.g. hero-region pulsing dot)
+    // overrides the registry default carried by finding().
+    if (f.severity && f.severity !== item.severity) item.severity = f.severity;
     return item;
-  }), options.providers);
+  });
 }
 
 async function createBrowserDetector(options = {}) {

@@ -12,6 +12,7 @@ Run comprehensive checks across 5 dimensions. Score each dimension 0-4 using the
 
 **Check for**:
 - **Contrast issues**: Text contrast ratios < 4.5:1 (or 7:1 for AAA)
+- **Motion sensitivity**: `prefers-reduced-motion` needs an intentional alternative that preserves state change and hierarchy; flag a global `0.01ms` kill that destroys useful feedback, flashing above threshold, and motion that blocks focus, reading, or task completion
 - **Missing ARIA**: Interactive elements without proper roles, labels, or states
 - **Keyboard navigation**: Missing focus indicators, illogical tab order, keyboard traps
 - **Semantic HTML**: Improper heading hierarchy, missing landmarks, divs instead of buttons
@@ -52,11 +53,11 @@ Run comprehensive checks across 5 dimensions. Score each dimension 0-4 using the
 
 **Score 0-4**: 0=Desktop-only (breaks on mobile), 1=Major issues (some breakpoints, many failures), 2=Partial (works on mobile, rough edges), 3=Good (responsive, minor touch target or overflow issues), 4=Excellent (fluid, all viewports, proper touch targets)
 
-### 5. Anti-Patterns (CRITICAL)
+### 5. Implementation Integrity (CRITICAL)
 
-Check against ALL the **DON'T** guidelines from the parent impeccable skill (already loaded in this context). Look for AI slop tells (AI color palette, gradient text, glassmorphism, hero metrics, card grids, generic fonts) and general design anti-patterns (gray on color, nested cards, bounce easing, redundant copy).
+Run the bundled detector and verify each finding in context. Look for repeated implementation shortcuts, design-system drift, misleading or decorative content, and structure that is interchangeable with an unrelated product. Keep deterministic findings separate from visual judgment and call out false positives.
 
-**Score 0-4**: 0=AI slop gallery (5+ tells), 1=Heavy AI aesthetic (3-4 tells), 2=Some tells (1-2 noticeable), 3=Mostly clean (subtle issues only), 4=No AI tells (distinctive, intentional design)
+**Score 0-4**: 0=systemic drift, 1=major repeated failures, 2=several verified issues, 3=minor isolated issues, 4=coherent and intentional
 
 ## Generate Report
 
@@ -68,13 +69,13 @@ Check against ALL the **DON'T** guidelines from the parent impeccable skill (alr
 | 2 | Performance | ? | |
 | 3 | Responsive Design | ? | |
 | 4 | Theming | ? | |
-| 5 | Anti-Patterns | ? | |
+| 5 | Implementation Integrity | ? | |
 | **Total** | | **??/20** | **[Rating band]** |
 
 **Rating bands**: 18-20 Excellent (minor polish), 14-17 Good (address weak dimensions), 10-13 Acceptable (significant work needed), 6-9 Poor (major overhaul), 0-5 Critical (fundamental issues)
 
-### Anti-Patterns Verdict
-**Start here.** Pass/fail: Does this look AI-generated? List specific tells. Be brutally honest.
+### Implementation Integrity Verdict
+**Start here.** Pass/fail: does the implementation express a coherent product-specific system? Cite verified evidence and detector findings.
 
 ### Executive Summary
 - Audit Health Score: **??/20** ([rating band])
@@ -93,7 +94,7 @@ Tag every issue with **P0-P3 severity**:
 For each issue, document:
 - **[P?] Issue name**
 - **Location**: Component, file, line
-- **Category**: Accessibility / Performance / Theming / Responsive / Anti-Pattern
+- **Category**: Accessibility / Performance / Theming / Responsive / Implementation Integrity
 - **Impact**: How it affects users
 - **WCAG/Standard**: Which standard it violates (if applicable)
 - **Recommendation**: How to fix it
@@ -132,4 +133,3 @@ After presenting the summary, tell the user:
 - Skip positive findings (celebrate what works)
 - Forget to prioritize (everything can't be P0)
 - Report false positives without verification
-

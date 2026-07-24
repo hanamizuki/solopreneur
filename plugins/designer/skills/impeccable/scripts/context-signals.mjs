@@ -11,7 +11,7 @@
  * output is always valid JSON.
  *
  * Signals:
- *   - setup:     PRODUCT.md / DESIGN.md presence, register, whether code exists
+ *   - setup:     PRODUCT.md / DESIGN.md presence and whether code exists
  *   - critique:  the latest cached critique score (.impeccable/critique)
  *   - git:       branch + files changed vs the default branch (a scope hint)
  *   - devServer: whether a local dev server answers on a common port (gates live)
@@ -21,7 +21,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { loadContext, extractRegister, extractPlatform } from './context.mjs';
+import { loadContext, extractPlatform } from './context.mjs';
 import { getCritiqueDir } from './lib/impeccable-paths.mjs';
 
 /** Is there code here at all, or just context files / an empty repo? */
@@ -196,7 +196,6 @@ export async function gatherSignals(cwd = process.cwd()) {
       hasDesign: ctx.hasDesign,
       designPath: ctx.designPath,
       hasCode: hasCode(cwd),
-      register: extractRegister(ctx.product),
       platform: extractPlatform(ctx.product),
     },
     critique: { latest: latestCritique(cwd) },
