@@ -246,7 +246,12 @@ function legacyPreviewValues(config, file) {
   // honestly propose a target from a malformed source. (Absent — undefined or
   // null — is not corrupt: the cascade simply continues past it.)
   const useObject = (node, where) => {
-    if (node === undefined || node === null) return false;
+    // Absent for the cascade means undefined, null, OR "" — the shell reader
+    // captures jq's output and tests `[ -n "$out" ]`, so an empty string reads
+    // as unanswered and falls through to the next layer (this is `isAnswer`, the
+    // same rule readPath and readAutoProtect use). Only a non-empty non-object
+    // (`[]`, `false`, `"docs"`, a number) is present-but-malformed.
+    if (!isAnswer(node)) return false;
     if (!isObject(node)) {
       throw new ConfigError(
         `malformed legacy preview config: ${where} is ${Array.isArray(node) ? 'an array' : `a ${typeof node}`}, not an object\n`

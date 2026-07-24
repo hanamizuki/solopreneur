@@ -861,6 +861,21 @@ test('a malformed preview subtree is refused, never silently dropped', () => {
   assert.ok(result.stderr.includes('default.preview'), result.stderr);
 });
 
+test('an empty-string preview subtree falls through, as the shell reader skips it', () => {
+  // default.preview = "" is unanswered for `[ -n "$out" ]`, so the cascade
+  // continues to the flat preview.paths layer — it must NOT be rejected as
+  // malformed the way [] / false / a non-empty string are.
+  const s = scenario({});
+  fs.writeFileSync(s.legacyFile, `{
+    "default": { "preview": "" },
+    "preview": { "paths": { "${s.repo}": "docs/from-flat" } }
+  }
+`);
+
+  const out = migrate(s, ['--target-project', 'p']);
+  assert.ok(out.stdout.includes('"root": "./docs/from-flat"'), out.stdout);
+});
+
 test('two repos migrated from one legacy file in the same second do not collide', () => {
   // The shared legacy file is backed up once per run; a second-granularity stamp
   // would make the second run fail EEXIST on COPYFILE_EXCL.
