@@ -191,6 +191,15 @@ exists as a regular file is refused for the same visibility reason — the dry r
 is the review surface, and it must not show a proposal that only fails after
 `--write`. A missing root is fine; a fresh setup creates it later.
 
+**Physical paths, not lexical, everywhere the resolver uses them.** The root
+containment check realpaths the root before judging it in-repo, so an in-repo
+symlink that physically escapes the tree is refused rather than written as an
+undiscoverable config — the resolver realpaths content, so a lexical check would
+disagree with it exactly there. Legacy sources are deduped by physical file
+identity too: a symlinked `CLAUDE_CONFIG_DIR` aliasing `~/.claude` would
+otherwise back the one file up twice onto the same `.backup-<stamp>` path, and
+the second `COPYFILE_EXCL` would fail EEXIST and roll the whole migration back.
+
 **Legacy files are classified before reading, and every config-derived string in
 the report is quoted.** A FIFO or a device symlink at a config path would block
 `readFileSync` forever, so the file is `stat`-checked first, exactly as the

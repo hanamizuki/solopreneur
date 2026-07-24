@@ -293,6 +293,24 @@ test('a legacy path escaping the repo via .. is refused', () => {
   assert.ok(result.stderr.includes('outside the repository'), result.stderr);
 });
 
+test('an in-repo symlink root pointing outside the repo is refused', () => {
+  // Lexically `link` is under the repo, but it physically escapes — and the
+  // resolver realpaths content, so a lexical-only check would pass here and
+  // still write a config no walk-up can find.
+  const s = scenario({});
+  const outside = mkdirp(s.root, 'outside');
+  fs.symlinkSync(outside, path.join(s.repo, 'link'), 'dir');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'link' } } },
+  });
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('outside the repository'), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
+});
+
 test('a root that is a regular file is rejected in the dry run, not just at --write', () => {
   const s = scenario({});
   writeJson(s.legacyFile, {
@@ -680,6 +698,29 @@ test('--legacy-config accepts repeated paths and merges them in order', () => {
   assert.ok(out.stdout.includes(second), out.stdout);
   assert.ok(out.stdout.includes('"root": "./from-a-path"'), 'the first file supplies the path');
   assert.ok(out.stdout.includes('"project": "from-b"'), 'the second file supplies the project');
+});
+
+test('aliased default locations are deduped by physical file, not path', () => {
+  // CLAUDE_CONFIG_DIR is a symlink to ~/.claude, so both default locations name
+  // one physical file. A lexical dedup keeps both; the second backup then lands
+  // on the same `.backup-<stamp>` path and fails EEXIST, rolling everything back.
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  git(repo, ['init', '-q', '-b', 'main']);
+  const home = mkdirp(root, 'home');
+  writeJson(path.join(home, '.claude', 'solopreneur.json'), {
+    default: { preview: { projects: { default: 'p' } } },
+  });
+  const ccd = path.join(root, 'ccd');
+  fs.symlinkSync(path.join(home, '.claude'), ccd, 'dir');
+
+  const out = run(['--target-project', 'p', '--write'], {
+    cwd: repo, home, env: { CLAUDE_CONFIG_DIR: ccd },
+  });
+  assert.equal(out.status, 0, out.stderr);
+  assert.ok(fs.existsSync(path.join(repo, '.solopreneur.json')));
+  // Exactly one backup of the one physical file, not an EEXIST failure.
+  assert.equal(backupsIn(path.join(home, '.claude')).length, 1);
 });
 
 test('a --legacy-config that does not exist is reported, never skipped', () => {

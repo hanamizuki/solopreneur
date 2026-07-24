@@ -198,8 +198,18 @@ function gatherSources(named) {
     ...defaultLegacyFiles().map((file) => ({ file, required: false })),
   ];
   for (const { file, required } of candidates) {
-    if (seen.has(file)) continue;
-    seen.add(file);
+    // Dedup by PHYSICAL identity, not the lexical path: a symlinked
+    // CLAUDE_CONFIG_DIR aliasing ~/.claude makes the two defaults name one file
+    // through two paths, and backing both up would hit the same `.backup-<stamp>`
+    // destination — the second COPYFILE_EXCL fails EEXIST and the whole run
+    // rolls back. A missing file cannot be realpath'd; its lexical path is a
+    // fine key, and readLegacy resolves whether that is fatal.
+    let identity = file;
+    try {
+      identity = fs.realpathSync(file);
+    } catch { /* missing or broken — readLegacy decides */ }
+    if (seen.has(identity)) continue;
+    seen.add(identity);
     const source = readLegacy(file, { required });
     if (!source) continue;
     if (Object.keys(source.values).length > 0) {
@@ -692,41 +702,56 @@ function main(argv) {
     );
   }
   const root = toRoot(legacyPath ?? DEFAULT_ROOT);
-  const resolvedRoot = path.resolve(path.dirname(dest), root);
-
-  // The config lands at the repo root, and the resolver finds it by walking up
-  // from a content item inside `root`. That only works when `root` is at or
-  // below the repo root; an absolute root elsewhere, or one escaping via `..`,
-  // would leave a file no walk-up ever reaches — a "wrote it" that resolves to
-  // nothing. This simple migrator refuses those rather than trying to guess a
-  // second placement; a hand edit can put the config at an ancestor of the root.
-  if (!isUnder(resolvedRoot, path.dirname(dest))) {
-    throw new ConfigError(
-      `the legacy preview root is outside the repository, so a config at the repo root could never be found\n`
-      + `  root: ${resolvedRoot}\n  repo: ${path.dirname(dest)}\n`
-      + `  ${legacyPath !== null ? `it comes from ${pathLayer.where} in ${pathLayer.file}` : ''}\n`
-      + `  place a ${V2_FILENAME} at an ancestor of that root by hand instead`,
-    );
-  }
+  // The repo root as the resolver would see it — physical. It always exists (a
+  // git toplevel, or the cwd), and the resolver walks up from realpath'd content
+  // so it compares against physical paths; a lexical compare here would disagree
+  // with it exactly where a symlink is involved.
+  const realDestDir = fs.realpathSync(path.dirname(dest));
+  // `root` is declared relative to the config file's directory (the repo root),
+  // matching how the resolver resolves it.
+  const lexicalRoot = path.resolve(realDestDir, root);
 
   // A root that exists but is a regular file will never resolve (the resolver
   // requires a directory). Catch it here so the DRY RUN says so, instead of a
   // clean-looking proposal that only fails after --write. A missing root is
-  // fine — a fresh setup creates it later.
+  // fine — a fresh setup creates it later, and it keeps its lexical path for the
+  // containment check below.
+  let physicalRoot = lexicalRoot;
   let rootExists = false;
   try {
-    if (!fs.statSync(resolvedRoot).isDirectory()) {
+    // realpath so an in-repo symlink pointing OUTSIDE the repo is judged by
+    // where it physically lands — the resolver realpaths content too, so a
+    // lexical-only check would pass here and still produce an undiscoverable
+    // config.
+    physicalRoot = fs.realpathSync(lexicalRoot);
+    if (!fs.statSync(physicalRoot).isDirectory()) {
       throw new ConfigError(
         `the legacy preview root is not a directory, so the migrated config would not resolve\n`
-        + `  root: ${resolvedRoot}\n  it is a file; preview.root must be a directory`,
+        + `  root: ${physicalRoot}\n  it is a file; preview.root must be a directory`,
       );
     }
     rootExists = true;
   } catch (err) {
     if (err instanceof ConfigError) throw err;
     if (err.code !== 'ENOENT') {
-      throw new ConfigError(`cannot inspect the legacy preview root: ${resolvedRoot}\n  ${err.message}`);
+      throw new ConfigError(`cannot inspect the legacy preview root: ${lexicalRoot}\n  ${err.message}`);
     }
+  }
+
+  // The config lands at the repo root, and the resolver finds it by walking up
+  // from a content item inside `root`. That only works when `root` sits at or
+  // below the repo root; an absolute root elsewhere, one escaping via `..`, or
+  // one reached through a symlink that leaves the tree would leave a file no
+  // walk-up ever reaches — a "wrote it" that resolves to nothing. This simple
+  // migrator refuses those rather than guessing a second placement; a hand edit
+  // can put the config at an ancestor of the root.
+  if (!isUnder(physicalRoot, realDestDir)) {
+    throw new ConfigError(
+      `the legacy preview root is outside the repository, so a config at the repo root could never be found\n`
+      + `  root: ${physicalRoot}\n  repo: ${realDestDir}\n`
+      + `  ${legacyPath !== null ? `it comes from ${pathLayer.where} in ${pathLayer.file}` : ''}\n`
+      + `  place a ${V2_FILENAME} at an ancestor of that root by hand instead`,
+    );
   }
 
   const rootNote = legacyPath !== null
