@@ -261,17 +261,6 @@ t('items', { count }) // Handles complex plural rules
 - Descriptive alt text
 - Semantic HTML
 
-**Motion sensitivity**:
-```css
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-```
-
 **High contrast mode**:
 - Test in Windows high contrast mode
 - Don't rely only on color
