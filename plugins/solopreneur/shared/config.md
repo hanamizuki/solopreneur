@@ -345,14 +345,17 @@ registered here by hand:
   only ever **reads and reports** that layout; it never writes a legacy file.
 - `preview/scripts/config-migrate.mjs` — its own `legacyPreviewValues()`, plus
   two readers that restate the **two different cascades** described above:
-  `readPerKey()` mirrors `deploy.sh:read_preview_config` (file-major —
-  `repos[<rk>]` then `default` *within* each file) for `projects.<bucket>` and
-  `autoProtect`, and `readPath()` mirrors `read_solopreneur_config preview`
+  `readAutoProtect()` mirrors `deploy.sh:read_preview_config` (file-major —
+  `repos[<rk>]` then `default` *within* each file), and `readPath()` mirrors
+  `read_solopreneur_config preview`
   (subtree-major — the whole `preview` subtree from the first layer that has
   one, then `.path` else `.paths[<rk>]` from that one subtree) for the preview
-  path. `repoKey()` mirrors `deploy.sh:_preview_repo_key`. All of it **reads
-  only**: the legacy file is never written, and `--write` copies it aside
-  before creating the separate v2 file. Keep these in sync when either cascade
+  path. Both treat `null` **and the empty string** as "not an answer", because
+  both shell readers capture jq's output and then test `[ -n "$out" ]`; a
+  literal `false` survives, which is the case `autoProtect` depends on.
+  `repoKey()` mirrors `deploy.sh:_preview_repo_key`. All of it **reads only**:
+  the legacy file is never written, and `--write` copies it aside before
+  creating the separate v2 file. Keep these in sync when either cascade
   changes — answering the way only one of them does would migrate a setting the
   user never set.
 
@@ -541,15 +544,21 @@ Rules worth knowing before running it:
 - **The new file lands at the git toplevel** (or the working directory outside a
   repo), because a legacy path is stored relative to the repo root and a v2
   relative `root` resolves against the directory of the file declaring it.
-- **`--write` backs up first**, copying each legacy file it read to
-  `<file>.backup-<UTC timestamp>` (never overwriting an existing backup), then
-  writes the v2 file through a same-directory temp that is validated with
-  `config-resolve.mjs` before being `rename`d into place.
-- **Refusals are clean no-ops**: nothing is written when the destination already
-  exists, when a v2 config at or above the destination would be shadowed, or
-  when there is no legacy preview config to migrate. A user-global
-  `~/.config/solopreneur/config.json` does *not* block a repo-local migration —
-  it is a lower layer that a repo-local file is meant to win over.
+- **`--write` stages, then backs up, then installs.** The v2 file is written to
+  a same-directory temp and validated with `config-resolve.mjs` first; only then
+  is each legacy file copied to `<file>.backup-<UTC timestamp>` (never
+  overwriting an existing backup); only then is the temp `rename`d into place.
+  Validating before backing up is what makes a *failed* write leave nothing at
+  all — a stray backup would otherwise block the corrected retry, since the
+  stamp is second-granularity and the copy refuses to overwrite.
+- **Nothing is written unless the whole thing succeeds.** That covers the
+  refusals — the destination already exists, a v2 config at or above the
+  destination would be shadowed, `$SOLOPRENEUR_CONFIG` is set (it outranks every
+  file on disk, so a migrated file would be inert), or there is no legacy
+  preview config to migrate — and equally a write that fails validation
+  part-way. A user-global `~/.config/solopreneur/config.json` does *not* block a
+  repo-local migration: it is a lower layer that a repo-local file is meant to
+  win over.
 
 `PREVIEW_PROJECT` is neither read nor changed by the migrator; it stays the
 highest-priority override for the legacy per-page flow.

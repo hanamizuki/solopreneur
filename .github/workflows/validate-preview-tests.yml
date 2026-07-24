@@ -51,6 +51,12 @@ jobs:
       - name: Run the preview skill test suite
         working-directory: plugins/solopreneur/skills/preview
         run: |
+          # failglob, or this gate can pass having run zero tests: with no match
+          # bash passes the pattern through literally, Node >= 22.6 treats it as
+          # its own glob, matches nothing, and exits 0 on "tests 0". A renamed or
+          # deleted suite would then go green — the exact hole this workflow
+          # exists to close. Verified both ways locally.
+          shopt -s failglob
           # NOT `node --test tests/`: since Node 22.6 the positional arguments
           # are glob patterns rather than paths, so a bare directory matches
           # itself and Node then tries to execute the directory as a test file —

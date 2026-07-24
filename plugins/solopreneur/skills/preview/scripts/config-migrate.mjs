@@ -65,6 +65,22 @@ const DEFAULT_ROOT = 'docs/preview';
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /**
+ * Render a config-derived value on exactly one line of the report.
+ *
+ * Project names, the repo key and the preview path are attacker-ish text — a
+ * legacy config gets copied between machines, and `--legacy-config` can point
+ * at any file — while the report is precisely what a human reads to decide
+ * whether to `--write`. Printed raw, a newline inside a project name forges a
+ * line indistinguishable from this script's own statements of fact (verified:
+ * a name ending in `\nwrote /etc/passwd` reproduces it). `config-resolve.mjs`
+ * escapes its output for the same reason and has a test for it; quoting rather
+ * than escaping also makes stray whitespace visible. Filesystem paths this
+ * script resolved itself are left unquoted — they are the most-read lines and
+ * are not config content.
+ */
+const show = (value) => JSON.stringify(String(value));
+
+/**
  * Walk a path of own keys, yielding `undefined` at the first missing step.
  * Own-property lookups, not `?.`: a repo key like `constructor` or `toString`
  * would otherwise resolve through `Object.prototype` and hand back a function.
@@ -103,7 +119,13 @@ function legacyPreviewValues(config) {
   if (isObject(at(config, 'default', 'preview'))) found.default = config.default.preview;
   // The older flat shape, e.g. { "preview": { "paths": { "<repo-key>": "..." } } }
   if (isObject(at(config, 'preview'))) found.preview = config.preview;
-  const repos = {};
+  // Null prototype: `JSON.parse` creates a real own `__proto__` property, but
+  // assigning that key on a normal object hits `Object.prototype`'s setter and
+  // creates nothing — so a `repos.__proto__` entry would vanish from a report
+  // whose whole job is to show everything it found. (`config-resolve.mjs` has
+  // the same accumulator without this; it only ever reports, and this file is
+  // the one that turns the values into a written config.)
+  const repos = Object.create(null);
   for (const [key, entry] of Object.entries(isObject(config?.repos) ? config.repos : {})) {
     if (isObject(at(entry, 'preview'))) repos[key] = entry.preview;
   }
@@ -166,7 +188,18 @@ function gatherSources(named) {
     if (seen.has(file)) continue;
     seen.add(file);
     const source = readLegacy(file, { required });
-    if (source && Object.keys(source.values).length > 0) sources.push(source);
+    if (!source) continue;
+    if (Object.keys(source.values).length > 0) {
+      sources.push(source);
+    } else if (required) {
+      // A file the caller named is never dropped in silence. Otherwise the run
+      // ends with "no legacy preview config found ... name another file with
+      // --legacy-config", which is the thing they just did.
+      throw new ConfigError(
+        `--legacy-config holds no preview settings: ${file}\n`
+        + '  it parsed fine, but has no default.preview, repos.<key>.preview or top-level preview',
+      );
+    }
   }
   return sources;
 }
@@ -180,20 +213,31 @@ function gatherSources(named) {
 // ---------------------------------------------------------------------------
 
 /**
- * `projects.<bucket>` and `autoProtect`, the way `deploy.sh:read_preview_config`
- * reads them: file-major, trying `repos[<key>]` then `default` inside each file
- * before moving to the next. `!= null` semantics mirror its `| values`, so a
- * legacy `autoProtect: false` counts as an answer instead of falling through as
- * if it were unset. There is no flat top-level layer for these two keys.
+ * A value the legacy shell readers would treat as present. Both of them capture
+ * jq's output into a shell variable and then test `[ -n "$out" ]`, so `null`
+ * (dropped by `| values` / `// empty`) AND the empty string fall through to the
+ * next layer. A literal `false` survives both, which is the case that matters
+ * for `autoProtect`.
  */
-function readPerKey(sources, key, leaf) {
+const isAnswer = (value) => value !== undefined && value !== null && value !== '';
+
+/**
+ * `autoProtect`, the way `deploy.sh:read_preview_config` reads it: file-major,
+ * trying `repos[<key>]` then `default` inside each file before moving to the
+ * next. There is no flat top-level layer for this key.
+ *
+ * `projects.<bucket>` deliberately does NOT go through this cascade — the
+ * caller picks a project explicitly, so `collectCandidates` offers the union of
+ * every name instead of hiding the shadowed ones.
+ */
+function readAutoProtect(sources, key) {
   for (const { file, values } of sources) {
     for (const [where, subtree] of [
-      [`repos[${key}].preview`, at(values, 'repos', key)],
+      [`repos[${show(key)}].preview`, at(values, 'repos', key)],
       ['default.preview', at(values, 'default')],
     ]) {
-      const value = at(subtree, ...leaf);
-      if (value !== undefined && value !== null) return { value, file, where };
+      const value = at(subtree, 'autoProtect');
+      if (isAnswer(value)) return { value, file, where };
     }
   }
   return null;
@@ -215,7 +259,7 @@ function readPerKey(sources, key, leaf) {
 function readPath(sources, key) {
   const layers = [
     ...sources.flatMap(({ file, values }) => [
-      { file, where: `repos[${key}].preview`, subtree: at(values, 'repos', key) },
+      { file, where: `repos[${show(key)}].preview`, subtree: at(values, 'repos', key) },
       { file, where: 'default.preview', subtree: at(values, 'default') },
     ]),
     // Layer 5: the flat top-level `preview` subtree, primary then fallback.
@@ -223,8 +267,12 @@ function readPath(sources, key) {
   ];
   for (const layer of layers) {
     if (!isObject(layer.subtree)) continue;
-    const value = at(layer.subtree, 'path') ?? at(layer.subtree, 'paths', key);
-    return { file: layer.file, where: layer.where, value: value ?? null };
+    // `.path` else `.paths[<key>]`, both through the shell's own "is this an
+    // answer" test — SKILL.md reads them with jq `// empty` and then checks the
+    // captured string, so an empty `.path` falls through to `.paths` there too.
+    const direct = at(layer.subtree, 'path');
+    const value = isAnswer(direct) ? direct : at(layer.subtree, 'paths', key);
+    return { file: layer.file, where: layer.where, value: isAnswer(value) ? value : null };
   }
   return null;
 }
@@ -251,7 +299,7 @@ function collectCandidates(sources) {
     for (const [key, preview] of Object.entries(isObject(values.repos) ? values.repos : {})) {
       const repoProjects = at(preview, 'projects');
       for (const [bucket, project] of Object.entries(isObject(repoProjects) ? repoProjects : {})) {
-        add(project, `repos[${key}].preview.projects.${bucket}`, file);
+        add(project, `repos[${show(key)}].preview.projects.${bucket}`, file);
       }
     }
   }
@@ -313,7 +361,11 @@ function repoKey(dir) {
 function toRoot(value) {
   if (path.isAbsolute(value)) return value;
   const normalized = path.normalize(value).replace(/\/+$/, '');
-  return normalized === '.' || normalized.startsWith('..') ? normalized : `./${normalized}`;
+  // Only a real parent segment escapes — the same distinction `isUnder` makes.
+  // A plain startsWith('..') would also catch a directory legitimately named
+  // `...`, and emit it without the `./` marker.
+  const escapes = normalized === '..' || normalized.startsWith(`..${path.sep}`);
+  return normalized === '.' || escapes ? normalized : `./${normalized}`;
 }
 
 /**
@@ -390,11 +442,19 @@ function backup(file, stamp) {
  * in one call. `$SOLOPRENEUR_CONFIG` is the resolver's own "use exactly this
  * file" entry point.
  */
-function verifyResolves(file) {
+function verifyResolves(file, dest) {
   const previous = process.env.SOLOPRENEUR_CONFIG;
   process.env.SOLOPRENEUR_CONFIG = file;
   try {
     resolveConfig({});
+  } catch (err) {
+    if (!(err instanceof ConfigError)) throw err;
+    // Re-phrase against the destination: the resolver names the file it read,
+    // and that temp is deleted before anyone sees the message.
+    throw new ConfigError(
+      `the migrated config does not resolve, so nothing was written\n  it would be: ${dest}\n  `
+      + err.message.split(file).join(dest).split('\n').join('\n  '),
+    );
   } finally {
     if (previous === undefined) delete process.env.SOLOPRENEUR_CONFIG;
     else process.env.SOLOPRENEUR_CONFIG = previous;
@@ -402,7 +462,14 @@ function verifyResolves(file) {
 }
 
 /**
- * Write via a temp file in the SAME directory, then rename.
+ * Write the new config to a temp file in the SAME directory and prove it
+ * resolves, returning the temp path for the caller to rename into place.
+ *
+ * Staging is split from installing so that validation happens BEFORE the caller
+ * takes any backup. Validating after would leave backup files behind on a
+ * failed run — and because the stamp is second-granularity and the copy is
+ * `COPYFILE_EXCL`, the corrected re-run would then die on EEXIST complaining
+ * about backups instead of the problem the user actually has to fix.
  *
  * Same directory is load-bearing twice. It puts the temp on the same filesystem,
  * so the rename cannot fail with EXDEV and cannot decay into a copy; and the
@@ -414,19 +481,39 @@ function verifyResolves(file) {
  * is the property that matters here; power-loss durability is not the threat
  * model when the legacy config is untouched and the recovery is "run it again".
  */
-function writeAtomic(dest, text) {
+function stageConfig(dest, text) {
   const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.${randomUUID()}.tmp`);
   try {
-    fs.writeFileSync(tmp, text);
-    verifyResolves(tmp);
+    try {
+      fs.writeFileSync(tmp, text);
+    } catch (err) {
+      // A read-only directory or a full disk is the environment's problem, not
+      // a bug in a shipped file — so it must not escape as a stack trace.
+      throw new ConfigError(`cannot write into ${path.dirname(dest)}\n  ${err.message}`);
+    }
+    verifyResolves(tmp, dest);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    throw err;
+  }
+  return tmp;
+}
+
+/** Rename the staged file into place, always clearing the temp. */
+function installStaged(tmp, dest) {
+  try {
     // The caller already refused when `dest` existed. That check is a guard for
     // the user, not a lock: nothing here can stop another process from creating
     // the file in between, and a single-user CLI does not need it to.
     fs.renameSync(tmp, dest);
+  } catch (err) {
+    throw new ConfigError(`cannot install ${dest}\n  ${err.message}`);
   } finally {
-    // Covers every failure — a rejected config, ENOSPC mid-write, EACCES on the
-    // rename — and is a no-op once the rename has consumed the temp.
-    fs.rmSync(tmp, { force: true });
+    // A no-op once the rename has consumed the temp. Its own failure must never
+    // replace the error above, which is the one worth reading.
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch { /* the original outcome wins */ }
   }
 }
 
@@ -449,6 +536,16 @@ function parseArgs(argv) {
     if (arg.startsWith(`${name}=`)) return { value: arg.slice(name.length + 1), next: i };
     const value = argv[i + 1];
     if (value === undefined) throw new ConfigError(`${name} requires a value\n${USAGE}`);
+    // Swallowing the next flag is not a typo the user can see: with a legacy
+    // config that names no projects there is nothing to check the value
+    // against, so `--target-project --write` would quietly propose a project
+    // called "--write" and run as a dry run.
+    if (value.startsWith('--')) {
+      throw new ConfigError(
+        `${name} requires a value, but the next argument is the flag ${value}\n`
+        + `  if that really is the value, write it as ${name}=${value}\n${USAGE}`,
+      );
+    }
     return { value, next: i + 1 };
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -496,6 +593,17 @@ function destinationFor(cwd) {
  * repo-local file is *supposed* to win over, so it must not block a migration.
  */
 function assertNotShadowing(resolved, dest) {
+  // $SOLOPRENEUR_CONFIG is resolver layer 1 and wins from anywhere on disk, so
+  // a file written while it is set would be inert — and this script would still
+  // report success. Positional containment cannot catch that; the variable can
+  // point outside the tree entirely.
+  if (process.env.SOLOPRENEUR_CONFIG) {
+    throw new ConfigError(
+      'refusing to migrate: $SOLOPRENEUR_CONFIG is set, and it outranks every file on disk\n'
+      + `  config: ${path.resolve(process.env.SOLOPRENEUR_CONFIG)}\n`
+      + `  a new ${V2_FILENAME} at ${dest} would be ignored while it is set — unset it first`,
+    );
+  }
   if (resolved.mode !== 'v2' || !isUnder(path.dirname(dest), path.dirname(resolved.configPath))) return;
   throw new ConfigError(
     `refusing to migrate: a v2 config already covers this scope\n  config: ${resolved.configPath}\n`
@@ -508,7 +616,7 @@ function requireTargetProject(chosen, candidates) {
   const listing = candidates.size === 0
     ? '  no project names found in the legacy config — name the project this scope should publish to'
     : `  candidates found in the legacy config:\n${
-      [...candidates].map(([project, origins]) => `    ${project}\n${origins.map((o) => `      from ${o}`).join('\n')}`).join('\n')}`;
+      [...candidates].map(([project, origins]) => `    ${show(project)}\n${origins.map((o) => `      from ${o}`).join('\n')}`).join('\n')}`;
 
   if (chosen === undefined) {
     throw new ConfigError(
@@ -523,7 +631,7 @@ function requireTargetProject(chosen, candidates) {
   // is exactly the shape most in need of migrating.
   if (candidates.size > 0 && !candidates.has(chosen)) {
     throw new ConfigError(
-      `--target-project "${chosen}" is not one of the projects in the legacy config\n${listing}`,
+      `--target-project ${show(chosen)} is not one of the projects in the legacy config\n${listing}`,
     );
   }
 }
@@ -557,9 +665,9 @@ function main(argv) {
 
   const pathLayer = readPath(sources, key);
   const legacyPath = pathLayer === null ? null : pathLayer.value;
-  if (legacyPath !== null && (typeof legacyPath !== 'string' || legacyPath === '')) {
+  if (legacyPath !== null && typeof legacyPath !== 'string') {
     throw new ConfigError(
-      `the legacy preview path for ${key} is not a non-empty string\n  ${pathLayer.where} in ${pathLayer.file}`,
+      `the legacy preview path for ${show(key)} is not a string\n  ${pathLayer.where} in ${pathLayer.file}`,
     );
   }
   const root = toRoot(legacyPath ?? DEFAULT_ROOT);
@@ -571,7 +679,7 @@ function main(argv) {
   // deploy.sh compares this value against the string "false", so a JSON `false`
   // and a quoted "false" mean the same thing. Anything else — including a
   // missing key — protects, which is the safe direction.
-  const protect = readPerKey(sources, key, ['autoProtect']);
+  const protect = readAutoProtect(sources, key);
   const protectOff = protect !== null && String(protect.value) === 'false';
 
   const text = `${JSON.stringify(buildConfig(options.targetProject, root), null, 2)}\n`;
@@ -583,8 +691,8 @@ function main(argv) {
       ...JSON.stringify(values, null, 2).split('\n').map((line) => `    ${line}`),
     ]),
     '',
-    `repo key: ${key}`,
-    `preview.root: ${root}  (${rootNote}${rootExists ? '' : '; this directory does not exist yet'})`,
+    `repo key: ${show(key)}`,
+    `preview.root: ${show(root)}  (${rootNote}${rootExists ? '' : '; this directory does not exist yet'})`,
     `autoProtect: ${protect ? `${JSON.stringify(protect.value)} (${protect.where} in ${protect.file})` : 'unset, defaults to true'}`
       + '  ->  visibility "private"',
     ...(protectOff ? [
@@ -597,10 +705,10 @@ function main(argv) {
     ...(candidates.size === 0
       ? ['  (none in the legacy config)']
       : [...candidates].flatMap(([project, origins]) => [
-        `  ${project}`,
+        `  ${show(project)}`,
         ...origins.map((origin) => `    from ${origin}`),
       ])),
-    `  chosen: ${options.targetProject}`,
+    `  chosen: ${show(options.targetProject)}`,
     '',
     `destination: ${dest}`,
     '',
@@ -621,11 +729,20 @@ function main(argv) {
     return 0;
   }
 
-  // Backups first: after this point the new file appears, and rollback is
-  // "delete it". The legacy files themselves are never touched either way.
+  // Stage and validate first, while nothing user-visible exists yet: a config
+  // that cannot resolve must leave no backup, no temp and no destination file.
+  // Only then take the backups, and only then let the new file appear — so the
+  // spec's "back up before writing the new file" ordering still holds, and
+  // rollback stays "delete it".
+  const staged = stageConfig(dest, text);
   const stamp = stampNow();
-  for (const { file } of sources) report.push(`backed up ${file} -> ${backup(file, stamp)}`);
-  writeAtomic(dest, text);
+  try {
+    for (const { file } of sources) report.push(`backed up ${file} -> ${backup(file, stamp)}`);
+  } catch (err) {
+    fs.rmSync(staged, { force: true });
+    throw err;
+  }
+  installStaged(staged, dest);
   report.push(`wrote ${dest}`, 'the legacy config was not modified.');
   process.stdout.write(`${report.join('\n')}\n`);
   return 0;

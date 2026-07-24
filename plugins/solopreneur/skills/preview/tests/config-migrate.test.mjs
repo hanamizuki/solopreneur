@@ -212,7 +212,7 @@ test('the flat preview.paths shape supplies the root', () => {
   );
 
   const out = migrate(s, ['--target-project', 'fresh-previews']);
-  assert.ok(out.stdout.includes('repo key: github.com/owner/repo'), out.stdout);
+  assert.ok(out.stdout.includes('repo key: "github.com/owner/repo"'), out.stdout);
   assert.ok(out.stdout.includes('"root": "./docs/preview"'), out.stdout);
   // No projects anywhere in this shape, so there is nothing to check the chosen
   // name against — it has to be accepted as given.
@@ -304,6 +304,22 @@ test('autoProtect cascades file by file, the way deploy.sh reads it', () => {
   writeJson(s.legacyFile, { repos: { [s.repo]: { preview: { autoProtect: true } } } });
 
   const out = migrate(s, ['--legacy-config', first, '--target-project', 'p']);
+  assert.ok(out.stdout.includes('autoProtect: false'), out.stdout);
+  assert.match(out.stderr, /warning/);
+});
+
+test('an empty-string autoProtect falls through, as it does in the shell', () => {
+  // deploy.sh captures jq's output into a shell variable and then tests
+  // `[ -n "$out" ]`, so "" is not an answer there — it falls through to the
+  // next layer. Treating it as an answer here would silently miss a real
+  // opt-out and skip the warning that exists to surface it.
+  const s = scenario({});
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' }, autoProtect: false } },
+    repos: { [s.repo]: { preview: { autoProtect: '' } } },
+  });
+
+  const out = migrate(s, ['--target-project', 'p']);
   assert.ok(out.stdout.includes('autoProtect: false'), out.stdout);
   assert.match(out.stderr, /warning/);
 });
@@ -407,7 +423,7 @@ test('--write installs the new file with an atomic rename', () => {
   assert.deepEqual(tempsIn(s.repo), []);
 });
 
-test('a config that fails validation leaves no file and no temp behind', () => {
+test('a config that fails validation leaves no file, no temp and no backup', () => {
   const s = scenario({});
   writeJson(s.legacyFile, {
     default: { preview: { projects: { default: 'p' } } },
@@ -422,8 +438,53 @@ test('a config that fails validation leaves no file and no temp behind', () => {
   const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
   assertFailed(result);
   assert.ok(result.stderr.includes('not a directory'), result.stderr);
+  // The message must name the destination, not the temp file it validated —
+  // that path is already deleted by the time anyone reads this.
+  assert.ok(result.stderr.includes(s.dest), result.stderr);
+  assert.ok(!result.stderr.includes('.tmp'), result.stderr);
   assert.ok(!fs.existsSync(s.dest));
   assert.deepEqual(tempsIn(s.repo), []);
+  // Validation runs BEFORE the backups, so a failed write leaves none. A stray
+  // backup would also block the corrected retry: the stamp is second-grained
+  // and the copy is COPYFILE_EXCL.
+  assert.deepEqual(backupsIn(s.configDir), []);
+});
+
+test('a corrected retry in the same second succeeds', () => {
+  const s = scenario({});
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
+  });
+  mkdirp(s.repo, 'docs');
+  const blocker = path.join(s.repo, 'docs', 'preview');
+  fs.writeFileSync(blocker, 'not a directory\n');
+  assertFailed(run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env }));
+
+  // Remove the cause and go straight back in — no sleep. If the failed run had
+  // left a backup, this would die on EEXIST complaining about backups rather
+  // than migrating.
+  fs.rmSync(blocker);
+  mkdirp(s.repo, 'docs', 'preview');
+  migrate(s, ['--target-project', 'p', '--write']);
+  assert.ok(fs.existsSync(s.dest));
+  assert.equal(backupsIn(s.configDir).length, 1);
+});
+
+test('an unwritable destination directory fails cleanly, not with a stack trace', { skip: process.getuid?.() === 0 ? 'root ignores mode bits' : false }, () => {
+  const s = scenario({ default: { preview: { projects: { default: 'p' } } } });
+  const mode = fs.statSync(s.repo).mode;
+  fs.chmodSync(s.repo, 0o555);
+  try {
+    const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+    assertFailed(result);
+    // EACCES on the user's own directory is an environment problem, not a bug
+    // in a shipped file — so it must not surface as raw Node internals.
+    assert.ok(!result.stderr.includes('node:fs'), result.stderr);
+    assert.ok(result.stderr.startsWith('config-migrate.mjs:'), result.stderr);
+  } finally {
+    fs.chmodSync(s.repo, mode);
+  }
 });
 
 test('--write leaves the legacy file byte-identical', () => {
@@ -479,6 +540,20 @@ test('a v2 config above the destination blocks the migration', () => {
   assertFailed(result);
   assert.ok(result.stderr.includes(ancestor), result.stderr);
   assert.ok(result.stderr.includes('shadow'), result.stderr);
+});
+
+test('$SOLOPRENEUR_CONFIG set blocks the migration', () => {
+  const s = scenario({ default: { preview: { projects: { default: 'p' } } } });
+  // Resolver layer 1 wins from anywhere on disk, so a file written now would be
+  // inert — and without this check the run would still report success.
+  const explicit = writeJson(path.join(s.root, 'explicit.json'), v2('elsewhere'));
+
+  const result = run(['--target-project', 'p', '--write'], {
+    cwd: s.repo, home: s.home, env: { ...s.env, SOLOPRENEUR_CONFIG: explicit },
+  });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('SOLOPRENEUR_CONFIG'), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
 });
 
 test('a user-global v2 config does not block a repo-local migration', () => {
@@ -595,7 +670,70 @@ test('the generated config validates and resolves through config-resolve.mjs', (
   assert.ok(rejected.stderr.includes('preview.root'), rejected.stderr);
 });
 
+// --- untrusted config content ----------------------------------------------
+
+test('a newline in a project name cannot forge a report line', () => {
+  // The report is what a human reads to decide whether to --write, and a legacy
+  // config travels between machines. config-resolve.mjs escapes its output for
+  // the same reason and has the same test.
+  const s = scenario({
+    default: { preview: { projects: { default: 'evil\nwrote /etc/passwd\nthe legacy config was not modified.' } } },
+  });
+
+  const refused = run([], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(refused);
+  for (const forged of ['\nwrote /etc/passwd', '\nthe legacy config was not modified.']) {
+    assert.ok(!refused.stderr.includes(forged), refused.stderr);
+  }
+  assert.ok(refused.stderr.includes('\\nwrote /etc/passwd'), refused.stderr);
+});
+
+test('a repos.__proto__ entry is still reported, not swallowed', () => {
+  // JSON.parse makes a real own `__proto__` key, but assigning it onto a plain
+  // object hits Object.prototype's setter and stores nothing — so it would
+  // vanish from a report whose whole job is to show what was found.
+  const s = scenario({});
+  // Written as raw text on purpose: `{ __proto__: ... }` in a JS object literal
+  // sets the prototype too, so building this fixture with an object literal
+  // serializes an EMPTY repos map and the test would pass without testing.
+  fs.writeFileSync(s.legacyFile, `{
+    "default": { "preview": { "projects": { "default": "p" } } },
+    "repos": { "__proto__": { "preview": { "path": "from-proto" } } }
+  }
+`);
+
+  const out = migrate(s, ['--target-project', 'p']);
+  assert.ok(out.stdout.includes('from-proto'), out.stdout);
+});
+
 // --- CLI surface -----------------------------------------------------------
+
+test('--target-project does not swallow the next flag', () => {
+  // With a paths-only legacy config there are no candidates, so the membership
+  // check is deliberately skipped — nothing else would catch this, and the user
+  // would get a dry run plus a project literally named "--write".
+  const s = scenario({ preview: { paths: { 'github.com/owner/repo': 'docs/preview' } } },
+    { origin: 'git@github.com:owner/repo.git' });
+
+  const result = run(['--target-project', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('--target-project=--write'), result.stderr);
+
+  // The documented escape hatch still allows it deliberately.
+  const out = migrate(s, ['--target-project=--write']);
+  assert.ok(out.stdout.includes('"project": "--write"'), out.stdout);
+});
+
+test('a --legacy-config with no preview settings is named, not silently dropped', () => {
+  const s = scenario({ default: { preview: { projects: { default: 'p' } } } });
+  const other = writeJson(path.join(s.root, 'other.json'), { todos: { backlog: 'todos/backlog' } });
+
+  const result = run(['--legacy-config', other, '--target-project', 'p'], {
+    cwd: s.repo, home: s.home, env: s.env,
+  });
+  assertFailed(result);
+  assert.ok(result.stderr.includes(other), result.stderr);
+});
 
 test('--help prints the usage and exits 0', () => {
   const result = run(['--help']);
