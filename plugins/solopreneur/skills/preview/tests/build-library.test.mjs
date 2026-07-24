@@ -215,16 +215,25 @@ test('the overlay rewrite tolerates single quotes and extra attributes', () => {
   assert.match(entry, /src="\/assets\/comment-overlay\.js" data-preview-id="a"/);
 });
 
-test('a third-party script merely ENDING in comment-overlay.js is left alone', () => {
-  // The filename must be a whole path segment: rewriting someone else's
-  // `acme-comment-overlay.js` to our asset would silently drop their script.
-  const root = tmp();
-  const html = '<html><body>a<script src="./vendor/acme-comment-overlay.js"></script></body></html>';
-  writeItem(root, 'active', 'a', { files: { 'index.html': html } });
-  const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
-  assert.match(entry, /src="\.\/vendor\/acme-comment-overlay\.js"/, 'the third-party src must survive untouched');
-  assert.doesNotMatch(entry, /\/assets\/comment-overlay\.js/, 'must not be rewritten to our shared asset');
-});
+// Only the LOCAL sidecar (bare or ./ prefixed) is ours to rewrite. Anything else
+// belongs to the page author and must survive untouched — rewriting it would
+// silently swap in our overlay and drop their script.
+for (const [label, src] of [
+  ['a third-party file merely ENDING in the name', './vendor/acme-comment-overlay.js'],
+  ['a remote URL with the same filename', 'https://cdn.example.com/comment-overlay.js'],
+  ['a protocol-relative URL', '//cdn.example.com/comment-overlay.js'],
+  ['an absolute path', '/vendor/comment-overlay.js'],
+]) {
+  test(`${label} is left alone`, () => {
+    const root = tmp();
+    writeItem(root, 'active', 'a', {
+      files: { 'index.html': `<html><body>a<script src="${src}"></script></body></html>` },
+    });
+    const entry = readStaged(build(root, ['active'], CHROME).stagingDir, 'p', 'a', 'index.html');
+    assert.ok(entry.includes(`src="${src}"`), 'the author\'s src must survive untouched');
+    assert.doesNotMatch(entry, /\/assets\/comment-overlay\.js/, 'must not be rewritten to our shared asset');
+  });
+}
 
 test('a bare (path-less) comment-overlay.js src is still rewritten', () => {
   const root = tmp();
