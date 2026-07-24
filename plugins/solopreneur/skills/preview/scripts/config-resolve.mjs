@@ -3,11 +3,7 @@
  * Resolve which solopreneur config applies to a filesystem path, and report the
  * decision in one structured shape so every agent sees the same answer.
  *
- * Requires Node.js >= 20 (stable `node:test` for the accompanying tests; every
- * runtime API used here has been available far longer). The floor reflects the
- * APIs in use, not a tested matrix — development and verification happened on
- * Node 26. Staying at that floor rules out `import.meta.main`, `t.assert.*`,
- * `test.snapshot` and `fs.glob`, all of which arrived in 22 or later.
+ * Requires Node.js >= 20.
  *
  * Usage:
  *   config-resolve.mjs [--from <path>] [--json]
@@ -18,10 +14,10 @@
  *   losslessly parseable, so scripts must use `--json`.
  *
  * Resolution order, first hit wins:
- *   1. $SOLOPRENEUR_CONFIG                        -> mode "v2"
+ *   1. $SOLOPRENEUR_CONFIG                          -> mode "v2"
  *   2. nearest ancestor .solopreneur.json that
- *      contains a `preview` block                 -> mode "v2"
- *   3. ~/.config/solopreneur/config.json          -> mode "v2"
+ *      contains a `preview` block                   -> mode "v2"
+ *   3. ~/.config/solopreneur/config.json            -> mode "v2"
  *   4. legacy ${CLAUDE_CONFIG_DIR}/solopreneur.json -> mode "legacy"
  *   5. legacy ~/.claude/solopreneur.json            -> mode "legacy"
  *   nothing found                                   -> mode "none"
@@ -29,7 +25,7 @@
  * The anchor is `--from` when given, else the current working directory. It is
  * resolved to its physical path before the walk-up: this workspace is a large
  * symlink tree, and a logical path must never resolve to a different config
- * than its physical path.
+ * than its physical path. A file anchor walks from its directory.
  *
  * The walk-up does not stop at a git toplevel. Crossing nested repo boundaries
  * is deliberate — a repo without its own config inherits the enclosing one. The
@@ -53,7 +49,13 @@ const SCHEMA_PATH = path.join(
   '..', '..', '..', 'shared', 'config.schema.json',
 );
 
-/** Thrown for every user-facing failure; the CLI prints `.message` and exits 1. */
+/**
+ * A problem with the USER's config. Thrown for every user-facing failure; the
+ * CLI prints `.message` and exits 1. A broken install — a missing or
+ * unsupported `config.schema.json` — deliberately throws a plain Error instead,
+ * so a caller catching ConfigError to say "fix your config" cannot swallow a
+ * bug in a shipped file and blame a file that is fine.
+ */
 export class ConfigError extends Error {}
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -64,44 +66,98 @@ const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 // ponytail: a small interpreter over config.schema.json, not a JSON Schema
 // engine. The repo has no package.json and allows no dependencies, and reading
 // the schema file keeps it the single source of truth instead of restating
-// every rule twice. It implements only the keywords the schema uses. If the
-// schema ever needs more, drop in ajv rather than growing this.
+// every rule twice. If the schema ever needs more than the keywords below, drop
+// in ajv rather than growing this.
 // ---------------------------------------------------------------------------
 
-/**
- * Keywords this interpreter understands, plus the annotations that carry no
- * validation behavior. An unknown keyword is a hard error rather than a silent
- * no-op: adding `oneOf` or `patternProperties` to the schema one day must fail
- * loudly on the next run instead of quietly validating less than it claims to.
- */
+/** Keywords the interpreter implements, plus non-validating annotations. */
 const KNOWN_KEYWORDS = new Set([
   '$ref', 'type', 'const', 'enum', 'required', 'properties',
   'additionalProperties', 'items', 'minItems', 'minLength',
   '$schema', '$defs', 'title', 'description',
 ]);
 
-function schemaBug(detail) {
-  return new ConfigError(
-    `${detail}\n  in ${SCHEMA_PATH}\n`
-    + '  this resolver ships a deliberately small schema interpreter — teach it the keyword, or move to a full validator',
-  );
+/** `type` values the interpreter implements. */
+const KNOWN_TYPES = new Set(['object', 'array', 'string']);
+
+const schemaBug = (detail) => new Error(
+  `${SELF}: ${detail}\n  in ${SCHEMA_PATH}\n`
+  + '  this resolver ships a deliberately small schema interpreter — teach it the keyword, or move to a full validator',
+);
+
+/**
+ * Audit the whole schema once, at load time, and refuse to run on anything the
+ * interpreter cannot honor.
+ *
+ * This has to be a whole-schema sweep rather than a check inside `validate`:
+ * a per-node check only ever sees the subschemas a particular config reaches,
+ * so an unsupported keyword on an optional field would sit unnoticed until some
+ * config happened to set that field. Names AND `type` values are both checked —
+ * `type` is a known keyword, so a name-only check would let `"type": "integer"`
+ * through to a branch that does not exist and silently validate nothing.
+ */
+function auditSchema(node, defs, where) {
+  if (typeof node === 'boolean') return;
+  if (!isObject(node)) throw schemaBug(`${where} is not a schema`);
+
+  for (const keyword of Object.keys(node)) {
+    if (!KNOWN_KEYWORDS.has(keyword)) throw schemaBug(`unsupported keyword "${keyword}" at ${where}`);
+  }
+  if ('type' in node && !KNOWN_TYPES.has(node.type)) {
+    throw schemaBug(`unsupported "type" value ${JSON.stringify(node.type)} at ${where}`);
+  }
+  if ('$ref' in node) {
+    const key = typeof node.$ref === 'string' && node.$ref.startsWith('#/$defs/')
+      ? node.$ref.slice('#/$defs/'.length) : null;
+    if (key === null || !defs[key]) throw schemaBug(`unsupported $ref ${JSON.stringify(node.$ref)} at ${where}`);
+    // Draft 2020-12 applies keywords alongside $ref; this interpreter resolves
+    // the reference and returns, so a sibling would be silently dropped.
+    const siblings = Object.keys(node).filter((k) => !['$ref', 'title', 'description'].includes(k));
+    if (siblings.length) throw schemaBug(`$ref with sibling keyword "${siblings[0]}" at ${where}`);
+  }
+  // Keyword values must have the shape the interpreter tests for; otherwise its
+  // `typeof`/`Array.isArray` guards would quietly skip the check.
+  for (const [keyword, ok] of [
+    ['required', Array.isArray(node.required)],
+    ['enum', Array.isArray(node.enum)],
+    ['properties', isObject(node.properties)],
+    ['minLength', typeof node.minLength === 'number'],
+    ['minItems', typeof node.minItems === 'number'],
+  ]) {
+    if (keyword in node && !ok) throw schemaBug(`malformed "${keyword}" at ${where}`);
+  }
+
+  for (const [key, sub] of Object.entries(node.properties ?? {})) auditSchema(sub, defs, `${where}.${key}`);
+  if ('items' in node) auditSchema(node.items, defs, `${where}[]`);
+  if ('additionalProperties' in node) auditSchema(node.additionalProperties, defs, `${where}.*`);
+}
+
+let schemaCache;
+function loadSchema() {
+  if (schemaCache) return schemaCache;
+  let schema;
+  try {
+    schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf8'));
+  } catch (err) {
+    // Fatal, never "carry on unvalidated" — a missing or broken schema means
+    // nothing downstream can trust what this script prints.
+    throw new Error(`${SELF}: cannot load schema: ${SCHEMA_PATH}\n  ${err.message}`);
+  }
+  const defs = schema.$defs ?? {};
+  for (const [key, sub] of Object.entries(defs)) auditSchema(sub, defs, `$defs.${key}`);
+  auditSchema(schema, defs, '(root)');
+  schemaCache = schema;
+  return schemaCache;
 }
 
 function validate(value, schema, defs, where, errors) {
-  if (schema === true || schema === undefined) return;
+  if (schema === true) return;
   if (schema === false) {
     errors.push(`${where}: not allowed here`);
     return;
   }
-  for (const keyword of Object.keys(schema)) {
-    if (!KNOWN_KEYWORDS.has(keyword)) throw schemaBug(`unsupported schema keyword "${keyword}"`);
-  }
   if (typeof schema.$ref === 'string') {
-    // Local $defs references only — an unresolvable $ref would otherwise
-    // validate nothing at all, the exact silent weakening guarded against above.
-    const key = schema.$ref.startsWith('#/$defs/') ? schema.$ref.slice('#/$defs/'.length) : null;
-    if (key === null || !defs[key]) throw schemaBug(`unsupported schema $ref "${schema.$ref}"`);
-    validate(value, defs[key], defs, where, errors);
+    validate(value, defs[schema.$ref.slice('#/$defs/'.length)], defs, where, errors);
     return;
   }
   if (schema.type === 'object' && !isObject(value)) {
@@ -120,51 +176,38 @@ function validate(value, schema, defs, where, errors) {
     errors.push(`${where}: expected ${JSON.stringify(schema.const)}`);
     return;
   }
-  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+  if ('enum' in schema && !schema.enum.includes(value)) {
     errors.push(`${where}: expected one of ${schema.enum.map((v) => JSON.stringify(v)).join(', ')}`);
     return;
   }
-  if (typeof schema.minLength === 'number' && typeof value === 'string' && value.length < schema.minLength) {
-    errors.push(`${where}: must not be empty`);
+  if ('minLength' in schema && typeof value === 'string' && value.length < schema.minLength) {
+    errors.push(`${where}: needs at least ${schema.minLength} character(s)`);
   }
-  if (typeof schema.minItems === 'number' && Array.isArray(value) && value.length < schema.minItems) {
-    errors.push(`${where}: needs at least ${schema.minItems} entr${schema.minItems === 1 ? 'y' : 'ies'}`);
+  if ('minItems' in schema && Array.isArray(value) && value.length < schema.minItems) {
+    errors.push(`${where}: needs at least ${schema.minItems} item(s)`);
   }
-  if (Array.isArray(schema.required) && isObject(value)) {
+  if ('required' in schema && isObject(value)) {
     for (const key of schema.required) {
       if (!(key in value)) errors.push(`${where === '' ? key : `${where}.${key}`}: required but missing`);
     }
   }
-  if (isObject(schema.properties) && isObject(value)) {
+  if ('properties' in schema && isObject(value)) {
     for (const [key, sub] of Object.entries(schema.properties)) {
       if (key in value) validate(value[key], sub, defs, where === '' ? key : `${where}.${key}`, errors);
     }
   }
-  // `additionalProperties` here covers the map-shaped objects (`targets`),
-  // where every entry shares one schema and none are named in `properties`.
-  if (schema.additionalProperties !== undefined && isObject(value)) {
-    const named = isObject(schema.properties) ? Object.keys(schema.properties) : [];
+  // Covers the map-shaped objects (`targets`), where every entry shares one
+  // schema and none are named in `properties`.
+  if ('additionalProperties' in schema && isObject(value)) {
+    const named = Object.keys(schema.properties ?? {});
     for (const [key, sub] of Object.entries(value)) {
       if (named.includes(key)) continue;
       validate(sub, schema.additionalProperties, defs, where === '' ? key : `${where}.${key}`, errors);
     }
   }
-  if (schema.items !== undefined && Array.isArray(value)) {
+  if ('items' in schema && Array.isArray(value)) {
     value.forEach((item, i) => validate(item, schema.items, defs, `${where}[${i}]`, errors));
   }
-}
-
-let schemaCache;
-function loadSchema() {
-  if (schemaCache) return schemaCache;
-  try {
-    schemaCache = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf8'));
-  } catch (err) {
-    // Fatal, never "carry on unvalidated" — a missing or broken schema means
-    // nothing downstream can trust what this script prints.
-    throw new ConfigError(`cannot load schema: ${SCHEMA_PATH}\n  ${err.message}`);
-  }
-  return schemaCache;
 }
 
 /** Validate a parsed v2 config, throwing a ConfigError naming the file. */
@@ -172,31 +215,38 @@ function validateV2(config, file) {
   const schema = loadSchema();
   const errors = [];
   validate(config, schema, schema.$defs ?? {}, '', errors);
-  if (errors.length) {
-    throw new ConfigError(`invalid config: ${file}\n  ${errors.join('\n  ')}`);
-  }
+  if (errors.length) throw new ConfigError(`invalid config: ${file}\n  ${errors.join('\n  ')}`);
 }
 
-// ---------------------------------------------------------------------------
-// File reading
-// ---------------------------------------------------------------------------
-
 /**
- * Parse a JSON config, or return null when there is no such file.
+ * Parse a JSON config, or return `undefined` when there is no such file.
+ * `undefined` is the absent sentinel precisely because JSON can never produce
+ * it — a file whose whole content is `null` is present, and must be rejected
+ * rather than mistaken for a missing file.
  *
- * Only ENOENT counts as absent. A file that exists but cannot be read — bad
- * permissions, a directory sitting in its place — is fatal, and so is malformed
- * JSON. Skipping either and continuing up the tree would resolve against the
- * wrong config, which is exactly what this resolver exists to prevent. (Testing
- * readability with `statSync` first would reintroduce that hole: `stat` succeeds
- * on a file the process cannot open.)
+ * Only a missing path counts as absent. A file that exists but cannot be read,
+ * is not a regular file (a FIFO or a symlink to a device would otherwise block
+ * the process forever), or holds malformed JSON is fatal. Skipping any of those
+ * and continuing up the tree would resolve against the wrong config, which is
+ * exactly what this resolver exists to prevent — so `stat` is used to classify
+ * the file, never to decide it is readable (`stat` succeeds on files the
+ * process cannot open; the read below is what proves that).
  */
 function readJsonIfPresent(file) {
+  let stat;
+  try {
+    stat = fs.statSync(file);
+  } catch (err) {
+    if (err.code === 'ENOENT' || err.code === 'ENOTDIR') return undefined;
+    throw new ConfigError(`cannot read config: ${file}\n  ${err.message}`);
+  }
+  if (!stat.isFile()) throw new ConfigError(`config is not a regular file: ${file}`);
+
   let raw;
   try {
     raw = fs.readFileSync(file, 'utf8');
   } catch (err) {
-    if (err.code === 'ENOENT') return null;
+    if (err.code === 'ENOENT') return undefined;
     throw new ConfigError(`cannot read config: ${file}\n  ${err.message}`);
   }
   try {
@@ -206,49 +256,49 @@ function readJsonIfPresent(file) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// v2 resolution
-// ---------------------------------------------------------------------------
-
 /**
- * Physical path of `input`. A missing anchor is an error rather than a silent
- * walk from its parent: the anchor is by contract a content source path (or the
- * cwd), so a path that is not there is a typo worth reporting.
+ * A `.solopreneur.json` that parsed to something other than an object cannot be
+ * "a config for another feature" — it is broken, and must not be stepped over.
  */
-function realAnchor(input, label) {
-  const abs = path.resolve(input);
-  try {
-    return fs.realpathSync(abs);
-  } catch (err) {
-    throw new ConfigError(`${label} does not exist: ${abs}\n  ${err.message}`);
+function assertConfigObject(config, file) {
+  if (!isObject(config)) {
+    throw new ConfigError(`invalid config: ${file}\n  top level: expected an object`);
   }
 }
 
-/** Every directory from `dir` up to the filesystem root, inclusive. */
-function* ancestors(dir) {
-  let current = dir;
-  for (;;) {
-    yield current;
-    const parent = path.dirname(current);
-    if (parent === current) return;
-    current = parent;
+/**
+ * Physical directory to walk up from. A file anchor resolves to its containing
+ * directory (matching git, editorconfig and eslint); a missing anchor is an
+ * error rather than a silent walk from its parent, since the anchor is by
+ * contract a content source path (or the cwd) and a typo is worth reporting.
+ */
+function realAnchor(input, label) {
+  const abs = path.resolve(input);
+  let real;
+  try {
+    real = fs.realpathSync(abs);
+  } catch (err) {
+    const why = err.code === 'ENOENT' ? 'does not exist' : 'is not readable';
+    throw new ConfigError(`${label} ${why}: ${abs}\n  ${err.message}`);
   }
+  return fs.statSync(real).isDirectory() ? real : path.dirname(real);
 }
 
 /**
  * Nearest ancestor `.solopreneur.json` carrying a `preview` block. A file
- * without one is skipped — it may configure something else entirely — but a
- * file that cannot be parsed still stops the walk.
+ * without one is skipped — it may configure something else — but a file that
+ * cannot be parsed, or is not an object, still stops the walk.
  */
 function findAncestorConfig(anchorDir) {
-  for (const dir of ancestors(anchorDir)) {
-    const candidate = path.join(dir, V2_FILENAME);
-    const config = readJsonIfPresent(candidate);
-    if (config === null) continue;
-    if (!isObject(config) || !('preview' in config)) continue;
-    return { file: candidate, config };
+  for (let dir = anchorDir; ; dir = path.dirname(dir)) {
+    const file = path.join(dir, V2_FILENAME);
+    const config = readJsonIfPresent(file);
+    if (config !== undefined) {
+      assertConfigObject(config, file);
+      if ('preview' in config) return { file, config };
+    }
+    if (path.dirname(dir) === dir) return null;
   }
-  return null;
 }
 
 /**
@@ -256,19 +306,24 @@ function findAncestorConfig(anchorDir) {
  *
  * `root` resolves against the directory of the file that declared it, and is
  * then made physical so it can be compared against the physical anchor. A root
- * that does not exist yet (a fresh setup) keeps its lexical absolute path.
+ * that does not exist yet (a fresh setup) keeps its lexical absolute path; that
+ * stays safe for the containment check, because an anchor is always realpath'd
+ * and therefore always exists, so it cannot live under a root that does not.
  */
 function resolveV2(file, config) {
   const preview = config.preview;
-  const configDir = path.dirname(file);
-  const lexicalRoot = path.resolve(configDir, preview.root);
+  const lexicalRoot = path.resolve(path.dirname(file), preview.root);
   let root = lexicalRoot;
   try {
     root = fs.realpathSync(lexicalRoot);
-  } catch {
-    // Not created yet — the lexical path is the best available answer, and it
-    // stays safe for the containment check below: an anchor is always realpath'd
-    // and therefore always exists, so it cannot live under a root that doesn't.
+    if (!fs.statSync(root).isDirectory()) {
+      throw new ConfigError(`invalid config: ${file}\n  preview.root: not a directory: ${root}`);
+    }
+  } catch (err) {
+    if (err instanceof ConfigError) throw err;
+    if (err.code !== 'ENOENT') {
+      throw new ConfigError(`invalid config: ${file}\n  preview.root: ${lexicalRoot}\n  ${err.message}`);
+    }
   }
 
   const targetNames = Object.keys(preview.targets);
@@ -290,6 +345,15 @@ function resolveV2(file, config) {
       `invalid config: ${file}\n  preview.targets.${name}.provider: v1 supports only "vercel", found ${JSON.stringify(target.provider)}`,
     );
   }
+  // `include` names collection keys, so an entry with no declared collection
+  // would hand the builder a key that resolves to nothing.
+  const unknown = target.include.filter((key) => !(key in preview.collections));
+  if (unknown.length) {
+    throw new ConfigError(
+      `invalid config: ${file}\n  preview.targets.${name}.include: no such collection: ${unknown.join(', ')}`
+      + ` (declared: ${Object.keys(preview.collections).join(', ')})`,
+    );
+  }
 
   return {
     configPath: file,
@@ -300,7 +364,8 @@ function resolveV2(file, config) {
       name,
       provider: target.provider,
       project: target.project,
-      // Fail closed: an omitted or misspelled visibility is private.
+      // Fail closed: an omitted visibility is private. (A misspelled one is a
+      // hard enum failure in the schema and never reaches here.)
       visibility: target.visibility ?? 'private',
       include: target.include,
     },
@@ -309,17 +374,25 @@ function resolveV2(file, config) {
   };
 }
 
-/** True when `child` is `parent` or sits underneath it. Both must be physical. */
-const isUnder = (child, parent) => child === parent || child.startsWith(parent + path.sep);
+/**
+ * True when `child` is `parent` or sits underneath it. Both must be physical.
+ * `path.relative` rather than a prefix compare: a prefix test needs a trailing
+ * separator to keep `/a/previews-old` out of `/a/previews`, and that trailing
+ * separator then breaks a `parent` of `/`.
+ */
+function isUnder(child, parent) {
+  const rel = path.relative(parent, child);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
 
-// ---------------------------------------------------------------------------
-// Legacy reporting (layers 4-5)
-//
 // Legacy files are described, never converted. Reporting the raw subtrees keeps
 // this honest: the migrator is the only thing allowed to interpret them, and it
 // is a separate script that asks the user before writing anything.
-// ---------------------------------------------------------------------------
-
+//
+// NOTE: this is another copy of the legacy `solopreneur.json` layout knowledge
+// (also in shared/config.md and deploy.sh). It is registered in config.md's
+// legacy-consumer list because neither of that file's greps can find it — the
+// markers they look for are bash.
 function legacyPreviewValues(config) {
   const found = {};
   if (isObject(config?.default?.preview)) found.default = config.default.preview;
@@ -343,77 +416,85 @@ const emptyResult = (mode, configPath = null, legacy = null) => ({
   legacy,
 });
 
-// ---------------------------------------------------------------------------
-// Public entry point
-// ---------------------------------------------------------------------------
-
 /**
- * @param {{from?: string, env?: NodeJS.ProcessEnv, cwd?: string}} [options]
  * @returns {{configPath: string|null, mode: 'v2'|'legacy'|'none', root: string|null,
  *            defaultTarget: string|null, target: object|null, collections: object|null,
- *            legacy: object|null}}
+ *            legacy: Array<{file: string, values: object}>|null}}
  */
-export function resolveConfig({ from, env = process.env, cwd = process.cwd() } = {}) {
-  const anchor = realAnchor(from ?? cwd, from === undefined ? 'working directory' : '--from path');
+export function resolveConfig({ from } = {}) {
+  const anchor = realAnchor(from ?? process.cwd(), from === undefined ? 'working directory' : '--from path');
+
+  // An explicit `--from` must sit under the resolved root. Not applied to the
+  // cwd anchor: the cwd is only a fallback for "no source path yet", and
+  // enforcing it there would make inspection fail from anywhere outside the
+  // preview root.
+  const decide = (result) => {
+    if (from !== undefined && !isUnder(anchor, result.root)) {
+      throw new ConfigError(
+        '--from is outside the configured preview root\n'
+        + `  --from: ${anchor}\n`
+        + `  root:   ${result.root}\n`
+        + `  config: ${result.configPath}`,
+      );
+    }
+    return result;
+  };
 
   // Layer 1: an explicitly named config. Never falls through — if the caller
   // pointed at a file, a problem with that file is the answer.
-  const explicit = env.SOLOPRENEUR_CONFIG;
+  const explicit = process.env.SOLOPRENEUR_CONFIG;
   if (explicit) {
-    const file = path.resolve(explicit);
-    const config = readJsonIfPresent(file);
-    if (config === null) throw new ConfigError(`$SOLOPRENEUR_CONFIG does not exist: ${file}`);
+    const abs = path.resolve(explicit);
+    const config = readJsonIfPresent(abs);
+    if (config === undefined) throw new ConfigError(`$SOLOPRENEUR_CONFIG does not exist: ${abs}`);
+    // realpath so configPath is physical here too, matching the walk-up layers.
+    const file = fs.realpathSync(abs);
+    assertConfigObject(config, file);
     validateV2(config, file);
-    return checkContainment(resolveV2(file, config), from, anchor);
+    return decide(resolveV2(file, config));
   }
 
   // Layer 2: nearest ancestor with a preview block.
   const ancestor = findAncestorConfig(anchor);
   if (ancestor) {
     validateV2(ancestor.config, ancestor.file);
-    return checkContainment(resolveV2(ancestor.file, ancestor.config), from, anchor);
+    return decide(resolveV2(ancestor.file, ancestor.config));
   }
 
   // Layer 3: the user-global v2 config.
   const globalFile = path.join(os.homedir(), '.config', 'solopreneur', 'config.json');
   const globalConfig = readJsonIfPresent(globalFile);
-  if (isObject(globalConfig) && 'preview' in globalConfig) {
-    validateV2(globalConfig, globalFile);
-    return checkContainment(resolveV2(globalFile, globalConfig), from, anchor);
+  if (globalConfig !== undefined) {
+    assertConfigObject(globalConfig, globalFile);
+    if ('preview' in globalConfig) {
+      validateV2(globalConfig, globalFile);
+      return decide(resolveV2(globalFile, globalConfig));
+    }
   }
 
-  // Layers 4-5: the legacy feature config, reported as-is.
-  const legacyFiles = [];
-  if (env.CLAUDE_CONFIG_DIR) legacyFiles.push(path.join(env.CLAUDE_CONFIG_DIR, LEGACY_FILENAME));
-  legacyFiles.push(path.join(os.homedir(), '.claude', LEGACY_FILENAME));
-  for (const file of legacyFiles) {
-    const legacyConfig = readJsonIfPresent(file);
-    if (legacyConfig === null) continue;
-    const values = legacyPreviewValues(legacyConfig);
+  // Layers 4-5: the legacy feature config, reported as-is. BOTH files are
+  // reported, not just the first: deploy.sh cascades across them per key, so a
+  // single-file report would hide values that are actually in effect and the
+  // migrator would silently drop them.
+  const candidates = [];
+  if (process.env.CLAUDE_CONFIG_DIR) candidates.push(path.join(process.env.CLAUDE_CONFIG_DIR, LEGACY_FILENAME));
+  candidates.push(path.join(os.homedir(), '.claude', LEGACY_FILENAME));
+  const legacy = [];
+  const seen = new Set();
+  for (const file of candidates) {
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const config = readJsonIfPresent(file);
+    if (config === undefined) continue;
+    const values = legacyPreviewValues(config);
     // A legacy file that says nothing about preview is not a preview config;
     // keep looking rather than reporting a decision it did not make.
     if (Object.keys(values).length === 0) continue;
-    return emptyResult('legacy', file, values);
+    legacy.push({ file, values });
   }
+  if (legacy.length) return emptyResult('legacy', legacy[0].file, legacy);
 
   return emptyResult('none');
-}
-
-/**
- * An explicit `--from` must sit under the resolved root. Not applied to the cwd
- * anchor: the cwd is only a fallback for "no source path yet", and enforcing it
- * there would make inspection fail from anywhere outside the preview root.
- */
-function checkContainment(result, from, anchor) {
-  if (from !== undefined && !isUnder(anchor, result.root)) {
-    throw new ConfigError(
-      `--from is outside the configured preview root\n`
-      + `  --from: ${anchor}\n`
-      + `  root:   ${result.root}\n`
-      + `  config: ${result.configPath}`,
-    );
-  }
-  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -425,16 +506,27 @@ const USAGE = `usage: ${SELF} [--from <path>] [--json]
   --from <path>  anchor the lookup at <path> instead of the current directory
   --json         print the resolved decision as JSON instead of key=value lines`;
 
-/** Flatten the result to `key=value` lines, arrays joined with commas. */
+/**
+ * Flatten the result to `key=value` lines. Newlines inside values are escaped:
+ * a config string containing one would otherwise print as extra lines that look
+ * exactly like real facts.
+ */
 function toLines(value, prefix = '') {
   if (value === null || value === undefined) return [`${prefix}=`];
-  if (Array.isArray(value)) return [`${prefix}=${value.join(',')}`];
+  if (Array.isArray(value)) {
+    return value.every((v) => !isObject(v) && !Array.isArray(v))
+      ? [`${prefix}=${value.join(',')}`]
+      : value.flatMap((v, i) => toLines(v, `${prefix}[${i}]`));
+  }
   if (isObject(value)) {
     return Object.entries(value).flatMap(([key, sub]) => toLines(sub, prefix ? `${prefix}.${key}` : key));
   }
-  return [`${prefix}=${value}`];
+  return [`${prefix}=${String(value).replace(/\n/g, '\\n')}`];
 }
 
+// ponytail: hand-rolled rather than node:util parseArgs — parseArgs only became
+// stable in 20.16, and this file's declared floor is 20, where it would print an
+// ExperimentalWarning onto the stderr this CLI reserves for errors.
 function main(argv) {
   let from;
   let asJson = false;
@@ -442,6 +534,8 @@ function main(argv) {
     const arg = argv[i];
     if (arg === '--json') {
       asJson = true;
+    } else if (arg.startsWith('--from=')) {
+      from = arg.slice('--from='.length);
     } else if (arg === '--from') {
       from = argv[i + 1];
       if (from === undefined) throw new ConfigError(`--from requires a path\n${USAGE}`);
@@ -460,11 +554,16 @@ function main(argv) {
 }
 
 // Compare physical paths: this file is reachable through symlinked plugin
-// trees, where argv[1] is the link and import.meta.url is already resolved.
+// trees, where argv[1] is the link and import.meta.url is already resolved. The
+// lexical comparison is kept as well, for `--preserve-symlinks-main`, where
+// import.meta.url stays logical and the realpath would never match.
 function invokedDirectly() {
-  if (!process.argv[1]) return false;
+  const self = fileURLToPath(import.meta.url);
+  const entry = process.argv[1];
+  if (!entry) return false;
+  if (path.resolve(entry) === self) return true;
   try {
-    return fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+    return fs.realpathSync(entry) === self;
   } catch {
     return false;
   }

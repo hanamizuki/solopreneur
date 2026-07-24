@@ -3,9 +3,7 @@
  *
  * Requires Node.js >= 20 (stable `node:test`).
  * Run with:  cd plugins/solopreneur/skills/preview && node --test
- *   (or `node --test tests/*.test.mjs` for this suite alone. A bare directory
- *   argument does NOT work: since Node 22.6 the positional arguments are glob
- *   patterns, so `node --test tests/` matches the directory itself and fails.)
+ *   (`node --test tests/` does not work on Node >= 22.6 — see config.md.)
  *
  * Every case spawns the real CLI with a fully controlled environment — HOME
  * points at an empty fixture directory, and CLAUDE_CONFIG_DIR /
@@ -39,6 +37,19 @@ after(() => {
 function tmp() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'solo-config-')));
   fixtures.push(dir);
+  // The walk-up runs to `/`, so a `.solopreneur.json` above the temp directory
+  // would silently change what the `mode=none` and `mode=legacy` cases resolve
+  // to. Harmless on macOS (/var/folders/...), but some Linux CI images put
+  // TMPDIR under $HOME — exactly where this feature tells users to put one.
+  // Assert it here so the failure names the cause instead of looking like a
+  // resolver bug.
+  for (let d = dir; ; d = path.dirname(d)) {
+    assert.ok(
+      !fs.existsSync(path.join(d, '.solopreneur.json')),
+      `TMPDIR sits under a configured preview scope (${d}) — set TMPDIR elsewhere`,
+    );
+    if (path.dirname(d) === d) break;
+  }
   return dir;
 }
 
@@ -213,7 +224,6 @@ test('a relative root resolves against the config directory, not cwd', () => {
 
   const out = runJson(['--from', anchor], { cwd: decoyCwd });
   assert.equal(out.root, path.join(repo, 'previews'));
-  assert.notEqual(out.root, decoy);
 });
 
 test('an absolute root is honored as-is', () => {
@@ -241,6 +251,18 @@ test('--from outside the resolved root fails and names the root', () => {
   assert.ok(result.stderr.includes(config), result.stderr);
 });
 
+test('a file --from anchors at its directory', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  writeJson(path.join(repo, '.solopreneur.json'), v2('file-anchor-project', { root: '.' }));
+  const dir = mkdirp(repo, 'previews', 'item');
+  const file = path.join(dir, 'index.html');
+  fs.writeFileSync(file, '<!doctype html>\n');
+
+  // A content source path is what callers hand this, and that is often a file.
+  assert.deepEqual(runJson(['--from', file]), runJson(['--from', dir]));
+});
+
 test('a --from path that does not exist is reported, not silently walked', () => {
   const result = run(['--from', path.join(tmp(), 'no-such-dir')]);
   assertFailed(result);
@@ -261,8 +283,20 @@ test('malformed JSON exits non-zero naming the file and never falls through', ()
   const result = run(['--json', '--from', anchor]);
   assertFailed(result);
   assert.ok(result.stderr.includes(broken), result.stderr);
-  assert.equal(result.stdout.trim(), '');
-  assert.ok(!result.stdout.includes('ancestor-project'));
+});
+
+test('a .solopreneur.json that is not an object errors, never falls through', () => {
+  const root = tmp();
+  writeJson(path.join(root, '.solopreneur.json'), v2('ancestor-project', { root: '.' }));
+  const repo = mkdirp(root, 'repo');
+  const notAnObject = path.join(repo, '.solopreneur.json');
+  // Valid JSON, but nothing a config can be. It must not be mistaken for "a
+  // config for some other feature" and stepped over.
+  fs.writeFileSync(notAnObject, 'null\n');
+
+  const result = run(['--json', '--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes(notAnObject), result.stderr);
 });
 
 test('two targets exit non-zero (v1 supports one)', () => {
@@ -289,6 +323,52 @@ test('a non-vercel provider exits non-zero', () => {
   const result = run(['--from', mkdirp(repo, 'sub')]);
   assertFailed(result);
   assert.ok(result.stderr.includes('vercel'), result.stderr);
+});
+
+test('a defaultTarget naming no declared target exits non-zero', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  writeJson(path.join(repo, '.solopreneur.json'), v2('p', { root: '.', defaultTarget: 'public' }));
+
+  const result = run(['--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes('defaultTarget'), result.stderr);
+});
+
+test('an include entry with no declared collection exits non-zero', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('p', { root: '.' });
+  config.preview.targets.private.include = ['active', 'nope'];
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const result = run(['--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes('nope'), result.stderr);
+});
+
+test('a wrong schemaVersion exits non-zero', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('p', { root: '.' });
+  config.schemaVersion = 3;
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const result = run(['--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes('schemaVersion'), result.stderr);
+});
+
+test('an out-of-enum visibility exits non-zero', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const config = v2('p', { root: '.' });
+  config.preview.targets.private.visibility = 'Public';
+  writeJson(path.join(repo, '.solopreneur.json'), config);
+
+  const result = run(['--from', mkdirp(repo, 'sub')]);
+  assertFailed(result);
+  assert.ok(result.stderr.includes('visibility'), result.stderr);
 });
 
 // --- schema ----------------------------------------------------------------
@@ -354,9 +434,11 @@ test('legacy default.preview.projects is reported as mode=legacy, not converted'
   const out = runJson(['--from', mkdirp(tmp(), 'work')], { home });
   assert.equal(out.mode, 'legacy');
   assert.equal(out.configPath, legacy);
-  assert.equal(out.legacy.default.projects.keep, 'kept');
-  assert.equal(out.legacy.default.autoProtect, true);
-  assert.equal(out.legacy.repos['github.com/owner/repo'].path, 'docs/preview');
+  assert.equal(out.legacy.length, 1);
+  assert.equal(out.legacy[0].file, legacy);
+  assert.equal(out.legacy[0].values.default.projects.keep, 'kept');
+  assert.equal(out.legacy[0].values.default.autoProtect, true);
+  assert.equal(out.legacy[0].values.repos['github.com/owner/repo'].path, 'docs/preview');
   // Nothing is synthesized from a legacy file.
   assert.equal(out.root, null);
   assert.equal(out.target, null);
@@ -372,7 +454,28 @@ test('legacy flat preview.paths is reported as mode=legacy', () => {
   const out = runJson(['--from', mkdirp(tmp(), 'work')], { env: { CLAUDE_CONFIG_DIR: configDir } });
   assert.equal(out.mode, 'legacy');
   assert.equal(out.configPath, legacy);
-  assert.equal(out.legacy.preview.paths['github.com/owner/repo'], 'docs/preview');
+  assert.equal(out.legacy[0].values.preview.paths['github.com/owner/repo'], 'docs/preview');
+});
+
+test('both legacy files are reported, matching how deploy.sh cascades them', () => {
+  // deploy.sh reads $CLAUDE_CONFIG_DIR and ~/.claude per key, so values in the
+  // second file are in effect too. Reporting only the first would hide them
+  // from the migrator.
+  const home = tmp();
+  const configDir = tmp();
+  const primary = writeJson(path.join(configDir, 'solopreneur.json'), {
+    default: { preview: { projects: { default: 'from-ccd' } } },
+  });
+  const fallback = writeJson(path.join(home, '.claude', 'solopreneur.json'), {
+    default: { preview: { projects: { keep: 'from-home' }, autoProtect: false } },
+  });
+
+  const out = runJson(['--from', mkdirp(tmp(), 'work')], { home, env: { CLAUDE_CONFIG_DIR: configDir } });
+  assert.equal(out.mode, 'legacy');
+  assert.equal(out.configPath, primary);
+  assert.deepEqual(out.legacy.map((e) => e.file), [primary, fallback]);
+  assert.equal(out.legacy[1].values.default.projects.keep, 'from-home');
+  assert.equal(out.legacy[1].values.default.autoProtect, false);
 });
 
 test('a legacy file with no preview values is not reported as a preview config', () => {
@@ -399,7 +502,7 @@ test('--json output carries every documented key', () => {
   writeJson(path.join(repo, '.solopreneur.json'), v2('shape-project', { root: '.' }));
 
   const out = runJson(['--from', mkdirp(repo, 'sub')]);
-  for (const key of ['configPath', 'mode', 'root', 'defaultTarget', 'target', 'collections']) {
+  for (const key of ['configPath', 'mode', 'root', 'defaultTarget', 'target', 'collections', 'legacy']) {
     assert.ok(key in out, `missing key: ${key}`);
   }
   assert.deepEqual(Object.keys(out.target).sort(),

@@ -95,7 +95,7 @@ older flat `preview.paths.<repo-key>` shape.
 - [x] Test command passes: `cd plugins/solopreneur/skills/preview && node --test` exits 0
       (the spec originally said `node --test tests/`; see "Corrections" below —
       a bare directory argument cannot work on Node >= 22.6)
-- [ ] Tests cover each of these as a distinct case: explicit `$SOLOPRENEUR_CONFIG`;
+- [x] Tests cover each of these as a distinct case: explicit `$SOLOPRENEUR_CONFIG`;
       nearest ancestor wins over a farther ancestor; a `.solopreneur.json` with no
       `preview` block is skipped during walk-up; a relative `root` resolves against
       the config file's directory and **not** cwd (assert by running with cwd set
@@ -107,13 +107,13 @@ older flat `preview.paths.<repo-key>` shape.
       `visibility` resolves to `"private"`; legacy fallback reports
       `mode: "legacy"` for both the `default.preview.projects.*` and the flat
       `preview.paths.*` shapes
-- [ ] Structured output contains every documented key
-- [ ] Public plugin carries no Hana-specific defaults:
+- [x] Structured output contains every documented key
+- [x] Public plugin carries no Hana-specific defaults:
       `grep -rniE 'hana|~/Agents|mojo-apps' plugins/solopreneur/shared/config.schema.json plugins/solopreneur/skills/preview/scripts/config-resolve.mjs` returns no matches (exit 1)
-- [ ] A test asserts the schema validates a minimal generic config (single
+- [x] A test asserts the schema validates a minimal generic config (single
       `private` target, both collections) and rejects a config missing
       `preview.root`
-- [ ] `git diff --stat` shows no modification to `deploy.sh`, `preflight.sh`,
+- [x] `git diff --stat` shows no modification to `deploy.sh`, `preflight.sh`,
       `SKILL.md`, `comment-overlay.js`, or any `plugin.json`
 
 ## Notes
@@ -153,6 +153,36 @@ set (`deploy.sh:150-155`). Also note there is no repo-authored `.mjs` anywhere
 and no CI workflow installs Node, so the test suite is currently a local gate
 only — wiring it into CI is deliberately left out of this PR's file scope.
 
+## Review outcomes
+
+Five internal reviewers ran against the first implementation. The findings that
+changed the code are folded into the sections below; these are the ones that
+were **declined**, recorded so they are not re-litigated in PR2+:
+
+- **Emit the `targets` map instead of a flattened `target`.** The output shape
+  is specified by this document and asserted by the acceptance criteria. The
+  "structural room" rule is about the **file format** — `targets` does stay a
+  map in the schema. The resolver's output is a script-side shape versioned
+  with the scripts, so it can grow when multi-target actually lands.
+- **Close `provider` to an `enum: ["vercel"]` in the schema.** Directly against
+  the spec's "the single-target v1 limit is enforced in the resolver, not by
+  narrowing the schema".
+- **Use `node:util` `parseArgs`.** It only became stable in Node 20.16, and this
+  file declares a floor of 20, where it prints an `ExperimentalWarning` onto the
+  stderr this CLI reserves for errors. The one concrete gap it would have closed
+  — `--from=value` — was implemented directly instead.
+- **Compare `dev`+`ino` for containment instead of paths.** Raised for
+  case-insensitive filesystems, where a wrong-case `--from` is rejected. It
+  fails *closed* with an error naming the root, and no reviewer could construct
+  a false accept. `path.relative` was adopted instead, which also fixes
+  containment when `root` is `/`.
+- **Guard `toLines` against deep recursion.** A ~2000-level-deep legacy config
+  is not a real scenario and the failure is already loud.
+- **Convert the tests to in-process calls for speed.** Subprocess isolation is a
+  deliberate choice (below); 1.8s is not a problem worth trading it for.
+- **Factor the test fixtures into a shared builder.** Each test's explicit
+  setup is its documentation; the duplication is the readable kind.
+
 ## Implementation decisions
 
 Decisions taken while implementing, recorded because later PRs depend on them.
@@ -167,17 +197,34 @@ Keeping the schema file as the single source of truth is what makes the
 acceptance criterion "the schema validates …" literally true. If the schema ever
 needs keywords outside that subset, swap the function for `ajv` at that point.
 
-The interpreter **fails closed on the schema itself**: an unrecognized keyword,
-or a `$ref` that is not a resolvable local `#/$defs/` pointer, throws instead of
-being ignored. Without that guard, adding `oneOf` or `patternProperties` to the
-schema later would silently validate *less* than the schema claims — the one
-failure mode a hand-coded validator does not have. Verified by injecting a
-`pattern` keyword: 16 tests fail loudly rather than passing weakly.
+The interpreter **fails closed on the schema itself**, in a whole-schema audit
+that runs once at load time. It rejects an unrecognized keyword, a `type` value
+it does not implement, a keyword whose value has the wrong shape, a `$ref` that
+is not a resolvable local `#/$defs/` pointer, and a `$ref` carrying sibling
+keywords (Draft 2020-12 applies those; this interpreter resolves and returns, so
+a sibling would be silently dropped). Without this, adding `oneOf` or
+`"type": "integer"` to the schema later would silently validate *less* than the
+schema claims — the one failure mode a hand-coded validator does not have.
 
-**Presence is tested by reading, not by `stat`.** Only `ENOENT` counts as "no
-such config". A file that exists but cannot be opened is fatal, because `stat`
-succeeds on files the process cannot read — checking existence that way would
-reintroduce exactly the silent fall-through this resolver exists to prevent.
+The audit has to be a **load-time sweep, not a check inside `validate`**: a
+per-node check only ever sees the subschemas a particular config reaches, so an
+unsupported keyword on an optional field would sit unnoticed until some config
+happened to set that field. Verified by injecting `"type": "integer"` on a field
+the probe config does not even set — it still fails immediately.
+
+**Absence is `undefined`, never `null`.** `readJsonIfPresent` returns
+`undefined` for a missing file, because `JSON.parse("null")` returns `null` and
+a config file whose entire content is `null` must be **rejected**, not mistaken
+for a missing file. A `.solopreneur.json` that parses to a non-object is broken,
+not "a config for another feature", so it stops the walk rather than being
+stepped over.
+
+**Presence is classified by `stat`, but readability is proven by reading.**
+`stat` decides missing-vs-present and rejects anything that is not a regular
+file (a FIFO or a symlink to a device would otherwise block the process
+forever). It is never used to decide a file is *readable* — `stat` succeeds on
+files the process cannot open, so the read itself is what proves that, and its
+failure is fatal rather than a silent skip.
 
 **No `additionalProperties: false` anywhere in the schema.** Phase 1 of the
 architecture plan has `setup.mjs` writing `projectId` and `teamId` into each
