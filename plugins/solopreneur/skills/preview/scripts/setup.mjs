@@ -104,11 +104,23 @@ const DEFAULT_ROOT = 'docs/preview';
  */
 export class SetupError extends Error {}
 
-const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const enc = encodeURIComponent;
 
 /** A yes/no answer the user typed, read as affirmative only on an explicit yes. */
 const affirmative = (answer) => /^(y|yes)$/i.test(String(answer).trim());
+
+/**
+ * True when `child` is `parent` or sits underneath it — the same `path.relative`
+ * test config-resolve.mjs / config-migrate.mjs use, for the same reason a prefix
+ * compare cannot be (a trailing separator is needed to keep `/a/x-old` out of
+ * `/a/x`, and that separator then breaks a `parent` of `/`).
+ */
+function isUnder(child, parent) {
+  const rel = path.relative(parent, child);
+  if (rel === '') return true;
+  if (rel === '..' || rel.startsWith(`..${path.sep}`)) return false;
+  return !path.isAbsolute(rel);
+}
 
 /**
  * Run git under the current working directory, returning stdout with only its
@@ -234,6 +246,18 @@ function parseArgs(argv) {
       throw new SetupError(`unknown argument: ${arg}\n${USAGE}`);
     }
   }
+  // A team scope is applied by `?teamId=` only when the value is a `team_…` id
+  // (mirroring vercel-protect.mjs / deploy.sh). A slug or any other value would
+  // otherwise be SILENTLY dropped, provisioning the user's PERSONAL scope instead
+  // of the team they named — a wrong-scope footgun for a provisioning tool. Reject
+  // it loudly rather than guess.
+  if (opts.team !== undefined && !opts.team.startsWith('team_')) {
+    throw new SetupError(
+      `--team must be a Vercel team id starting with "team_", got ${JSON.stringify(opts.team)}\n`
+      + '  a team slug is not accepted — use the team_… id from your Vercel team settings\n'
+      + `${USAGE}`,
+    );
+  }
   return opts;
 }
 
@@ -332,7 +356,7 @@ async function provision({ create, projectName, teamId, io, deps }) {
  * and environment come from the process (the real resolver reads them too), which
  * tests control with a fixture directory and a fixture HOME.
  */
-export async function main({ argv = [], io, deps }) {
+export async function main({ argv = [], io, makeDeps }) {
   const opts = parseArgs(argv);
   if (opts.help) { io.print(`${USAGE}\n`); return 0; }
 
@@ -373,18 +397,37 @@ export async function main({ argv = [], io, deps }) {
   // ONLY when --force is replacing this script's own v2 config at this exact path.
   const overwritingOwnV2 = existing.mode === 'v2' && existing.configPath === dest && opts.force;
   let destPresent = false;
-  try { fs.lstatSync(dest); destPresent = true; } catch { destPresent = false; }
+  try { fs.lstatSync(dest); destPresent = true; } catch { /* absent */ }
   if (destPresent && !overwritingOwnV2) {
     throw new SetupError(
       `a ${V2_FILENAME} already exists at ${dest}\n`
       + '  setup will not overwrite it — merge by hand, or remove it and re-run',
     );
   }
+  // The only way past that guard with a file present is a --force replacement of
+  // our own v2 config. Keep its bytes: the write preserves any sibling top-level
+  // keys (a v2 file may configure other features too — the schema allows it), and
+  // a later verification failure restores them rather than deleting a config that
+  // was working before this run.
+  const priorBytes = overwritingOwnV2 && destPresent ? fs.readFileSync(dest) : null;
 
   const root = toRoot(opts.root ?? DEFAULT_ROOT);
   const rootAbs = path.resolve(anchor, root);
   const activeDir = path.join(rootAbs, 'active');
   const archiveDir = path.join(rootAbs, 'archive');
+
+  // The config lands at `dest` (under `anchor`) and is found by walking UP from a
+  // content path. That only works when the root sits at or under `anchor`; an
+  // absolute root elsewhere, or one escaping via `..`, would leave a config no
+  // walk-up could ever reach — and the discoverability check would catch it only
+  // AFTER Vercel was provisioned and the prior config (under --force) already
+  // overwritten. Refuse it up front, before any prompt or Vercel call.
+  if (!isUnder(rootAbs, anchor)) {
+    throw new SetupError(
+      `the preview root must sit under ${anchor}\n`
+      + `  ${rootAbs} is outside it — a config at ${dest} could never be discovered from there`,
+    );
+  }
 
   // 2/3. Gather the two inputs setup cannot infer: the project name and whether
   //      to create it or link an existing one. Both are asked (create-vs-link is
@@ -417,6 +460,14 @@ export async function main({ argv = [], io, deps }) {
     return 0;
   }
 
+  // Construct the Vercel deps only now, past the decline point: --help, an
+  // idempotent/legacy no-op, and a decline all return above without ever touching
+  // Vercel. Building deps eagerly at the CLI entry read the auth token before any
+  // of those, so a machine without `vercel login` could not even print --help. A
+  // missing token now throws SetupError HERE, inside main, so the CLI entry's
+  // catch turns it into a clean message rather than a raw stack trace.
+  const deps = makeDeps();
+
   // 5. Provision FIRST (fail closed). A throw here exits non-zero having written
   //    no config; a `false` return is the populated-project decline — a clean
   //    abort with nothing mutated.
@@ -426,9 +477,16 @@ export async function main({ argv = [], io, deps }) {
   }
 
   // 6. Write config + content dirs LAST, only now that protection is in place.
+  //    Under --force replacing our own v2 config, preserve any sibling top-level
+  //    keys the file carried — replace only schemaVersion + preview, never blow
+  //    the whole file away (which would silently drop another feature's config).
   fs.mkdirSync(activeDir, { recursive: true });
   fs.mkdirSync(archiveDir, { recursive: true });
-  writeAtomic(dest, `${JSON.stringify(buildConfig(projectName, root), null, 2)}\n`);
+  const fresh = buildConfig(projectName, root);
+  const cfgObject = priorBytes
+    ? { ...JSON.parse(priorBytes), schemaVersion: fresh.schemaVersion, preview: fresh.preview }
+    : fresh;
+  writeAtomic(dest, `${JSON.stringify(cfgObject, null, 2)}\n`);
 
   // 7. Discoverable AND effective: prove the SHIPPED resolver finds this config
   //    by walking up from a content path — not by pointing $SOLOPRENEUR_CONFIG at
@@ -436,9 +494,21 @@ export async function main({ argv = [], io, deps }) {
   //    (PR #135). A config that does not resolve is removed so setup never leaves
   //    an ineffective file behind; the Vercel project stays provisioned.
   const undo = (why) => {
-    fs.rmSync(dest, { force: true });
+    // Restore the prior config under --force — a failed re-setup must never
+    // destroy a config that worked before this run — else remove the file we just
+    // created (greenfield). The fs op is best-effort: its OWN failure must not
+    // replace the SetupError with a raw stack trace, so it is folded into the
+    // message rather than thrown.
+    let rollback = priorBytes ? 'the previous config was restored' : 'the config was removed';
+    try {
+      if (priorBytes) fs.writeFileSync(dest, priorBytes);
+      else fs.rmSync(dest, { force: true });
+    } catch (err) {
+      rollback = `could not ${priorBytes ? 'restore the previous config' : 'remove the config'} at ${dest} `
+        + `(${err.message}) — remove or fix it by hand`;
+    }
     return new SetupError(
-      `${why}, so the config was removed\n  the Vercel project ${JSON.stringify(projectName)} WAS provisioned`
+      `${why}, so ${rollback}\n  the Vercel project ${JSON.stringify(projectName)} WAS provisioned`
       + ' — re-run setup after fixing the location',
     );
   };
@@ -547,11 +617,10 @@ export function makeDefaultDeps({ token, run = spawnCurl } = {}) {
   };
 }
 
-/** Production `io`: prompts on stdin/stdout via readline, output to std streams. */
+/** Production `io`: prompts on stdin/stdout via readline, output to stdout. */
 export function makeStdio() {
   return {
     print: (text) => process.stdout.write(text),
-    error: (text) => process.stderr.write(text),
     ask: async (question) => {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       try {
@@ -586,7 +655,12 @@ function invokedDirectly() {
 
 if (invokedDirectly()) {
   const io = makeStdio();
-  main({ argv: process.argv.slice(2), io, deps: makeDefaultDeps() })
+  // `makeDeps` (not a built `deps`) is passed so main constructs the real deps
+  // LAZILY — only when it actually provisions, past --help / a no-op / a decline.
+  // Building them here would read the Vercel token before main runs, and that
+  // throw would land OUTSIDE the catch below (argument evaluation precedes the
+  // call) and surface as a raw stack trace on the commonest first-run condition.
+  main({ argv: process.argv.slice(2), io, makeDeps: makeDefaultDeps })
     .then((code) => { process.exitCode = code; })
     .catch((err) => {
       // A known, user-facing failure prints cleanly and exits 1; anything else is

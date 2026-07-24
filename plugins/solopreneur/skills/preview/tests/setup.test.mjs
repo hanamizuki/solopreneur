@@ -138,7 +138,6 @@ function fakeIo(answers = []) {
     asked,
     text: () => printed.join(''),
     print: (s) => printed.push(s),
-    error: (s) => printed.push(s),
     ask: async (q) => {
       asked.push(q);
       if (queue.length === 0) throw new Error(`fakeIo: unexpected prompt with an empty queue: ${JSON.stringify(q)}`);
@@ -191,12 +190,15 @@ function fakeDeps({
   };
 }
 
-async function runMain(argv, answers, deps) {
+async function runMain(argv, answers, deps, { makeDeps } = {}) {
   const io = fakeIo(answers);
   let code;
   let error;
   try {
-    code = await main({ argv, io, deps });
+    // main builds its deps lazily via makeDeps; default to a factory returning the
+    // fake. A test can pass its own makeDeps (e.g. one that throws) to prove the
+    // factory is not called on the --help / no-op / decline paths.
+    code = await main({ argv, io, makeDeps: makeDeps ?? (() => deps) });
   } catch (err) {
     error = err;
   }
@@ -463,6 +465,98 @@ test('an unrecognized create/link choice is refused', async () => {
   scenario();
   const { error } = await runMain(['--project', 'p'], ['maybe', 'y'], fakeDeps());
   assert.ok(error instanceof SetupError && /new.*existing/.test(error.message), `got ${error}`);
+});
+
+// --- lazy deps: no Vercel credentials for help / no-op / decline ------------
+
+test('the Vercel deps are constructed lazily — not for --help, a v2 no-op, or a decline', async () => {
+  // makeDeps() reads the Vercel token in production; a machine without `vercel
+  // login` must still be able to print --help, no-op on an existing config, and
+  // decline. A makeDeps that throws proves none of those paths construct deps.
+  const boom = () => { throw new SetupError('deps must not be constructed on this path'); };
+
+  let r = await runMain(['--help'], [], null, { makeDeps: boom });
+  assert.ifError(r.error); assert.equal(r.code, 0);
+
+  const s = scenario();
+  writeJson(s.dest, v2('already-set-up'));
+  r = await runMain([], [], null, { makeDeps: boom });
+  assert.ifError(r.error); assert.equal(r.code, 0);
+
+  scenario();
+  r = await runMain(['--project', 'p'], ['new', 'n'], null, { makeDeps: boom });
+  assert.ifError(r.error); assert.equal(r.code, 0);
+});
+
+// --- --force safety: never destroy an existing config ----------------------
+
+test('--force preserves sibling top-level keys when replacing an existing v2 config', async () => {
+  const s = scenario();
+  // A v2 file may carry preview AND another feature (the schema allows it).
+  writeJson(s.dest, {
+    schemaVersion: 2,
+    preview: v2('old-project').preview,
+    todos: { backlog: 'todos/backlog' },
+  });
+
+  const { code, error } = await runMain(['--project', 'my-private-previews', '--force'], ['new', 'y'], fakeDeps());
+  assert.ifError(error);
+  assert.equal(code, 0);
+  const cfg = readConfig(s.dest);
+  assert.equal(cfg.preview.targets.private.project, 'my-private-previews', 'preview replaced');
+  assert.deepEqual(cfg.todos, { backlog: 'todos/backlog' }, 'the sibling feature config survived --force');
+});
+
+test('--force restores the prior config byte-for-byte when post-write verification fails', async () => {
+  const s = scenario();
+  writeJson(s.dest, { schemaVersion: 2, preview: v2('old-project').preview, todos: { backlog: 'x' } });
+  const priorText = fs.readFileSync(s.dest, 'utf8');
+  // A nested .solopreneur.json between the content root and the repo root is what
+  // the resolver finds first walking up from content, so step-7 verification
+  // fails — and a failed re-setup must NOT delete the config that worked before.
+  writeJson(path.join(s.repo, 'docs', '.solopreneur.json'), v2('nested-shadow'));
+
+  const { error } = await runMain(['--project', 'my-private-previews', '--force'], ['new', 'y'], fakeDeps());
+  assert.ok(error instanceof SetupError, 'expected a verification failure');
+  assert.equal(fs.readFileSync(s.dest, 'utf8'), priorText, 'the prior config was restored, not deleted');
+});
+
+// --- root containment: refuse an undiscoverable root before provisioning ----
+
+test('an absolute --root outside the anchor is refused before any Vercel call', async () => {
+  const s = scenario();
+  const outside = tmp();
+  const { code, error, deps } = await runMain(['--project', 'p', `--root=${outside}`], [], fakeDeps());
+  assert.equal(code, undefined);
+  assert.ok(error instanceof SetupError && /must sit under|outside/.test(error.message), `got ${error}`);
+  assert.deepEqual(deps.calls.createProject, [], 'refused before provisioning');
+  assert.ok(!fs.existsSync(s.dest));
+});
+
+test('a --root escaping the anchor via .. is refused before any Vercel call', async () => {
+  scenario();
+  const { error, deps } = await runMain(['--project', 'p', '--root', '../escapes'], [], fakeDeps());
+  assert.ok(error instanceof SetupError && /must sit under|outside/.test(error.message), `got ${error}`);
+  assert.deepEqual(deps.calls.createProject, []);
+});
+
+// --- --team validation -----------------------------------------------------
+
+test('a --team that is not a team_ id is rejected (never silently personal scope)', async () => {
+  scenario();
+  const { error } = await runMain(['--project', 'p', '--team', 'my-slug'], [], fakeDeps());
+  assert.ok(error instanceof SetupError && /team_/.test(error.message), `got ${error}`);
+});
+
+test('a valid team_ id is accepted and threaded to Vercel', async () => {
+  const s = scenario();
+  const deps = fakeDeps();
+  const { code, error, io } = await runMain(['--project', 'my-private-previews', '--team', 'team_abc'], ['new', 'y'], deps);
+  assert.ifError(error);
+  assert.equal(code, 0);
+  assert.ok(io.text().includes('team team_abc'), io.text());
+  assert.equal(deps.calls.createProject[0].teamId, 'team_abc', 'the team id reaches Vercel');
+  assert.ok(fs.existsSync(s.dest));
 });
 
 // --- CLI surface -----------------------------------------------------------
