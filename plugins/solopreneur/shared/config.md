@@ -409,6 +409,38 @@ does not describe the legacy file.
 }
 ```
 
+## Private target protection contract
+
+A `private` target's protection is not a single flag — it is a recipe of Vercel
+behaviors verified against a real Hobby-plan account, enforced by
+`scripts/vercel-protect.mjs` and consumed by `setup.mjs` and the library deploy
+(later PRs). The rules exist because the naive version leaves projects
+world-readable:
+
+- **The protection value is the legacy enum `all_except_custom_domains`**, the
+  one a fresh project auto-enables. The documented `prod_deployment_urls_and_all_previews`
+  is **weaker** — it leaves the scope alias `<project>-<scope>.vercel.app`
+  anonymously readable — so `ensureProtected` refuses to set it, or anything but
+  the legacy value.
+- **The bare domain `<project>.vercel.app` must be removed.** Under the legacy
+  enum the immutable URL and the scope alias return anonymous 302, but the bare
+  domain returns anonymous 200. `removeBareDomain` deletes it (a 404 is success).
+- **Never trust a PATCH echo — GET the value back.** A rejected PATCH silently
+  clears protection to `null`. `ensureProtected` GET-verifies after every PATCH,
+  restores the pre-PATCH snapshot if it was nulled, and fails closed rather than
+  report a success it cannot confirm.
+- **Fail closed on an anonymous probe.** `verifyEntryProtected` treats only a
+  302/401 as protected and a 200 (or any unconfirmable status) as naked. The
+  durable guarantee is this probe, run after every provisioning step — not the
+  config GET, which can be nulled afterwards. Full protection of a target is the
+  composition of all three (ensure + remove-bare-domain + probe), so
+  `ensureProtected` resolving alone does not mean the deployment is unreadable.
+
+`vercel-protect.mjs` is network-testable through an injected `deps` object; its
+production `deps` reads the Vercel CLI token and talks to `api.vercel.com` the
+way `deploy.sh` does. `deploy.sh`'s own inline `ssoProtection` block is the
+legacy per-page flow and is unaffected.
+
 ## Resolution order
 
 `scripts/config-resolve.mjs` in the `preview` skill walks these layers, first
