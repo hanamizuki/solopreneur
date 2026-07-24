@@ -157,11 +157,30 @@ tolerates a root that does not exist yet, a defaulted root would otherwise
 validate silently into an empty Library — so the report flags when the directory
 is absent.
 
-**Membership check on `--target-project`, but only when there is something to
-check against.** A typo'd project name would otherwise migrate cleanly into a
-config pointing at a Vercel project that does not exist. A config carrying only
-`preview.paths` has no project names at all, and that is exactly the shape most
-in need of migrating, so any non-empty name is accepted there.
+**The candidate list is advisory, not a whitelist.** The first implementation
+refused a `--target-project` outside the candidates (except when there were
+none). Review showed that cannot be right: the list is a union across every repo
+the file mentions, so an unrelated repo's project would have been the only
+"valid" choice for a repo that has only a `preview.paths` entry, while a
+deliberately fresh project — the obvious reason to migrate — was refused. A name
+outside the list is now noted in the report instead, and the known names are
+still printed beside it so a typo stays visible.
+
+**Cross-layer order beats explicit-file priority for the path lookup.** A named
+`--legacy-config` outranks a default location *within* each cascade layer, but
+the layer order itself (every file's `repos`/`default` subtree before any file's
+flat top-level `preview`) is preserved from `read_solopreneur_config`.
+Re-ordering it for named files would make the migrator answer differently from
+the reader it is migrating from. The report names the winning layer and file, and
+says when that layer carries no path, so the outcome is visible rather than
+silent.
+
+**A failed `--write` rolls back everything it created.** Validation runs before
+any backup, and the backups already taken are removed if a later backup or the
+rename fails. Both matter for the same reason: the backup stamp is
+second-granularity and the copy is `COPYFILE_EXCL`, so a stray backup makes the
+corrected retry fail on EEXIST complaining about backups instead of the problem
+the user actually has to fix.
 
 **The shadow refusal is positional, not layer-based.** Refusing on any
 `mode === "v2"` would block a legitimate repo-local migration for anyone with a

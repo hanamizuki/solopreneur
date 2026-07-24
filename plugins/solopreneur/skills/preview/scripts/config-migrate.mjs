@@ -611,7 +611,10 @@ function assertNotShadowing(resolved, dest) {
   );
 }
 
-/** The `--target-project` refusal, listing what the legacy config actually offers. */
+/**
+ * Require an explicit `--target-project`, listing what the legacy config offers.
+ * Returns a warning when the chosen name is not one of them, or null.
+ */
 function requireTargetProject(chosen, candidates) {
   const listing = candidates.size === 0
     ? '  no project names found in the legacy config — name the project this scope should publish to'
@@ -626,14 +629,16 @@ function requireTargetProject(chosen, candidates) {
     );
   }
   if (chosen === '') throw new ConfigError(`--target-project cannot be empty\n${listing}`);
-  // Only checked when the legacy config offered something to check against: a
-  // config carrying only `preview.paths` has no project names at all, and that
-  // is exactly the shape most in need of migrating.
+  // The candidate list is ADVISORY, never a whitelist. It is a union across
+  // every repo the file mentions, so treating it as one both under- and
+  // over-restricts: a project belonging to a completely unrelated repo would be
+  // "valid", while a deliberately fresh project for THIS repo — the obvious
+  // reason to migrate — would be refused. Naming a project nobody configured is
+  // equally a typo and a legitimate intent, so it warns instead.
   if (candidates.size > 0 && !candidates.has(chosen)) {
-    throw new ConfigError(
-      `--target-project ${show(chosen)} is not one of the projects in the legacy config\n${listing}`,
-    );
+    return `${show(chosen)} is not one of the projects the legacy config names`;
   }
+  return null;
 }
 
 function main(argv) {
@@ -661,7 +666,7 @@ function main(argv) {
 
   const key = repoKey(cwd);
   const candidates = collectCandidates(sources);
-  requireTargetProject(options.targetProject, candidates);
+  const unknownProject = requireTargetProject(options.targetProject, candidates);
 
   const pathLayer = readPath(sources, key);
   const legacyPath = pathLayer === null ? null : pathLayer.value;
@@ -709,6 +714,7 @@ function main(argv) {
         ...origins.map((origin) => `    from ${origin}`),
       ])),
     `  chosen: ${show(options.targetProject)}`,
+    ...(unknownProject ? [`  NOTE: ${unknownProject} — check it is the project you meant`] : []),
     '',
     `destination: ${dest}`,
     '',
@@ -736,13 +742,22 @@ function main(argv) {
   // rollback stays "delete it".
   const staged = stageConfig(dest, text);
   const stamp = stampNow();
+  const copies = [];
   try {
-    for (const { file } of sources) report.push(`backed up ${file} -> ${backup(file, stamp)}`);
+    for (const { file } of sources) {
+      copies.push(backup(file, stamp));
+      report.push(`backed up ${file} -> ${copies[copies.length - 1]}`);
+    }
+    installStaged(staged, dest);
   } catch (err) {
+    // Undo exactly what this run created — the staged temp and every backup
+    // already taken — so a failure part-way through (a second source's backup,
+    // or the rename itself) still leaves the filesystem as it was. Each backup
+    // was created with COPYFILE_EXCL, so it is provably this run's to remove.
     fs.rmSync(staged, { force: true });
+    for (const copy of copies) fs.rmSync(copy, { force: true });
     throw err;
   }
-  installStaged(staged, dest);
   report.push(`wrote ${dest}`, 'the legacy config was not modified.');
   process.stdout.write(`${report.join('\n')}\n`);
   return 0;

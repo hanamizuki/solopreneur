@@ -519,8 +519,16 @@ user wants rather than one replacing the other.
 
 What it reads: `${CLAUDE_CONFIG_DIR}/solopreneur.json`,
 `~/.claude/solopreneur.json`, and any file named with `--legacy-config <path>`
-(repeatable, and outranking both default locations). There is no built-in
-inventory of anywhere else — looking further always takes the flag.
+(repeatable). There is no built-in inventory of anywhere else — looking further
+always takes the flag.
+
+An explicitly named file outranks a default location **within each cascade
+layer**, not across layers: the layer order itself is the one the shell readers
+use, so for the path lookup every file's `repos[<rk>]`/`default` subtree is
+still consulted before any file's flat top-level `preview`. That is deliberate —
+re-ordering it for named files would make the migrator answer differently from
+the reader it is migrating from. The report always names the layer and file the
+root came from, and says so explicitly when the winning layer carries no path.
 
 Rules worth knowing before running it:
 
@@ -531,7 +539,10 @@ Rules worth knowing before running it:
   the legacy bucket names (`default` / `keep` / `public`) are treated as opaque
   provenance — none of them implies which project to adopt. Without the flag the
   run exits non-zero listing every candidate and where it came from. A single
-  candidate is still not a decision.
+  candidate is still not a decision. The candidate list is **advisory, not a
+  whitelist**: it is a union across every repo the file mentions, so a name
+  outside it is noted in the report rather than refused — migrating to a brand
+  new project is a normal reason to run this.
 - **`autoProtect` maps to `visibility: "private"` in every case.** `true` and
   absent map there for the obvious reason; `false` maps there too, with a
   warning on both stdout and stderr. Turning a target `public` is never a

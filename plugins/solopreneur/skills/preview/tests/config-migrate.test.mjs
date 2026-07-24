@@ -342,13 +342,21 @@ test('a missing --target-project exits non-zero and lists the candidates', () =>
   assert.ok(result.stderr.includes('default.preview.projects.keep'), result.stderr);
 });
 
-test('a --target-project that is not in the legacy config is refused', () => {
-  const s = scenario({ default: { preview: { projects: { default: 'scratch' } } } });
+test('a --target-project outside the candidates is noted, not refused', () => {
+  // The candidate list is a union across every repo in the file, so it cannot
+  // be a whitelist: migrating THIS repo to a brand-new project is a normal
+  // reason to run this, and a project belonging to an unrelated repo would
+  // otherwise be the only "valid" choice.
+  const s = scenario({
+    default: { preview: { projects: { default: 'scratch' } } },
+    repos: { 'github.com/owner/other': { preview: { projects: { default: 'other-project' } } } },
+  });
 
-  const result = run(['--target-project', 'scartch'], { cwd: s.repo, home: s.home, env: s.env });
-  assertFailed(result);
-  assert.ok(result.stderr.includes('scartch'), result.stderr);
-  assert.ok(result.stderr.includes('scratch'), result.stderr);
+  const out = migrate(s, ['--target-project', 'brand-new']);
+  assert.ok(out.stdout.includes('"project": "brand-new"'), out.stdout);
+  assert.ok(out.stdout.includes('NOTE'), out.stdout);
+  // The names it does know are still listed, so a typo is visible next to it.
+  assert.ok(out.stdout.includes('scratch'), out.stdout);
 });
 
 // --- dry run ---------------------------------------------------------------
@@ -469,6 +477,31 @@ test('a corrected retry in the same second succeeds', () => {
   migrate(s, ['--target-project', 'p', '--write']);
   assert.ok(fs.existsSync(s.dest));
   assert.equal(backupsIn(s.configDir).length, 1);
+});
+
+test('a backup that fails part-way removes the backups already taken', { skip: process.getuid?.() === 0 ? 'root ignores mode bits' : false }, () => {
+  const s = scenario({ default: { preview: { projects: { default: 'p' } } } });
+  // Explicit files are backed up first, so the LATER one has to be the failure:
+  // this one succeeds, then the default location's backup cannot be created
+  // because its directory is read-only. Without a rollback, the succeeded
+  // backup would survive a run that migrated nothing.
+  const firstDir = mkdirp(s.root, 'first');
+  const first = writeJson(path.join(firstDir, 'solopreneur.json'), {
+    default: { preview: { projects: { keep: 'q' } } },
+  });
+  const mode = fs.statSync(s.configDir).mode;
+  fs.chmodSync(s.configDir, 0o555);
+  try {
+    const result = run(['--legacy-config', first, '--target-project', 'p', '--write'], {
+      cwd: s.repo, home: s.home, env: s.env,
+    });
+    assertFailed(result);
+    assert.deepEqual(backupsIn(firstDir), [], 'the backup already taken must be rolled back');
+    assert.ok(!fs.existsSync(s.dest));
+    assert.deepEqual(tempsIn(s.repo), []);
+  } finally {
+    fs.chmodSync(s.configDir, mode);
+  }
 });
 
 test('an unwritable destination directory fails cleanly, not with a stack trace', { skip: process.getuid?.() === 0 ? 'root ignores mode bits' : false }, () => {
