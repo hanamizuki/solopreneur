@@ -259,6 +259,16 @@ case) in the same second — or two concurrent invocations — would otherwise
 generate the same `.backup-<stamp>` name, and `COPYFILE_EXCL` would fail the
 second with EEXIST even though the migrations are independent.
 
+**The path reader matches jq `.path // empty`, not `| values`.** The two legacy
+readers use different jq semantics, and the migrator now honors each precisely.
+`autoProtect` is `| values` (a literal `false` survives). The preview PATH is
+`.path // empty`, so `false` and `null` are absent and the reader falls through
+to `.paths[<key>]`; command substitution then strips trailing newlines, so
+`"docs/preview\n"` reads as `docs/preview` and a newline-only value is empty.
+Git output is likewise stripped of only its trailing newline, not `.trim()`ed —
+a repo whose toplevel path ends in a space is a valid Unix path, and trimming it
+would point the destination at the wrong directory.
+
 **Same-directory temp is load-bearing twice.** It puts the temp on the same
 filesystem, so the rename cannot fail with EXDEV; and the resolver resolves a
 relative `root` against the directory of the file it reads, so validating the

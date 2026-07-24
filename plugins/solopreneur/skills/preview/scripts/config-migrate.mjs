@@ -391,6 +391,23 @@ function gatherSources(named) {
 const isAnswer = (value) => value !== undefined && value !== null && value !== '';
 
 /**
+ * A usable legacy PATH value, or undefined when the reader would fall through to
+ * the next candidate. The path is read with jq `.path // empty` (SKILL.md),
+ * which — unlike autoProtect's `| values` — treats BOTH `null` AND `false` as
+ * absent; the captured string is then `-z`-tested. Command substitution also
+ * strips trailing newlines, so `"docs/preview\n"` reads as `docs/preview` and a
+ * newline-only value is empty. A non-string, non-`false` value (a number, an
+ * array) is returned as-is for the caller to reject under the "path must be a
+ * string" rule, rather than silently stringified.
+ */
+function pathValue(raw) {
+  if (raw === undefined || raw === null || raw === false) return undefined;
+  if (typeof raw !== 'string') return raw;
+  const trimmed = raw.replace(/\n+$/, '');
+  return trimmed === '' ? undefined : trimmed;
+}
+
+/**
  * `autoProtect`, the way `deploy.sh:read_preview_config` reads it: file-major,
  * trying `repos[<key>]` then `default` inside each file before moving to the
  * next. There is no flat top-level layer for this key.
@@ -436,12 +453,12 @@ function readPath(sources, key) {
   ];
   for (const layer of layers) {
     if (!isObject(layer.subtree)) continue;
-    // `.path` else `.paths[<key>]`, both through the shell's own "is this an
-    // answer" test — SKILL.md reads them with jq `// empty` and then checks the
-    // captured string, so an empty `.path` falls through to `.paths` there too.
-    const direct = at(layer.subtree, 'path');
-    const value = isAnswer(direct) ? direct : at(layer.subtree, 'paths', key);
-    return { file: layer.file, where: layer.where, value: isAnswer(value) ? value : null };
+    // `.path` else `.paths[<key>]`, both through `pathValue` — SKILL.md reads
+    // them with jq `.path // empty` then a `-z` check, so `false`, `null`, `""`
+    // and a newline-only value all fall through to `.paths` here too.
+    const direct = pathValue(at(layer.subtree, 'path'));
+    const value = direct !== undefined ? direct : pathValue(at(layer.subtree, 'paths', key));
+    return { file: layer.file, where: layer.where, value: value === undefined ? null : value };
   }
   return null;
 }
@@ -483,17 +500,23 @@ function collectCandidates(sources) {
 // ---------------------------------------------------------------------------
 
 /**
- * Run git, returning trimmed stdout or null. Never throws: git may be absent
- * (spawn fails with no stdout at all), the directory may not be a repo, and an
- * ownership refusal also lands here — every one of those has to fall through to
- * the next fallback rather than abort the migration.
+ * Run git, returning stdout with only its trailing newline(s) removed, or null.
+ * Never throws: git may be absent (spawn fails with no stdout at all), the
+ * directory may not be a repo, and an ownership refusal also lands here — every
+ * one of those has to fall through to the next fallback rather than abort.
+ *
+ * `.replace(/\n+$/, '')`, NOT `.trim()`: the shell readers capture this through
+ * `$(...)`, which strips only trailing newlines. A repo whose toplevel path ends
+ * in a space or tab is a valid Unix path, and `.trim()` would silently mangle it
+ * — pointing `destinationFor` at the wrong directory and `repoKey` at the wrong
+ * legacy entry.
  */
 function git(args, cwd) {
   // No shell: arguments reach execve as-is, so nothing in a path or a remote
   // URL can be read as shell syntax.
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
   if (result.error || result.status !== 0 || typeof result.stdout !== 'string') return null;
-  const out = result.stdout.trim();
+  const out = result.stdout.replace(/\n+$/, '');
   return out === '' ? null : out;
 }
 

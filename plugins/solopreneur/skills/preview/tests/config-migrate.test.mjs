@@ -861,6 +861,63 @@ test('a malformed preview subtree is refused, never silently dropped', () => {
   assert.ok(result.stderr.includes('default.preview'), result.stderr);
 });
 
+test('a path of false falls through to paths[key], as jq .path // empty does', () => {
+  // `.path // empty` treats false (and null) as absent — unlike autoProtect's
+  // `| values`, which keeps false. So the winning subtree's false path must fall
+  // through to its own paths[<key>], not be returned and rejected as a non-string.
+  const s = scenario({});
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: false, paths: { [s.repo]: 'docs/from-paths' } } } },
+  });
+
+  const out = migrate(s, ['--target-project', 'p']);
+  assert.ok(out.stdout.includes('"root": "./docs/from-paths"'), out.stdout);
+});
+
+test('a trailing newline in a legacy path is stripped, as command substitution does', () => {
+  const s = scenario({});
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview\n' } } },
+  });
+
+  const out = migrate(s, ['--target-project', 'p']);
+  // The generated config's root is the stripped path (the echoed legacy values
+  // above it still show the raw "docs/preview\n", which is correct).
+  assert.ok(out.stdout.includes('"root": "./docs/preview"'), out.stdout);
+});
+
+test('a newline-only legacy path is treated as absent', () => {
+  const s = scenario({});
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: '\n' } } },
+  });
+
+  const out = migrate(s, ['--target-project', 'p']);
+  // Falls through to the documented default rather than writing a newline root.
+  assert.ok(out.stdout.includes('"root": "./docs/preview"'), out.stdout);
+});
+
+test('a repo toplevel path ending in a space is not mangled by trimming', () => {
+  // Command substitution strips only trailing newlines; `.trim()` would drop the
+  // trailing space and point the destination at the wrong directory.
+  const root = tmp();
+  const repo = mkdirp(root, 'repo dir ');
+  git(repo, ['init', '-q', '-b', 'main']);
+  const configDir = mkdirp(root, 'agent-config');
+  const home = mkdirp(root, 'home');
+  writeJson(path.join(configDir, 'solopreneur.json'), {
+    default: { preview: { projects: { default: 'p' } } },
+  });
+
+  const out = run(['--target-project', 'p'], { cwd: repo, home, env: { CLAUDE_CONFIG_DIR: configDir } });
+  assert.equal(out.status, 0, out.stderr);
+  // The destination keeps the trailing space; git's own toplevel is that path.
+  assert.ok(out.stdout.includes(`destination: ${path.join(repo, '.solopreneur.json')}`), out.stdout);
+});
+
 test('an empty-string preview subtree falls through, as the shell reader skips it', () => {
   // default.preview = "" is unanswered for `[ -n "$out" ]`, so the cascade
   // continues to the flat preview.paths layer — it must NOT be rejected as
