@@ -264,6 +264,51 @@ test('no legacy path anywhere falls back to the documented default', () => {
   assert.ok(out.stdout.includes('does not exist yet'), 'a defaulted root that is absent is flagged');
 });
 
+test('a legacy root outside the repo is refused, not written inert', () => {
+  // config-resolve.mjs finds the config by walking up from a content item, so a
+  // config at the repo root is unreachable when the root lives elsewhere. The
+  // old behavior wrote it and reported success anyway.
+  const s = scenario({});
+  const external = mkdirp(s.root, 'external');
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: external } } },
+  });
+
+  const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('outside the repository'), result.stderr);
+  assert.ok(!fs.existsSync(s.dest));
+});
+
+test('a legacy path escaping the repo via .. is refused', () => {
+  const s = scenario({});
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: '../escapes' } } },
+  });
+
+  const result = run(['--target-project', 'p'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('outside the repository'), result.stderr);
+});
+
+test('a root that is a regular file is rejected in the dry run, not just at --write', () => {
+  const s = scenario({});
+  writeJson(s.legacyFile, {
+    default: { preview: { projects: { default: 'p' } } },
+    repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
+  });
+  mkdirp(s.repo, 'docs');
+  fs.writeFileSync(path.join(s.repo, 'docs', 'preview'), 'not a directory\n');
+
+  // The dry run is the review surface — it must not show a proposal that only
+  // fails after --write.
+  const dry = run(['--target-project', 'p'], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(dry);
+  assert.ok(dry.stderr.includes('not a directory'), dry.stderr);
+});
+
 // --- autoProtect -----------------------------------------------------------
 
 test('autoProtect true maps to visibility private', () => {
@@ -338,8 +383,9 @@ test('a missing --target-project exits non-zero and lists the candidates', () =>
   for (const project of ['scratch', 'kept', 'other-scratch']) {
     assert.ok(result.stderr.includes(project), `candidate missing: ${project}\n${result.stderr}`);
   }
-  // The provenance is shown so the caller can tell the buckets apart themselves.
-  assert.ok(result.stderr.includes('default.preview.projects.keep'), result.stderr);
+  // The provenance is shown so the caller can tell the buckets apart themselves
+  // (the bucket key is quoted, like every other config-derived value).
+  assert.ok(result.stderr.includes('default.preview.projects."keep"'), result.stderr);
 });
 
 test('a --target-project outside the candidates is noted, not refused', () => {
@@ -431,30 +477,25 @@ test('--write installs the new file with an atomic rename', () => {
   assert.deepEqual(tempsIn(s.repo), []);
 });
 
-test('a config that fails validation leaves no file, no temp and no backup', () => {
+test('a --write onto an unusable root leaves no file, no temp and no backup', () => {
   const s = scenario({});
   writeJson(s.legacyFile, {
     default: { preview: { projects: { default: 'p' } } },
     repos: { [s.repo]: { preview: { path: 'docs/preview' } } },
   });
-  // The migrated root points at a regular file, which the resolver rejects.
-  // Whatever the write does internally, the outcome has to be: no config
-  // installed, no debris — the checked-then-written temp never becomes visible.
+  // The migrated root points at a regular file, refused before anything is
+  // written. The outcome has to be: no config installed, no debris — and, since
+  // the check runs before the backups, no backup either. A stray backup would
+  // block the corrected retry: the stamp is second-grained and COPYFILE_EXCL.
   mkdirp(s.repo, 'docs');
   fs.writeFileSync(path.join(s.repo, 'docs', 'preview'), 'not a directory\n');
 
   const result = run(['--target-project', 'p', '--write'], { cwd: s.repo, home: s.home, env: s.env });
   assertFailed(result);
   assert.ok(result.stderr.includes('not a directory'), result.stderr);
-  // The message must name the destination, not the temp file it validated —
-  // that path is already deleted by the time anyone reads this.
-  assert.ok(result.stderr.includes(s.dest), result.stderr);
   assert.ok(!result.stderr.includes('.tmp'), result.stderr);
   assert.ok(!fs.existsSync(s.dest));
   assert.deepEqual(tempsIn(s.repo), []);
-  // Validation runs BEFORE the backups, so a failed write leaves none. A stray
-  // backup would also block the corrected retry: the stamp is second-grained
-  // and the copy is COPYFILE_EXCL.
   assert.deepEqual(backupsIn(s.configDir), []);
 });
 
@@ -719,6 +760,36 @@ test('a newline in a project name cannot forge a report line', () => {
     assert.ok(!refused.stderr.includes(forged), refused.stderr);
   }
   assert.ok(refused.stderr.includes('\\nwrote /etc/passwd'), refused.stderr);
+});
+
+test('a newline in a projects bucket key cannot forge a report line', () => {
+  // The bucket key lands in the provenance string, so it needs the same quoting
+  // the project name and repo key already get.
+  const s = scenario({});
+  fs.writeFileSync(s.legacyFile, `{
+    "default": { "preview": { "projects": { "default\\nwrote /etc/passwd": "p" } } }
+  }
+`);
+
+  const refused = run([], { cwd: s.repo, home: s.home, env: s.env });
+  assertFailed(refused);
+  assert.ok(!refused.stderr.includes('\nwrote /etc/passwd'), refused.stderr);
+  assert.ok(refused.stderr.includes('\\nwrote /etc/passwd'), refused.stderr);
+});
+
+test('a legacy config that is not a regular file is refused, never read', () => {
+  // A FIFO would block readFileSync forever waiting for a writer; the resolver
+  // guards against this and so must the migrator.
+  const s = scenario({ default: { preview: { projects: { default: 'p' } } } });
+  const fifo = path.join(s.root, 'fifo');
+  const mk = spawnSync('mkfifo', [fifo]);
+  if (mk.status !== 0) return; // mkfifo absent — nothing to test
+
+  const result = run(['--legacy-config', fifo, '--target-project', 'p'], {
+    cwd: s.repo, home: s.home, env: s.env,
+  });
+  assertFailed(result);
+  assert.ok(result.stderr.includes('not a regular file'), result.stderr);
 });
 
 test('a repos.__proto__ entry is still reported, not swallowed', () => {

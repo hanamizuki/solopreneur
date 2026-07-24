@@ -182,6 +182,23 @@ second-granularity and the copy is `COPYFILE_EXCL`, so a stray backup makes the
 corrected retry fail on EEXIST complaining about backups instead of the problem
 the user actually has to fix.
 
+**The preview root is checked up front, in the dry run too.** The config lands at
+the repo root and the resolver finds it by walking up from a content item, so a
+root outside the repository — an absolute path elsewhere, or one escaping via
+`..` — would leave a file no walk-up ever reaches: a "wrote it" that resolves to
+nothing. That is refused rather than placed by a second guessed rule. A root that
+exists as a regular file is refused for the same visibility reason — the dry run
+is the review surface, and it must not show a proposal that only fails after
+`--write`. A missing root is fine; a fresh setup creates it later.
+
+**Legacy files are classified before reading, and every config-derived string in
+the report is quoted.** A FIFO or a device symlink at a config path would block
+`readFileSync` forever, so the file is `stat`-checked first, exactly as the
+resolver does. And the report is the human's decision surface: project names, the
+repo key, the preview path AND the `projects` bucket key are all user-controlled
+and all quoted through one `show()` helper, so a newline in any of them cannot
+forge a line that looks like the script's own statement of fact.
+
 **The shadow refusal is positional, not layer-based.** Refusing on any
 `mode === "v2"` would block a legitimate repo-local migration for anyone with a
 user-global `~/.config/solopreneur/config.json`, which is a *lower* layer that a

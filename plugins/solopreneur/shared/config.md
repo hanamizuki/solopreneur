@@ -565,11 +565,14 @@ Rules worth knowing before running it:
 - **Nothing is written unless the whole thing succeeds.** That covers the
   refusals — the destination already exists, a v2 config at or above the
   destination would be shadowed, `$SOLOPRENEUR_CONFIG` is set (it outranks every
-  file on disk, so a migrated file would be inert), or there is no legacy
+  file on disk, so a migrated file would be inert), the preview root resolves
+  outside the repository (a config at the repo root would never be found by the
+  walk-up) or to a regular file (it could not resolve), or there is no legacy
   preview config to migrate — and equally a write that fails validation
-  part-way. A user-global `~/.config/solopreneur/config.json` does *not* block a
-  repo-local migration: it is a lower layer that a repo-local file is meant to
-  win over.
+  part-way. The root refusals apply to the **dry run** too, so the proposal you
+  review is never one that would only fail at `--write`. A user-global
+  `~/.config/solopreneur/config.json` does *not* block a repo-local migration:
+  it is a lower layer that a repo-local file is meant to win over.
 
 `PREVIEW_PROJECT` is neither read nor changed by the migrator; it stays the
 highest-priority override for the legacy per-page flow.

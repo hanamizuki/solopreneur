@@ -141,12 +141,25 @@ function legacyPreviewValues(config) {
  * that was silently skipped would be wrong in a way nobody could see.
  */
 function readLegacy(file, { required }) {
+  const what = required ? '--legacy-config' : 'legacy config';
+  // Classify before reading, exactly as config-resolve.mjs does: a FIFO or a
+  // symlink to a device would otherwise block `readFileSync` forever waiting for
+  // a writer. `stat` is used only to reject non-regular files here — never to
+  // decide the file is readable, which the read below proves.
+  let stat;
+  try {
+    stat = fs.statSync(file);
+  } catch (err) {
+    if (err.code === 'ENOENT' && !required) return undefined;
+    throw new ConfigError(`cannot read ${what}: ${file}\n  ${err.message}`);
+  }
+  if (!stat.isFile()) throw new ConfigError(`${what} is not a regular file: ${file}`);
+
   let raw;
   try {
     raw = fs.readFileSync(file, 'utf8');
   } catch (err) {
     if (err.code === 'ENOENT' && !required) return undefined;
-    const what = required ? '--legacy-config' : 'legacy config';
     throw new ConfigError(`cannot read ${what}: ${file}\n  ${err.message}`);
   }
   let config;
@@ -291,15 +304,18 @@ function collectCandidates(sources) {
     if (!candidates.has(project)) candidates.set(project, []);
     candidates.get(project).push(`${origin} in ${file}`);
   };
+  // The bucket key is user-controlled too, and it lands mid-provenance — so it
+  // is quoted like every other config-derived value, or a newline in it forges
+  // report lines just as a project name would.
   for (const { file, values } of sources) {
     const globalProjects = at(values, 'default', 'projects');
     for (const [bucket, project] of Object.entries(isObject(globalProjects) ? globalProjects : {})) {
-      add(project, `default.preview.projects.${bucket}`, file);
+      add(project, `default.preview.projects.${show(bucket)}`, file);
     }
     for (const [key, preview] of Object.entries(isObject(values.repos) ? values.repos : {})) {
       const repoProjects = at(preview, 'projects');
       for (const [bucket, project] of Object.entries(isObject(repoProjects) ? repoProjects : {})) {
-        add(project, `repos[${show(key)}].preview.projects.${bucket}`, file);
+        add(project, `repos[${show(key)}].preview.projects.${show(bucket)}`, file);
       }
     }
   }
@@ -676,7 +692,43 @@ function main(argv) {
     );
   }
   const root = toRoot(legacyPath ?? DEFAULT_ROOT);
-  const rootExists = fs.existsSync(path.resolve(path.dirname(dest), root));
+  const resolvedRoot = path.resolve(path.dirname(dest), root);
+
+  // The config lands at the repo root, and the resolver finds it by walking up
+  // from a content item inside `root`. That only works when `root` is at or
+  // below the repo root; an absolute root elsewhere, or one escaping via `..`,
+  // would leave a file no walk-up ever reaches — a "wrote it" that resolves to
+  // nothing. This simple migrator refuses those rather than trying to guess a
+  // second placement; a hand edit can put the config at an ancestor of the root.
+  if (!isUnder(resolvedRoot, path.dirname(dest))) {
+    throw new ConfigError(
+      `the legacy preview root is outside the repository, so a config at the repo root could never be found\n`
+      + `  root: ${resolvedRoot}\n  repo: ${path.dirname(dest)}\n`
+      + `  ${legacyPath !== null ? `it comes from ${pathLayer.where} in ${pathLayer.file}` : ''}\n`
+      + `  place a ${V2_FILENAME} at an ancestor of that root by hand instead`,
+    );
+  }
+
+  // A root that exists but is a regular file will never resolve (the resolver
+  // requires a directory). Catch it here so the DRY RUN says so, instead of a
+  // clean-looking proposal that only fails after --write. A missing root is
+  // fine — a fresh setup creates it later.
+  let rootExists = false;
+  try {
+    if (!fs.statSync(resolvedRoot).isDirectory()) {
+      throw new ConfigError(
+        `the legacy preview root is not a directory, so the migrated config would not resolve\n`
+        + `  root: ${resolvedRoot}\n  it is a file; preview.root must be a directory`,
+      );
+    }
+    rootExists = true;
+  } catch (err) {
+    if (err instanceof ConfigError) throw err;
+    if (err.code !== 'ENOENT') {
+      throw new ConfigError(`cannot inspect the legacy preview root: ${resolvedRoot}\n  ${err.message}`);
+    }
+  }
+
   const rootNote = legacyPath !== null
     ? `from ${pathLayer.where} in ${pathLayer.file}`
     : `defaulted to ${DEFAULT_ROOT} — ${pathLayer === null ? 'no legacy layer names a path' : `${pathLayer.where} in ${pathLayer.file} carries no path`}`;
