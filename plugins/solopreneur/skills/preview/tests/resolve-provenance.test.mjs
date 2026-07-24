@@ -185,9 +185,27 @@ test('a creator with no updater does not fabricate an updater identity', () => {
   });
 });
 
+// --- title value is trusted display content (deliberate boundary) -----------
+
+test('a sessionTitle is passed through as authored, even one that looks path-like', () => {
+  // The guarantee is that the payload's raw ARTIFACT fields (session_id /
+  // transcript_path / cwd) never ride along — NOT a heuristic content scan of the
+  // title's value. sessionTitle is a human-chosen label (a Claude /rename, or a
+  // caller-explicit title); pattern-redacting it would need the forbidden guessing
+  // and would corrupt legitimate titles. This locks the deliberate decision so a
+  // later change cannot silently add value-redaction (see the module header).
+  assert.equal(
+    resolveParty({ agent: 'A', platform: 'claude', sessionTitle: 'Fix the /api/users path' }).sessionTitle,
+    'Fix the /api/users path',
+  );
+});
+
 // --- the sanitization sweep (crown-jewel guarantee) -------------------------
 
 test('no returned object ever contains a raw session id, transcript path, or absolute path', () => {
+  // Every forbidden value here sits in a DISCARDED field (a payload artifact or a
+  // stray key), never in a caller-explicit sessionTitle — that is exactly the scope
+  // of the guarantee: raw artifact fields are dropped; a chosen title value is not.
   const forbidden = [SESSION_ID, TRANSCRIPT, '/Users/', '/home/', 'C:\\Users'];
   const inputs = [
     { agent: 'A', platform: 'claude', payload: claudePayload() },

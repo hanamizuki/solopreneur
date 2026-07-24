@@ -20,10 +20,22 @@
  *
  *   2. SANITIZE BY CONSTRUCTION. Every returned object is assembled by assigning
  *      only the allowlisted display keys (`agent`, `platform`, `sessionTitle`) —
- *      the input is never spread. A raw `session_id`, a `transcript_path`, a
- *      `payload`, or any absolute local path therefore cannot ride along into the
- *      result. This is the same "pick, never spread" discipline build-library.mjs
- *      uses to keep source metadata out of directory.json.
+ *      the input is never spread. So the raw ARTIFACT FIELDS a platform payload
+ *      carries alongside the title — a Claude payload's `session_id`,
+ *      `transcript_path` and `cwd` (an absolute local path) — plus the `payload`
+ *      object itself can never ride along as fields of the result, the same "pick,
+ *      never spread" discipline build-library.mjs uses to keep source metadata out
+ *      of directory.json.
+ *
+ *      That guarantee is about those raw artifact FIELDS, not a content scan of a
+ *      display value: `sessionTitle` is a human-chosen label (a Claude `/rename` /
+ *      `--name`, or a caller-explicit title the owning agent picked) and is passed
+ *      through as authored — even one that happens to look path-like. It is
+ *      deliberately NOT pattern-redacted: that would need exactly the heuristic
+ *      guessing rule 1 forbids, and would corrupt legitimate titles. A secret a
+ *      human types INTO a title is the accepted same-trust-domain ceiling (the
+ *      footer additionally HTML-escapes it downstream), not something this
+ *      deterministic resolver may guess at.
  *
  * The module is TOTAL: it never throws. A footer resolver must degrade to
  * "unrecorded" on malformed provenance, not abort a publish. (Its siblings
@@ -144,9 +156,11 @@ const sameParty = (a, b) =>
  * provenance collapses to `{ producedBy: {} }`: a single "unrecorded" line.
  */
 export function resolveProvenance(provenance) {
-  const source = isObject(provenance) ? provenance : {};
-  const createdBy = resolveParty(source.createdBy);
-  const lastUpdatedBy = resolveParty(source.lastUpdatedBy);
+  // `provenance?.createdBy` is `undefined` for a non-object (string / number / null)
+  // without throwing, and `resolveParty` coerces `undefined` to `{}` — so a
+  // malformed `provenance` needs no separate guard here.
+  const createdBy = resolveParty(provenance?.createdBy);
+  const lastUpdatedBy = resolveParty(provenance?.lastUpdatedBy);
   if (sameParty(createdBy, lastUpdatedBy)) return { producedBy: createdBy };
   return { createdBy, lastUpdatedBy };
 }
