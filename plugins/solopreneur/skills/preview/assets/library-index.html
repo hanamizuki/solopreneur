@@ -55,6 +55,23 @@
   .card-title { color: var(--ink); font-weight: 600; font-size: 1rem; word-break: break-word; }
   .card-meta { margin-top: .2rem; font-size: .8rem; color: var(--muted); }
   .empty { color: var(--muted); font-size: .9rem; margin: .25rem 0; }
+  /* supersededBy earlier-copies group — collapsed by default, mirrors sidebar. */
+  details.earlier {
+    margin: .15rem 0 .15rem .6rem;
+    padding-left: .65rem;
+    border-left: 2px solid var(--rule);
+  }
+  details.earlier > summary {
+    list-style: none; cursor: pointer;
+    font-size: .8rem; color: var(--muted); padding: .25rem 0;
+  }
+  details.earlier > summary::-webkit-details-marker { display: none; }
+  details.earlier > summary::before {
+    content: "›"; display: inline-block; margin-right: .3rem;
+    transition: transform .15s ease;
+  }
+  details.earlier[open] > summary::before { transform: rotate(90deg); }
+  details.earlier .list { margin-top: .35rem; gap: .35rem; }
   footer.page { margin-top: 3rem; font-size: .78rem; color: var(--muted); }
 </style>
 </head>
@@ -116,7 +133,7 @@
     });
 
     render("active-list", active, "No previews yet.");
-    render("archive-list", archive, "Nothing archived.");
+    renderArchive("archive-list", archive, "Nothing archived.");
     document.getElementById("active-count").textContent = String(active.length);
     document.getElementById("archive-count").textContent = String(archive.length);
 
@@ -125,6 +142,30 @@
       var w = fmt(data.generatedAt);
       f.textContent = "Generated " + w.text;
       f.title = data.generatedAt;
+    }
+
+    // Fold archive rows with supersededBy under their canonical when that
+    // id is also in the archive list (mirrors preview-shell.js).
+    function groupArchiveWithSuperseded(list) {
+      var inArchive = {};
+      list.forEach(function (it) {
+        if (it && typeof it.id === "string") inArchive[it.id] = true;
+      });
+      var childrenOf = {};
+      var nested = {};
+      list.forEach(function (it) {
+        if (!it || typeof it.id !== "string") return;
+        var target = it.supersededBy;
+        if (typeof target === "string" && target && target !== it.id && inArchive[target]) {
+          if (!childrenOf[target]) childrenOf[target] = [];
+          childrenOf[target].push(it);
+          nested[it.id] = true;
+        }
+      });
+      var topLevel = list.filter(function (it) {
+        return it && typeof it.id === "string" && !nested[it.id];
+      });
+      return { topLevel: topLevel, childrenOf: childrenOf };
     }
 
     function render(id, list, emptyMsg) {
@@ -139,6 +180,37 @@
       }
       list.forEach(function (it) {
         wrap.appendChild(row(it));
+      });
+    }
+
+    function renderArchive(id, list, emptyMsg) {
+      var wrap = document.getElementById(id);
+      wrap.textContent = "";
+      if (!list.length) {
+        var e = document.createElement("p");
+        e.className = "empty";
+        e.textContent = emptyMsg;
+        wrap.appendChild(e);
+        return;
+      }
+      var folded = groupArchiveWithSuperseded(list);
+      folded.topLevel.forEach(function (it) {
+        wrap.appendChild(row(it));
+        var kids = folded.childrenOf[it.id];
+        if (kids && kids.length) {
+          var details = document.createElement("details");
+          details.className = "earlier";
+          var summary = document.createElement("summary");
+          summary.textContent = "Earlier copies (" + kids.length + ")";
+          details.appendChild(summary);
+          var inner = document.createElement("div");
+          inner.className = "list";
+          kids.forEach(function (k) {
+            inner.appendChild(row(k));
+          });
+          details.appendChild(inner);
+          wrap.appendChild(details);
+        }
       });
     }
 
