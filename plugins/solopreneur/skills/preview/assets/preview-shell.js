@@ -248,31 +248,68 @@
   // --- sidebar ------------------------------------------------------------
   //
   // Two open modes (breakpoint SIDEBAR_PUSH_MIN_PX):
-  //   - push (wide): the panel is a fixed dock; the LIGHT DOM body gets a
-  //     data attribute that a small injected stylesheet turns into
-  //     padding-left, so page content shifts right. No scrim — clicking the
+  //   - push (wide): the panel is a fixed dock; the LIGHT DOM page is
+  //     shifted right so content is not covered. No scrim — clicking the
   //     preview does not dismiss the catalog. Open/closed is sticky.
   //   - overlay (narrow): classic drawer + dimmed scrim; scrim click closes.
   // Mode is re-evaluated on resize while open so a phone rotating into
-  // landscape does not leave a stuck scrim or a missing push padding.
+  // landscape does not leave a stuck scrim or a missing push offset.
   //
   // Persistence: SIDEBAR_STORAGE_KEY on localStorage ("open" | "closed").
   // Failures (private mode, quota) are silent — the toggle still works for
   // the current page.
+  //
+  // Why margin+width (not just padding-left on body): preview pages often
+  // style `body { padding: …; max-width: … }` and some layouts treat the
+  // body as a full-bleed canvas. A lone padding-left is easy to lose to
+  // shorthand resets or to leave 100vw-wide children sitting under the
+  // fixed panel. margin-left shifts the whole body box; width calc keeps
+  // it from overflowing the viewport. Inline `setProperty(…, 'important')`
+  // beats page stylesheets. The class + stylesheet is a second path for
+  // anything that inspects classes instead of inline styles.
 
   function ensurePushStyle() {
     if (document.getElementById("preview-shell-push-style")) return;
     const s = document.createElement("style");
     s.id = "preview-shell-push-style";
-    // Light-DOM rule: the shadow CSS cannot pad the page's body. Using a
-    // data attribute (not an inline style) keeps other body styles intact
-    // and makes the open state inspectable from outside the shell.
+    const w = SIDEBAR_WIDTH_PX + "px";
     s.textContent =
-      "body[data-preview-shell-sidebar=\"open\"]{" +
-      "padding-left:" + SIDEBAR_WIDTH_PX + "px !important;" +
-      "box-sizing:border-box;" +
+      "html.preview-shell-sidebar-push,html.preview-shell-sidebar-push body{" +
+      "box-sizing:border-box !important;" +
+      "}" +
+      "html.preview-shell-sidebar-push body{" +
+      "margin-left:" + w + " !important;" +
+      "width:calc(100% - " + w + ") !important;" +
+      "max-width:calc(100vw - " + w + ") !important;" +
       "}";
     (document.head || document.documentElement).appendChild(s);
+  }
+
+  // Apply or clear the light-DOM push offset. Safe to call on every open/
+  // resize/close: closed always fully removes what we set.
+  function applyPushOffset(on) {
+    const html = document.documentElement;
+    const body = document.body;
+    if (!html || !body) return;
+    const w = SIDEBAR_WIDTH_PX + "px";
+    if (on) {
+      html.classList.add("preview-shell-sidebar-push");
+      body.classList.add("preview-shell-sidebar-push");
+      body.setAttribute("data-preview-shell-sidebar", "open");
+      // Inline important — wins over nearly any page CSS.
+      body.style.setProperty("margin-left", w, "important");
+      body.style.setProperty("width", "calc(100% - " + w + ")", "important");
+      body.style.setProperty("max-width", "calc(100vw - " + w + ")", "important");
+      body.style.setProperty("box-sizing", "border-box", "important");
+    } else {
+      html.classList.remove("preview-shell-sidebar-push");
+      body.classList.remove("preview-shell-sidebar-push");
+      body.removeAttribute("data-preview-shell-sidebar");
+      body.style.removeProperty("margin-left");
+      body.style.removeProperty("width");
+      body.style.removeProperty("max-width");
+      body.style.removeProperty("box-sizing");
+    }
   }
 
   function currentSidebarMode() {
@@ -325,11 +362,8 @@
       // Scrim only in overlay mode — never in push (that would feel temporary).
       scrim.classList.toggle("open", overlay);
 
-      if (push) {
-        document.body.setAttribute("data-preview-shell-sidebar", "open");
-      } else {
-        document.body.removeAttribute("data-preview-shell-sidebar");
-      }
+      // Push shifts the page; overlay must never leave a leftover offset.
+      applyPushOffset(push);
 
       if (isOpen) {
         sidebar.inert = false;
