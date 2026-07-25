@@ -445,7 +445,8 @@ provider project rather than to a name alone:
 A `private` target's protection is not a single flag — it is a recipe of Vercel
 behaviors verified against a real Hobby-plan account, enforced by
 `scripts/vercel-protect.mjs`, consumed by `setup.mjs` at first-run provisioning
-(see "Setting up from scratch" below) and by the library deploy (a later PR). The
+(see "Setting up from scratch" below) and by `deploy-library.mjs` on every publish
+(see "Publishing the Library" below). The
 rules exist because the naive version leaves projects world-readable:
 
 - **The protection value is the legacy enum `all_except_custom_domains`**, the
@@ -701,7 +702,7 @@ A private target's full protection (see the contract above) is
 `ensureProtected` + `removeBareDomain` + a 302 entry-probe. But the bare domain
 `<project>.vercel.app` and the immutable entry URL **do not exist until the
 project's first production deployment**, so the work is split between setup and
-first-publish (`deploy-library.mjs`, a later PR):
+first-publish (`deploy-library.mjs`; see "Publishing the Library" below):
 
 - **`ssoProtection` is a project-level setting** — settable and GET-verifiable on
   a project with zero deployments (verified against the Vercel REST API: the
@@ -727,7 +728,8 @@ flow is covered by `node --test` with zero real network and zero real prompts.
 ## Building the Library
 
 `scripts/build-library.mjs` turns a resolved target's collections into a
-deployable staging tree. It builds; it does not deploy (that is a later script).
+deployable staging tree. It builds; it does not deploy — `deploy-library.mjs` does
+(see "Publishing the Library" below).
 The CLI resolves config through `config-resolve.mjs`; the core `buildLibrary`
 takes the resolved `root` / `collections` / `include` as input.
 
@@ -948,5 +950,207 @@ sidebar uses.
 Tests live in `tests/preview-shell.test.mjs` and `tests/comment-overlay.test.mjs`
 (the assets' pure helpers) and the chrome-injection cases in
 `tests/build-library.test.mjs`; run them the same way.
+
+## Publishing the Library
+
+`scripts/deploy-library.mjs` publishes a built staging tree to the resolved
+target's Vercel project as the **stable production entry**. It calls
+`build-library.mjs` for the tree and `vercel-protect.mjs` for every protection
+primitive; it never re-implements either.
+
+```bash
+node scripts/deploy-library.mjs --from "$DIR"          # human report
+node scripts/deploy-library.mjs --json --from "$DIR"   # machine-readable report
+```
+
+It publishes **private** targets only. The schema allows
+`visibility: "public"`, but that value's own contract requires a publish-time
+content review which does not exist yet, so a public target is refused rather
+than published unreviewed.
+
+### The staged publish flow
+
+Every step exists because the intuitive or documented alternative was measured
+failing. Do not "simplify" this without re-running the experiment.
+
+`vercel deploy --prod --skip-domain` is **not** a staging step. `--skip-domain`
+only withholds the `targets.production` pointer; the automatic scope alias
+`<project>-<scope>.vercel.app` — which IS the stable entry — switches to the new
+deployment immediately, so there is no verify-before-switch window.
+
+1. **`vercel deploy`** — a PLAIN preview, never `--prod`. It produces a
+   `target: null` deployment and does not move the scope alias. This is the real
+   staging step.
+2. **Verify the staged preview**: anonymously challenged (302/401) and carrying
+   the revision just built. The revision check reads the deployment's `meta`
+   through the authenticated API — the entry is protected, so its content cannot
+   be read anonymously, and no bypass secret is needed for metadata.
+3. **`vercel promote <preview>`** to publish. Promoting a PREVIEW creates a
+   **new** production deployment rather than converting that preview in place, so
+   the deployment verified in step 2 is not the one that goes live.
+4. **Verify again**: the live production carries our revision, and the stable
+   entry is anonymously challenged.
+5. **Rollback is `vercel promote <last-good-production>`**, never
+   `vercel rollback` — that returns HTTP 500 on this account, by URL and by id
+   alike. Promoting a deployment that is already production is in-place.
+
+Fail-closed: a step-2 failure issues **no promote** (the alias never moved, so
+the published Library is untouched); a step-4 failure promotes the last-good
+production back and still exits non-zero. Success is never reported for a state
+that could not be verified, and every failure prints what the project is
+**actually** in — untouched / published-but-unverified / rolled-back /
+rollback-failed / unknown. Every failure *past* the publish point is routed
+through the rollback, including a transient Vercel read error — none of them can
+be reported as an untouched project.
+
+Two refinements keep the rollback from doing harm of its own:
+
+- **It waits before judging.** Promoting a preview rebuilds, and neither the
+  rebuild nor the alias assignment is documented as synchronous with the CLI's
+  exit, so the post-publish check polls (60s) for the live production to become
+  READY and carry our snapshot. A slow-but-successful publish must not be rolled
+  back — discarding a good snapshot is the expensive mistake.
+- **It never promotes over a stranger.** If the live production is another
+  *Library* publisher's (it carries `previewKind=library` with a different
+  snapshot and is not the one recorded before publishing), it is left alone and
+  the state is reported as unknown — promoting our older snapshot back over it
+  would cause exactly the backwards move the stale guard exists to prevent. A
+  production deployment *without* `previewKind=library` is not a competing
+  publisher, so rolling back over it is safe.
+
+Progress and warnings go to **stderr**, only the final report to **stdout**, so
+`--json` output is a single parseable document (the same split `deploy.sh` uses).
+
+**First publish is a documented exception**: Vercel always makes a project's
+first deployment a production deployment, even without `--prod`. That case is
+detected (the staged deployment reports `target: "production"` *and* the project
+had no production deployment beforehand), the promote is skipped, and step 4 runs
+identically. On an already-published project the same report is refused — it
+would mean the entry moved unverified.
+
+A promote whose CLI call does not confirm is reported as **unknown**, not
+untouched: Vercel documents that a promote timeout does not cancel the promotion.
+
+### First-publish protection split
+
+`ssoProtection` is a project-level setting that setup already ensures (see "Setup
+vs. first-publish" above), but the bare domain `<project>.vercel.app` and the
+entry URL do not exist until the first production deployment — so **bare-domain
+removal and the entry probe belong to the publish**, and run on EVERY publish,
+not only the first. The anonymous entry probe is the only durable proof; a config
+GET can be nulled afterwards.
+
+Per publish, in order:
+
+1. `ensureProtected` **before** the deploy, so content never lands on an
+   unprotected project.
+2. publish (steps 1–3 above).
+3. `ensureProtected` again — it GET-verifies, so a value changed mid-flight is
+   caught rather than assumed.
+4. `removeBareDomain`.
+5. `verifyEntryProtected` on the stable entry.
+
+Steps 4 and 5 are **separate checks and are never conflated**: removal is
+confirmed by `removeBareDomain`'s own DELETE status (404 = already absent, 2xx =
+removed), while `verifyEntryProtected` validates the protected ENTRY (302/401 =
+protected, **200 = naked → the publish fails and rolls back**). A removed bare
+domain answers 404, which the entry probe reads as unprotected.
+
+The stable entry hostname is **discovered, not derived**: the scope slug is in
+neither the link file nor the API (both carry ids), so it is picked out of the
+hostnames Vercel reports for the live production — the deployment's `alias` array
+and the project's domains — excluding the bare domain and the immutable URL, with
+the shortest match winning. If it cannot be resolved, the publish fails closed
+rather than skipping the probe.
+
+### Target identity and project pinning
+
+The configured project name is resolved by Vercel **under the target's scope**
+and the answer is compared with the config: a `projectId` that disagrees, a
+`teamId` that is not the project's owner, or a name resolving to a
+differently-named project each refuse to publish before anything is deployed — a
+name-only match is not sufficient, because a same-named project in another scope
+is a different project. A name-only target (valid config, e.g. from the migrator)
+publishes with a warning instead, and should be re-run through setup to record
+its `projectId`.
+
+The staging directory is pinned to that confirmed project **two** documented ways,
+because an unlinked `vercel deploy` would create a project named after the temp
+directory and publish private content into it: `.vercel/project.json` carrying
+`{orgId, projectId}` (the documented contents of a linked directory; `.vercel` is
+on Vercel's default ignore list, so it is never uploaded), and the
+`VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` environment variables (the recommended
+non-interactive pinning, which take precedence over the file).
+
+### Stale-publish guard
+
+Every publish is a FULL snapshot, so a publish from an older machine can make the
+Library's latest pointer go backwards. When the content root is in a git repo:
+
+- the content path must be **clean** — an uncommitted snapshot is not reproducible;
+- it must not be **behind its upstream** for that path (`git fetch` first;
+  a failed fetch warns and falls back to the last-fetched ref, because the
+  authoritative check is the next one);
+- the **source commit** is recorded in the deployment metadata;
+- the live production's recorded commit must be an **ancestor** of ours
+  (`git merge-base --is-ancestor`). Anything else — newer, divergent, or a commit
+  git cannot resolve — aborts. Checked before the deploy (so a stale publish costs
+  no quota) and again immediately before the promote.
+
+When the content root is **not** a git repo the guard is skipped with a printed
+caveat: without a canonical publisher, a publish from another machine can make the
+latest pointer briefly go backwards, and re-publishing from the newest machine
+heals it. Git is never hard-required.
+
+**The guard covers tracked content only.** A non-hidden file excluded by
+`.gitignore` inside a preview item is still deployed by the builder while
+`git status` reports the tree clean, so two machines at the same commit could
+publish different bundles. Treating ignored files as dirty was rejected
+deliberately: the legacy per-page flow leaves a gitignored `.vercel/` inside
+preview directories, so that check would block every publish on a file the builder
+already excludes. Keep deployable content tracked.
+
+The guard, and every "what is the live Library revision" question, reads **only**
+the stable production deployment (`targets.production`) and only when it carries
+`previewKind=library`. Never "the newest deployment in the project" — a later
+`previewKind=share` preview would otherwise poison the comparison. A foreign
+(non-library) production deployment is still a valid rollback target, but never
+drives the commit comparison.
+
+An **empty** Library refuses to publish: a full-snapshot publish of zero items
+would replace the Library with an empty page and 404 every existing `/p/<id>/`,
+and a misconfigured root is far likelier than a deliberate empty publish.
+
+### Deployment metadata and quota
+
+Every Library deployment carries `previewKind=library`, a `snapshot` digest
+(sha256 over the sorted `<id>`/`contentHash` pairs) and `sourceCommit` when there
+is one. `previewKind` is what separates a Library production from a Share preview
+in the same project, which is why a promoted production **without** it is refused
+rather than accepted — metadata propagation across the promote's rebuild is
+undocumented, and the guard depends on that field on the next publish.
+
+A publish costs **two** deployments against the daily limit: the staged preview,
+plus the rebuilt production the promote creates. Verify locally with
+`build-library.mjs` first and publish once per batch of edits; a quota rejection
+is detected and reported with that advice.
+
+### Known limitations
+
+- **Rolling Releases** (Pro-only, off by default) turns a promote into a gradual
+  rollout. The module does not detect it, so such a project could report success
+  while only part of the traffic sees the new snapshot. Both snapshots are
+  protected Libraries, so the impact is cosmetic.
+- **Deployment Retention** can delete the rollback target; the rollback promote
+  then fails and the state is reported as unknown rather than as a rollback.
+- Vercel documents that a deployment already promoted once cannot be promoted
+  again (a rollback is the documented route) — but `vercel rollback` 500s on this
+  account, which is why rollback here is promote-based. If both refuse, the
+  publish reports `rollback-failed` rather than claiming a rollback it did not
+  achieve.
+
+Tests live in `tests/deploy-library.test.mjs`; run them the same way. Every case
+injects a fake `deps`, so the suite performs **zero real network calls and zero
+real deploys** and spawns no `vercel` or `git` process.
 
 ---
