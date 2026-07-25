@@ -999,7 +999,27 @@ the published Library is untouched); a step-4 failure promotes the last-good
 production back and still exits non-zero. Success is never reported for a state
 that could not be verified, and every failure prints what the project is
 **actually** in — untouched / published-but-unverified / rolled-back /
-rollback-failed / unknown.
+rollback-failed / unknown. Every failure *past* the publish point is routed
+through the rollback, including a transient Vercel read error — none of them can
+be reported as an untouched project.
+
+Two refinements keep the rollback from doing harm of its own:
+
+- **It waits before judging.** Promoting a preview rebuilds, and neither the
+  rebuild nor the alias assignment is documented as synchronous with the CLI's
+  exit, so the post-publish check polls (60s) for the live production to become
+  READY and carry our snapshot. A slow-but-successful publish must not be rolled
+  back — discarding a good snapshot is the expensive mistake.
+- **It never promotes over a stranger.** If the live production is another
+  *Library* publisher's (it carries `previewKind=library` with a different
+  snapshot and is not the one recorded before publishing), it is left alone and
+  the state is reported as unknown — promoting our older snapshot back over it
+  would cause exactly the backwards move the stale guard exists to prevent. A
+  production deployment *without* `previewKind=library` is not a competing
+  publisher, so rolling back over it is safe.
+
+Progress and warnings go to **stderr**, only the final report to **stdout**, so
+`--json` output is a single parseable document (the same split `deploy.sh` uses).
 
 **First publish is a documented exception**: Vercel always makes a project's
 first deployment a production deployment, even without `--prod`. That case is
@@ -1081,6 +1101,14 @@ When the content root is **not** a git repo the guard is skipped with a printed
 caveat: without a canonical publisher, a publish from another machine can make the
 latest pointer briefly go backwards, and re-publishing from the newest machine
 heals it. Git is never hard-required.
+
+**The guard covers tracked content only.** A non-hidden file excluded by
+`.gitignore` inside a preview item is still deployed by the builder while
+`git status` reports the tree clean, so two machines at the same commit could
+publish different bundles. Treating ignored files as dirty was rejected
+deliberately: the legacy per-page flow leaves a gitignored `.vercel/` inside
+preview directories, so that check would block every publish on a file the builder
+already excludes. Keep deployable content tracked.
 
 The guard, and every "what is the live Library revision" question, reads **only**
 the stable production deployment (`targets.production`) and only when it carries

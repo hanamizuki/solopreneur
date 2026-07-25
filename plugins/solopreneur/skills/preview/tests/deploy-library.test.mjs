@@ -129,9 +129,22 @@ function resolvedConfig(root, over = {}) {
   };
 }
 
+/**
+ * A fake `io`. `print` is progress (stderr in production) and `report` is the final
+ * report (stdout) — kept SEPARATE here for the same reason production separates them:
+ * `--json` stdout has to stay a single parseable document.
+ */
 function fakeIo() {
   const printed = [];
-  return { printed, text: () => printed.join(''), print: (s) => printed.push(s) };
+  const reported = [];
+  return {
+    printed,
+    reported,
+    text: () => printed.join(''),
+    reportText: () => reported.join(''),
+    print: (s) => printed.push(s),
+    report: (s) => reported.push(s),
+  };
 }
 
 /**
@@ -161,6 +174,7 @@ function fakeDeps({
   promoteFails,
   stagedTarget = null,
   promoteMeta,
+  promoteReadyState = 'READY',
   stagedMeta,
   accountId = TEAM_ID,
   projectName = PROJECT,
@@ -184,6 +198,7 @@ function fakeDeps({
     listDomains: [],
     probe: [],
     git: [],
+    sleep: [],
   };
   const note = (name, arg) => { calls.log.push({ name, arg }); calls.order.push(name); calls[name].push(arg); };
   const indexOf = (name, match) => calls.log.findIndex((c) => c.name === name && (match === undefined || match(c.arg)));
@@ -251,7 +266,7 @@ function fakeDeps({
         uid: id,
         url: `${PROJECT}-prod${seq}-demoteam.vercel.app`,
         projectId,
-        readyState: 'READY',
+        readyState: promoteReadyState,
         target: 'production',
         meta: promoteMeta ?? { ...source.meta },
         alias: [SCOPE_ALIAS, BARE_DOMAIN],
@@ -271,6 +286,9 @@ function fakeDeps({
       }
       return { status: 1, stdout: '' }; // default: not a git repo
     },
+
+    // Instant, and counted — a test can assert the settle poll actually waited.
+    sleep: async () => { note('sleep', null); },
   };
   deps.store = store;
   deps.state = state;
@@ -522,11 +540,11 @@ test('a preview whose metadata does not match the build is NOT promoted', async 
   assert.deepEqual(deps.calls.promote, []);
 });
 
-test('a staged deployment that reports target=production on a PUBLISHED project is refused', async () => {
+test('a staged deploy that lands as PRODUCTION on a published project rolls back, never reports untouched', async () => {
   // The first-deployment exception applies only to a project with no production
   // deployment. On an already-published project a staging deploy reporting
-  // target:"production" means the stable entry moved without verification, so it
-  // must NOT be waved through as a first publish.
+  // target:"production" means the stable entry ALREADY moved unverified — so the
+  // state must not be "untouched", and the previous production must be promoted back.
   const root = contentRoot();
   const deps = fakeDeps({
     production: 'dpl_old',
@@ -537,16 +555,18 @@ test('a staged deployment that reports target=production on a PUBLISHED project 
 
   const { report, error } = await run(resolvedConfig(root), deps);
   assert.equal(report, undefined);
-  assert.ok(isDeployError(/reports target "production"/)(error), `got ${error?.message}`);
-  assert.deepEqual(deps.calls.promote, [], 'no promote after an unexpected production target');
+  assert.ok(isDeployError(/landed as PRODUCTION/, STATE.rolledBack)(error), `got ${error?.state}: ${error?.message}`);
+  assert.notEqual(error.state, STATE.untouched, 'the entry moved — untouched would be a lie');
+  assert.deepEqual(deps.calls.promote, ['dpl_old'], 'the only promote is the rollback to the last-good production');
 });
 
-test('a staged deployment that reports target=staging is refused', async () => {
+test('a staged deployment that reports target=staging is refused as untouched', async () => {
+  // A staging alias is not the production one, so the stable entry did NOT move.
   const root = contentRoot();
   const deps = fakeDeps({ gitScript: cleanRepo(), stagedTarget: 'staging' });
 
   const { error } = await run(resolvedConfig(root), deps);
-  assert.ok(isDeployError(/reports target "staging"/, STATE.untouched)(error), `got ${error?.message}`);
+  assert.ok(isDeployError(/reports target "staging"/, STATE.untouched)(error), `got ${error?.state}: ${error?.message}`);
   assert.deepEqual(deps.calls.promote, []);
 });
 
@@ -582,13 +602,13 @@ test('a failed post-promote verification rolls back by promoting the last-good p
     production: 'dpl_old',
     deployments: libraryProduction('dpl_old'),
     gitScript: cleanRepo(),
-    // The promote-created production carries someone else's snapshot: a concurrent
-    // publisher won the race, so the live revision is not ours.
-    promoteMeta: { previewKind: PREVIEW_KIND, snapshot: 'raced' },
+    // The published production is ours by metadata but never becomes READY, so the
+    // settle poll exhausts and the publish cannot be verified.
+    promoteReadyState: 'ERROR',
   });
 
   const { error } = await run(resolvedConfig(root), deps);
-  assert.ok(isDeployError(/did not verify/, STATE.rolledBack)(error), `got ${error?.message}`);
+  assert.ok(isDeployError(/not READY/, STATE.rolledBack)(error), `got ${error?.state}: ${error?.message}`);
   assert.deepEqual(deps.calls.promote.slice(-1), ['dpl_old']);
 });
 
@@ -624,6 +644,85 @@ test('a promote that does not confirm is reported as UNKNOWN, never as untouched
   const { error } = await run(resolvedConfig(root), deps);
   assert.ok(isDeployError(/did not confirm/, STATE.unknown)(error), `got ${error?.message}`);
   assert.match(error.message, /may still be proceeding/);
+});
+
+test('a rollback NEVER promotes over another publisher\'s newer production', async () => {
+  // The race the stale guard exists to prevent must not be caused BY the rollback:
+  // if a third machine's snapshot is live when our verification fails, promoting our
+  // recorded `live` back would push the Library backwards. Leave the stranger alone.
+  const root = contentRoot();
+  const deps = fakeDeps({
+    production: 'dpl_old',
+    deployments: libraryProduction('dpl_old'),
+    gitScript: cleanRepo(),
+    promoteMeta: { previewKind: PREVIEW_KIND, snapshot: 'a-third-machines-snapshot' },
+  });
+
+  const { error } = await run(resolvedConfig(root), deps);
+  assert.ok(isDeployError(/another publisher's deployment/, STATE.unknown)(error), `got ${error?.state}: ${error?.message}`);
+  // Exactly one promote — the publish. No rollback promote was issued.
+  assert.equal(deps.calls.promote.length, 1, 'the stranger\'s production must be left in place');
+  assert.notEqual(deps.calls.promote[0], 'dpl_old');
+});
+
+test('post-promote verification polls for the new production instead of rolling back early', async () => {
+  // `vercel promote` REBUILDS and neither the rebuild nor the alias assignment is
+  // documented as synchronous, so a not-yet-READY production must be waited for — a
+  // premature rollback would discard a good publish.
+  const root = contentRoot();
+  const deps = fakeDeps({
+    production: 'dpl_old',
+    deployments: libraryProduction('dpl_old'),
+    gitScript: cleanRepo(),
+  });
+  // The promoted deployment reports BUILDING for the first two reads, then READY.
+  const realPromote = deps.promote;
+  deps.promote = async (a) => {
+    await realPromote(a);
+    const fresh = Object.values(deps.store).find((d) => d.uid === deps.state.production);
+    fresh.readyState = 'BUILDING';
+    let reads = 0;
+    const realGet = deps.getDeployment;
+    deps.getDeployment = async (arg) => {
+      const out = await realGet(arg);
+      if (out.uid === fresh.uid) { reads += 1; if (reads >= 3) fresh.readyState = 'READY'; }
+      return out;
+    };
+  };
+
+  const { report, error } = await run(resolvedConfig(root), deps);
+  assert.ifError(error);
+  assert.equal(report.state, 'published', 'a slow-but-successful publish must not be rolled back');
+  assert.ok(deps.calls.sleep.length >= 1, 'the settle poll must actually wait between reads');
+  assert.equal(deps.calls.promote.length, 1, 'no rollback promote');
+});
+
+test('a transient read failure after the promote rolls back rather than claiming untouched', async () => {
+  const root = contentRoot();
+  const deps = fakeDeps({
+    production: 'dpl_old',
+    deployments: libraryProduction('dpl_old'),
+    gitScript: cleanRepo(),
+  });
+  // Every post-promote getProject throws (a 429/5xx), so the settle poll exhausts.
+  const realPromote = deps.promote;
+  deps.promote = async (a) => {
+    await realPromote(a);
+    // Only the verification reads fail; the rollback's own read must still work, so
+    // restore after the poll budget is spent.
+    let failures = 0;
+    const realGetProject = deps.getProject;
+    deps.getProject = async (arg) => {
+      failures += 1;
+      if (failures <= 12) throw new Error('simulated Vercel 429');
+      return realGetProject(arg);
+    };
+  };
+
+  const { error } = await run(resolvedConfig(root), deps);
+  assert.ok(error instanceof DeployError, `got ${error}`);
+  assert.notEqual(error.state, STATE.untouched, 'the entry moved — untouched would be a lie');
+  assert.match(error.message, /simulated Vercel 429/);
 });
 
 test('a rollback that itself fails is reported as an UNKNOWN state, never as success', async () => {
@@ -909,7 +1008,7 @@ test('a protection failure after publishing rolls back rather than reporting suc
 
   const { report, error } = await run(resolvedConfig(root), deps);
   assert.equal(report, undefined);
-  assert.ok(isDeployError(/protection could not be confirmed/, STATE.rolledBack)(error), `got ${error?.message}`);
+  assert.ok(isDeployError(/could not remove bare domain/, STATE.rolledBack)(error), `got ${error?.state}: ${error?.message}`);
 });
 
 test('an unresolvable stable entry fails closed rather than skipping the probe', async () => {
@@ -998,7 +1097,7 @@ test('main --help prints usage without building deps', async () => {
     makeDeps: () => { throw new Error('deps must not be built for --help'); },
   });
   assert.equal(code, 0);
-  assert.match(io.text(), /usage: deploy-library\.mjs/);
+  assert.match(io.reportText(), /usage: deploy-library\.mjs/);
 });
 
 test('main rejects an unknown argument', async () => {
@@ -1067,7 +1166,10 @@ test('the shipped CLI resolves a config by walking up and publishes through it',
 
   const code = await main({ argv: ['--json'], io, makeDeps: () => deps });
   assert.equal(code, 0);
-  const report = JSON.parse(io.text().slice(io.text().indexOf('{')));
+  // The whole point: stdout is ONE parseable JSON document — no progress line ahead
+  // of it. Parse it verbatim, with no slicing to skip noise.
+  const report = JSON.parse(io.reportText());
+  assert.ok(io.text().length > 0, 'progress still happens — on the stderr channel');
   assert.equal(report.state, 'published');
   assert.equal(report.stableUrl, `https://${SCOPE_ALIAS}`);
   assert.equal(report.project.name, PROJECT);
@@ -1179,7 +1281,7 @@ test('the human report names the stable entry, the immutable URL, the commit and
 
   const code = await main({ argv: [], io, makeDeps: () => deps });
   assert.equal(code, 0);
-  const text = io.text();
+  const text = io.reportText();
   assert.match(text, /published — the Library is live/);
   assert.match(text, new RegExp(`stable:\\s+https://${SCOPE_ALIAS.replace(/\./g, '\\.')}`));
   assert.match(text, /immutable:\s+https:\/\//);

@@ -114,6 +114,17 @@ const API = 'https://api.vercel.com';
 export const PREVIEW_KIND = 'library';
 
 /**
+ * How long to wait for the promote's new production deployment to become the live,
+ * READY, ours-metadata production. Promoting a preview REBUILDS (Vercel's docs), and
+ * neither that rebuild nor the alias assignment is documented as synchronous with the
+ * CLI's exit — so the post-publish verification polls rather than judging the first
+ * read. Without this a slow-but-successful publish would be rolled back, which is the
+ * expensive failure: it discards a good snapshot. 12 × 5s = 60s.
+ */
+const SETTLE_TRIES = 12;
+const SETTLE_MS = 5000;
+
+/**
  * What the project is in when a publish fails. Printed verbatim on failure so a
  * human never has to guess whether the stable entry moved.
  */
@@ -528,24 +539,94 @@ export async function publishLibrary({ resolved, deps, io, build = buildLibrary 
     // Gated on the project having had NO production deployment before this deploy:
     // that is the only situation the exception covers. On an already-published
     // project a `target: "production"` staging deploy means the stable entry moved
-    // without verification, which the branch below refuses instead of waving through.
+    // without verification, which the branch below rolls back instead of waving
+    // through — and never reports as "untouched".
     const autoProduction = stagedRecord?.target === 'production' && !live;
 
+    // Restore the previous production, but ONLY when doing so cannot destroy someone
+    // else's newer publish. Defined here — before the staged-target check below can
+    // need it — and it reads `live` at call time, so the pre-promote guard re-read
+    // further down is the value it uses.
+    //
+    // `noTarget` is the state to report when there is nothing to promote back (a
+    // first publish): usually the new snapshot IS live but unverified.
+    const rollback = async (why, noTarget = STATE.published) => {
+      // Never overwrite a stranger's publish. If the live production is neither ours
+      // nor the one recorded before publishing, another machine won the race with a
+      // NEWER snapshot — promoting `live` back over it would make the Library go
+      // backwards, which is the very thing the stale guard exists to prevent. Leave
+      // it in place and report an unknown state instead.
+      let current;
+      try {
+        current = await liveProduction({ projectId, teamId, deps });
+      } catch (err) {
+        throw new DeployError(
+          `${why}\n  the live production could not be read (${err.message}), so NO rollback was attempted — `
+          + 'inspect the project before retrying.',
+          STATE.unknown,
+        );
+      }
+      // A STRANGER is specifically another Library publisher: a production deployment
+      // that is neither the one recorded before publishing nor ours, yet carries
+      // `previewKind=library` — every library publish stamps that field, so only a
+      // real competing publish can look like this. A deployment MISSING the field is
+      // not a competitor (it is our own rebuild with the metadata dropped, or a
+      // foreign non-library deployment), and rolling back over it is safe.
+      const stranger = current?.id
+        && current.id !== live?.id
+        && current.meta?.previewKind === PREVIEW_KIND
+        && current.meta?.snapshot !== snapshot;
+      if (stranger) {
+        throw new DeployError(
+          `${why}\n  another publisher's deployment ${current.id} is now the live production, so it was left in `
+          + `place rather than promoting ${live?.id ?? 'an older snapshot'} back over a newer one.`,
+          STATE.unknown,
+        );
+      }
+      if (!live?.id) {
+        throw new DeployError(
+          `${why}\n  the project had no previous production deployment, so there is nothing to promote back.`,
+          noTarget,
+        );
+      }
+      try {
+        await deps.promote({ cwd: built.stagingDir, deployment: live.id, teamId, projectId, orgId });
+      } catch (err) {
+        throw new DeployError(
+          `${why}\n  rolling back to ${live.id} failed too: ${err.message}`,
+          STATE.rollbackFailed,
+        );
+      }
+      throw new DeployError(`${why}\n  rolled back to the previous production ${live.id}.`, STATE.rolledBack);
+    };
+
     if (!autoProduction) {
-      // 6. Verify the staged preview. Any failure here means NO promote: the scope
-      //    alias never moved, so the published Library is untouched.
+      // 6. Verify the staged preview. The TARGET is checked first: if the plain
+      //    deploy already landed as production, the stable entry has moved and the
+      //    state is no longer "untouched", so a metadata mismatch must not be the
+      //    thing that reports it.
+      if (stagedRecord?.target === 'production') {
+        await rollback(
+          `the staging deploy https://${stagedHost} unexpectedly landed as PRODUCTION on an already-published `
+          + 'project, moving the stable entry with no verification.',
+        );
+      }
+      if (stagedRecord?.target !== null && stagedRecord?.target !== undefined) {
+        // A `staging` target assigns a staging alias, NOT the production one, so the
+        // stable entry did not move — refuse without touching anything.
+        throw new DeployError(
+          `the staged deployment reports target ${JSON.stringify(stagedRecord.target)}; a staging deploy must be a `
+          + 'plain preview (target: null). The stable entry was NOT moved.',
+        );
+      }
+      // Any failure from here to the promote means NO promote: the scope alias never
+      // moved, so the published Library is untouched.
       assertOurRevision(stagedRecord, {
         projectId,
         meta,
         where: `the staged preview https://${stagedHost} did not verify`,
         state: STATE.untouched,
       });
-      if (stagedRecord.target !== null && stagedRecord.target !== undefined) {
-        throw new DeployError(
-          `the staged deployment reports target ${JSON.stringify(stagedRecord.target)}; a staging deploy must be a `
-          + 'plain preview (target: null) or the stable entry has already moved.',
-        );
-      }
       if (!(await verifyEntryProtected(`https://${stagedHost}`, { deps }))) {
         throw new DeployError(
           `the staged preview https://${stagedHost} is not anonymously challenged (expected 302/401) — refusing to `
@@ -581,88 +662,93 @@ export async function publishLibrary({ resolved, deps, io, build = buildLibrary 
       io.print('note: this is the project\'s first deployment, which Vercel publishes as production directly.\n');
     }
 
-    // 9. From here the stable entry HAS moved (or landed, on first publish), so
-    //    every failure below reports a real state and rolls back when it can.
-    //     `noTarget` is the state to report when there is nothing to promote back
-    //     (a first publish): usually the new snapshot IS live but unverified.
-    const rollback = async (why, noTarget = STATE.published) => {
-      if (!live?.id) {
-        throw new DeployError(
-          `${why}\n  the project had no previous production deployment, so there is nothing to promote back.`,
-          noTarget,
-        );
+    // 9. From here the stable entry HAS moved (or landed, on first publish). EVERY
+    //    failure below — a verification mismatch or a transient Vercel read error
+    //    alike — is routed through `rollback`, so none of them can be reported as an
+    //    untouched project. That is why the whole block sits in one try: a bare
+    //    throw escaping to the caller would carry the default "untouched" state.
+    const verifyPublished = async () => {
+      // Promoting a preview creates a NEW production deployment, and neither the
+      // promotion nor the alias assignment is documented as synchronous — so poll for
+      // OUR revision to appear instead of declaring a mismatch on the first read. A
+      // slow-but-successful publish must not be rolled back. A read error inside the
+      // poll is retried too; only the final attempt's failure propagates.
+      let published;
+      let readError;
+      for (let attempt = 0; attempt < SETTLE_TRIES; attempt += 1) {
+        if (attempt > 0) await deps.sleep(SETTLE_MS);
+        try {
+          published = await liveProduction({ projectId, teamId, deps });
+          readError = undefined;
+        } catch (err) {
+          published = undefined;
+          readError = err;
+          continue;
+        }
+        if (published?.id && published.readyState === 'READY' && published.meta?.snapshot === snapshot) break;
       }
-      try {
-        await deps.promote({ cwd: built.stagingDir, deployment: live.id, teamId, projectId, orgId });
-      } catch (err) {
-        throw new DeployError(
-          `${why}\n  rolling back to ${live.id} failed too: ${err.message}`,
-          STATE.rollbackFailed,
-        );
-      }
-      throw new DeployError(`${why}\n  rolled back to the previous production ${live.id}.`, STATE.rolledBack);
-    };
-
-    const published = await liveProduction({ projectId, teamId, deps });
-    // Nothing to claim as live: not "published", so do not say so.
-    if (!published?.id) {
-      await rollback('the publish left no production deployment on the project.', STATE.unknown);
-    }
-    try {
+      if (readError) throw readError;
+      if (!published?.id) throw new DeployError('the publish left no production deployment on the project.');
+      // The precise mismatch (not-READY, wrong project, foreign metadata) is reported
+      // by assertOurRevision; reaching it means the poll budget was spent.
       assertOurRevision(published, {
         projectId,
         meta,
         where: 'the published production did not verify',
         state: STATE.published,
       });
-    } catch (err) {
-      await rollback(err.message);
-    }
 
-    // 10. Protection of the now-existing entry. Re-assert first (a GET-verified
-    //     no-op when it is already correct), then remove the world-readable bare
-    //     domain, then prove the entry itself is challenged. THREE distinct facts —
-    //     the DELETE status confirms removal, the probe confirms the entry.
-    let bareDomain;
-    try {
+      // 10. Protection of the now-existing entry. Re-assert first (a GET-verified
+      //     no-op when it is already correct), then remove the world-readable bare
+      //     domain, then prove the entry itself is challenged. THREE distinct facts —
+      //     the DELETE status confirms removal, the probe confirms the entry.
       await ensureProtected({ projectId, teamId, deps });
-      bareDomain = await removeBareDomain({ projectId, teamId, project: project.name, deps });
-    } catch (err) {
-      await rollback(`protection could not be confirmed after publishing: ${err.message}`);
-    }
+      const bareDomain = await removeBareDomain({ projectId, teamId, project: project.name, deps });
 
-    const entry = resolveStableEntry({
-      name: project.name,
-      aliases: published.aliases,
-      domains: (await deps.listDomains({ projectId, teamId })) ?? [],
-      immutable: published.url,
-    });
-    if (!entry) {
-      await rollback(
-        'the stable entry hostname could not be resolved from the production deployment\'s aliases or the '
-        + 'project\'s domains, so its protection could not be verified.',
-      );
-    }
-    if (!(await verifyEntryProtected(`https://${entry}`, { deps }))) {
-      // A 200 here means the entry is NAKED. Fail closed — never report success.
-      await rollback(
-        `the stable entry https://${entry} is not anonymously challenged (expected 302/401; a 200 means it is `
-        + 'world-readable).',
-      );
+      const entry = resolveStableEntry({
+        name: project.name,
+        aliases: published.aliases,
+        domains: (await deps.listDomains({ projectId, teamId })) ?? [],
+        immutable: published.url,
+      });
+      if (!entry) {
+        throw new DeployError(
+          'the stable entry hostname could not be resolved from the production deployment\'s aliases or the '
+          + 'project\'s domains, so its protection could not be verified.',
+        );
+      }
+      if (!(await verifyEntryProtected(`https://${entry}`, { deps }))) {
+        // A 200 here means the entry is NAKED. Fail closed — never report success.
+        throw new DeployError(
+          `the stable entry https://${entry} is not anonymously challenged (expected 302/401; a 200 means it is `
+          + 'world-readable).',
+        );
+      }
+      return { published, bareDomain, entry };
+    };
+
+    let outcome;
+    try {
+      outcome = await verifyPublished();
+    } catch (err) {
+      await rollback(err instanceof DeployError
+        ? err.message
+        : `the publish could not be verified: ${err.message}`);
+      throw err; // unreachable — rollback always throws
     }
 
     return {
       state: 'published',
-      stableUrl: `https://${entry}`,
-      productionUrl: published.url ? `https://${hostOf(published.url)}` : null,
-      productionId: published.id,
+      stableUrl: `https://${outcome.entry}`,
+      productionUrl: outcome.published.url ? `https://${hostOf(outcome.published.url)}` : null,
+      productionId: outcome.published.id,
       stagedUrl: `https://${stagedHost}`,
       promoted: !autoProduction,
       project: { name: project.name, projectId, scope: teamId ?? project.owner ?? null },
       collections: target.include,
       commit: commit ?? null,
       snapshot,
-      bareDomain,
+      bareDomain: outcome.bareDomain,
       items: built.directory.items.length,
       sizeReport: built.sizeReport,
     };
@@ -808,11 +894,21 @@ export function makeDefaultDeps({ token, run = spawnRun } = {}) {
       if (res.error || typeof res.stdout !== 'string') return { status: res.status ?? 1, stdout: '' };
       return { status: res.status, stdout: res.stdout };
     },
+
+    // Injected so the post-publish settle poll is instant under `node --test`.
+    sleep: (ms) => new Promise((resolve) => { setTimeout(resolve, ms); }),
   };
 }
 
-/** Production `io`: report to stdout. */
-export const makeStdio = () => ({ print: (text) => process.stdout.write(text) });
+/**
+ * Production `io`. Progress and warnings go to STDERR and only the final report to
+ * STDOUT, so `--json` stdout is a single parseable JSON document — the same split
+ * `deploy.sh` uses ("progress to stderr, URL to stdout").
+ */
+export const makeStdio = () => ({
+  print: (text) => process.stderr.write(text),
+  report: (text) => process.stdout.write(text),
+});
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -869,7 +965,7 @@ const humanReport = (r) => [
  */
 export async function main({ argv = [], io, makeDeps, build }) {
   const opts = parseArgs(argv);
-  if (opts.help) { io.print(`${USAGE}\n`); return 0; }
+  if (opts.help) { io.report(`${USAGE}\n`); return 0; }
 
   const resolved = resolveConfig({ from: opts.from });
   if (resolved.mode !== 'v2') {
@@ -880,7 +976,9 @@ export async function main({ argv = [], io, makeDeps, build }) {
   }
 
   const report = await publishLibrary({ resolved, deps: makeDeps(), io, build });
-  io.print(opts.asJson ? `${JSON.stringify(report, null, 2)}\n` : `${humanReport(report)}\n`);
+  // The report goes to `io.report` (stdout), never `io.print` (stderr): progress
+  // lines on stdout would make `--json` output unparseable.
+  io.report(opts.asJson ? `${JSON.stringify(report, null, 2)}\n` : `${humanReport(report)}\n`);
   return 0;
 }
 

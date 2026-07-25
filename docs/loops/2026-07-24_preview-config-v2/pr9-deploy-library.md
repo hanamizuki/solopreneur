@@ -6,9 +6,9 @@ using a staged flow that was empirically verified on a real Hobby-plan account o
 2026-07-24. Every rule below exists because the naive or documented approach was
 observed to FAIL.
 
-Builds on the merged Phase 1/3 work (#134 config-resolve + schema, #135 migrate,
-#136 vercel-protect, #137 setup, #138 build-library, #139 provenance, #140 chrome,
-#141 target identity / F9).
+Builds on the merged Phase 1/3 work (PR #134 config-resolve + schema, #135 migrate,
+#136 vercel-protect, #137 setup, #138 build-library, #139 provenance, #140 chrome
+and #141 target identity / F9).
 
 ## Requirements
 
@@ -216,6 +216,21 @@ real state instead of a false success.
 - **Whether `GET /v9/projects/{id}/domains` lists the auto-assigned scope alias**
   was not captured in the Gate A log, which is why the entry is resolved from that
   list *and* the deployment's `alias` array.
+- **Whether `vercel promote` resolves the target scope from the link file or
+  `VERCEL_ORG_ID`** is not documented (only `deploy` documents the env pinning).
+  Passing `--scope` was considered and rejected: it is documented to take a team
+  *slug*, and this module holds only ids — passing `team_…` there would be an
+  unverified guess on a production path. If the CLI does reject a cross-scope
+  promote, it surfaces as a promote that "did not confirm" with state UNKNOWN and the
+  CLI's own error text, which is actionable.
+- **Content excluded by `.gitignore` is outside the stale guard.** `git status
+  --porcelain` reports a clean tree while `build-library.mjs` still deploys any
+  non-hidden ignored file inside a preview item, so two machines at the same HEAD
+  could publish different bundles. Adding `--ignored` was considered and rejected: the
+  legacy per-page flow leaves a gitignored `.vercel/` inside preview directories, so
+  that check would block every publish on a file the builder already excludes. The
+  blast radius is the guard's documented one — the latest pointer can briefly go
+  backwards and re-publishing heals it.
 
 ## Notes
 
