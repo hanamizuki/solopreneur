@@ -267,46 +267,20 @@
   // shorthand resets or to leave 100vw-wide children sitting under the
   // fixed panel. margin-left shifts the whole body box; width calc keeps
   // it from overflowing the viewport. Inline `setProperty(…, 'important')`
-  // beats page stylesheets. The class + stylesheet is a second path for
-  // anything that inspects classes instead of inline styles.
-
-  function ensurePushStyle() {
-    if (document.getElementById("preview-shell-push-style")) return;
-    const s = document.createElement("style");
-    s.id = "preview-shell-push-style";
-    const w = SIDEBAR_WIDTH_PX + "px";
-    s.textContent =
-      "html.preview-shell-sidebar-push,html.preview-shell-sidebar-push body{" +
-      "box-sizing:border-box !important;" +
-      "}" +
-      "html.preview-shell-sidebar-push body{" +
-      "margin-left:" + w + " !important;" +
-      "width:calc(100% - " + w + ") !important;" +
-      "max-width:calc(100vw - " + w + ") !important;" +
-      "}";
-    (document.head || document.documentElement).appendChild(s);
-  }
+  // is the single path — no mirrored stylesheet (that was dual-tracked noise).
 
   // Apply or clear the light-DOM push offset. Safe to call on every open/
-  // resize/close: closed always fully removes what we set.
+  // mode-change/close: closed always fully removes what we set.
   function applyPushOffset(on) {
-    const html = document.documentElement;
     const body = document.body;
-    if (!html || !body) return;
+    if (!body) return;
     const w = SIDEBAR_WIDTH_PX + "px";
     if (on) {
-      html.classList.add("preview-shell-sidebar-push");
-      body.classList.add("preview-shell-sidebar-push");
-      body.setAttribute("data-preview-shell-sidebar", "open");
-      // Inline important — wins over nearly any page CSS.
       body.style.setProperty("margin-left", w, "important");
       body.style.setProperty("width", "calc(100% - " + w + ")", "important");
       body.style.setProperty("max-width", "calc(100vw - " + w + ")", "important");
       body.style.setProperty("box-sizing", "border-box", "important");
     } else {
-      html.classList.remove("preview-shell-sidebar-push");
-      body.classList.remove("preview-shell-sidebar-push");
-      body.removeAttribute("data-preview-shell-sidebar");
       body.style.removeProperty("margin-left");
       body.style.removeProperty("width");
       body.style.removeProperty("max-width");
@@ -315,8 +289,16 @@
   }
 
   function currentSidebarMode() {
-    const w = (typeof window !== "undefined" && window.innerWidth) || 0;
-    return sidebarLayoutMode(w, SIDEBAR_PUSH_MIN_PX);
+    // matchMedia is the native breakpoint primitive (same approach as
+    // comment-overlay.js). Pure sidebarLayoutMode stays for Node tests.
+    try {
+      if (window.matchMedia) {
+        return window.matchMedia("(min-width: " + SIDEBAR_PUSH_MIN_PX + "px)").matches
+          ? "push"
+          : "overlay";
+      }
+    } catch (_) { /* fall through */ }
+    return sidebarLayoutMode(window.innerWidth || 0, SIDEBAR_PUSH_MIN_PX);
   }
 
   function readStoredSidebarOpen() {
@@ -347,8 +329,6 @@
     const scrim = root.querySelector("#ps-scrim");
     const archiveToggle = root.querySelector("#ps-archive-toggle");
 
-    ensurePushStyle();
-
     // A closed sidebar is only translated off-screen, so without `inert` its
     // links / collapse button / archive toggle would stay in the Tab order and
     // exposed to assistive tech — invisible controls a keyboard user lands on
@@ -361,9 +341,9 @@
       const overlay = isOpen && mode === "overlay";
 
       sidebar.classList.toggle("open", isOpen);
-      wrap.classList.toggle("is-open", isOpen);
+      // is-push styles the docked panel (no drawer shadow). Only class that
+      // the stylesheet reads — no dead is-open / is-overlay toggles.
       wrap.classList.toggle("is-push", push);
-      wrap.classList.toggle("is-overlay", overlay);
 
       // Scrim only in overlay mode — never in push (that would feel temporary).
       scrim.classList.toggle("open", overlay);
@@ -390,10 +370,14 @@
     const open = () => {
       applyChrome(true);
       writeStoredSidebarOpen(true);
+      // Move focus into the still-visible control (expand is now hidden).
+      try { collapseBtn.focus(); } catch (_) { /* non-focusable environments */ }
     };
     const close = () => {
       applyChrome(false);
       writeStoredSidebarOpen(false);
+      // Return focus to the floating expand (standard expandable-panel a11y).
+      try { expandBtn.focus(); } catch (_) { /* non-focusable environments */ }
     };
 
     expandBtn.addEventListener("click", open);
@@ -401,24 +385,34 @@
     // Scrim is only interactive in overlay mode (see applyChrome); a no-op
     // click when closed is fine.
     scrim.addEventListener("click", close);
-    root.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") close();
+    // Escape must work when focus is in the light-DOM page content, so listen
+    // on document — a shadow-root-only listener never sees those keydowns.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (!sidebar.classList.contains("open")) return;
+      close();
     });
 
     // Re-apply chrome when the viewport crosses the push/overlay breakpoint
-    // so padding and scrim stay consistent with the current mode.
-    let resizeTimer = null;
-    const onResize = () => {
-      if (!sidebar.classList.contains("open")) return;
-      if (resizeTimer) clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => applyChrome(true), 50);
+    // so offset and scrim stay consistent with the current mode. matchMedia
+    // fires only on the crossing, not on every pixel of a resize drag.
+    const mql = window.matchMedia
+      ? window.matchMedia("(min-width: " + SIDEBAR_PUSH_MIN_PX + "px)")
+      : null;
+    const onBreakpoint = () => {
+      // Re-check open: a delayed callback must not reopen after the user
+      // explicitly collapsed (TOCTOU with any prior debounce; still correct
+      // with matchMedia's synchronous change).
+      if (sidebar.classList.contains("open")) applyChrome(true);
     };
-    if (typeof window !== "undefined" && window.addEventListener) {
-      window.addEventListener("resize", onResize);
+    if (mql) {
+      if (typeof mql.addEventListener === "function") mql.addEventListener("change", onBreakpoint);
+      else if (typeof mql.addListener === "function") mql.addListener(onBreakpoint); // Safari < 14
     }
 
-    // Restore prior open state (same-origin navigation keeps the panel open).
-    if (readStoredSidebarOpen()) open();
+    // Restore prior open state only in push mode. Overlay restore would slam
+    // a scrim over the page on a phone that shared the desktop's open flag.
+    if (readStoredSidebarOpen() && currentSidebarMode() === "push") open();
 
     // Archive is COLLAPSED by default (aria-expanded="false", section
     // hidden). Toggling flips both.
@@ -659,7 +653,7 @@
   #ps-scrim.open { opacity: 1; pointer-events: auto; }
   #ps-sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 10011;
-    width: 300px; max-width: 84vw; background: #ffffff;
+    width: ${SIDEBAR_WIDTH_PX}px; max-width: 84vw; background: #ffffff;
     border-right: 1px solid #e5e7eb;
     /* Overlay feels like a drawer (shadow); push feels like a docked pane. */
     box-shadow: 2px 0 24px rgba(0,0,0,.14);
@@ -669,7 +663,7 @@
   #ps-sidebar.open { transform: translateX(0); }
   .ps-wrap.is-push #ps-sidebar {
     box-shadow: none;
-    max-width: 300px; /* never shrink the docked panel under vw pressure */
+    max-width: ${SIDEBAR_WIDTH_PX}px; /* never shrink the docked panel under vw pressure */
   }
   @media (prefers-reduced-motion: reduce) {
     #ps-sidebar, #ps-scrim { transition: none; }
