@@ -212,13 +212,26 @@ features vs nice-to-haves).
    (Path B). To keep the defer uniform across both paths — and because
    committing to product `main` is forbidden in the Path A case — instruct
    `/preview`: do **not** commit the proposal, do **not** modify
-   `.gitignore`. Generate + deploy (or local fallback) only. The PRD dir
-   physically lands at `/preview`'s resolved in-repo path
-   (e.g. `docs/preview/<date>-<slug>/`) but stays uncommitted in the
-   working tree. Record that path — Step 5 commits it onto the feature
-   branch.
+   `.gitignore`. Generate + deploy (or local fallback) only.
+
+   **Where the PRD lands** — follow `/preview`'s resolved layout; do not
+   invent one:
+   - **Library v2 (when present):** if the nearest `.solopreneur.json` with
+     a `preview` block resolves, content goes under `<root>/active/<id>/`
+     with a `preview.json` sidecar. Publish via the preview skill's Library
+     path (`deploy-library.mjs` / `/preview` Library workflow) — not a new
+     flat date-slug dir as the default.
+   - **No v2 config:** fall back to `/preview`'s setup or **legacy** path
+     (e.g. a date-slug dir under the skill's resolved parent such as
+     `docs/preview/<date>-<slug>/`). Follow the preview skill; do not invent
+     a layout.
+
+   The PRD stays uncommitted in the working tree. Record that path — Step 5
+   commits it onto the feature branch.
 3. Iterate using `/preview`'s native comment-overlay + revision loop until
-   the user is satisfied.
+   the user is satisfied. Under Library v2 the shared overlay is injected
+   at build time — still use the skill's revision loop; do not teach
+   copying `comment-overlay.js` into every item as the happy path.
 4. **PRD-complete gate.** Explicitly ask: "PRD discussion complete?
    Confirming moves to template lookup." Mirror Step 1's confirmation
    gate — proceed only on explicit confirmation.
@@ -356,22 +369,28 @@ feature worktree). Step 2 deferred their commit. They must land on
   checkout) in the handoff prompt. The subagent's *first* action after the
   branch rename — before any plan step — is to copy them into its own
   worktree (resolved via `git rev-parse --show-toplevel`) and make a
-  dedicated `docs(mvp): PRD + spec` commit that includes them **and** the
-  `**/comment-overlay.js` line `/preview` normally appends to
-  `.gitignore` (deferred from Step 2).
+  dedicated `docs(mvp): PRD + spec` commit that includes them. **Library
+  v2:** shared overlay is injected at build time — do not copy
+  `comment-overlay.js` into every item or add `**/comment-overlay.js` to
+  `.gitignore` as the happy path. **Legacy / transition only:** if Step 2
+  used `/preview`'s legacy flat layout and would have appended
+  `**/comment-overlay.js` to `.gitignore` (deferred from Step 2), include
+  that line in this commit.
 - **Path B** (same worktree, no isolation): the PRD/spec are already in
-  this worktree; commit them on the feature branch as the first commit,
-  same `.gitignore` line included.
+  this worktree; commit them on the feature branch as the first commit.
+  Same Library-vs-legacy rule as Path A for any deferred `.gitignore`
+  line.
 - **Path A cleanup (mandatory).** Copying into the worktree does not remove
   the originals — without this the run leaves product `main` dirty with
-  stale PRD/spec/comment-overlay files, blocking later main-branch work.
-  After the subagent confirms the `docs(mvp): PRD + spec` commit is pushed,
-  the orchestrator restores the original `main` checkout to clean: delete
-  the (untracked) PRD dir and `git checkout -- <markdown-spec-path>` to
-  discard the uncommitted Step 2 reconcile edits. The authoritative
-  reconciled copy now lives on `{TARGET_BRANCH}` and returns to `main` via
-  the eventual PR merge. Path B needs no cleanup — the files are already in
-  the feature worktree where they belong.
+  stale PRD/spec (and, under legacy layout only, per-item overlay) files,
+  blocking later main-branch work. After the subagent confirms the
+  `docs(mvp): PRD + spec` commit is pushed, the orchestrator restores the
+  original `main` checkout to clean: delete the (untracked) PRD dir and
+  `git checkout -- <markdown-spec-path>` to discard the uncommitted Step 2
+  reconcile edits. The authoritative reconciled copy now lives on
+  `{TARGET_BRANCH}` and returns to `main` via the eventual PR merge. Path B
+  needs no cleanup — the files are already in the feature worktree where
+  they belong.
 
 ### 5b. Dispatch
 
@@ -399,12 +418,13 @@ Dispatch a single implementer subagent via the **Agent tool**:
      source paths of the PRD dir + updated markdown spec (in the original
      `main` checkout), plus the instruction that the subagent's *first*
      action after the branch rename is to copy them into its worktree and
-     make a dedicated `docs(mvp): PRD + spec` commit — including the
-     deferred `**/comment-overlay.js` `.gitignore` line — before any
-     plan-step commit. Path B: the files are already in the worktree; same
-     dedicated first commit, no copy. Without this item the PRD/spec stays
-     uncommitted or gets folded into the first feature commit, defeating
-     5a-bis.
+     make a dedicated `docs(mvp): PRD + spec` commit before any plan-step
+     commit. Include a deferred `**/comment-overlay.js` `.gitignore` line
+     only for **legacy / transition** flat layouts (Library v2 injects
+     shared overlay at build — not the happy path). Path B: the files are
+     already in the worktree; same dedicated first commit, no copy. Without
+     this item the PRD/spec stays uncommitted or gets folded into the first
+     feature commit, defeating 5a-bis.
 
 Do NOT delegate to `superpowers:executing-plans` or
 `superpowers:subagent-driven-development` — both enforce TDD discipline
