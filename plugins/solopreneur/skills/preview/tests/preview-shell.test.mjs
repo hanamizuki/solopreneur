@@ -24,6 +24,9 @@ import shell from '../assets/preview-shell.js';
 
 const {
   groupDirectory,
+  groupArchiveWithSuperseded,
+  buildArchiveRequest,
+  resolveLibraryLabel,
   partyLine,
   footerModel,
   buildShareRequest,
@@ -81,6 +84,82 @@ test('groupDirectory tolerates a non-array input', () => {
   assert.deepEqual(groupDirectory(undefined), { active: [], archive: [] });
   assert.deepEqual(groupDirectory(null), { active: [], archive: [] });
   assert.deepEqual(groupDirectory('nope'), { active: [], archive: [] });
+});
+
+// --- groupArchiveWithSuperseded ---------------------------------------------
+
+test('groupArchiveWithSuperseded nests copies under a canonical still in archive', () => {
+  const folded = groupArchiveWithSuperseded([
+    { id: 'current', title: 'Current', updatedAt: '2026-03-01T00:00:00Z', collection: 'archive' },
+    { id: 'old-a', title: 'Old A', updatedAt: '2026-02-01T00:00:00Z', collection: 'archive', supersededBy: 'current' },
+    { id: 'old-b', title: 'Old B', updatedAt: '2026-01-01T00:00:00Z', collection: 'archive', supersededBy: 'current' },
+    { id: 'solo', title: 'Solo', updatedAt: '2026-02-15T00:00:00Z', collection: 'archive' },
+  ]);
+  assert.deepEqual(folded.topLevel.map((x) => x.id), ['current', 'solo']);
+  assert.deepEqual(folded.childrenOf.current.map((x) => x.id), ['old-a', 'old-b']);
+  assert.equal(folded.childrenOf.solo, undefined);
+});
+
+test('groupArchiveWithSuperseded keeps a dangling supersededBy as a top-level archive row', () => {
+  const folded = groupArchiveWithSuperseded([
+    { id: 'orphan', title: 'Orphan', updatedAt: '2026-01-01T00:00:00Z', collection: 'archive', supersededBy: 'ghost' },
+    { id: 'active-parent-copy', title: 'Copy of active', updatedAt: '2026-02-01T00:00:00Z', collection: 'archive', supersededBy: 'still-active' },
+  ]);
+  // neither ghost nor still-active is in the archive list → both stay top-level
+  assert.deepEqual(folded.topLevel.map((x) => x.id), ['active-parent-copy', 'orphan']);
+  assert.deepEqual(Object.keys(folded.childrenOf), []);
+});
+
+// --- buildArchiveRequest ----------------------------------------------------
+
+test('buildArchiveRequest emits the agent contract and omits unselected sections', () => {
+  const text = buildArchiveRequest({
+    libraryLabel: 'example.host',
+    exported: '2026-07-25T12:00:00.000Z',
+    archive: [
+      { id: 'a1', title: 'Alpha' },
+      { id: 'a2', title: 'Beta' },
+    ],
+    restore: [{ id: 'r1', title: 'Restored' }],
+  });
+  assert.match(text, /^## library archive request\n/);
+  assert.match(text, /library: example\.host\n/);
+  assert.match(text, /exported: 2026-07-25T12:00:00\.000Z\n/);
+  assert.match(text, /archive（active → archive）：\n- a1 — Alpha\n- a2 — Beta\n/);
+  assert.match(text, /restore（archive → active）：\n- r1 — Restored\n/);
+  assert.match(text, /給 agent：對每個 id 做 mv/);
+  // unselected ids must not appear
+  assert.equal(text.includes('nope'), false);
+});
+
+test('buildArchiveRequest omits empty sections entirely and falls title back to id', () => {
+  const onlyArchive = buildArchiveRequest({
+    libraryLabel: 'library',
+    exported: 't',
+    archive: [{ id: 'x' }],
+    restore: [],
+  });
+  assert.match(onlyArchive, /archive（active → archive）：\n- x — x\n/);
+  assert.equal(onlyArchive.includes('restore（archive → active）：'), false);
+
+  const onlyRestore = buildArchiveRequest({
+    exported: 't',
+    archive: [],
+    restore: [{ id: 'y', title: 'Yay' }],
+  });
+  assert.equal(onlyRestore.includes('archive（active → archive）：'), false);
+  assert.match(onlyRestore, /restore（archive → active）：\n- y — Yay\n/);
+  // default library label
+  assert.match(onlyRestore, /library: library\n/);
+});
+
+test('resolveLibraryLabel prefers shell fields then falls back', () => {
+  assert.equal(resolveLibraryLabel({ configPath: '/tmp/cfg' }), '/tmp/cfg');
+  assert.equal(resolveLibraryLabel({ root: './previews' }), './previews');
+  assert.equal(resolveLibraryLabel({ library: 'my-lib' }), 'my-lib');
+  // no shell fields and no browser location → literal
+  assert.equal(resolveLibraryLabel({}), 'library');
+  assert.equal(resolveLibraryLabel(null), 'library');
 });
 
 // --- partyLine --------------------------------------------------------------

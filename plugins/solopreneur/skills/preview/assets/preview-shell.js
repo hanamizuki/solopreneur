@@ -1,18 +1,22 @@
 // preview skill: Library chrome injected into every item entry page.
 //
-// Three pieces of chrome, all inside a Shadow DOM so the shell's styles
+// Four pieces of chrome, all inside a Shadow DOM so the shell's styles
 // never leak into (or inherit from) the preview content:
 //   1. a library sidebar (active + archive sections, archive collapsed,
-//      current page marked). Expand/collapse is one concept: a floating
-//      expand control when closed; the same control relocates into the
-//      sidebar head when open (no folder glyph, no ✕). On wide viewports
-//      the open state is a PUSH layout (page content shifts right, no
-//      scrim); on narrow viewports it stays an overlay drawer with scrim.
-//      Open/closed is remembered in localStorage across pages in the same
-//      origin.
-//   2. a provenance footer ("who produced / last updated" this preview),
+//      current page marked; archive rows with supersededBy nest under
+//      their canonical as "Earlier copies"). Expand/collapse is one
+//      concept: a floating expand control when closed; the same control
+//      relocates into the sidebar head when open (no folder glyph, no ✕).
+//      On wide viewports the open state is a PUSH layout (page content
+//      shifts right, no scrim); on narrow viewports it stays an overlay
+//      drawer with scrim. Open/closed is remembered in localStorage
+//      across pages in the same origin.
+//   2. a Manage section at the bottom of the sidebar — toggle checkboxes
+//      on rows and "Copy instructions" to build a library archive request
+//      for an agent (read-only; no filesystem / deploy from the page);
+//   3. a provenance footer ("who produced / last updated" this preview),
 //      rendered from the display shape resolve-provenance.mjs returns;
-//   3. a Share request block — it does NOT deploy and holds NO token; it
+//   4. a Share request block — it does NOT deploy and holds NO token; it
 //      builds a copyable request that a /preview agent later consumes.
 //
 // Data flow: the builder injects the CURRENT item's metadata (id, title,
@@ -94,6 +98,115 @@
     return groups;
   }
 
+  // Same updatedAt DESC / id ASC order as groupDirectory. Shared so
+  // groupArchiveWithSuperseded can re-sort child lists without duplicating
+  // the comparator.
+  function sortCatalogItems(list) {
+    const arr = Array.isArray(list) ? list.slice() : [];
+    const instant = (s) => {
+      const t = Date.parse(s);
+      return Number.isNaN(t) ? -Infinity : t;
+    };
+    arr.sort((a, b) => {
+      const ta = instant(a && a.updatedAt);
+      const tb = instant(b && b.updatedAt);
+      if (ta !== tb) return tb - ta;
+      const ia = (a && a.id) || "";
+      const ib = (b && b.id) || "";
+      return ia < ib ? -1 : ia > ib ? 1 : 0;
+    });
+    return arr;
+  }
+
+  // Fold archive rows that declare supersededBy:<canonicalId> under that
+  // canonical when the canonical is ALSO in the archive list. Copies whose
+  // target is missing or only in active stay top-level (do not drop them).
+  // Returns { topLevel: Item[], childrenOf: { [canonicalId]: Item[] } }.
+  function groupArchiveWithSuperseded(archiveItems) {
+    const list = sortCatalogItems(archiveItems);
+    const inArchive = new Map();
+    for (const it of list) {
+      if (it && typeof it.id === "string") inArchive.set(it.id, it);
+    }
+    const childrenOf = Object.create(null);
+    const nested = new Set();
+    for (const it of list) {
+      if (!it || typeof it.id !== "string") continue;
+      const target = it.supersededBy;
+      if (typeof target === "string" && target && target !== it.id && inArchive.has(target)) {
+        if (!childrenOf[target]) childrenOf[target] = [];
+        childrenOf[target].push(it);
+        nested.add(it.id);
+      }
+    }
+    for (const k of Object.keys(childrenOf)) {
+      childrenOf[k] = sortCatalogItems(childrenOf[k]);
+    }
+    const topLevel = list.filter((it) => it && typeof it.id === "string" && !nested.has(it.id));
+    return { topLevel, childrenOf };
+  }
+
+  // Build the agent-facing archive request text. Empty archive/restore
+  // sections are OMITTED entirely (no "- (none)" noise). Titles fall back
+  // to id. `exported` is supplied by the caller so unit tests stay pure.
+  // Chinese section headers are part of the agent parse contract (not UI chrome).
+  function buildArchiveRequest(o) {
+    const src = o && typeof o === "object" ? o : {};
+    // libraryLabel: prefer an explicit string (shell/config). Browser path
+    // falls back to location.host or the literal "library" — never invents
+    // absolute local paths the page cannot know.
+    const libraryLabel =
+      typeof src.libraryLabel === "string" && src.libraryLabel
+        ? src.libraryLabel
+        : "library";
+    const exported = typeof src.exported === "string" ? src.exported : "";
+    const archive = Array.isArray(src.archive) ? src.archive : [];
+    const restore = Array.isArray(src.restore) ? src.restore : [];
+
+    const lines = [
+      "## library archive request",
+      "library: " + libraryLabel,
+      "exported: " + exported,
+      "",
+    ];
+    const bullet = (it) => {
+      const id = it && typeof it.id === "string" ? it.id : "";
+      const title =
+        it && typeof it.title === "string" && it.title ? it.title : id;
+      return "- " + id + " — " + title;
+    };
+    if (archive.length) {
+      lines.push("archive（active → archive）：");
+      for (const it of archive) lines.push(bullet(it));
+      lines.push("");
+    }
+    if (restore.length) {
+      lines.push("restore（archive → active）：");
+      for (const it of restore) lines.push(bullet(it));
+      lines.push("");
+    }
+    lines.push(
+      "（給 agent：對每個 id 做 mv <root>/<from>/<id> <root>/<to>/<id>，全部完成後重新發布 library。）"
+    );
+    return lines.join("\n");
+  }
+
+  // Resolve the library: label for archive requests in the browser.
+  // Prefer shell.library / shell.configPath / shell.root when the builder
+  // injects one; else the deployment host; else the literal "library".
+  function resolveLibraryLabel(shell) {
+    const s = shell && typeof shell === "object" ? shell : {};
+    for (const key of ["library", "configPath", "root"]) {
+      if (typeof s[key] === "string" && s[key]) return s[key];
+    }
+    try {
+      if (typeof location !== "undefined" && location && location.host) {
+        return location.host;
+      }
+    } catch (_) { /* non-browser */ }
+    return "library";
+  }
+
   // A resolved provenance party ({ agent?, platform?, sessionTitle? }) as a
   // single display line. Empty / missing -> "unrecorded" (never fabricated;
   // mirrors resolve-provenance.mjs's "never guess" contract).
@@ -160,6 +273,10 @@
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {
       groupDirectory,
+      sortCatalogItems,
+      groupArchiveWithSuperseded,
+      buildArchiveRequest,
+      resolveLibraryLabel,
       partyLine,
       footerModel,
       buildShareRequest,
@@ -193,6 +310,7 @@
     root.innerHTML = STYLE + MARKUP;
 
     wireSidebar(root);
+    const manage = wireManage(root, shell);
     wireShare(root, shell);
     renderFooter(root, shell);
 
@@ -200,7 +318,10 @@
     // /directory.json (the same file the index is generated from), so the
     // sidebar always reflects what was actually deployed. Failure degrades
     // to a small note, never a crash.
-    fetchDirectory().then((dir) => renderSidebar(root, dir, currentId));
+    fetchDirectory().then((dir) => {
+      manage.setDirectory(dir, currentId);
+      manage.render();
+    });
   }
 
   function readShellData() {
@@ -453,11 +574,101 @@
     });
   }
 
-  function renderSidebar(root, dir, currentId) {
+  // Manage mode: checkboxes on rows + copyable archive request. Page stays
+  // read-only (no mv / deploy). State lives in this closure so re-renders
+  // keep selections until the user toggles mode off (clears) or unchecks.
+  function wireManage(root, shell) {
+    let dir = null;
+    let currentId = "";
+    let manageMode = false;
+    // id -> { id, title, action: "archive" | "restore" }
+    const selected = new Map();
+    const libraryLabel = resolveLibraryLabel(shell);
+
+    const toggleBtn = root.querySelector("#ps-manage-toggle");
+    const copyBtn = root.querySelector("#ps-manage-copy");
+    const wrap = root.querySelector("#ps-manage");
+
+    const updateCopyEnabled = () => {
+      copyBtn.disabled = selected.size === 0;
+    };
+
+    const setManageMode = (on) => {
+      manageMode = !!on;
+      toggleBtn.setAttribute("aria-pressed", manageMode ? "true" : "false");
+      toggleBtn.classList.toggle("ps-manage-on", manageMode);
+      wrap.classList.toggle("ps-manage-active", manageMode);
+      if (!manageMode) selected.clear();
+      updateCopyEnabled();
+      render();
+    };
+
+    toggleBtn.addEventListener("click", () => setManageMode(!manageMode));
+
+    copyBtn.addEventListener("click", () => {
+      if (!selected.size) return;
+      const archive = [];
+      const restore = [];
+      for (const row of selected.values()) {
+        if (row.action === "archive") archive.push(row);
+        else if (row.action === "restore") restore.push(row);
+      }
+      // Stable id ASC so copy output is deterministic for agents/tests.
+      const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      archive.sort(byId);
+      restore.sort(byId);
+      const text = buildArchiveRequest({
+        libraryLabel,
+        exported: new Date().toISOString(),
+        archive,
+        restore,
+      });
+      copyText(text, copyBtn);
+    });
+
+    function onCheckChange(it, action, checked) {
+      if (checked) {
+        selected.set(it.id, {
+          id: it.id,
+          title: typeof it.title === "string" && it.title ? it.title : it.id,
+          action,
+        });
+      } else {
+        selected.delete(it.id);
+      }
+      updateCopyEnabled();
+    }
+
+    function render() {
+      renderSidebar(root, dir, currentId, {
+        manageMode,
+        selected,
+        onCheckChange,
+      });
+      updateCopyEnabled();
+    }
+
+    updateCopyEnabled();
+
+    return {
+      setDirectory(nextDir, id) {
+        dir = nextDir;
+        currentId = id || "";
+      },
+      render,
+    };
+  }
+
+  function renderSidebar(root, dir, currentId, manage) {
     const activeWrap = root.querySelector("#ps-active");
     const archiveWrap = root.querySelector("#ps-archive");
     activeWrap.textContent = "";
     archiveWrap.textContent = "";
+    const opts = manage && typeof manage === "object" ? manage : {};
+    const manageMode = !!opts.manageMode;
+    const selected = opts.selected instanceof Map ? opts.selected : new Map();
+    const onCheckChange =
+      typeof opts.onCheckChange === "function" ? opts.onCheckChange : null;
 
     if (!dir) {
       activeWrap.appendChild(note("Catalog unavailable."));
@@ -468,16 +679,78 @@
     root.querySelector("#ps-archive-count").textContent = String(groups.archive.length);
 
     if (!groups.active.length) activeWrap.appendChild(note("No active previews."));
-    for (const it of groups.active) activeWrap.appendChild(sidebarRow(it, currentId));
-    if (!groups.archive.length) archiveWrap.appendChild(note("Nothing archived."));
-    for (const it of groups.archive) archiveWrap.appendChild(sidebarRow(it, currentId));
+    for (const it of groups.active) {
+      activeWrap.appendChild(
+        sidebarRow(it, currentId, {
+          manageMode,
+          action: "archive",
+          checked: selected.has(it.id),
+          onCheckChange,
+        })
+      );
+    }
+
+    if (!groups.archive.length) {
+      archiveWrap.appendChild(note("Nothing archived."));
+      return;
+    }
+    const folded = groupArchiveWithSuperseded(groups.archive);
+    for (const it of folded.topLevel) {
+      archiveWrap.appendChild(
+        sidebarRow(it, currentId, {
+          manageMode,
+          action: "restore",
+          checked: selected.has(it.id),
+          onCheckChange,
+        })
+      );
+      const kids = folded.childrenOf[it.id];
+      if (kids && kids.length) {
+        archiveWrap.appendChild(
+          earlierCopiesGroup(kids, currentId, {
+            manageMode,
+            selected,
+            onCheckChange,
+          })
+        );
+      }
+    }
+  }
+
+  // Collapsed-by-default group of superseded archive rows under a canonical.
+  function earlierCopiesGroup(kids, currentId, manageOpts) {
+    const details = document.createElement("details");
+    details.className = "ps-earlier";
+    const summary = document.createElement("summary");
+    summary.className = "ps-earlier-summary";
+    summary.textContent = "Earlier copies (" + kids.length + ")";
+    details.appendChild(summary);
+    const body = document.createElement("div");
+    body.className = "ps-earlier-body";
+    for (const it of kids) {
+      body.appendChild(
+        sidebarRow(it, currentId, {
+          manageMode: !!(manageOpts && manageOpts.manageMode),
+          action: "restore",
+          checked: !!(manageOpts && manageOpts.selected && manageOpts.selected.has(it.id)),
+          onCheckChange: manageOpts && manageOpts.onCheckChange,
+        })
+      );
+    }
+    details.appendChild(body);
+    return details;
   }
 
   // One catalog row. Links ALWAYS target the SAME deployment's /p/<id>/
   // (never a cross-deployment URL). The current page is clearly marked
   // with "v<revision> · updated <local date/time>" and aria-current.
-  function sidebarRow(it, currentId) {
+  // When manageMode is on, a checkbox sits before the link (archive =
+  // active→archive, restore = archive→active).
+  function sidebarRow(it, currentId, manageOpts) {
+    const opts = manageOpts && typeof manageOpts === "object" ? manageOpts : {};
+    const manageMode = !!opts.manageMode;
     const isCurrent = it.id === currentId;
+
     const a = document.createElement("a");
     a.className = "ps-row" + (isCurrent ? " ps-current" : "");
     a.href = "/p/" + encodeURIComponent(it.id) + "/";
@@ -502,7 +775,28 @@
       if (when) meta.title = when.iso;
       a.appendChild(meta);
     }
-    return a;
+
+    if (!manageMode) return a;
+
+    const row = document.createElement("div");
+    row.className = "ps-row-wrap" + (isCurrent ? " ps-current" : "");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "ps-row-check";
+    cb.checked = !!opts.checked;
+    const labelText = (it.title || it.id) +
+      (opts.action === "archive" ? " (archive)" : " (restore)");
+    cb.setAttribute("aria-label", labelText);
+    cb.addEventListener("change", () => {
+      if (typeof opts.onCheckChange === "function") {
+        opts.onCheckChange(it, opts.action || "archive", cb.checked);
+      }
+    });
+    // Stop checkbox activation from also navigating the adjacent link.
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    row.appendChild(cb);
+    row.appendChild(a);
+    return row;
   }
 
   function note(text) {
@@ -733,13 +1027,65 @@
   .ps-row {
     display: block; text-decoration: none; color: #374151;
     padding: 7px 8px; border-radius: 8px; font-size: 13.5px;
+    flex: 1 1 auto; min-width: 0;
   }
   .ps-row:hover { background: #f3f4f6; }
+  .ps-row-wrap {
+    display: flex; align-items: flex-start; gap: 4px;
+    border-radius: 8px;
+  }
+  .ps-row-wrap:hover { background: #f3f4f6; }
+  .ps-row-wrap .ps-row:hover { background: transparent; }
+  .ps-row-check {
+    flex: 0 0 auto; margin: 10px 2px 0 6px; width: 14px; height: 14px;
+    accent-color: #4f46e5; cursor: pointer;
+  }
   .ps-row-title { display: block; word-break: break-word; }
   .ps-current { background: #eef2ff; }
   .ps-current .ps-row-title { color: #1f2937; font-weight: 600; }
   .ps-row-meta { display: block; margin-top: 2px; font-size: 11.5px; color: #6366f1; }
   .ps-note { padding: 6px 8px; font-size: 12.5px; color: #9ca3af; }
+  /* supersededBy earlier-copies group (Archive only; collapsed by default) */
+  .ps-earlier {
+    margin: 0 0 4px 10px; padding: 0 0 0 8px;
+    border-left: 2px solid #e5e7eb;
+  }
+  .ps-earlier-summary {
+    list-style: none; cursor: pointer;
+    font: 500 11.5px ui-sans-serif, system-ui, sans-serif;
+    color: #9ca3af; padding: 4px 6px;
+  }
+  .ps-earlier-summary::-webkit-details-marker { display: none; }
+  .ps-earlier-summary::before {
+    content: "›"; display: inline-block; margin-right: 4px;
+    transition: transform .15s ease;
+  }
+  .ps-earlier[open] > .ps-earlier-summary::before { transform: rotate(90deg); }
+  .ps-earlier-body { padding-bottom: 2px; }
+  /* Manage section — read-only instruction export at sidebar bottom */
+  #ps-manage {
+    margin-top: 16px; padding-top: 12px; border-top: 1px solid #f0f0ef;
+  }
+  .ps-manage-blurb {
+    margin: 0 0 10px; padding: 0 6px;
+    font-size: 11.5px; line-height: 1.45; color: #9ca3af;
+  }
+  .ps-manage-actions {
+    display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px;
+  }
+  #ps-manage-toggle, #ps-manage-copy {
+    padding: 6px 10px; border-radius: 7px;
+    border: 1px solid #e5e7eb; background: #ffffff; color: #1f2937;
+    font: 500 12px ui-sans-serif, system-ui, sans-serif; cursor: pointer;
+  }
+  #ps-manage-toggle:hover, #ps-manage-copy:hover { background: #f9fafb; }
+  #ps-manage-toggle.ps-manage-on {
+    background: #eef2ff; border-color: #c7d2fe; color: #3730a3;
+  }
+  #ps-manage-copy:disabled {
+    opacity: .45; cursor: not-allowed;
+  }
+  #ps-manage-copy:disabled:hover { background: #ffffff; }
   /* Provenance footer — in-flow at the very bottom of the entry (the host
      is appended last in <body>). Not fixed, so it sits after content. */
   #ps-footer {
@@ -824,6 +1170,13 @@
         <span class="ps-caret" aria-hidden="true">›</span>
       </button>
       <div id="ps-archive" hidden></div>
+      <div id="ps-manage">
+        <p class="ps-manage-blurb">Active = in progress · Archive = kept for reference · archiving does not change the URL.</p>
+        <div class="ps-manage-actions">
+          <button id="ps-manage-toggle" type="button" aria-pressed="false" aria-label="Manage mode">Manage mode</button>
+          <button id="ps-manage-copy" type="button" disabled aria-label="Copy archive instructions">Copy instructions</button>
+        </div>
+      </div>
     </div>
   </nav>
   <footer id="ps-footer" data-cmt-ui="1">

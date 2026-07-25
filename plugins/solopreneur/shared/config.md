@@ -909,7 +909,14 @@ isolation from the preview content). It renders:
   default**, and the current page marked `v<revision> · updated <local time>`. The
   sidebar's catalog is fetched at runtime from the deployment's `/directory.json`
   (the same file the index is generated from — a single source), and every item
-  link targets the same deployment's `/p/<id>/`;
+  link targets the same deployment's `/p/<id>/`. Archive rows that carry
+  `supersededBy` nest under their canonical (when that id is also in Archive) in
+  a collapsed **Earlier copies** group;
+- a **Manage mode** block at the bottom of the sidebar: a one-line lifecycle
+  blurb, a toggle that reveals per-row checkboxes (Active checked = archive,
+  Archive checked = restore), and **Copy instructions**, which builds a read-only
+  `## library archive request` text for an agent to `mv` items and re-publish.
+  The page never writes the filesystem or calls deploy APIs;
 - a **provenance footer** built from the shape `resolve-provenance.mjs` returns
   (`{ producedBy }` collapsed, or `{ createdBy, lastUpdatedBy }` distinct;
   "unrecorded" when absent). Timestamps render in the viewer's local timezone with
@@ -945,7 +952,8 @@ Generated at `<staging>/index.html` from the `library-index.html` template + the
 projected `directory.json`, which the builder embeds as an escaped JSON island. It
 renders active and archive sections (archive collapsed by default via a native
 `<details>`, `updatedAt` DESC, links to `/p/<id>/`) — the same directory data the
-sidebar uses.
+sidebar uses, including **Earlier copies** grouping for archive rows with
+`supersededBy`.
 
 Tests live in `tests/preview-shell.test.mjs` and `tests/comment-overlay.test.mjs`
 (the assets' pure helpers) and the chrome-injection cases in
