@@ -10,6 +10,10 @@ or updates that plugin.
 
 ## 2026-07-25
 
+### solopreneur 0.5.34 → 0.5.35
+`/preview` Library sidebar gains **Manage mode**: multi-select Active/Archive items and copy a structured archive request for your agent (batch move + one republish — the page itself stays read-only). Archive rows linked by `supersededBy` nest under **Earlier copies**. Library publish no longer gets stuck when a background git rebase rewrites the commit that was recorded at the last deploy — it compares content trees instead. The skill docs now default agents to Library v2 (`active/<id>/`, `deploy-library`, Share, archive requests); three-bucket `deploy.sh` is documented as a legacy escape hatch. `/mvp` preview paths align with the same `active/` layout.
+(#145, #146, #147)
+
 ### solopreneur 0.5.33 → 0.5.34
 `/preview` now ships **Preview Library v2**: path-based `.solopreneur.json` config, a static library builder (catalog, content hashes, Shadow DOM sidebar with expand/collapse, provenance footer, per-preview comments), staged library publish with fail-closed SSO protection, and single-item **Share** deployments (project-members or anyone-with-link) that never move Library production. Includes first-run setup, legacy migrator, and a docked push-layout sidebar on wide screens.
 (#134–#144)
