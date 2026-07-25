@@ -2,12 +2,14 @@
 //
 // Three pieces of chrome, all inside a Shadow DOM so the shell's styles
 // never leak into (or inherit from) the preview content:
-//   1. a top-left directory icon that expands a library sidebar (active +
-//      archive sections, archive collapsed, current page marked). On wide
-//      viewports the open state is a PUSH layout (body gains left padding,
-//      no scrim) so the catalog stays open while reading; on narrow
-//      viewports it stays an overlay drawer with scrim. Open/closed is
-//      remembered in localStorage across pages in the same origin.
+//   1. a library sidebar (active + archive sections, archive collapsed,
+//      current page marked). Expand/collapse is one concept: a floating
+//      expand control when closed; the same control relocates into the
+//      sidebar head when open (no folder glyph, no ✕). On wide viewports
+//      the open state is a PUSH layout (page content shifts right, no
+//      scrim); on narrow viewports it stays an overlay drawer with scrim.
+//      Open/closed is remembered in localStorage across pages in the same
+//      origin.
 //   2. a provenance footer ("who produced / last updated" this preview),
 //      rendered from the display shape resolve-provenance.mjs returns;
 //   3. a Share request block — it does NOT deploy and holds NO token; it
@@ -335,16 +337,20 @@
 
   function wireSidebar(root) {
     const wrap = root.querySelector(".ps-wrap");
-    const icon = root.querySelector("#ps-icon");
+    // Two placements of the same expand/collapse control:
+    //   #ps-expand   — floating, only while closed (opens the panel)
+    //   #ps-collapse — in the sidebar head, only while open (closes it)
+    // Never both visible; never a folder glyph or a bare ✕.
+    const expandBtn = root.querySelector("#ps-expand");
+    const collapseBtn = root.querySelector("#ps-collapse");
     const sidebar = root.querySelector("#ps-sidebar");
     const scrim = root.querySelector("#ps-scrim");
-    const closeBtn = root.querySelector("#ps-sidebar-close");
     const archiveToggle = root.querySelector("#ps-archive-toggle");
 
     ensurePushStyle();
 
     // A closed sidebar is only translated off-screen, so without `inert` its
-    // links / close button / archive toggle would stay in the Tab order and
+    // links / collapse button / archive toggle would stay in the Tab order and
     // exposed to assistive tech — invisible controls a keyboard user lands on
     // mid-page. `inert` is the native fix (no focus, no AT, no clicks); it
     // starts set in the markup and is cleared only while open. Browsers without
@@ -365,16 +371,19 @@
       // Push shifts the page; overlay must never leave a leftover offset.
       applyPushOffset(push);
 
+      // Floating expand is hidden while open so it cannot cover the shifted
+      // content; the collapse control in the head takes over.
+      expandBtn.hidden = isOpen;
+      collapseBtn.hidden = !isOpen;
+      expandBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      collapseBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+
       if (isOpen) {
         sidebar.inert = false;
         sidebar.removeAttribute("inert");
-        icon.setAttribute("aria-expanded", "true");
-        icon.setAttribute("aria-label", "Collapse library");
       } else {
         sidebar.inert = true;
         sidebar.setAttribute("inert", "");
-        icon.setAttribute("aria-expanded", "false");
-        icon.setAttribute("aria-label", "Expand library");
       }
     };
 
@@ -386,13 +395,12 @@
       applyChrome(false);
       writeStoredSidebarOpen(false);
     };
-    const toggle = () => (sidebar.classList.contains("open") ? close() : open());
 
-    icon.addEventListener("click", toggle);
+    expandBtn.addEventListener("click", open);
+    collapseBtn.addEventListener("click", close);
     // Scrim is only interactive in overlay mode (see applyChrome); a no-op
     // click when closed is fine.
     scrim.addEventListener("click", close);
-    closeBtn.addEventListener("click", close);
     root.addEventListener("keydown", (e) => {
       if (e.key === "Escape") close();
     });
@@ -627,21 +635,21 @@
     color: #111827;
     line-height: 1.5;
   }
-  /* Directory icon — fixed top-left. Fixed positioning resolves against
-     the viewport from inside a shadow root (the host has no transformed
-     ancestor). When the sidebar is open in push mode the icon rides with
-     the shifted content (left = panel width + margin). */
-  #ps-icon {
+  /* Expand control — fixed top-left while the panel is closed. Hidden
+     entirely when open (the head's collapse control takes over) so it
+     never sits on top of the pushed content. Fixed positioning resolves
+     against the viewport from inside a shadow root. */
+  #ps-expand {
     position: fixed; top: 14px; left: 14px; z-index: 9996;
     width: 40px; height: 40px; border-radius: 10px;
     border: 1px solid #e5e7eb; background: #ffffff; color: #1f2937;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.10);
-    transition: left .2s cubic-bezier(.22,1,.36,1);
+    padding: 0;
   }
-  #ps-icon:hover { background: #f9fafb; }
-  #ps-icon svg { width: 20px; height: 20px; display: block; }
-  .ps-wrap.is-push #ps-icon { left: 314px; /* SIDEBAR_WIDTH_PX + 14 */ }
+  #ps-expand:hover { background: #f9fafb; }
+  #ps-expand[hidden] { display: none !important; }
+  #ps-expand svg, #ps-collapse svg { width: 20px; height: 20px; display: block; }
   /* Scrim is overlay-only (narrow). Push mode never adds .open to it. */
   #ps-scrim {
     position: fixed; inset: 0; z-index: 10010;
@@ -664,17 +672,25 @@
     max-width: 300px; /* never shrink the docked panel under vw pressure */
   }
   @media (prefers-reduced-motion: reduce) {
-    #ps-sidebar, #ps-scrim, #ps-icon { transition: none; }
+    #ps-sidebar, #ps-scrim { transition: none; }
   }
   .ps-sidebar-head {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 14px 10px; border-bottom: 1px solid #f0f0ef;
+    padding: 10px 10px 10px 14px; border-bottom: 1px solid #f0f0ef;
+    gap: 8px;
   }
   .ps-sidebar-title { font-size: 14px; font-weight: 600; color: #111827; }
-  #ps-sidebar-close {
-    border: none; background: transparent; cursor: pointer;
-    font-size: 18px; line-height: 1; color: #6b7280; padding: 4px 8px;
+  /* Collapse control — same visual language as #ps-expand, sits where the
+     old ✕ was. Hidden while the panel is closed. */
+  #ps-collapse {
+    flex: 0 0 auto;
+    width: 36px; height: 36px; border-radius: 10px;
+    border: 1px solid #e5e7eb; background: #ffffff; color: #1f2937;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0;
   }
+  #ps-collapse:hover { background: #f9fafb; }
+  #ps-collapse[hidden] { display: none !important; }
   .ps-sidebar-body { overflow-y: auto; padding: 8px 10px 20px; }
   .ps-section-head {
     display: flex; align-items: center; gap: 6px; width: 100%;
@@ -750,17 +766,29 @@
   #ps-share-copy:hover { background: #111827; }
 </style>`;
 
+  // Expand / collapse glyphs: a left rail (the panel) + a chevron. Expand
+  // points the chevron outward (open the panel); collapse points it inward
+  // (dock it away). Same metaphor in both placements — not a folder, not ✕.
+  const ICON_EXPAND = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="6" height="16" rx="1.5"></rect>
+      <path d="M14 8l4 4-4 4"></path>
+    </svg>`;
+  const ICON_COLLAPSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="6" height="16" rx="1.5"></rect>
+      <path d="M18 8l-4 4 4 4"></path>
+    </svg>`;
+
   const MARKUP = `<div class="ps-wrap">
-  <button id="ps-icon" type="button" aria-label="Expand library" aria-expanded="false" aria-controls="ps-sidebar" data-cmt-ui="1">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-    </svg>
+  <button id="ps-expand" type="button" aria-label="Expand library" aria-expanded="false" aria-controls="ps-sidebar" data-cmt-ui="1">
+    ${ICON_EXPAND}
   </button>
   <div id="ps-scrim" data-cmt-ui="1"></div>
   <nav id="ps-sidebar" aria-label="Preview library" data-cmt-ui="1" inert>
     <div class="ps-sidebar-head">
       <span class="ps-sidebar-title">Library</span>
-      <button id="ps-sidebar-close" type="button" aria-label="Close">✕</button>
+      <button id="ps-collapse" type="button" aria-label="Collapse library" aria-expanded="false" aria-controls="ps-sidebar" hidden data-cmt-ui="1">
+        ${ICON_COLLAPSE}
+      </button>
     </div>
     <div class="ps-sidebar-body">
       <div class="ps-section-head">
