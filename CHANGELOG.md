@@ -8,6 +8,12 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-07-25
+
+### solopreneur 0.5.33 → 0.5.34
+`/preview` now ships **Preview Library v2**: path-based `.solopreneur.json` config, a static library builder (catalog, content hashes, Shadow DOM sidebar with expand/collapse, provenance footer, per-preview comments), staged library publish with fail-closed SSO protection, and single-item **Share** deployments (project-members or anyone-with-link) that never move Library production. Includes first-run setup, legacy migrator, and a docked push-layout sidebar on wide screens.
+(#134–#144)
+
 ## 2026-07-21
 
 ### solopreneur 0.5.32 → 0.5.33
