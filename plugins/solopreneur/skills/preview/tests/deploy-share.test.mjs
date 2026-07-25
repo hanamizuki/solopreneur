@@ -220,8 +220,11 @@ function snapshotTree(dir) {
  * the acceptance criteria are about what was NOT issued.
  *
  * Scriptable knobs: `probe` maps a hostname to the status an anonymous request gets
- * (default 302 = protected); `shareProbe` is the SEPARATE redirect-following probe
- * (default 200 = the share link reads); `deployFails` makes the CLI call throw;
+ * (default 302 = protected); `shareProbe` is the SEPARATE redirect-following probe,
+ * whose result models the VERIFIED platform behavior — it reports both the status and
+ * where the redirect chain LANDED, because a dead secret also answers 200 (on
+ * vercel.com/login). Default: 200 on the deployment host = the link reads;
+ * `deployFails` makes the CLI call throw;
  * `deployedTarget` overrides the target a plain deploy produces; `deployedMeta`
  * overrides the metadata it carries; `bypassResponse` overrides the shareable-link
  * PATCH response; `productionAfterDeploy` models the pointer moving mid-Share.
@@ -289,9 +292,18 @@ function fakeDeps({
       note('probe', url);
       return { status: probe[url.replace(/^https?:\/\//, '')] ?? 302 };
     },
+    // Models the verified redirect chain: a WORKING secret ends 200 on the
+    // deployment's own host; a dead one ends 200 on vercel.com/login. `shareProbe`
+    // may be a number (status, landing on the deployment host), a full
+    // `{status, url}`, or a function of the probed URL.
     probeShare: async (url) => {
       note('probeShare', url);
-      return { status: typeof shareProbe === 'function' ? shareProbe(url) : shareProbe };
+      const scripted = typeof shareProbe === 'function' ? shareProbe(url) : shareProbe;
+      if (scripted !== null && typeof scripted === 'object') return scripted;
+      // A non-200 never followed through to content, so it reports no landing URL —
+      // exactly what the real probe does when the chain did not complete.
+      const landed = scripted === 200 ? String(url).split('?')[0] : null;
+      return { status: scripted, url: landed };
     },
 
     // A plain preview deploy. Records the exact meta AND a full snapshot of the
@@ -815,6 +827,41 @@ test('anyone-with-link fails closed on a non-200 probe AND revokes the unverifie
   assert.deepEqual(deps.calls.bypass[1].body, { revoke: { secret: SECRET, regenerate: false } });
 });
 
+/**
+ * The fail-OPEN this check exists to close, verified against a real protected
+ * deployment: `?_vercel_share=<dead secret>` redirects to `https://vercel.com/login`,
+ * which is itself a perfectly normal HTTP **200**. A probe that only looked at the
+ * status would report a dead link as a working public share.
+ */
+test('anyone-with-link fails closed when a 200 is the SSO login page, not the preview', async () => {
+  const root = contentRoot();
+  const deps = fakeDeps({
+    shareProbe: { status: 200, url: 'https://vercel.com/login?next=%2Fsso-api%3Furl%3Dhttps%253A%252F%252Fx' },
+  });
+  const { error } = await run({ root, deps, request: linkRequest(root) });
+  assert.ok(isShareError(/could not be read anonymously/)(error), `got ${error?.message}`);
+  assert.match(error.message, /landed on "https:\/\/vercel\.com\/login/);
+  assert.equal(deps.calls.bypass.length, 2, 'the unverified link must be revoked');
+});
+
+test('anyone-with-link fails closed when the probe reports no landing URL at all', async () => {
+  const root = contentRoot();
+  const deps = fakeDeps({ shareProbe: { status: 200, url: null } });
+  const { error } = await run({ root, deps, request: linkRequest(root) });
+  assert.ok(isShareError(/could not be read anonymously/)(error), `got ${error?.message}`);
+});
+
+test('anyone-with-link accepts a 200 that landed on the deployment host', async () => {
+  const root = contentRoot();
+  const host = `${PROJECT}-share1-demoteam.vercel.app`;
+  // Host match is case-insensitive and ignores the path the clean URL redirected to.
+  const deps = fakeDeps({ shareProbe: { status: 200, url: `https://${host.toUpperCase()}/` } });
+  const { report, error } = await run({ root, deps, request: linkRequest(root) });
+  assert.ifError(error);
+  assert.equal(report.shareSecret, SECRET);
+  assert.equal(deps.calls.bypass.length, 1, 'a verified link must NOT be revoked');
+});
+
 test('a probe failure whose revoke ALSO fails says the link may still be live', async () => {
   const root = contentRoot();
   let calls = 0;
@@ -962,6 +1009,27 @@ test('--revoke refuses to report success while the secret still reads the deploy
     revokeShare({ resolved: resolvedConfig(contentRoot()), deploymentId: 'dpl_share_1', secret: SECRET, deps, io: fakeIo() }),
     isShareError(/STILL readable with that secret/),
   );
+});
+
+/**
+ * The mirror of the fail-open above: a SUCCESSFUL revoke redirects to
+ * vercel.com/login, which answers 200. A bare status check would call every good
+ * revoke a failure and send the user chasing a link that is already gone.
+ */
+test('--revoke treats a 200 SSO login page as revoked, not as still-readable', async () => {
+  const deps = fakeDeps({
+    store: { dpl_share_1: shareRecord() },
+    shareProbe: { status: 200, url: 'https://vercel.com/login?next=%2Fsso-api' },
+  });
+  const report = await revokeShare({
+    resolved: resolvedConfig(contentRoot()),
+    deploymentId: 'dpl_share_1',
+    secret: SECRET,
+    deps,
+    io: fakeIo(),
+  });
+  assert.equal(report.state, 'revoked');
+  assert.equal(report.confirmed, true);
 });
 
 test('--revoke requires a secret, because it cannot be looked up from the id', async () => {
@@ -1342,17 +1410,20 @@ test('makeDefaultDeps.patchProtectionBypass hits the aliases endpoint and keeps 
 });
 
 test('makeDefaultDeps.probeShare follows redirects with a cookie jar and hides the URL from argv', () => {
-  const run = fakeRun('200');
+  const run = fakeRun('200 https://x-y.vercel.app/');
   const deps = makeDefaultDeps({ token: 'tok', run });
 
   const url = `https://x-y.vercel.app?_vercel_share=${SECRET}`;
-  assert.deepEqual(deps.probeShare(url), { status: 200 });
+  // Both the status AND where the chain landed — the status alone cannot tell a
+  // working link from the 200 SSO login page.
+  assert.deepEqual(deps.probeShare(url), { status: 200, url: 'https://x-y.vercel.app/' });
 
   const call = run.spawned.at(-1);
   assert.equal(call.cmd, 'curl');
   assert.ok(call.args.includes('-L'), 'the 307 must be followed to reach the content');
   assert.ok(call.args.includes('-b') && call.args.includes('-c'), 'the cookie engine carries _vercel_jwt across it');
   assert.ok(call.args.includes('-q'), 'an ambient ~/.curlrc must not change the probe');
+  assert.equal(call.args[call.args.indexOf('-w') + 1], '%{http_code} %{url_effective}');
   // Anonymous: no auth header, and the secret-bearing URL rides in stdin, not argv.
   assert.ok(!call.options.input.includes('Authorization'), 'the share probe must be anonymous');
   assert.equal(call.options.input, `url = "${url}"\n`);
@@ -1361,12 +1432,22 @@ test('makeDefaultDeps.probeShare follows redirects with a cookie jar and hides t
   assert.ok(!fs.existsSync(path.dirname(jar)), 'the cookie jar must be removed');
 });
 
-test('makeDefaultDeps.probeShare fails closed on a transport error', () => {
+test('makeDefaultDeps.probeShare reports the login page it actually landed on', () => {
+  const landing = 'https://vercel.com/login?next=%2Fsso-api%3Furl%3Dhttps%253A%252F%252Fx-y.vercel.app';
+  const deps = makeDefaultDeps({ token: 'tok', run: fakeRun(`200 ${landing}`) });
+  assert.deepEqual(deps.probeShare('https://x-y.vercel.app?_vercel_share=dead'), { status: 200, url: landing });
+});
+
+test('makeDefaultDeps.probeShare fails closed on a transport error or an unparseable -w', () => {
   const deps = makeDefaultDeps({ token: 'tok', run: () => ({ error: new Error('no curl') }) });
-  assert.deepEqual(deps.probeShare('https://x-y.vercel.app?_vercel_share=s'), { status: 0 });
+  assert.deepEqual(deps.probeShare('https://x-y.vercel.app?_vercel_share=s'), { status: 0, url: null });
 
   const nonZero = makeDefaultDeps({ token: 'tok', run: () => ({ status: 7, stdout: '', stderr: 'boom' }) });
-  assert.deepEqual(nonZero.probeShare('https://x-y.vercel.app?_vercel_share=s'), { status: 0 });
+  assert.deepEqual(nonZero.probeShare('https://x-y.vercel.app?_vercel_share=s'), { status: 0, url: null });
+
+  // A status with no effective URL is unconfirmable, so it carries none forward.
+  const bare = makeDefaultDeps({ token: 'tok', run: fakeRun('200') });
+  assert.deepEqual(bare.probeShare('https://x-y.vercel.app?_vercel_share=s'), { status: 200, url: null });
 });
 
 test('makeDefaultDeps rejects a token, and a share URL, carrying an illegal character', () => {

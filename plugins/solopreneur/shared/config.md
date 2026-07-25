@@ -1263,8 +1263,17 @@ entries are filtered by that scope and **exactly one** is required, because hand
 out a guessed secret is not acceptable. The anonymous read URL is
 `<deploymentUrl>?_vercel_share=<secret>`, which answers **307 + `Set-Cookie:
 _vercel_jwt`** and redirects — so the probe follows redirects with curl's cookie
-engine on, and success is reported only after it returns **200**. If it does not,
-the link is revoked immediately rather than left live unverified.
+engine on. If verification fails, the link is revoked immediately rather than left
+live unverified.
+
+> **A bare `200` is not proof the link works.** Verified: a *dead*
+> `?_vercel_share=` secret redirects to `https://vercel.com/login?next=…`, which is
+> itself a normal **HTTP 200**. So the probe reports `%{http_code}` **and**
+> `%{url_effective}`, and "reads anonymously" means 200 **still on the deployment's
+> own host** — a working link ends on the deployment, a dead one on `vercel.com`.
+> The rule inverts for revoke: a *successful* revoke lands on that same 200 login
+> page, so a status-only check would report every good revoke as a failure. One
+> helper decides both directions.
 
 `--ttl` defaults to **7 days**; `--ttl never` omits the field and warns. Revoke with
 the same endpoint and `{"revoke": {"secret": "<secret>", "regenerate": false}}`; the

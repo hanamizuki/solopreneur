@@ -166,6 +166,15 @@ recipe assumes, and guessing which secret to hand out is not acceptable.
   must follow the redirect **with** the cookie to reach 200. The probe therefore
   enables curl's cookie engine and follows redirects — unlike
   `vercel-protect.probe`, which deliberately does neither.
+- **A bare `200` is NOT proof the link works, and treating it as such fails OPEN.**
+  Verified against a real protected deployment: a *dead* `?_vercel_share=` secret
+  redirects to `https://vercel.com/login?next=…`, which is itself a perfectly normal
+  **HTTP 200**. Status and landing are only distinguishable together:
+  a working link ends 200 **on the deployment's own host**; a dead one ends 200 on
+  `vercel.com`. So the probe reports `%{http_code}` *and* `%{url_effective}`, and
+  success requires both. The same rule inverts for revoke — a *successful* revoke
+  lands on that same 200 login page, so a bare status check would call every good
+  revoke a failure.
 - **The `x-vercel-protection-bypass` header/param does NOT accept a
   shareable-link secret.** It only accepts a project-level automation-bypass
   secret, which would unlock the **whole project** — so it is never used for

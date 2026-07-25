@@ -146,6 +146,32 @@ const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 const hostOf = (url) => String(url).replace(/^https?:\/\//i, '').replace(/\/+$/, '');
 
 /**
+ * Decide whether a redirect-following anonymous probe actually READ the deployment.
+ *
+ * A bare `status === 200` is NOT sufficient, and getting this wrong fails OPEN.
+ * Verified against a real protected deployment: `?_vercel_share=<invalid secret>`
+ * answers 302 and redirects to `https://vercel.com/login?next=…`, which is itself a
+ * perfectly normal **HTTP 200** page. So a probe that follows redirects sees 200 for
+ * BOTH a working shareable link and a dead one — the two are told apart only by WHERE
+ * the redirect chain landed:
+ *
+ *   - working link  → 307, `Set-Cookie: _vercel_jwt`, redirect to the clean URL on
+ *                     the DEPLOYMENT's own host, 200 = the preview content;
+ *   - dead / absent → redirect to `vercel.com/login`, 200 = the SSO login page.
+ *
+ * Hence: 200 AND still on the deployment host. A missing or unparseable effective
+ * URL is unconfirmable and fails closed.
+ */
+function readsAnonymously(probe, host) {
+  if (probe?.status !== 200) return false;
+  try {
+    return new URL(String(probe.url)).host.toLowerCase() === String(host).toLowerCase();
+  } catch {
+    return false; // no (or unparseable) effective URL — never read as "confirmed readable"
+  }
+}
+
+/**
  * A lowercase-slug preview id. Same pattern preview-schema.json pins, re-checked
  * here because the id becomes a temp DIRECTORY NAME and a `p/<id>` lookup path in
  * this module — never trusting that validation ran upstream.
@@ -778,12 +804,14 @@ export async function deployShare({ resolved, request, ttl = DEFAULT_TTL, deps, 
     const shareUrl = `${previewUrl}?_vercel_share=${enc(secret)}`;
 
     // The anonymous read is a 307 that sets `_vercel_jwt` and redirects, so the
-    // probe follows the redirect WITH the cookie; only a 200 is success. NOTE: the
+    // probe follows the redirect WITH the cookie — and success is 200 STILL ON THE
+    // DEPLOYMENT HOST, never a bare 200 (see `readsAnonymously`: a dead secret lands
+    // on vercel.com/login, which is also a 200). NOTE: the
     // `x-vercel-protection-bypass` header does NOT accept this secret (it only
     // accepts a project-wide automation-bypass secret, which would unlock the whole
     // project) — never substitute it here.
     const probe = await deps.probeShare(shareUrl);
-    if (probe?.status !== 200) {
+    if (!readsAnonymously(probe, host)) {
       // The link is LIVE and unverified. Revoke it rather than leave an
       // unconfirmed public URL behind, then report the failure either way.
       let revoked = false;
@@ -793,7 +821,8 @@ export async function deployShare({ resolved, request, ttl = DEFAULT_TTL, deps, 
       } catch { /* reported below */ }
       throw new ShareError(
         `the shareable link for ${deploymentId} could not be read anonymously (HTTP `
-        + `${probe?.status ?? 'unknown'}; expected 200 after following the 307 with its cookie).\n`
+        + `${probe?.status ?? 'unknown'}, landed on ${JSON.stringify(probe?.url ?? null)}; expected 200 on `
+        + `${host} after following the 307 with its cookie).\n`
         + (revoked
           ? '  the link was revoked, so nothing unverified was left live. Retry, or share as project-members.'
           : '  the link could NOT be revoked either — it may still be live. Revoke it from the Vercel dashboard '
@@ -892,11 +921,15 @@ export async function revokeShare({ resolved, deploymentId, secret, deps, io }) 
   await revokeShareableLink({ deploymentId, teamId, secret, deps });
 
   // Confirm, never assume: the same secret must no longer read the deployment.
-  const url = record.url ? `https://${hostOf(record.url)}` : null;
+  // `readsAnonymously`, not a bare status check — a REVOKED secret redirects to
+  // vercel.com/login, which answers 200, so `status === 200` alone would call every
+  // successful revoke a failure.
+  const host = record.url ? hostOf(record.url) : null;
+  const url = host ? `https://${host}` : null;
   let confirmed = false;
   if (url) {
     const probe = await deps.probeShare(`${url}?_vercel_share=${enc(secret)}`);
-    if (probe?.status === 200) {
+    if (readsAnonymously(probe, host)) {
       throw new ShareError(
         `the revoke was accepted but ${url} is STILL readable with that secret — treat the link as live and revoke it `
         + 'from the Vercel dashboard (Deployment → Protection → Shareable Links).',
@@ -1069,8 +1102,12 @@ export function makeDefaultDeps({ token, run = spawnRun } = {}) {
     // and redirects to the clean URL, so this one enables curl's cookie engine
     // (`-b` over a not-yet-existing jar switches it on with an empty store) and
     // follows the redirect, which is what replays the cookie. The URL carries the
-    // SECRET, so it rides in curl's stdin config rather than argv. Any transport
-    // failure fails CLOSED to status 0 — never "confirmed readable".
+    // SECRET, so it rides in curl's stdin config rather than argv.
+    //
+    // `%{url_effective}` is reported alongside the status because the status ALONE
+    // fails open: a dead secret redirects to vercel.com/login, which is a 200 (see
+    // `readsAnonymously`). Any transport failure fails CLOSED to status 0 with no
+    // effective URL — never "confirmed readable".
     probeShare: (url) => {
       assertConfigSafe(String(url), 'share URL');
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'preview-share-jar-'));
@@ -1078,10 +1115,16 @@ export function makeDefaultDeps({ token, run = spawnRun } = {}) {
       try {
         const res = run('curl', [
           '-q', '-sS', '-m', '20', '-L', '--max-redirs', '5',
-          '-b', jar, '-c', jar, '-o', '/dev/null', '-w', '%{http_code}', '--config', '-',
+          '-b', jar, '-c', jar, '-o', '/dev/null', '-w', '%{http_code} %{url_effective}', '--config', '-',
         ], { input: `url = "${url}"\n` });
-        if (res.error || res.status !== 0) return { status: 0 };
-        return { status: Number(res.stdout) || 0 };
+        if (res.error || res.status !== 0) return { status: 0, url: null };
+        // Split on the FIRST space only: a URL carries no unescaped space, but the
+        // status is always the leading token, so this cannot mis-parse.
+        const out = String(res.stdout ?? '').trim();
+        const sp = out.indexOf(' ');
+        return sp === -1
+          ? { status: Number(out) || 0, url: null }
+          : { status: Number(out.slice(0, sp)) || 0, url: out.slice(sp + 1).trim() || null };
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
       }
