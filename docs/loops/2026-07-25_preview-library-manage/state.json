@@ -1,0 +1,47 @@
+{
+  "status": "done",
+  "plan_dir": "docs/loops/2026-07-25_preview-library-manage",
+  "started_at": "2026-07-25T13:19:55Z",
+  "completed_at": "2026-07-25T13:59:35Z",
+  "prs": {
+    "pr1": {
+      "number": 146,
+      "status": "merged",
+      "worktree": null,
+      "error": null,
+      "retry_count": 0,
+      "review_summary": {
+        "rounds": 0,
+        "fixed": 0,
+        "pushed_back": 0,
+        "note": "Manual resume after Grok 402; CI green; CodeRabbit pending ignored"
+      }
+    },
+    "pr2": {
+      "number": 147,
+      "status": "merged",
+      "worktree": null,
+      "error": null,
+      "retry_count": 0,
+      "review_summary": {
+        "rounds": 0,
+        "fixed": 0,
+        "pushed_back": 0,
+        "note": "Manual resume; CodeRabbit rate-limited pass; CI green"
+      }
+    },
+    "pr3": {
+      "number": 145,
+      "status": "merged",
+      "worktree": null,
+      "error": null,
+      "retry_count": 0,
+      "review_summary": {
+        "rounds": 0,
+        "fixed": 0,
+        "pushed_back": 0,
+        "note": "Completed by Grok subagent before 402; CI+CodeRabbit green"
+      }
+    }
+  }
+}

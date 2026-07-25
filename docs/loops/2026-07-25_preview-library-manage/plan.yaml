@@ -1,0 +1,40 @@
+name: "Preview Library manage mode + SKILL v2"
+source_todo: "/Users/Hana/Agents/tasks/doing/2026-07-23_preview-library-architecture.md"
+created_at: "2026-07-25"
+
+prs:
+  - id: pr1
+    branch: feature/preview-library-manage-mode
+    title: "feat(preview): library sidebar manage mode + supersededBy groups"
+    type: code
+    size: m
+    subagent: general-purpose
+    depends_on: []
+    spec: pr1-manage-mode.md
+    files:
+      - plugins/solopreneur/skills/preview/assets/preview-shell.js
+      - plugins/solopreneur/skills/preview/assets/library-index.html
+      - plugins/solopreneur/skills/preview/tests/preview-shell.test.mjs
+      - plugins/solopreneur/shared/config.md
+
+  - id: pr2
+    branch: feature/preview-skill-library-v2
+    title: "docs(preview): rewrite SKILL.md for Library v2 workflow"
+    type: code
+    size: m
+    subagent: general-purpose
+    depends_on: []
+    spec: pr2-skill-library-v2.md
+    files:
+      - plugins/solopreneur/skills/preview/SKILL.md
+
+  - id: pr3
+    branch: feature/mvp-preview-library-align
+    title: "docs(mvp): align preview layout with Library active/"
+    type: code
+    size: s
+    subagent: general-purpose
+    depends_on: []
+    spec: pr3-mvp-align.md
+    files:
+      - plugins/solopreneur/skills/mvp/SKILL.md
