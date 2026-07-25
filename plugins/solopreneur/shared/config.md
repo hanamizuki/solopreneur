@@ -1153,4 +1153,155 @@ Tests live in `tests/deploy-library.test.mjs`; run them the same way. Every case
 injects a fake `deps`, so the suite performs **zero real network calls and zero
 real deploys** and spawns no `vercel` or `git` process.
 
+## Sharing a single preview
+
+`scripts/deploy-share.mjs` deploys **one** Library item as an isolated snapshot
+into the **same** Vercel project, as a plain **preview** deployment. It adds no
+config surface: there is no share project, no second root, no second target — the
+resolved Library target's identity is what it deploys into.
+
+```bash
+node scripts/deploy-share.mjs                       # request on stdin
+node scripts/deploy-share.mjs --request req.json    # request from a file
+node scripts/deploy-share.mjs --list [--preview-id <id>] [--limit <n>]
+node scripts/deploy-share.mjs --revoke <deployment-id>   # secret on stdin
+```
+
+**Private targets only** — it asserts project protection before deploying, which
+would change a public target's access model.
+
+### The Share request
+
+The in-page Share block (`preview-shell.js`) produces the request; it holds no
+token and deploys nothing. The contract has one source: `deploy-share.mjs` imports
+`SHARE_SCHEMA_VERSION` and `ACCESS_OPTIONS` from that same asset rather than
+restating them, so the producer and consumer cannot drift.
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "preview-share-request",
+  "previewId": "<slug>",
+  "revision": 3,
+  "contentHash": "sha256:<hex>",
+  "url": "<source Library item URL>",
+  "access": "project-members"
+}
+```
+
+Nothing is defaulted: an unknown `schemaVersion`, a `null`/mistyped field (what the
+page emits when it cannot read its own metadata island) and an unknown `access` are
+all refusals. `url` is informational; `sourceUrl` is accepted as an alias.
+
+**Revision drift fails closed.** The module re-derives the item's `revision` and
+`contentHash` locally by running the real builder — the same canonical payload,
+hashed before chrome injection — and on any mismatch (or an unknown `previewId`)
+deploys **nothing**, naming both versions and telling you to reopen the latest
+Library page. A human must never see one version and share another.
+
+### The isolated artifact
+
+The selected preview becomes the **root page `/`**, not `/p/<id>/`. It carries only
+its own files plus `assets/comment-overlay.js`; it never contains the Library index,
+`directory.json`, another `/p/<id>/`, or the raw `preview.json` — asserted by a walk
+over the assembled tree before anything is deployed.
+
+The real builder stages the whole target (its cross-collection duplicate-id and
+`supersededBy` cycle checks only hold that way, so a broken sibling item blocks a
+share — the same refusal a publish gives), then the item's staged directory is moved
+out into a second temp root. **Both** temp roots are removed on every exit path,
+refusals included.
+
+A Share keeps the comment overlay but **not** `preview-shell.js`: with no
+`/directory.json` the sidebar would render "Catalog unavailable" and the Share block
+would offer to share a share, neither of which belongs on a page that may leave the
+project. The shell island + script are removed (exactly one match required, so a
+change to the builder's output or a preview containing that markup verbatim is a
+loud refusal) and a **static provenance footer** takes their place — same
+`footerModel`, same `resolve-provenance.mjs`, rendered from the builder's `item`
+inside the injection seam, because `directory.json` deliberately strips provenance.
+It shows ISO instants rather than viewer-local time: a static footer runs no
+JavaScript.
+
+### Never `--prod`, never `promote`
+
+A plain `vercel deploy` produces a `target: null` preview and does not move the
+project's scope alias, so Library production is untouched — there is no `--prod` and
+no promote path in the module at all. The project is pinned two documented ways
+(`.vercel/project.json` **and** `VERCEL_PROJECT_ID`/`VERCEL_ORG_ID`), because an
+unpinned deploy from a temp directory would create a project named after it.
+
+**A Share must never be a project's FIRST deployment.** Vercel publishes a project's
+first deployment as production even without `--prod`, so a project with no
+production deployment is refused (publish the Library first). After the deploy the
+`targets.production` pointer is re-read and must be unchanged — the module *proves*
+production did not move rather than assuming it.
+
+Metadata: `previewKind=share`, `previewId`, `revision`, `contentHash`, every value a
+**string** (Vercel returns `--meta` values as strings, so a numeric revision would
+never compare equal on read-back). The deployment is read back over the
+authenticated API and refused unless it is READY, in the pinned project, not
+production, and carrying exactly that metadata. Because the Library's stale-publish
+guard reads only `targets.production` **and** `previewKind=library`, a Share can
+never poison "what is the live Library revision".
+
+### Access modes
+
+`project-members` (the default) reports the deployment's own preview URL and
+verifies anonymously that it is challenged (302/401). A 200 means naked and fails
+closed. That check runs in **both** modes.
+
+`anyone-with-link` additionally creates a **per-deployment** shareable link:
+
+```http
+PATCH https://api.vercel.com/aliases/<deploymentId>/protection-bypass?teamId=<team>
+{"ttl": 604800}     # optional, max 63072000; omitted = never expires
+```
+
+The response is `{"protectionBypass": {"<secret>": {"scope": "shareable-link", …}}}`;
+entries are filtered by that scope and **exactly one** is required, because handing
+out a guessed secret is not acceptable. The anonymous read URL is
+`<deploymentUrl>?_vercel_share=<secret>`, which answers **307 + `Set-Cookie:
+_vercel_jwt`** and redirects — so the probe follows redirects with curl's cookie
+engine on, and success is reported only after it returns **200**. If it does not,
+the link is revoked immediately rather than left live unverified.
+
+`--ttl` defaults to **7 days**; `--ttl never` omits the field and warns. Revoke with
+the same endpoint and `{"revoke": {"secret": "<secret>", "regenerate": false}}`; the
+deployment is identity-checked as one of our shares first and the revoke is
+confirmed by an anonymous probe that must no longer reach 200.
+
+> **Never** substitute `x-vercel-protection-bypass` for a shareable-link secret. It
+> does not accept one — it accepts a project-level **automation-bypass** secret,
+> which would unlock the **whole project**.
+
+### Secret handling and known limitations
+
+The shareable-link secret is written **nowhere**: not `preview.json`, not
+`directory.json`, not git, not deployment metadata, and not process **argv** (the
+revoke body reaches curl through a `0600` file in a `0700` temp dir; the
+secret-bearing probe URL through curl's stdin config — the same discipline
+`vercel-protect.mjs` applies to the API token). It does appear in the create step's
+own report, because a shareable link is useless without it; what a calling agent
+does with captured stdout is that caller's concern.
+
+- **The secret cannot be looked up from a deployment id.** It is not on the
+  deployment object, and `project.protectionBypass` lists only automation-bypass
+  secrets — so `--revoke` **requires** it. Keep it for as long as the link should
+  live.
+- `--list` reads one page (`--limit`, default 100) with no pagination, and filters
+  `previewKind=share` client-side: `GET /v7/deployments` has no documented
+  `meta-<key>` filter, and an undocumented one is not something a "which of these is
+  safe to revoke" answer may depend on.
+- Deleting a deployment is deliberately **not** in this module — it is destructive
+  and needs an explicit human confirmation elsewhere.
+- A Share is a new origin, so existing Library comments do not travel with it (which
+  matches the overlay's "comments are not promised across deployments" contract).
+- One deploy per share, against the same daily deployment quota as a publish; a quota
+  rejection is reported with that advice.
+
+Tests live in `tests/deploy-share.test.mjs`; run them the same way. Every case
+injects a fake `deps`, so the suite performs **zero real network calls and zero real
+deploys** and spawns no `vercel` or `curl` process.
+
 ---
