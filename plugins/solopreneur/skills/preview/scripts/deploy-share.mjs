@@ -1308,8 +1308,17 @@ export async function main({ argv = [], io, makeDeps, build }) {
   const limit = mode === 'list' ? parseLimit(opts.limit) : undefined;
 
   const request = mode === 'deploy' ? parseShareRequest(readRequestText(opts, io)) : null;
-  if (mode === 'deploy' && ttl === null && request.access === 'anyone-with-link') {
+  if (mode === 'deploy' && request.access === 'anyone-with-link' && ttl === null) {
     io.print('WARNING: --ttl never — the shareable link will not expire until it is revoked.\n');
+  }
+  // `--ttl` only governs a shareable link, and the access mode is not known until the
+  // request is parsed. Say so rather than accept a flag that does nothing — the same
+  // rule the mode-conflict refusals enforce for the flags that CAN be checked early.
+  if (mode === 'deploy' && request.access !== 'anyone-with-link' && opts.ttl !== undefined) {
+    io.print(
+      `WARNING: --ttl is ignored for access ${JSON.stringify(request.access)} — it only bounds an `
+      + 'anyone-with-link shareable link, and this request asks for no link.\n',
+    );
   }
   const secret = mode === 'revoke' ? (opts.secret ?? io.readStdin('shareable-link secret')).trim() : null;
 

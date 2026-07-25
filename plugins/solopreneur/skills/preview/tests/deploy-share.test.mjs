@@ -52,8 +52,27 @@ import { PREVIEW_KIND } from '../scripts/deploy-library.mjs';
 const ORIGINAL_CWD = process.cwd();
 const ENV_KEYS = ['HOME', 'SOLOPRENEUR_CONFIG', 'CLAUDE_CONFIG_DIR'];
 
+/**
+ * This file gets its OWN TMPDIR, and that is load-bearing rather than tidiness.
+ *
+ * `node --test` runs test FILES in parallel processes, and build-library.test.mjs
+ * asserts on the COUNT of `preview-build-*` directories in `os.tmpdir()` to prove an
+ * aborted build removes its staging tree. This suite drives the REAL builder, so its
+ * staging dirs would land in that same shared namespace and make that assertion
+ * flaky — observed failing exactly that way. `os.tmpdir()` reads `TMPDIR` on every
+ * call and each file is a separate process, so redirecting it here is fully contained
+ * and needs no change to the sibling suite or to build-library.mjs.
+ *
+ * Set before any `tmp()` call: module-level statements run before the tests do.
+ */
+const TMP_HOME = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'solo-share-tmp-'));
+process.env.TMPDIR = TMP_HOME;
+
 const fixtures = [];
-after(() => { for (const dir of fixtures) fs.rmSync(dir, { recursive: true, force: true }); });
+after(() => {
+  for (const dir of fixtures) fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(TMP_HOME, { recursive: true, force: true });
+});
 
 const ORIGINAL_ENV = {};
 for (const key of ENV_KEYS) ORIGINAL_ENV[key] = process.env[key];
@@ -1249,6 +1268,19 @@ test('the CLI reads a request from a file, and reports it for a human', async ()
   assert.match(text, /library prod:\s+dpl_library_production \(unchanged\)/);
   assert.match(text, /NOTE: that URL embeds a secret/);
   assert.deepEqual(io.stdinReads, [], 'a file request must not touch stdin');
+});
+
+test('the CLI warns that --ttl is ignored for a project-members request', async () => {
+  const { root } = cliFixture();
+  const facts = itemFacts(root, 'alpha');
+  const io = fakeIo({
+    stdin: JSON.stringify({
+      schemaVersion: 1, previewId: 'alpha', revision: facts.revision, contentHash: facts.contentHash, access: 'project-members',
+    }),
+  });
+  const code = await main({ argv: ['--ttl', '60'], io, makeDeps: () => fakeDeps() });
+  assert.equal(code, 0);
+  assert.match(io.text(), /--ttl is ignored for access "project-members"/);
 });
 
 test('the CLI warns when --ttl never is combined with a public link', async () => {
