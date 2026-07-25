@@ -269,22 +269,39 @@
   // it from overflowing the viewport. Inline `setProperty(…, 'important')`
   // is the single path — no mirrored stylesheet (that was dual-tracked noise).
 
+  // Inline body properties the push offset may overwrite. Snapshotted on
+  // first apply so close restores the page's own values instead of wiping
+  // authored inline styles for the rest of the session.
+  const PUSH_STYLE_PROPS = ["margin-left", "width", "max-width", "box-sizing"];
+  let pushStyleSnapshot = null; // null = no push applied by us
+
   // Apply or clear the light-DOM push offset. Safe to call on every open/
-  // mode-change/close: closed always fully removes what we set.
+  // mode-change/close: closed restores any snapshotted page styles.
   function applyPushOffset(on) {
     const body = document.body;
     if (!body) return;
     const w = SIDEBAR_WIDTH_PX + "px";
     if (on) {
+      if (!pushStyleSnapshot) {
+        pushStyleSnapshot = {};
+        for (const prop of PUSH_STYLE_PROPS) {
+          pushStyleSnapshot[prop] = {
+            value: body.style.getPropertyValue(prop),
+            priority: body.style.getPropertyPriority(prop),
+          };
+        }
+      }
       body.style.setProperty("margin-left", w, "important");
       body.style.setProperty("width", "calc(100% - " + w + ")", "important");
       body.style.setProperty("max-width", "calc(100vw - " + w + ")", "important");
       body.style.setProperty("box-sizing", "border-box", "important");
-    } else {
-      body.style.removeProperty("margin-left");
-      body.style.removeProperty("width");
-      body.style.removeProperty("max-width");
-      body.style.removeProperty("box-sizing");
+    } else if (pushStyleSnapshot) {
+      for (const prop of PUSH_STYLE_PROPS) {
+        const prev = pushStyleSnapshot[prop];
+        if (prev && prev.value) body.style.setProperty(prop, prev.value, prev.priority || undefined);
+        else body.style.removeProperty(prop);
+      }
+      pushStyleSnapshot = null;
     }
   }
 
@@ -387,9 +404,17 @@
     scrim.addEventListener("click", close);
     // Escape must work when focus is in the light-DOM page content, so listen
     // on document — a shadow-root-only listener never sees those keydowns.
+    // Skip when the comment overlay (or any other light-DOM UI) already
+    // consumed Escape: it sets defaultPrevented / stopPropagation, and its
+    // active editors live under [data-cmt-ui] / contenteditable surfaces.
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       if (!sidebar.classList.contains("open")) return;
+      if (e.defaultPrevented) return;
+      const t = e.target;
+      if (t && typeof t.closest === "function") {
+        if (t.closest("[data-cmt-ui], [contenteditable='true'], textarea, input, select")) return;
+      }
       close();
     });
 
@@ -412,7 +437,12 @@
 
     // Restore prior open state only in push mode. Overlay restore would slam
     // a scrim over the page on a phone that shared the desktop's open flag.
-    if (readStoredSidebarOpen() && currentSidebarMode() === "push") open();
+    // Use applyChrome + writeStored (not open()) so restore does NOT steal
+    // focus into the sidebar — the newly loaded document keeps initial focus.
+    if (readStoredSidebarOpen() && currentSidebarMode() === "push") {
+      applyChrome(true);
+      writeStoredSidebarOpen(true);
+    }
 
     // Archive is COLLAPSED by default (aria-expanded="false", section
     // hidden). Toggling flips both.
