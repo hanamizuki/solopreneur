@@ -55,7 +55,7 @@ skills that wrap the lifecycle around your work.
 | [`/tech-vetting`](./plugins/solopreneur/skills/tech-vetting/SKILL.md) | **Tech Lead.** Vets your technical plan against the latest official docs and platform-specific best practices before you write a single line of code |
 | [`/worktree-handoff`](./plugins/solopreneur/skills/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
 | [`/handoff`](./plugins/solopreneur/skills/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). No worktree, no file save |
-| [`/preview`](./plugins/solopreneur/skills/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into an interactive HTML page, deploys it to Vercel for a protected-by-default review URL (or a public bucket when explicitly requested), with an in-page comment overlay so reviewers can highlight text and leave in-context feedback you can act on directly |
+| [`/preview`](./plugins/solopreneur/skills/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into interactive HTML and publishes a **private Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments). Single-item **Share** requests deploy an isolated preview of one entry without changing the Library production URL. Legacy per-page deploy remains for compatibility |
 | [`/specialist-review`](./plugins/solopreneur/skills/specialist-review/SKILL.md) | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
 | [`/post-mortem`](./plugins/solopreneur/skills/post-mortem/SKILL.md) | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
 | [`/session-retro`](./plugins/solopreneur/skills/session-retro/SKILL.md) | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
@@ -97,7 +97,7 @@ Start them and walk away. They loop until the job is done.
 - **[Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector)**: recommended. `/greenlight` PR mode default reviewer (`@codex review`).
 - **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR-mode reviewer (`/gemini review`), offered only when activity detection finds it acting on the repo. Consumer Code Assist stopped GitHub code review on 2026-07-17; **enterprise is unaffected**. For post-commit review, `/greenlight` uses the Antigravity CLI (`agy`) as its Gemini-family reviewer.
 - **[CodeRabbit](https://coderabbit.ai)**: optional. `/greenlight` passive reviewer (auto-triggered on push).
-- **[Vercel CLI](https://vercel.com/docs/cli)**: optional. `/preview` deploys previews to a protected Vercel review URL when present, can target a public bucket for external sharing, and gracefully degrades to a local `open` of the HTML when absent.
+- **[Vercel CLI](https://vercel.com/docs/cli)**: optional. `/preview` publishes a private Library (and optional per-item Share deployments) to a Vercel project when present; first-run setup provisions a single private target. Gracefully degrades to a local `open` of the HTML when absent.
 
 ---
 
