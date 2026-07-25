@@ -22,7 +22,19 @@ import assert from 'node:assert/strict';
 
 import shell from '../assets/preview-shell.js';
 
-const { groupDirectory, partyLine, footerModel, buildShareRequest, shareRequestText, ACCESS_OPTIONS, SHARE_SCHEMA_VERSION } = shell;
+const {
+  groupDirectory,
+  partyLine,
+  footerModel,
+  buildShareRequest,
+  shareRequestText,
+  sidebarLayoutMode,
+  sidebarStoredOpen,
+  ACCESS_OPTIONS,
+  SHARE_SCHEMA_VERSION,
+  SIDEBAR_PUSH_MIN_PX,
+  SIDEBAR_STORAGE_KEY,
+} = shell;
 
 // --- groupDirectory ---------------------------------------------------------
 
@@ -157,4 +169,26 @@ test('buildShareRequest nulls absent / non-string fields (no fabrication)', () =
 test('shareRequestText is parseable JSON round-tripping the request', () => {
   const req = buildShareRequest({ id: 'p1', revision: 1, contentHash: 'sha256:x', url: 'https://x/', access: 'project-members' });
   assert.deepEqual(JSON.parse(shareRequestText(req)), req);
+});
+
+// --- sidebar layout / persistence helpers ----------------------------------
+
+test('sidebarLayoutMode is push at/above the breakpoint and overlay below', () => {
+  assert.equal(sidebarLayoutMode(SIDEBAR_PUSH_MIN_PX, SIDEBAR_PUSH_MIN_PX), 'push');
+  assert.equal(sidebarLayoutMode(SIDEBAR_PUSH_MIN_PX + 200, SIDEBAR_PUSH_MIN_PX), 'push');
+  assert.equal(sidebarLayoutMode(SIDEBAR_PUSH_MIN_PX - 1, SIDEBAR_PUSH_MIN_PX), 'overlay');
+  assert.equal(sidebarLayoutMode(0, SIDEBAR_PUSH_MIN_PX), 'overlay');
+  // Non-finite widths fail closed to overlay (never pad a body we cannot size).
+  assert.equal(sidebarLayoutMode(NaN, SIDEBAR_PUSH_MIN_PX), 'overlay');
+  assert.equal(sidebarLayoutMode(undefined, SIDEBAR_PUSH_MIN_PX), 'overlay');
+});
+
+test('sidebarStoredOpen only treats the exact "open" token as restored-open', () => {
+  assert.equal(sidebarStoredOpen('open'), true);
+  assert.equal(sidebarStoredOpen('closed'), false);
+  assert.equal(sidebarStoredOpen(null), false);
+  assert.equal(sidebarStoredOpen(''), false);
+  assert.equal(sidebarStoredOpen('OPEN'), false);
+  assert.equal(typeof SIDEBAR_STORAGE_KEY, 'string');
+  assert.ok(SIDEBAR_STORAGE_KEY.length > 0);
 });

@@ -2,8 +2,14 @@
 //
 // Three pieces of chrome, all inside a Shadow DOM so the shell's styles
 // never leak into (or inherit from) the preview content:
-//   1. a top-left directory icon that opens a sidebar catalog (active +
-//      archive sections, archive collapsed, current page marked);
+//   1. a library sidebar (active + archive sections, archive collapsed,
+//      current page marked). Expand/collapse is one concept: a floating
+//      expand control when closed; the same control relocates into the
+//      sidebar head when open (no folder glyph, no ✕). On wide viewports
+//      the open state is a PUSH layout (page content shifts right, no
+//      scrim); on narrow viewports it stays an overlay drawer with scrim.
+//      Open/closed is remembered in localStorage across pages in the same
+//      origin.
 //   2. a provenance footer ("who produced / last updated" this preview),
 //      rendered from the display shape resolve-provenance.mjs returns;
 //   3. a Share request block — it does NOT deploy and holds NO token; it
@@ -36,9 +42,30 @@
   // performs no deploy and carries no token.
   const ACCESS_OPTIONS = ["project-members", "anyone-with-link"];
 
+  // Sidebar layout: wide enough to push content; narrower = temporary overlay.
+  const SIDEBAR_WIDTH_PX = 300;
+  const SIDEBAR_PUSH_MIN_PX = 720;
+  // Origin-scoped; only this shell reads/writes it. Values: "open" | "closed".
+  const SIDEBAR_STORAGE_KEY = "preview_shell_sidebar";
+
   // ===================================================================
   // Pure, DOM-free helpers (also the Node unit-test seam)
   // ===================================================================
+
+  // "push" = docked panel that reserves layout space; "overlay" = drawer +
+  // scrim. Pure so unit tests pin the breakpoint without a window.
+  function sidebarLayoutMode(viewportWidthPx, minPushPx) {
+    const w = Number(viewportWidthPx);
+    const min = Number(minPushPx);
+    if (!Number.isFinite(w) || !Number.isFinite(min)) return "overlay";
+    return w >= min ? "push" : "overlay";
+  }
+
+  // localStorage value -> whether to restore open on boot. Anything other
+  // than the exact string "open" is closed (including missing / corrupt).
+  function sidebarStoredOpen(stored) {
+    return stored === "open";
+  }
 
   // Group a directory.json item list into { active, archive }, each sorted
   // updatedAt DESC then id ASC. The builder already emits them in that
@@ -137,8 +164,13 @@
       footerModel,
       buildShareRequest,
       shareRequestText,
+      sidebarLayoutMode,
+      sidebarStoredOpen,
       SHARE_SCHEMA_VERSION,
       ACCESS_OPTIONS,
+      SIDEBAR_WIDTH_PX,
+      SIDEBAR_PUSH_MIN_PX,
+      SIDEBAR_STORAGE_KEY,
     };
   }
 
@@ -216,39 +248,201 @@
   }
 
   // --- sidebar ------------------------------------------------------------
+  //
+  // Two open modes (breakpoint SIDEBAR_PUSH_MIN_PX):
+  //   - push (wide): the panel is a fixed dock; the LIGHT DOM page is
+  //     shifted right so content is not covered. No scrim — clicking the
+  //     preview does not dismiss the catalog. Open/closed is sticky.
+  //   - overlay (narrow): classic drawer + dimmed scrim; scrim click closes.
+  // Mode is re-evaluated on resize while open so a phone rotating into
+  // landscape does not leave a stuck scrim or a missing push offset.
+  //
+  // Persistence: SIDEBAR_STORAGE_KEY on localStorage ("open" | "closed").
+  // Failures (private mode, quota) are silent — the toggle still works for
+  // the current page.
+  //
+  // Why margin+width (not just padding-left on body): preview pages often
+  // style `body { padding: …; max-width: … }` and some layouts treat the
+  // body as a full-bleed canvas. A lone padding-left is easy to lose to
+  // shorthand resets or to leave 100vw-wide children sitting under the
+  // fixed panel. margin-left shifts the whole body box; width calc keeps
+  // it from overflowing the viewport. Inline `setProperty(…, 'important')`
+  // is the single path — no mirrored stylesheet (that was dual-tracked noise).
+
+  // Inline body properties the push offset may overwrite. Snapshotted on
+  // first apply so close restores the page's own values instead of wiping
+  // authored inline styles for the rest of the session.
+  const PUSH_STYLE_PROPS = ["margin-left", "width", "max-width", "box-sizing"];
+  let pushStyleSnapshot = null; // null = no push applied by us
+
+  // Apply or clear the light-DOM push offset. Safe to call on every open/
+  // mode-change/close: closed restores any snapshotted page styles.
+  function applyPushOffset(on) {
+    const body = document.body;
+    if (!body) return;
+    const w = SIDEBAR_WIDTH_PX + "px";
+    if (on) {
+      if (!pushStyleSnapshot) {
+        pushStyleSnapshot = {};
+        for (const prop of PUSH_STYLE_PROPS) {
+          pushStyleSnapshot[prop] = {
+            value: body.style.getPropertyValue(prop),
+            priority: body.style.getPropertyPriority(prop),
+          };
+        }
+      }
+      body.style.setProperty("margin-left", w, "important");
+      body.style.setProperty("width", "calc(100% - " + w + ")", "important");
+      body.style.setProperty("max-width", "calc(100vw - " + w + ")", "important");
+      body.style.setProperty("box-sizing", "border-box", "important");
+    } else if (pushStyleSnapshot) {
+      for (const prop of PUSH_STYLE_PROPS) {
+        const prev = pushStyleSnapshot[prop];
+        if (prev && prev.value) body.style.setProperty(prop, prev.value, prev.priority || undefined);
+        else body.style.removeProperty(prop);
+      }
+      pushStyleSnapshot = null;
+    }
+  }
+
+  function currentSidebarMode() {
+    // matchMedia is the native breakpoint primitive (same approach as
+    // comment-overlay.js). Pure sidebarLayoutMode stays for Node tests.
+    try {
+      if (window.matchMedia) {
+        return window.matchMedia("(min-width: " + SIDEBAR_PUSH_MIN_PX + "px)").matches
+          ? "push"
+          : "overlay";
+      }
+    } catch (_) { /* fall through */ }
+    return sidebarLayoutMode(window.innerWidth || 0, SIDEBAR_PUSH_MIN_PX);
+  }
+
+  function readStoredSidebarOpen() {
+    try {
+      return sidebarStoredOpen(localStorage.getItem(SIDEBAR_STORAGE_KEY));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function writeStoredSidebarOpen(isOpen) {
+    try {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, isOpen ? "open" : "closed");
+    } catch (_) {
+      /* private mode / quota — non-fatal */
+    }
+  }
+
   function wireSidebar(root) {
-    const icon = root.querySelector("#ps-icon");
+    const wrap = root.querySelector(".ps-wrap");
+    // Two placements of the same expand/collapse control:
+    //   #ps-expand   — floating, only while closed (opens the panel)
+    //   #ps-collapse — in the sidebar head, only while open (closes it)
+    // Never both visible; never a folder glyph or a bare ✕.
+    const expandBtn = root.querySelector("#ps-expand");
+    const collapseBtn = root.querySelector("#ps-collapse");
     const sidebar = root.querySelector("#ps-sidebar");
     const scrim = root.querySelector("#ps-scrim");
-    const closeBtn = root.querySelector("#ps-sidebar-close");
     const archiveToggle = root.querySelector("#ps-archive-toggle");
 
     // A closed sidebar is only translated off-screen, so without `inert` its
-    // links / close button / archive toggle would stay in the Tab order and
+    // links / collapse button / archive toggle would stay in the Tab order and
     // exposed to assistive tech — invisible controls a keyboard user lands on
     // mid-page. `inert` is the native fix (no focus, no AT, no clicks); it
     // starts set in the markup and is cleared only while open. Browsers without
     // `inert` simply ignore it, which is no worse than not having it.
+    const applyChrome = (isOpen) => {
+      const mode = currentSidebarMode();
+      const push = isOpen && mode === "push";
+      const overlay = isOpen && mode === "overlay";
+
+      sidebar.classList.toggle("open", isOpen);
+      // is-push styles the docked panel (no drawer shadow). Only class that
+      // the stylesheet reads — no dead is-open / is-overlay toggles.
+      wrap.classList.toggle("is-push", push);
+
+      // Scrim only in overlay mode — never in push (that would feel temporary).
+      scrim.classList.toggle("open", overlay);
+
+      // Push shifts the page; overlay must never leave a leftover offset.
+      applyPushOffset(push);
+
+      // Floating expand is hidden while open so it cannot cover the shifted
+      // content; the collapse control in the head takes over.
+      expandBtn.hidden = isOpen;
+      collapseBtn.hidden = !isOpen;
+      expandBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      collapseBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+
+      if (isOpen) {
+        sidebar.inert = false;
+        sidebar.removeAttribute("inert");
+      } else {
+        sidebar.inert = true;
+        sidebar.setAttribute("inert", "");
+      }
+    };
+
     const open = () => {
-      sidebar.classList.add("open");
-      scrim.classList.add("open");
-      sidebar.inert = false;
-      sidebar.removeAttribute("inert");
-      icon.setAttribute("aria-expanded", "true");
+      applyChrome(true);
+      writeStoredSidebarOpen(true);
+      // Move focus into the still-visible control (expand is now hidden).
+      try { collapseBtn.focus(); } catch (_) { /* non-focusable environments */ }
     };
     const close = () => {
-      sidebar.classList.remove("open");
-      scrim.classList.remove("open");
-      sidebar.inert = true;
-      sidebar.setAttribute("inert", "");
-      icon.setAttribute("aria-expanded", "false");
+      applyChrome(false);
+      writeStoredSidebarOpen(false);
+      // Return focus to the floating expand (standard expandable-panel a11y).
+      try { expandBtn.focus(); } catch (_) { /* non-focusable environments */ }
     };
-    icon.addEventListener("click", () => (sidebar.classList.contains("open") ? close() : open()));
+
+    expandBtn.addEventListener("click", open);
+    collapseBtn.addEventListener("click", close);
+    // Scrim is only interactive in overlay mode (see applyChrome); a no-op
+    // click when closed is fine.
     scrim.addEventListener("click", close);
-    closeBtn.addEventListener("click", close);
-    root.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") close();
+    // Escape must work when focus is in the light-DOM page content, so listen
+    // on document — a shadow-root-only listener never sees those keydowns.
+    // Skip when the comment overlay (or any other light-DOM UI) already
+    // consumed Escape: it sets defaultPrevented / stopPropagation, and its
+    // active editors live under [data-cmt-ui] / contenteditable surfaces.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (!sidebar.classList.contains("open")) return;
+      if (e.defaultPrevented) return;
+      const t = e.target;
+      if (t && typeof t.closest === "function") {
+        if (t.closest("[data-cmt-ui], [contenteditable='true'], textarea, input, select")) return;
+      }
+      close();
     });
+
+    // Re-apply chrome when the viewport crosses the push/overlay breakpoint
+    // so offset and scrim stay consistent with the current mode. matchMedia
+    // fires only on the crossing, not on every pixel of a resize drag.
+    const mql = window.matchMedia
+      ? window.matchMedia("(min-width: " + SIDEBAR_PUSH_MIN_PX + "px)")
+      : null;
+    const onBreakpoint = () => {
+      // Re-check open: a delayed callback must not reopen after the user
+      // explicitly collapsed (TOCTOU with any prior debounce; still correct
+      // with matchMedia's synchronous change).
+      if (sidebar.classList.contains("open")) applyChrome(true);
+    };
+    if (mql) {
+      if (typeof mql.addEventListener === "function") mql.addEventListener("change", onBreakpoint);
+      else if (typeof mql.addListener === "function") mql.addListener(onBreakpoint); // Safari < 14
+    }
+
+    // Restore prior open state only in push mode. Overlay restore would slam
+    // a scrim over the page on a phone that shared the desktop's open flag.
+    // Use applyChrome + writeStored (not open()) so restore does NOT steal
+    // focus into the sidebar — the newly loaded document keeps initial focus.
+    if (readStoredSidebarOpen() && currentSidebarMode() === "push") {
+      applyChrome(true);
+      writeStoredSidebarOpen(true);
+    }
 
     // Archive is COLLAPSED by default (aria-expanded="false", section
     // hidden). Toggling flips both.
@@ -465,18 +659,22 @@
     color: #111827;
     line-height: 1.5;
   }
-  /* Directory icon — fixed top-left. Fixed positioning resolves against
-     the viewport from inside a shadow root (the host has no transformed
-     ancestor). */
-  #ps-icon {
+  /* Expand control — fixed top-left while the panel is closed. Hidden
+     entirely when open (the head's collapse control takes over) so it
+     never sits on top of the pushed content. Fixed positioning resolves
+     against the viewport from inside a shadow root. */
+  #ps-expand {
     position: fixed; top: 14px; left: 14px; z-index: 9996;
     width: 40px; height: 40px; border-radius: 10px;
     border: 1px solid #e5e7eb; background: #ffffff; color: #1f2937;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.10);
+    padding: 0;
   }
-  #ps-icon:hover { background: #f9fafb; }
-  #ps-icon svg { width: 20px; height: 20px; display: block; }
+  #ps-expand:hover { background: #f9fafb; }
+  #ps-expand[hidden] { display: none !important; }
+  #ps-expand svg, #ps-collapse svg { width: 20px; height: 20px; display: block; }
+  /* Scrim is overlay-only (narrow). Push mode never adds .open to it. */
   #ps-scrim {
     position: fixed; inset: 0; z-index: 10010;
     background: rgba(0,0,0,.35); opacity: 0; pointer-events: none;
@@ -485,24 +683,38 @@
   #ps-scrim.open { opacity: 1; pointer-events: auto; }
   #ps-sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 10011;
-    width: 300px; max-width: 84vw; background: #ffffff;
-    border-right: 1px solid #e5e7eb; box-shadow: 2px 0 24px rgba(0,0,0,.14);
+    width: ${SIDEBAR_WIDTH_PX}px; max-width: 84vw; background: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    /* Overlay feels like a drawer (shadow); push feels like a docked pane. */
+    box-shadow: 2px 0 24px rgba(0,0,0,.14);
     transform: translateX(-104%); transition: transform .2s cubic-bezier(.22,1,.36,1);
     display: flex; flex-direction: column;
   }
   #ps-sidebar.open { transform: translateX(0); }
+  .ps-wrap.is-push #ps-sidebar {
+    box-shadow: none;
+    max-width: ${SIDEBAR_WIDTH_PX}px; /* never shrink the docked panel under vw pressure */
+  }
   @media (prefers-reduced-motion: reduce) {
     #ps-sidebar, #ps-scrim { transition: none; }
   }
   .ps-sidebar-head {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 14px 10px; border-bottom: 1px solid #f0f0ef;
+    padding: 10px 10px 10px 14px; border-bottom: 1px solid #f0f0ef;
+    gap: 8px;
   }
   .ps-sidebar-title { font-size: 14px; font-weight: 600; color: #111827; }
-  #ps-sidebar-close {
-    border: none; background: transparent; cursor: pointer;
-    font-size: 18px; line-height: 1; color: #6b7280; padding: 4px 8px;
+  /* Collapse control — same visual language as #ps-expand, sits where the
+     old ✕ was. Hidden while the panel is closed. */
+  #ps-collapse {
+    flex: 0 0 auto;
+    width: 36px; height: 36px; border-radius: 10px;
+    border: 1px solid #e5e7eb; background: #ffffff; color: #1f2937;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0;
   }
+  #ps-collapse:hover { background: #f9fafb; }
+  #ps-collapse[hidden] { display: none !important; }
   .ps-sidebar-body { overflow-y: auto; padding: 8px 10px 20px; }
   .ps-section-head {
     display: flex; align-items: center; gap: 6px; width: 100%;
@@ -578,17 +790,29 @@
   #ps-share-copy:hover { background: #111827; }
 </style>`;
 
+  // Expand / collapse glyphs: a left rail (the panel) + a chevron. Expand
+  // points the chevron outward (open the panel); collapse points it inward
+  // (dock it away). Same metaphor in both placements — not a folder, not ✕.
+  const ICON_EXPAND = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="6" height="16" rx="1.5"></rect>
+      <path d="M14 8l4 4-4 4"></path>
+    </svg>`;
+  const ICON_COLLAPSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="6" height="16" rx="1.5"></rect>
+      <path d="M18 8l-4 4 4 4"></path>
+    </svg>`;
+
   const MARKUP = `<div class="ps-wrap">
-  <button id="ps-icon" type="button" aria-label="Open library" aria-expanded="false" aria-controls="ps-sidebar" data-cmt-ui="1">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-    </svg>
+  <button id="ps-expand" type="button" aria-label="Expand library" aria-expanded="false" aria-controls="ps-sidebar" data-cmt-ui="1">
+    ${ICON_EXPAND}
   </button>
   <div id="ps-scrim" data-cmt-ui="1"></div>
   <nav id="ps-sidebar" aria-label="Preview library" data-cmt-ui="1" inert>
     <div class="ps-sidebar-head">
       <span class="ps-sidebar-title">Library</span>
-      <button id="ps-sidebar-close" type="button" aria-label="Close">✕</button>
+      <button id="ps-collapse" type="button" aria-label="Collapse library" aria-expanded="false" aria-controls="ps-sidebar" hidden data-cmt-ui="1">
+        ${ICON_COLLAPSE}
+      </button>
     </div>
     <div class="ps-sidebar-body">
       <div class="ps-section-head">
