@@ -36,6 +36,7 @@ import {
   snapshotId,
   sourceGuard,
   assertMovesForward,
+  contentTree,
   DeployError,
   STATE,
   PREVIEW_KIND,
@@ -439,6 +440,85 @@ test('assertMovesForward allows an equal or descendant commit and refuses otherw
   );
 });
 
+/**
+ * Git responses for a checkout whose content root is `docs/preview`, where the
+ * commit the live Library recorded was REBASED away (the object is unreachable) but
+ * its content survives in our history under a new hash. `trees` maps a rev to the
+ * tree oid of the content root at that rev; a rev that is absent resolves to
+ * nothing, which is exactly what an orphaned commit does on a machine that never
+ * had it.
+ */
+const TREE_LIVE = 'ab'.repeat(20);
+const TREE_NEW = 'cd'.repeat(20);
+const TREE_OLD = 'ef'.repeat(20);
+const TREE_THEIRS = 'ba'.repeat(20);
+
+const rebasedRepo = ({ history, trees, ancestor = 1 }) => {
+  const script = {
+    'merge-base --is-ancestor': { status: ancestor, stdout: '' },
+    'rev-parse --show-prefix': { status: 0, stdout: 'docs/preview/\n' },
+    'rev-list': { status: 0, stdout: `${history.join('\n')}\n` },
+  };
+  for (const [rev, tree] of Object.entries(trees)) {
+    script[`rev-parse --verify ${rev}:docs/preview`] = { status: 0, stdout: `${tree}\n` };
+  }
+  return script;
+};
+
+test('assertMovesForward accepts a rebased-away live commit whose content is in our history', () => {
+  // The live publish recorded `orphan`, which no longer exists as a reachable
+  // commit — but our own `older` holds exactly the tree it published from.
+  const deps = fakeDeps({
+    gitScript: rebasedRepo({
+      history: ['head', 'older'],
+      trees: { orphan: TREE_LIVE, head: TREE_NEW, older: TREE_LIVE },
+    }),
+  });
+  const io = fakeIo();
+  assertMovesForward({ liveCommit: 'orphan', commit: 'head', root: '/r', deps, io });
+  assert.match(io.text(), /unreachable from this checkout/);
+  assert.match(io.text(), /publish proceeds/);
+});
+
+test('assertMovesForward reads the recorded sourceTree, so the orphaned commit need not be local', () => {
+  // No `orphan:` entry at all — the machine publishing now never pulled that commit.
+  // The tree recorded in the deployment metadata is what makes the comparison work.
+  const deps = fakeDeps({
+    gitScript: rebasedRepo({ history: ['head', 'older'], trees: { head: TREE_NEW, older: TREE_LIVE } }),
+  });
+  const io = fakeIo();
+  assertMovesForward({ liveCommit: 'orphan', liveTree: TREE_LIVE, commit: 'head', root: '/r', deps, io });
+  assert.match(io.text(), new RegExp(TREE_LIVE.slice(0, 12)));
+});
+
+test('assertMovesForward still refuses when the live content is nowhere in our history', () => {
+  // Genuine divergence: another machine published content we have never held.
+  const deps = fakeDeps({
+    gitScript: rebasedRepo({ history: ['head', 'older'], trees: { head: TREE_NEW, older: TREE_OLD } }),
+  });
+  assert.throws(
+    () => assertMovesForward({ liveCommit: 'theirs', liveTree: TREE_THEIRS, commit: 'head', root: '/r', deps }),
+    isDeployError(/not in our history either/),
+  );
+});
+
+test('assertMovesForward refuses when the content root is not in a git repo at all', () => {
+  // `--show-prefix` fails -> no tree to compare -> the fallback must not pass.
+  const deps = fakeDeps({ gitScript: { 'merge-base --is-ancestor': { status: 1, stdout: '' } } });
+  assert.throws(
+    () => assertMovesForward({ liveCommit: 'a', liveTree: TREE_LIVE, commit: 'b', root: '/r', deps }),
+    isDeployError(/go backwards/),
+  );
+});
+
+test('contentTree resolves the content root tree, and is null outside a repo', () => {
+  const inRepo = fakeDeps({ gitScript: rebasedRepo({ history: ['head'], trees: { head: TREE_NEW } }) });
+  assert.equal(contentTree({ rev: 'head', root: '/r', deps: inRepo }), TREE_NEW);
+
+  const noRepo = fakeDeps({ gitScript: {} });
+  assert.equal(contentTree({ rev: 'head', root: '/r', deps: noRepo }), null);
+});
+
 // --- the staged flow --------------------------------------------------------
 
 test('publish deploys a PLAIN preview first, verifies it, and only then promotes', async () => {
@@ -479,6 +559,31 @@ test('every library deployment carries previewKind=library metadata plus the sou
   assert.equal(meta.sourceCommit, commit);
   assert.equal(meta.snapshot, report.snapshot);
   assert.match(meta.snapshot, /^[0-9a-f]{64}$/);
+});
+
+test('a publish records the content tree next to the commit, so a later rebase cannot orphan it', async () => {
+  const root = contentRoot();
+  const commit = '1'.repeat(40);
+  const deps = fakeDeps({
+    gitScript: cleanRepo(commit, {
+      'rev-parse --show-prefix': { status: 0, stdout: 'docs/preview/\n' },
+      [`rev-parse --verify ${commit}:docs/preview`]: { status: 0, stdout: `${TREE_NEW}\n` },
+    }),
+  });
+
+  const { error } = await run(resolvedConfig(root), deps);
+  assert.ifError(error);
+  assert.equal(deps.calls.deploy[0].meta.sourceTree, TREE_NEW);
+});
+
+test('a publish outside a git repo records neither commit nor tree', async () => {
+  const root = contentRoot();
+  const deps = fakeDeps({ gitScript: {} });
+
+  const { error } = await run(resolvedConfig(root), deps);
+  assert.ifError(error);
+  assert.equal(deps.calls.deploy[0].meta.sourceCommit, undefined);
+  assert.equal(deps.calls.deploy[0].meta.sourceTree, undefined);
 });
 
 test('the promoted production is verified after the promote, not just the preview', async () => {

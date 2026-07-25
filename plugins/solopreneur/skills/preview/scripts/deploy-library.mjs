@@ -68,11 +68,23 @@
  * A multi-machine fleet may publish from either machine, and every publish is a
  * FULL snapshot — so an older machine can make the latest pointer go backwards.
  * When the content root is a git repo the publish requires it to be clean and not
- * behind its remote for the content path, records the source commit in the
- * deployment metadata, and refuses to promote over a live production whose recorded
- * commit is not an ancestor of ours. When the content root is NOT a git repo the
- * guard is skipped (documented caveat: without a canonical publisher the latest
- * pointer can briefly go backwards) — git is never hard-required.
+ * behind its remote for the content path, records the source commit AND the content
+ * root's tree oid in the deployment metadata, and refuses to promote over a live
+ * production whose recorded content is not already in our history. When the content
+ * root is NOT a git repo the guard is skipped (documented caveat: without a
+ * canonical publisher the latest pointer can briefly go backwards) — git is never
+ * hard-required.
+ *
+ * "Not already in our history" is answered by commit ancestry FIRST and by content
+ * SECOND, because a commit hash is not a stable name for a snapshot. A fleet that
+ * commits locally and lets a background `git pull --rebase` push minutes later has
+ * the recorded commit REWRITTEN out from under the deployment: the object is
+ * orphaned, `merge-base --is-ancestor` can never reach it again, and every
+ * subsequent publish is refused even though nothing moved backwards — one publish
+ * bricks the next one. The content-root TREE oid survives a rebase untouched, so
+ * when ancestry fails the guard asks the question that actually matters: is the
+ * live snapshot's content a state our history already passed through? Genuine
+ * divergence still fails closed — a tree we never had is found nowhere.
  *
  * The guard and every "what is the live library revision" question read ONLY the
  * stable production deployment and only when it is `previewKind=library`. They must
@@ -340,23 +352,102 @@ export function sourceGuard({ root, deps, io }) {
 }
 
 /**
- * Refuse to publish over a live production whose recorded source commit is NOT an
- * ancestor of ours — that would make the latest pointer go backwards. `merge-base
- * --is-ancestor` is the whole test: exit 0 means our commit descends from (or
- * equals) the live one and publishing moves forward; a non-zero exit means the
- * live commit is newer or divergent, and an unknown commit (git exits 128) is
- * equally a refusal — an unverifiable comparison is never "safe".
+ * The content root's path relative to the repo toplevel (`''` when the root IS the
+ * toplevel), or null when the root is not in a git repo.
+ */
+function contentPrefix({ root, deps }) {
+  const res = deps.git(['rev-parse', '--show-prefix'], root);
+  if (res.status !== 0) return null;
+  return res.stdout.trim().replace(/\/+$/, '');
+}
+
+/** The tree oid of `rel` at `rev`, or null when it cannot be resolved. */
+function treeAt({ rev, rel, root, deps }) {
+  // `--verify` so a spec that resolves to several objects — or to none — is an
+  // error rather than something that parses into a bogus comparison value.
+  const spec = rel === '' ? `${rev}^{tree}` : `${rev}:${rel}`;
+  const res = deps.git(['rev-parse', '--verify', spec], root);
+  if (res.status !== 0) return null;
+  const oid = res.stdout.trim();
+  return /^[0-9a-f]{7,64}$/.test(oid) ? oid : null;
+}
+
+/**
+ * The content root's tree oid at `rev` — the rebase-proof identity of a snapshot's
+ * source, recorded alongside the commit so a later publish can compare content even
+ * when the commit hash has been rewritten (or belongs to a machine we never pulled).
+ */
+export function contentTree({ rev, root, deps }) {
+  const rel = contentPrefix({ root, deps });
+  return rel === null ? null : treeAt({ rev, rel, root, deps });
+}
+
+/**
+ * How far back the content comparison looks. Only commits that TOUCHED the content
+ * path are walked, so this covers a very long history of the Library itself; a miss
+ * is a refusal, never a silent pass.
+ */
+const TREE_SEARCH_LIMIT = 500;
+
+/**
+ * Did our history ever hold exactly this content-root tree?
+ *
+ * The pathspec is `.` — NOT the repo-relative prefix. Every git command here runs
+ * with the content root as its cwd, and a pathspec resolves against the CWD while
+ * the `<rev>:<path>` syntax used by `treeAt` resolves against the repo ROOT. Passing
+ * the prefix to both makes one of them wrong: `-- docs/preview` from inside
+ * `docs/preview` means `docs/preview/docs/preview`, matches nothing, and turns the
+ * whole fallback into a silent no-op that still refuses the publish.
+ */
+function historyHasTree({ tree, rel, root, deps }) {
+  const args = ['rev-list', `--max-count=${TREE_SEARCH_LIMIT}`, 'HEAD', '--', '.'];
+  const res = deps.git(args, root);
+  if (res.status !== 0) return false;
+  return res.stdout.split('\n').map((s) => s.trim()).filter(Boolean)
+    .some((rev) => treeAt({ rev, rel, root, deps }) === tree);
+}
+
+/**
+ * Refuse to publish over a live production whose recorded content is NOT already in
+ * our history — that would make the latest pointer go backwards.
+ *
+ * Two tests, in order. `merge-base --is-ancestor` first: exit 0 means our commit
+ * descends from (or equals) the live one and publishing moves forward. When that
+ * fails — the live commit is newer, divergent, OR simply unreachable because a
+ * rebase rewrote it after the publish — fall back to comparing the CONTENT ROOT
+ * TREE, which a rebase cannot change: if the live snapshot's tree is a state our
+ * own history passed through, publishing still moves forward and is allowed with a
+ * note. The live tree comes from the deployment metadata (`sourceTree`), falling
+ * back to resolving it from the recorded commit for deployments published before
+ * that field existed — which only works while that object is still local, hence
+ * recording it.
+ *
+ * Everything else fails closed: a tree we never held is found nowhere, and an
+ * unresolvable comparison is a refusal — never "safe".
  *
  * Only ever called with a commit read off a `previewKind=library` STABLE
  * PRODUCTION deployment; a Share preview never reaches it.
  */
-export function assertMovesForward({ liveCommit, commit, root, deps }) {
+export function assertMovesForward({ liveCommit, liveTree, commit, root, deps, io }) {
   if (!liveCommit || !commit || liveCommit === commit) return;
   const res = deps.git(['merge-base', '--is-ancestor', liveCommit, commit], root);
   if (res.status === 0) return;
+
+  const rel = contentPrefix({ root, deps });
+  const live = rel === null ? null : (liveTree || treeAt({ rev: liveCommit, rel, root, deps }));
+  if (live && historyHasTree({ tree: live, rel, root, deps })) {
+    io?.print(
+      `NOTE: the live Library's source commit ${liveCommit.slice(0, 12)} is unreachable from this checkout,\n`
+      + `  but its content tree ${live.slice(0, 12)} IS in our history — that commit was rewritten (a rebase)\n`
+      + '  after it was published. Nothing moves backwards, so the publish proceeds.\n',
+    );
+    return;
+  }
+
   throw new DeployError(
     `the live Library production was published from commit ${liveCommit}, which is not an ancestor of this\n`
-    + `  checkout's ${commit} — publishing would make the Library go backwards.\n`
+    + `  checkout's ${commit}, and its content is not in our history either — publishing would make the\n`
+    + '  Library go backwards.\n'
     + (res.status === 1
       ? '  Pull the newer content (or publish from the machine that has it), then retry.'
       : `  git could not compare the two commits (exit ${res.status}); run \`git fetch\` and retry.`),
@@ -369,9 +460,9 @@ export function assertMovesForward({ liveCommit, commit, root, deps }) {
  * Read from the project's `targets.production` pointer — the thing the scope alias
  * follows — NEVER from "the newest deployment in the project": a Share preview is
  * newer and would poison both the rollback target and the commit comparison. The
- * returned `commit` is populated ONLY for a `previewKind=library` production, so a
- * foreign production deployment can still be rolled back to but never drives the
- * stale guard.
+ * returned `commit`/`tree` are populated ONLY for a `previewKind=library`
+ * production, so a foreign production deployment can still be rolled back to but
+ * never drives the stale guard.
  */
 async function liveProduction({ projectId, teamId, deps }) {
   const project = await deps.getProject({ projectId, teamId });
@@ -389,6 +480,7 @@ async function liveProduction({ projectId, teamId, deps }) {
     projectId: deployment?.projectId ?? null,
     isLibrary,
     commit: isLibrary ? (deployment.meta.sourceCommit || null) : null,
+    tree: isLibrary ? (deployment.meta.sourceTree || null) : null,
   };
 }
 
@@ -465,6 +557,9 @@ export async function publishLibrary({ resolved, deps, io, build = buildLibrary 
   // 2. Source guard, then build. Both precede every Vercel mutation, so a dirty or
   //    stale content root costs no deployment quota.
   const commit = sourceGuard({ root: resolved.root, deps, io });
+  // Recorded next to the commit because the commit alone is not a durable name for
+  // this snapshot: a background `pull --rebase` rewrites it. See assertMovesForward.
+  const tree = commit ? contentTree({ rev: commit, root: resolved.root, deps }) : null;
   const built = build({
     root: resolved.root,
     collections: resolved.collections,
@@ -489,12 +584,15 @@ export async function publishLibrary({ resolved, deps, io, build = buildLibrary 
     const snapshot = snapshotId(built.directory);
     const meta = { previewKind: PREVIEW_KIND, snapshot };
     if (commit) meta.sourceCommit = commit;
+    if (tree) meta.sourceTree = tree;
 
     // 3. The live production: our rollback target, and (only when it is a library
     //    production) the commit the stale guard compares against. Checked before
     //    the deploy so a stale publish is refused without spending quota.
     let live = await liveProduction({ projectId, teamId, deps });
-    assertMovesForward({ liveCommit: live?.commit, commit, root: resolved.root, deps });
+    assertMovesForward({
+      liveCommit: live?.commit, liveTree: live?.tree, commit, root: resolved.root, deps, io,
+    });
 
     // 4. Protection before content lands. Project-level, so it works even on a
     //    project with zero deployments; GET-verified inside ensureProtected.
@@ -637,7 +735,9 @@ export async function publishLibrary({ resolved, deps, io, build = buildLibrary 
       // 7. Re-check the guard immediately before the promote, narrowing the window
       //    in which another machine could have published something newer.
       live = await liveProduction({ projectId, teamId, deps });
-      assertMovesForward({ liveCommit: live?.commit, commit, root: resolved.root, deps });
+      assertMovesForward({
+        liveCommit: live?.commit, liveTree: live?.tree, commit, root: resolved.root, deps, io,
+      });
 
       // 8. Publish. `vercel promote` — never `vercel rollback`, which 500s on this
       //    account. Promoting a preview CREATES a new production deployment.
