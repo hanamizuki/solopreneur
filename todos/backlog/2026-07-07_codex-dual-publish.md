@@ -92,7 +92,7 @@
 - [ ] Pilot with `marketer`: install via local marketplace, then via git `@ref`; verify skill-triggered agent spawning actually works on Codex.
 - [ ] Rewrite Claude-specific vocabulary in ~20 native skill files (actions, not tool names); add a per-harness mapping reference covering the ~13 vendored files.
 - [ ] Extend `/release`: run the manifest generator inside the bump commit; keep a single CHANGELOG; no new tag namespace.
-- [ ] Audit high-level workflow skills: `autopilot`, `greenlight`, `preview`, `mvp`, `tech-vetting`, `todos-*`.
+- [ ] Audit high-level workflow skills: `autopilot`, `greenlight`, `preview`, `mvp`, `plan-review`, `todos-*`.
 - [ ] Add README install instructions for both Claude Code and Codex (document `@tag` pinning for Codex).
 
 ## 下次優先讀的檔案

@@ -475,10 +475,15 @@ When user approves a todo with `go`:
 
 Based on review results and todo content, create an implementation plan.
 
-### Step 2: Tech Vetting
+### Step 2: Plan Review
 
-Invoke `/tech-vetting` to verify the plan against platform best practices.
-Report Tech Vetting results to the user — wait for confirmation before proceeding.
+Invoke `/plan-review internal` to verify the plan against platform best practices
+and check it for over-engineering. Internal mode skips the external reviewer, so
+the gate stays cheap enough to run on every approved todo.
+Report the findings and its Verdict line to the user. **In interactive mode**
+wait for confirmation before proceeding; in auto mode proceed on
+`Ready to implement` and stop for the user on `Needs revision` / `Needs rethink`
+(matching the gate at the end of this file).
 
 ### Step 3: Create Worktree & Implement
 
@@ -549,5 +554,5 @@ After `/greenlight` completes:
 - **Auto-cleanup**: Merged PR worktrees and local branches are cleaned up
 - **Noise avoidance**: Previously reviewed, unchanged todos are not re-notified
 - **Conflict escalation**: Simple conflicts auto-resolved, complex ones escalated to user
-- **Tech Vetting gate**: Implementation plan must pass tech-vetting; in interactive mode wait
-  for user confirmation
+- **Plan review gate**: Implementation plan must come back from `/plan-review internal`
+  with no Critical findings; in interactive mode wait for user confirmation

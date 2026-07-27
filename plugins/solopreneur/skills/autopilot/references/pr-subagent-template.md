@@ -53,12 +53,24 @@ Enter Plan Mode (EnterPlanMode). Based on the spec above:
 - Verification passes → exit Plan Mode (ExitPlanMode)
 - Verification fails → stop and report what's missing
 
-### 2. Tech Vetting
-Invoke the /tech-vetting skill with the Step 1 implementation plan as input.
-/tech-vetting will detect the tech stack, query official docs, and dispatch expert
-subagents for best practice review.
-If /tech-vetting finds serious issues → adjust the plan and re-run /tech-vetting.
-If only suggestions → note them and keep them in mind during implementation.
+### 2. Plan Review
+Invoke the /plan-review skill with the Step 1 implementation plan as input, in
+`internal` mode: `/plan-review internal`. Internal mode runs the technical
+vetting stage (stack detection, official docs, expert subagents) and the lean
+check (what the plan does not need), skips the external reviewer, and reports
+findings without writing anything back — you adjust the plan yourself.
+Branch on the Verdict line it emits:
+- `Ready to implement` → note the Important/Suggestion items, keep them in mind
+  during implementation, and continue to Step 3.
+- `Needs revision` / `Needs rethink` (any Critical finding) → adjust the plan and
+  re-run `/plan-review internal` once, re-dispatching **every platform the edits
+  touch**, not just the ones that reported. Fixing an iOS blocker by changing a
+  shared API can break Android, and you cannot know a platform is still clean
+  without re-running its reviewer.
+- **Still not `Ready to implement` after that one re-run → stop.** Do not start
+  Step 3. Report the outstanding Critical findings and halt with
+  `status: "blocked"`. Implementing a plan whose blockers survived two reviews is
+  exactly what this gate exists to prevent.
 
 ### 3. Implement + Test
 - Implement code according to the plan

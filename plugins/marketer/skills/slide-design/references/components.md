@@ -840,14 +840,14 @@ Card for showing a named capability (slash command, CLI tool, skill). Features a
 ```html
 <div class="skill-grid">
   <div class="skill-card">
-    <div class="sc-role">顧問</div>
-    <div class="sc-cmd">/second-opinion</div>
-    <div class="sc-title">第二雙眼</div>
-    <div class="sc-desc">用 Codex CLI 當獨立審查者，從 5 個維度壓測計畫。</div>
+    <div class="sc-role">技術主管</div>
+    <div class="sc-cmd">/plan-review</div>
+    <div class="sc-title">計畫審查</div>
+    <div class="sc-desc">三段驗證 spec/plan：官方文件、精簡檢查、外部獨立審查者。</div>
     <div class="sc-tags">
-      <span class="sc-tag">完整性</span>
-      <span class="sc-tag">一致性</span>
-      <span class="sc-tag">清晰度</span>
+      <span class="sc-tag">技術驗證</span>
+      <span class="sc-tag">精簡檢查</span>
+      <span class="sc-tag">外部意見</span>
     </div>
   </div>
   <!-- More cards -->

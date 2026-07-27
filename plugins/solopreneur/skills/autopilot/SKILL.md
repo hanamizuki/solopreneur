@@ -44,8 +44,8 @@ Before proceeding, confirm that the execution-phase skills are available.
 **Co-packaged in `solopreneur`** (always present alongside this skill —
 no runtime check needed):
 - `/greenlight` — Automated PR review loop
-- `/tech-vetting` — Pre-implementation technical vetting (called by PR
-  subagent after planning)
+- `/plan-review` — Pre-implementation plan review (called by PR subagent
+  after planning, in `internal` mode)
 
 **External dependency** (must be verified at runtime):
 - `/merge-pr` — PR merge workflow
@@ -270,7 +270,8 @@ Initial state (multi-PR or single-PR + schedule; **not** written for single-PR
 
 ### Multi-PR
 
-Present the final plan + Tech Vetting results for user confirmation:
+Present the final plan for user confirmation. Plan review is not run here — each
+PR subagent runs `/plan-review internal` at execution time (Step 5):
 
 ```text
 Plan: 4 PRs
@@ -278,7 +279,7 @@ Plan: 4 PRs
   PR3 (router) → waits for PR1
   PR4 (docs) → waits for all
 
-Tech Vetting: all passed ✅
+Plan review: runs per PR at execution time (`/plan-review internal`)
 
 Schedule for automatic execution? Tell me when you'd like it to run.
 ```
@@ -354,7 +355,7 @@ After the user picks, write the artifacts per Step 3's table, then proceed to St
    subagent's returned result JSON (Agent branch).
 7. Print a completion report inline (see "Completion Report" below).
 
-The full lifecycle still runs: Plan Mode → `/tech-vetting` → implement + test →
+The full lifecycle still runs: Plan Mode → `/plan-review internal` → implement + test →
 commit + push + `gh pr create` → `/greenlight` → CI poll → `/merge-pr` →
 cleanup → result JSON. All defined by the unchanged `pr-subagent-template.md`.
 
