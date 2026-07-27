@@ -59,10 +59,16 @@ Invoke the /plan-review skill with the Step 1 implementation plan as input, in
 vetting stage (stack detection, official docs, expert subagents) and the lean
 check (what the plan does not need), skips the external reviewer, and reports
 findings without writing anything back — you adjust the plan yourself.
-Branch on the Verdict line it emits: `Needs revision` / `Needs rethink` (any
-Critical finding) → adjust the plan and re-run `/plan-review internal` once,
-re-dispatching only the platforms whose findings changed. `Ready to implement`
-→ note the Important/Suggestion items and keep them in mind during implementation.
+Branch on the Verdict line it emits:
+- `Ready to implement` → note the Important/Suggestion items, keep them in mind
+  during implementation, and continue to Step 3.
+- `Needs revision` / `Needs rethink` (any Critical finding) → adjust the plan and
+  re-run `/plan-review internal` once, re-dispatching only the platforms whose
+  findings changed.
+- **Still not `Ready to implement` after that one re-run → stop.** Do not start
+  Step 3. Report the outstanding Critical findings and halt with
+  `status: "blocked"`. Implementing a plan whose blockers survived two reviews is
+  exactly what this gate exists to prevent.
 
 ### 3. Implement + Test
 - Implement code according to the plan
