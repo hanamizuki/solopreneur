@@ -480,8 +480,10 @@ Based on review results and todo content, create an implementation plan.
 Invoke `/plan-review internal` to verify the plan against platform best practices
 and check it for over-engineering. Internal mode skips the external reviewer, so
 the gate stays cheap enough to run on every approved todo.
-Report the findings and its Verdict line to the user — wait for confirmation
-before proceeding.
+Report the findings and its Verdict line to the user. **In interactive mode**
+wait for confirmation before proceeding; in auto mode proceed on
+`Ready to implement` and stop for the user on `Needs revision` / `Needs rethink`
+(matching the gate at the end of this file).
 
 ### Step 3: Create Worktree & Implement
 

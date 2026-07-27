@@ -186,4 +186,5 @@ One .md file per PR, placed in the same directory as the plan.
    autopilot spec quality gate (`../SKILL.md` Step 3), which rejects vague criteria
    before the spec is written.
 3. **List files to read**: so the subagent knows which parts of the codebase are relevant
-4. **List file paths**: so plan-review can verify paths exist and don't overlap
+4. **List file paths**: so overlapping PRs are visible at planning time, and so
+   `plan-review` has concrete paths to cross-check the plan's claims against

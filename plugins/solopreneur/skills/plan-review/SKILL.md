@@ -180,22 +180,30 @@ Available → **Path A** (Codex CLI: a different model, zero shared context, the
 most independent read). Not installed or not authenticated → **Path B** (a
 subagent: same model family, clean context window).
 
-### 3b. Confirm the cost
+### 3b. Identify related files
 
-Ask before running, naming the resolved path — Path A is expensive, Path B is not:
+Scan the document for referenced paths so the reviewer can cross-validate its
+claims. Collect up to 10 — files the plan makes specific claims about ("this
+module reads X", "we'll delete Y"), not every path it mentions. Prefer small,
+high-signal files: a huge generated file or log spends the token budget without
+adding evidence.
 
-> Stage 3 sends the plan to Codex — roughly 240K tokens. Continue?
-> (Path B: a fresh subagent instead, at ordinary subagent cost.)
+### 3c. Confirm cost and what leaves the machine
+
+Ask before running. Name the resolved path (Path A is expensive, Path B is not)
+**and what gets sent** — this is a data-egress decision, not just a cost one:
+
+> Stage 3 sends the plan and these N related files to Codex (OpenAI) — roughly
+> 240K tokens: `<list the files from 3b by name>`. Continue?
+> (Path B: a fresh local subagent instead, at ordinary subagent cost.)
+
+Naming the files is the point: the user cannot consent to an egress they can't
+see. If any carry secrets, credentials, or personal data, say so and offer to
+drop them — a plan review does not need them.
 
 Declined, or no interactive user to answer → **skip stage 3 in place** and
 continue to Resolution with the stage 1–2 findings; full mode still adjudicates
 and writes back. Label the stage-3 section `skipped`. Do not re-invoke the skill.
-
-### 3c. Identify related files
-
-Scan the document for referenced paths so the reviewer can cross-validate its
-claims. Collect up to 10 — files the plan makes specific claims about ("this
-module reads X", "we'll delete Y"), not every path it mentions.
 
 ### The review prompt
 
