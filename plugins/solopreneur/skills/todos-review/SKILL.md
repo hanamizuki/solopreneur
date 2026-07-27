@@ -1,11 +1,13 @@
 ---
 name: todos-review
 description: |
-  Deep-review a single todo or spec file to evaluate problem clarity, solution
-  quality, and implementation priority. Dispatches platform-specific expert agents
-  for best-practice checks. Use when the user says "review this todo",
-  "review todo", "evaluate this spec", provides a todo file path, or wants a
-  go/no-go recommendation before implementing a backlog item.
+  Deep-review a single todo or backlog item to decide whether it is worth
+  building: problem clarity, solution quality, and implementation priority.
+  Dispatches platform-specific expert agents for best-practice checks. Use when
+  the user says "review this todo", "review todo", provides a todo file path, or
+  wants a go/no-go recommendation before implementing a backlog item. This skill
+  answers "should we build this at all" — for "is this the right way to build
+  it", use `/plan-review` on the spec or implementation plan instead.
 ---
 
 # Todos Review

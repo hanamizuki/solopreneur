@@ -841,7 +841,7 @@ Card for showing a named capability (slash command, CLI tool, skill). Features a
 <div class="skill-grid">
   <div class="skill-card">
     <div class="sc-role">顧問</div>
-    <div class="sc-cmd">/second-opinion</div>
+    <div class="sc-cmd">/plan-review</div>
     <div class="sc-title">第二雙眼</div>
     <div class="sc-desc">用 Codex CLI 當獨立審查者，從 5 個維度壓測計畫。</div>
     <div class="sc-tags">

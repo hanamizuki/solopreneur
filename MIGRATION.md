@@ -1,13 +1,67 @@
 # Migration guide
 
-Two breaking renames in this marketplace's history. If you're coming from a
-previous installation, you'll need to uninstall the old plugins and reinstall
-under the new names.
+Breaking renames in this marketplace's history. The plugin renames need an
+uninstall + reinstall; the skill renames only need a plugin update, but the old
+command names stop resolving.
 
+- [Skill consolidation: `/plan-review`](#skill-consolidation-plan-review):
+  `/tech-vetting` renamed, `/second-opinion` retired, both folded into one skill.
 - [v0.5.x → v0.5.3](#v05x--v053): drop the `solo-` prefix on sub-plugins.
 - [v0.3.0 → v0.5.x](#v030--v05x): rename the `solopreneur-*` family to
   `solopreneur` + `solo-*`, split out the designer agent, add `solo-marketer`
   and `solo-neo4j-dev`, drop `solopreneur-nextjs` and `solopreneur-python`.
+
+---
+
+## Skill consolidation: `/plan-review`
+
+Lands in the first `solopreneur` release after `solopreneur--v0.5.35`. Affects
+the core `solopreneur` plugin only — no other plugin changes, no reinstall.
+
+### What changed
+
+**`/tech-vetting` → `/plan-review`.** The pre-implementation vetting skill was
+renamed and expanded. It now runs three stages over a spec, implementation plan,
+or design doc: technical vetting against the latest official docs and platform
+best practices (what `/tech-vetting` did), a leanness pass that lists what the
+plan doesn't need, and an independent outside reviewer. A shared resolution
+phase then walks you through every finding — adopt, skip, or discuss — and
+writes the accepted ones back.
+
+> **This is the skill's second rename.** It shipped as `/preflight`, became
+> `/tech-vetting` in v0.5.x, and is now `/plan-review`. If you already updated
+> scripts once for the `/preflight` cut, this is the same exercise. There is no
+> alias — `/tech-vetting` no longer resolves.
+
+**`/second-opinion` retired.** Its adversarial Codex review is now
+`/plan-review`'s third stage, with the same 5 dimensions (completeness,
+consistency, clarity, scope, feasibility), the same Codex-CLI-first / subagent-
+fallback behaviour, and the same per-finding adjudication. Nothing was dropped.
+`/second-opinion` no longer resolves.
+
+Three skills claimed overlapping "review this plan / review this spec" triggers,
+so which one answered was effectively a coin flip. That is why the consolidation
+is a hard cut rather than an alias — leaving the old names live would leave the
+collision live.
+
+### What to run
+
+```bash
+claude plugin marketplace update solopreneur
+claude plugin update solopreneur
+```
+
+Then update any custom script, cron job, or muscle memory:
+
+| Before | After |
+|---|---|
+| `/tech-vetting` | `/plan-review` |
+| `/second-opinion` | `/plan-review` (stage 3 is the old behaviour) |
+
+**Automated / unattended callers should use `/plan-review internal`** — it runs
+the first two stages and skips the external reviewer, which costs ~240K tokens
+per run. `/autopilot` and `/todos-babysit` already pass it. Interactive
+`/plan-review` runs all three stages and confirms the cost before stage 3.
 
 ---
 

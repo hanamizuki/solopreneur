@@ -53,11 +53,13 @@ Enter Plan Mode (EnterPlanMode). Based on the spec above:
 - Verification passes → exit Plan Mode (ExitPlanMode)
 - Verification fails → stop and report what's missing
 
-### 2. Tech Vetting
-Invoke the /tech-vetting skill with the Step 1 implementation plan as input.
-/tech-vetting will detect the tech stack, query official docs, and dispatch expert
-subagents for best practice review.
-If /tech-vetting finds serious issues → adjust the plan and re-run /tech-vetting.
+### 2. Plan Review
+Invoke the /plan-review skill with the Step 1 implementation plan as input, in
+`internal` mode: `/plan-review internal`. Internal mode runs the technical
+vetting stage (stack detection, official docs, expert subagents) and the lean
+check (what the plan does not need), skips the external reviewer, and reports
+findings without writing anything back — you adjust the plan yourself.
+If /plan-review finds serious issues → adjust the plan and re-run /plan-review internal.
 If only suggestions → note them and keep them in mind during implementation.
 
 ### 3. Implement + Test

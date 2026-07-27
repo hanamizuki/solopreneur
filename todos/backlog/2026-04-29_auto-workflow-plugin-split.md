@@ -7,7 +7,7 @@
 `solopreneur` 目前混了兩種性質的 skill：
 
 1. **通用工作流自動化**（todos / autopilot / greenlight / worktree-handoff…）
-2. **元工具**（perspective / second-opinion / session-retro / tech-vetting / specialist-review…）
+2. **元工具**（perspective / plan-review / session-retro / specialist-review…）
 
 「自動化工作流」這組對非開發者使用情境也有用，而且演化路徑不同（會持續加多 PR 編排、scheduling、cron 整合等），拆出去能：
 
@@ -28,8 +28,7 @@
 | `worktree-handoff` | auto-workflow（搭配 autopilot 用） |
 | `perspective` | solopreneur 留著 |
 | `post-mortem` | solopreneur 留著 |
-| `tech-vetting` | solopreneur 留著 |
-| `second-opinion` | solopreneur 留著 |
+| `plan-review` | solopreneur 留著 |
 | `session-retro` | solopreneur 留著 |
 | `specialist-review` | solopreneur 留著 |
 | `rebuild-skill-index` | solopreneur 留著（基礎設施） |

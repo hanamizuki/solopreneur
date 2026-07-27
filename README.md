@@ -51,8 +51,7 @@ skills that wrap the lifecycle around your work.
 | Skill | What it does |
 |---|---|
 | [`/mvp`](./plugins/solopreneur/skills/mvp/SKILL.md) | **PM.** Drives the full new-product flow end-to-end: brainstorming → PRD visual confirmation → template lookup (auto-discovers `*-app-templates` in installed plugins) → plan → execution. Use when starting from scratch |
-| [`/second-opinion`](./plugins/solopreneur/skills/second-opinion/SKILL.md) | **Advisor.** Challenges your plan across 5 dimensions (completeness, consistency, clarity, scope, feasibility) using an independent reviewer |
-| [`/tech-vetting`](./plugins/solopreneur/skills/tech-vetting/SKILL.md) | **Tech Lead.** Vets your technical plan against the latest official docs and platform-specific best practices before you write a single line of code |
+| [`/plan-review`](./plugins/solopreneur/skills/plan-review/SKILL.md) | **Tech Lead.** Vets a spec, plan, or design doc in three stages — latest official docs + platform best practices, a leanness pass that cuts what the plan doesn't need, and an independent outside reviewer challenging it across 5 dimensions — then walks you through every finding. `internal` skips the external reviewer |
 | [`/worktree-handoff`](./plugins/solopreneur/skills/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
 | [`/handoff`](./plugins/solopreneur/skills/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). No worktree, no file save |
 | [`/preview`](./plugins/solopreneur/skills/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into interactive HTML and publishes a **private Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments). Single-item **Share** requests deploy an isolated preview of one entry without changing the Library production URL. Legacy per-page deploy remains for compatibility |
@@ -90,9 +89,9 @@ Start them and walk away. They loop until the job is done.
 #### Requirements
 
 - **`git`**, **`gh`** (GitHub CLI), **`jq`**: required CLIs. Used across `/greenlight`, `/autopilot`, `/post-mortem`, `/todos-babysit`, and `scripts/sync-vendored.sh`.
-- **[Codex CLI](https://github.com/openai/codex)**: **required** for `/greenlight` uncommitted mode (the only path on `main` with uncommitted changes). Also used by `/second-opinion` (primary review path), `/greenlight` PR mode (one reviewer option), and `/naming` (multi-model candidate generation).
+- **[Codex CLI](https://github.com/openai/codex)**: **required** for `/greenlight` uncommitted mode (the only path on `main` with uncommitted changes). Also used by `/plan-review` (stage 3, the external reviewer), `/greenlight` PR mode (one reviewer option), and `/naming` (multi-model candidate generation).
 - **[superpowers](https://github.com/obra/superpowers)** plugin: strongly recommended. `/greenlight` and `/specialist-review` use `superpowers:requesting-code-review` and `receiving-code-review` for the review framework. Graceful fallback if absent.
-- **[context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7)** MCP: strongly recommended. Used by `/tech-vetting`, `/specialist-review`, and every stack agent (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) for current official docs. Graceful skip if absent.
+- **[context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7)** MCP: strongly recommended. Used by `/plan-review`, `/specialist-review`, and every stack agent (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) for current official docs. Graceful skip if absent.
 - **[`gstack /review`](https://github.com/garrytan/gstack/tree/main/review)**: recommended. Powers the `/greenlight` internal review phase (SQL safety, trust boundaries, structural issues).
 - **[Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector)**: recommended. `/greenlight` PR mode default reviewer (`@codex review`).
 - **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR-mode reviewer (`/gemini review`), offered only when activity detection finds it acting on the repo. Consumer Code Assist stopped GitHub code review on 2026-07-17; **enterprise is unaffected**. For post-commit review, `/greenlight` uses the Antigravity CLI (`agy`) as its Gemini-family reviewer.
@@ -233,8 +232,7 @@ Idea
  ├─ /mvp ────────────── Brainstorm → PRD → template → plan → execute
  │                       dispatches: ios-dev · android-dev · ai-engineer
  │
- ├─ /second-opinion ─── Challenge the spec (independent reviewer)
- ├─ /tech-vetting ───── Verify against latest official docs
+ ├─ /plan-review ────── Vet the spec: official docs · leanness · outside reviewer
  │
  ├─ /worktree-handoff ─ Isolate the work in a git worktree
  ├─ /autopilot ──────── Split into PRs, auto-implement, review, merge
@@ -302,11 +300,13 @@ Run `/loop 24h /todos-babysit`. It scans your backlog, auto-implements bug
 fixes that pass the readiness gate, and notifies you only for items that
 need human judgment.
 
-### Get a second opinion before building
+### Vet the plan before building
 
-`/second-opinion` challenges your plan across 5 dimensions. `/tech-vetting`
-verifies the technical approach against latest official docs. Run both before
-writing code to catch issues early.
+`/plan-review` runs three stages over a spec, plan, or design doc: it checks the
+approach against the latest official docs, hunts what the plan doesn't need, and
+sends it to an independent reviewer that challenges it across 5 dimensions. Then
+it walks you through the findings one by one. Add `internal` to skip the external
+reviewer.
 
 ## Install
 
