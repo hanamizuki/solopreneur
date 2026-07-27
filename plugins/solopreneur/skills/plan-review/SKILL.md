@@ -203,12 +203,15 @@ Ask before running. Name the resolved path (Path A is expensive, Path B is not)
 > 240K tokens: `<list the files from 3b by name>`. Codex runs read-only in this
 > repo, so it can also open other files here while cross-checking the plan's
 > claims; read-only stops writes, not reads. Continue?
-> (Path B: a fresh local subagent instead, at ordinary subagent cost.)
+> (Path B sends the same files to this session's own model provider instead —
+> far cheaper, but not local either.)
 
 Say what actually leaves the machine, not a smaller number that reads better:
-the listed files are what we point it at, not a boundary the sandbox enforces.
-If anything here carries secrets, credentials, or personal data, say so and
-offer to drop those files, or to stop — a plan review does not need them.
+the listed files are what we point the reviewer at, not a boundary the sandbox
+enforces, and **neither path keeps anything on-device** — Path B is a different
+provider and a lower bill, not privacy. If anything here carries secrets,
+credentials, or personal data, say so and offer to drop those files, or to stop
+— a plan review does not need them.
 
 Declined, or no interactive user to answer → **skip stage 3 in place** and
 continue to Resolution with the stage 1–2 findings. Label the stage-3 section
@@ -223,9 +226,15 @@ terminator would close the heredoc early and run the rest as shell.
 
 If the plan came from the conversation and has no file path, write it to a temp
 file **here** — only when stage 3 is actually running. Create both temp files
-with `mktemp` (0600, owner-only) and delete them when stage 3 ends, on every
-path including errors and Path B: an unreviewed plan copy left on disk is the
-kind of thing nobody goes looking for later.
+with `mktemp` and keep the paths it returns (0600, owner-only):
+
+```bash
+PROMPT_FILE=$(mktemp)   # and, when the plan has no file path, PLAN_FILE=$(mktemp)
+```
+
+Delete them when stage 3 ends, on every path including errors and Path B — an
+unreviewed plan copy left on disk is the kind of thing nobody goes looking for
+later.
 
 The prompt itself:
 
@@ -255,13 +264,12 @@ Needs rethink (fundamental issues).
 Do not modify any files. Review only.
 ```
 
-**Path A** — write the filled-in prompt to `<tmp>/plan-review-prompt.txt`, then
-redirect it in. Read-only keeps the reviewer from editing the plan it is
-reviewing. Allow up to 5 minutes for stdout; if the output is long, save it and
-read the key sections:
+**Path A** — write the filled-in prompt into `$PROMPT_FILE`, then redirect it in.
+Read-only keeps the reviewer from editing the plan it is reviewing. Allow up to
+5 minutes for stdout; if the output is long, save it and read the key sections:
 
 ```bash
-codex exec --sandbox read-only - < "$TMP/plan-review-prompt.txt" 2>&1
+codex exec --sandbox read-only - < "$PROMPT_FILE" 2>&1
 ```
 
 **Path B** — dispatch a `general-purpose` subagent with the same prompt, prefixed
