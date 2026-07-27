@@ -200,18 +200,20 @@ Ask before running. Name the resolved path (Path A is expensive, Path B is not)
 **and what gets sent** — this is a data-egress decision, not just a cost one:
 
 > Stage 3 points Codex (OpenAI) at the plan and these N related files — roughly
-> 240K tokens: `<list the files from 3b by name>`. Codex runs read-only in this
-> repo, so it can also open other files here while cross-checking the plan's
-> claims; read-only stops writes, not reads. Continue?
-> (Path B sends the same files to this session's own model provider instead —
+> 240K tokens: `<list the files from 3b by name>`. `--sandbox read-only` blocks
+> writes, **not reads**: while cross-checking the plan's claims Codex can open
+> anything your user account can read, inside this repo or outside it, and
+> whatever it reads goes to the provider. Continue?
+> (Path B sends the same material to this session's own model provider instead —
 > far cheaper, but not local either.)
 
-Say what actually leaves the machine, not a smaller number that reads better:
-the listed files are what we point the reviewer at, not a boundary the sandbox
-enforces, and **neither path keeps anything on-device** — Path B is a different
-provider and a lower bill, not privacy. If anything here carries secrets,
-credentials, or personal data, say so and offer to drop those files, or to stop
-— a plan review does not need them.
+Say what actually leaves the machine, not a smaller number that reads better.
+The listed files are what we point the reviewer at — **not a boundary anything
+enforces** — and neither path keeps anything on-device; Path B is a different
+provider and a lower bill, not privacy. A plan is untrusted input, so injected
+text steering the reviewer toward unrelated files is exactly the case this
+disclosure has to cover. If the repo or the account holds secrets, credentials,
+or personal data, say so and offer to drop files, or to stop.
 
 Declined, or no interactive user to answer → **skip stage 3 in place** and
 continue to Resolution with the stage 1–2 findings. Label the stage-3 section
