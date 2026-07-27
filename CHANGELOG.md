@@ -8,6 +8,27 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-07-28
+
+### solopreneur 0.5.35 → 0.5.36
+Planning-stage review collapses into one skill. `/tech-vetting` is now
+**`/plan-review`**, and `/second-opinion` is retired — both old commands are
+gone (see `MIGRATION.md`). The new skill runs three stages over a spec, plan,
+or design doc: technical vetting against official docs, a lean check that
+flags over-engineering, and an independent outside review via Codex. Findings
+from all three arrive as one list you adjudicate before anything is written
+back — no stage edits your plan on its own. The file argument is now optional,
+so it can review a plan that only exists in the conversation. Unattended
+callers (`/autopilot`, `/todos-babysit`) pass `internal` to run the first two
+stages without the expensive external review, and a cost confirmation guards
+the third stage against accidental triggers.
+(#148)
+
+### marketer 0.0.9 → 0.0.10
+The `slide-design` component reference stopped demonstrating its skill-card
+markup with a command that no longer exists.
+(#148)
+
 ## 2026-07-25
 
 ### solopreneur 0.5.34 → 0.5.35
