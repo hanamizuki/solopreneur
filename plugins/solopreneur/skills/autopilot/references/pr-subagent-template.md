@@ -59,8 +59,10 @@ Invoke the /plan-review skill with the Step 1 implementation plan as input, in
 vetting stage (stack detection, official docs, expert subagents) and the lean
 check (what the plan does not need), skips the external reviewer, and reports
 findings without writing anything back — you adjust the plan yourself.
-If /plan-review finds serious issues → adjust the plan and re-run /plan-review internal.
-If only suggestions → note them and keep them in mind during implementation.
+Branch on the Verdict line it emits: `Needs revision` / `Needs rethink` (any
+Critical finding) → adjust the plan and re-run `/plan-review internal` once,
+re-dispatching only the platforms whose findings changed. `Ready to implement`
+→ note the Important/Suggestion items and keep them in mind during implementation.
 
 ### 3. Implement + Test
 - Implement code according to the plan

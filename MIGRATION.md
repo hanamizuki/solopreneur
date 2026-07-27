@@ -59,9 +59,10 @@ Then update any custom script, cron job, or muscle memory:
 | `/second-opinion` | `/plan-review` (stage 3 is the old behaviour) |
 
 **Automated / unattended callers should use `/plan-review internal`** — it runs
-the first two stages and skips the external reviewer, which costs ~240K tokens
-per run. `/autopilot` and `/todos-babysit` already pass it. Interactive
-`/plan-review` runs all three stages and confirms the cost before stage 3.
+the first two stages and reports findings without adjudication or write-back,
+skipping the external reviewer that costs ~240K tokens per run. `/autopilot` and
+`/todos-babysit` already pass it. Interactive `/plan-review` runs all three
+stages and confirms the cost before the external reviewer.
 
 ---
 
@@ -157,7 +158,8 @@ line. The old `solopreneur-*` plugin names are gone.
 **Plugins removed:** `solopreneur-nextjs` and `solopreneur-python`. Both
 shipped only an agent and no curated skills. The `nextjs-dev` and
 `python-dev` specialist subagents are no longer dispatchable from
-`/specialist-review`, `/tech-vetting`, `/todos-review`, or `/autopilot`. Use the
+`/specialist-review`, `/tech-vetting` (now `/plan-review`), `/todos-review`, or
+`/autopilot`. Use the
 `general-purpose` subagent for those stacks until / unless we ship
 replacement plugins.
 

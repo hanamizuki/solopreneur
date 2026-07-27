@@ -270,7 +270,8 @@ Initial state (multi-PR or single-PR + schedule; **not** written for single-PR
 
 ### Multi-PR
 
-Present the final plan + Plan Review results for user confirmation:
+Present the final plan for user confirmation. Plan review is not run here — each
+PR subagent runs `/plan-review internal` at execution time (Step 5):
 
 ```text
 Plan: 4 PRs
@@ -278,7 +279,7 @@ Plan: 4 PRs
   PR3 (router) → waits for PR1
   PR4 (docs) → waits for all
 
-Plan Review: all passed ✅
+Plan review: runs per PR at execution time (`/plan-review internal`)
 
 Schedule for automatic execution? Tell me when you'd like it to run.
 ```

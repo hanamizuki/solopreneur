@@ -20,7 +20,7 @@ for details and role-based recommendations.
 
 | Plugin | What you get |
 |---|---|
-| [`solopreneur`](#solopreneur-core) | 16 in-house skills (review, pipelines, thinking partners, automation) |
+| [`solopreneur`](#solopreneur-core) | 15 in-house skills (review, pipelines, thinking partners, automation) |
 | [`marketer`](#marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) |
 | [`designer`](#designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
 | [`ios-dev`](#ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 24 vendored skills (`apple-design` + `asc-*` + `iphone-apps`) |
@@ -43,7 +43,7 @@ explicitly; everything else is recommended and degrades gracefully if absent.
 
 ### `solopreneur` (core)
 
-The foundation. Every other plugin depends on this one. No agent, just 16
+The foundation. Every other plugin depends on this one. No agent, just 15
 skills that wrap the lifecycle around your work.
 
 #### Your Virtual Product Team
@@ -51,7 +51,7 @@ skills that wrap the lifecycle around your work.
 | Skill | What it does |
 |---|---|
 | [`/mvp`](./plugins/solopreneur/skills/mvp/SKILL.md) | **PM.** Drives the full new-product flow end-to-end: brainstorming → PRD visual confirmation → template lookup (auto-discovers `*-app-templates` in installed plugins) → plan → execution. Use when starting from scratch |
-| [`/plan-review`](./plugins/solopreneur/skills/plan-review/SKILL.md) | **Tech Lead.** Vets a spec, plan, or design doc in three stages — latest official docs + platform best practices, a leanness pass that cuts what the plan doesn't need, and an independent outside reviewer challenging it across 5 dimensions — then walks you through every finding. `internal` skips the external reviewer |
+| [`/plan-review`](./plugins/solopreneur/skills/plan-review/SKILL.md) | **Tech Lead.** Vets a spec, plan, or design doc in three stages — latest official docs + platform best practices, a leanness pass that cuts what the plan doesn't need, and an independent outside reviewer challenging it across 5 dimensions — then walks you through every finding. `internal` runs the first two stages only and reports findings without adjudication or write-back |
 | [`/worktree-handoff`](./plugins/solopreneur/skills/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
 | [`/handoff`](./plugins/solopreneur/skills/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). No worktree, no file save |
 | [`/preview`](./plugins/solopreneur/skills/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into interactive HTML and publishes a **private Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments). Single-item **Share** requests deploy an isolated preview of one entry without changing the Library production URL. Legacy per-page deploy remains for compatibility |
@@ -67,7 +67,7 @@ This repo dogfoods the backlog workflow with public task files under
 
 | Skill | What it does |
 |---|---|
-| [`/todos-review`](./plugins/solopreneur/skills/todos-review/SKILL.md) | **Backlog Reviewer.** Deep-reviews a single todo/spec for feasibility, best practices, and priority. Dispatches platform-specific expert agents and outputs a readiness rating |
+| [`/todos-review`](./plugins/solopreneur/skills/todos-review/SKILL.md) | **Backlog Reviewer.** Deep-reviews a single todo/backlog item for feasibility and priority — is it worth building? Dispatches platform-specific expert agents and outputs a readiness rating. Specs and implementation plans go to `/plan-review` |
 | [`/todos-cleanup`](./plugins/solopreneur/skills/todos-cleanup/SKILL.md) | **Backlog Janitor.** Batch-scans backlog, matches against git history, moves completed/partial items to done/ or doing/ |
 
 #### Automation Pipelines
@@ -305,8 +305,8 @@ need human judgment.
 `/plan-review` runs three stages over a spec, plan, or design doc: it checks the
 approach against the latest official docs, hunts what the plan doesn't need, and
 sends it to an independent reviewer that challenges it across 5 dimensions. Then
-it walks you through the findings one by one. Add `internal` to skip the external
-reviewer.
+it walks you through the findings one by one. Add `internal` to run the first two
+stages only and get the findings reported back without adjudication or write-back.
 
 ## Install
 

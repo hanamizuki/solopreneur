@@ -480,7 +480,8 @@ Based on review results and todo content, create an implementation plan.
 Invoke `/plan-review internal` to verify the plan against platform best practices
 and check it for over-engineering. Internal mode skips the external reviewer, so
 the gate stays cheap enough to run on every approved todo.
-Report the findings to the user — wait for confirmation before proceeding.
+Report the findings and its Verdict line to the user — wait for confirmation
+before proceeding.
 
 ### Step 3: Create Worktree & Implement
 
@@ -551,5 +552,5 @@ After `/greenlight` completes:
 - **Auto-cleanup**: Merged PR worktrees and local branches are cleaned up
 - **Noise avoidance**: Previously reviewed, unchanged todos are not re-notified
 - **Conflict escalation**: Simple conflicts auto-resolved, complex ones escalated to user
-- **Plan review gate**: Implementation plan must pass `/plan-review internal`; in interactive
-  mode wait for user confirmation
+- **Plan review gate**: Implementation plan must come back from `/plan-review internal`
+  with no Critical findings; in interactive mode wait for user confirmation
