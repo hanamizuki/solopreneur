@@ -63,8 +63,10 @@ Branch on the Verdict line it emits:
 - `Ready to implement` → note the Important/Suggestion items, keep them in mind
   during implementation, and continue to Step 3.
 - `Needs revision` / `Needs rethink` (any Critical finding) → adjust the plan and
-  re-run `/plan-review internal` once, re-dispatching only the platforms whose
-  findings changed.
+  re-run `/plan-review internal` once, re-dispatching **every platform the edits
+  touch**, not just the ones that reported. Fixing an iOS blocker by changing a
+  shared API can break Android, and you cannot know a platform is still clean
+  without re-running its reviewer.
 - **Still not `Ready to implement` after that one re-run → stop.** Do not start
   Step 3. Report the outstanding Critical findings and halt with
   `status: "blocked"`. Implementing a plan whose blockers survived two reviews is

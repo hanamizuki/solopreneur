@@ -61,8 +61,7 @@ write back to.
 ## Severity
 
 Every stage tags each finding **Critical** (blocks implementation) /
-**Important** (should fix) / **Suggestion** (optional). Stage 2's cuts are
-Suggestion unless removing the scope also removes a blocker. This is the shared
+**Important** (should fix) / **Suggestion** (optional). This is the shared
 vocabulary R1 merges on and the callers branch on — a stage that emits untagged
 findings breaks both.
 
@@ -140,8 +139,11 @@ Return analysis only — no code.
 What in this plan does not need to exist? Stage 1 asks whether the approach is
 *correct*; this asks whether it is *necessary*.
 
-**Format:** `<location>: <tag> <what>. <replacement>.` — location is the plan's
-line number (`L42`) or section heading (`§ Migration`).
+**Format:** `<location>: <tag> <what>. <replacement>. [<severity>]` — location is
+the plan's line number (`L42`) or section heading (`§ Migration`). The severity
+is not optional: R1 sorts on it and the callers derive the Verdict from it, so a
+finding without one is invisible to both. Cuts are `[Suggestion]` unless
+removing the scope also removes a blocker.
 
 **Tags** — the five `ponytail:ponytail-review` uses. Use these; don't invent more:
 
@@ -323,7 +325,8 @@ Ready to implement | Needs revision (list the Critical findings) | Needs rethink
 what's wrong ⚠️, suggested adjustment 🔧 — each tagged with a severity.]
 
 ### Stage 2 — Lean check
-[One line per finding in tag format, then the structural net. Or "Lean already."]
+[One line per finding in tag format, each with its severity, then the structural
+net. Or "Lean already."]
 
 ### Stage 3 — Outside opinion
 [Findings + verdict. "skipped" in `internal` mode or when 3c was declined.]
