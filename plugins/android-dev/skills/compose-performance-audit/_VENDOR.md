@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/new-silvermoon/awesome-android-agent-skills
 - **Source path**: `.github/skills/performance/compose-performance-audit`
-- **Pinned commit**: e5d0275e9f28f4e5feb5939210d78ef39568c029
-- **Synced at**: 2026-07-15T10:32:20Z
+- **Pinned commit**: 82900eacc8dbe13de93c6310af27b9df4b2bd2f6
+- **Synced at**: 2026-07-28T06:15:13Z
 - **License**: see `../../vendor/LICENSES/awesome-android-agent-skills-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied

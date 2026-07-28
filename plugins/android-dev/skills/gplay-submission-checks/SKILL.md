@@ -33,14 +33,24 @@ hand-scripting individual validators:
   ```
 
 - **`gplay preflight --file <app.aab>`** — offline AAB/APK compliance and
-  hygiene: manifest presence, bundle/dex size, native-lib coverage, debuggable
-  and testOnly flags, cleartext traffic, dangerous permissions, and a secret
-  scan (API keys / private keys). No API calls. Exit codes: 0 clean, 1 findings
-  at/above `--fail-on`.
+  hygiene. Fully decodes `AndroidManifest.xml` (binary AXML for APKs, aapt2
+  protobuf for App Bundles) and runs nine scanners: `manifest`, `permissions`,
+  `native_libs`, `metadata`, `secrets`, `billing`, `privacy`, `policy`, `size`.
+  No API calls and no credentials. Exit codes: 0 clean, 1 findings at/above
+  `--fail-on`.
 
   ```bash
   gplay preflight --file app-release.aab --max-size 150M --fail-on warning
+
+  # Validate the store listing in the same pass
+  gplay preflight --file app-release.aab --listings-dir ./metadata --fail-on error
+
+  # Narrow the gate
+  gplay preflight --file app-release.aab --only manifest,permissions,native_libs
   ```
+
+  **See the `gplay-preflight` skill** for what each scanner catches, how to read
+  the findings, and CI gating patterns.
 
 - **`gplay checks upload`** — Google Checks compliance analysis as a CI gate.
   Use `--severity-threshold PRIORITY` to fail the pipeline on high-priority
@@ -228,20 +238,33 @@ gplay edits commit --package com.example.app --edit $EDIT_ID
 ## Content Policy Compliance
 
 ### Target API Level
-Google Play requires apps to target a recent Android API level. As of 2025:
-- New apps: must target API level 34 (Android 14) or higher
-- App updates: must target API level 34 or higher
 
-Check your `build.gradle` or `build.gradle.kts`:
+Google Play requires apps to target a recent Android API level, and raises the
+floor roughly every August to "latest release minus one". Both new apps and
+updates are affected; builds below the floor are rejected at upload.
+
+Check the build without guessing at the current number:
+
+```bash
+# The policy scanner reports targetSdkVersion against Play's floor
+gplay preflight --file app-release.aab --only policy
+
+# Override the floor if Google's annual bump landed before a gplay release
+gplay preflight --file app-release.aab --only policy --min-target-sdk 36
+```
+
+Fix it in `build.gradle` / `build.gradle.kts`:
+
 ```
 android {
     defaultConfig {
-        targetSdkVersion 34  // or targetSdk = 34
+        targetSdk = 35  // set to Play's current floor or higher
     }
 }
 ```
 
-Builds targeting older API levels will be rejected by the Play Console.
+Do not tell the user a specific required API level from memory — read it from
+the `policy` scanner output or from Play's published requirement.
 
 ### Permissions Declarations
 Sensitive permissions require justification in the Play Console:
