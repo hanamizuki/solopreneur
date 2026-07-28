@@ -29,6 +29,47 @@ The `slide-design` component reference stopped demonstrating its skill-card
 markup with a command that no longer exists.
 (#148)
 
+### designer 0.1.8 → 0.1.9
+The vendored `impeccable` skill jumps to upstream 4.x, its largest revision
+since it was added. The skill file is now a lean router: the design rules that
+used to load on every invocation — color, typography, layout, motion, the
+anti-pattern bans — moved into a craft-floor reference that loads only when
+you're about to edit UI. Surfaces are classified by what success looks like on
+them (persuade, operate, read, experience), replacing the older
+brand-versus-product split, and `craft` is deprecated in favor of an ordinary
+new-work request. The anti-pattern detector grew from 46 to 60 checks. New: a
+`doctor` pass that finds stale PRODUCT.md / DESIGN.md artifacts, a
+browser-served decision page for choices that are better seen than described,
+and concept seeding that pulls composition directions from an upstream catalog
+— it falls back to a local catalog when offline, and its anonymous choice ping
+honors `DO_NOT_TRACK`. Optional image generation runs only when
+`OPENAI_API_KEY` is set and bills to your own key. Self-QA is now capped at
+bounded verification passes instead of an open-ended polish loop.
+(#132)
+
+### ios-dev 0.4.10 → 0.4.11
+`asc-release-flow` and `asc-submission-health` were restructured: both SKILL
+files shrank substantially, with situational detail moved into references that
+load only when the situation applies. The new references cover review
+submissions that must bundle an app version with versioned digital goods or
+Game Center components, App Privacy publish state when the public API can't
+confirm it, digital-goods readiness when IAP or subscription validation fails,
+and repairs for proven `asc validate` / `asc review doctor` blockers.
+(#130)
+
+### android-dev 0.4.10 → 0.4.11
+`compose-navigation` was rewritten for **Navigation 3**, which models
+navigation as application state rather than through a `NavController`. It now
+covers navigation keys, back stack management, ViewModel scoping, entry
+decorators, adaptive layouts, and migration from Navigation Compose — note
+that Navigation 3 is still an alpha library, and the skill pins alpha
+coordinates. The `viewmodel` skill moved to Kotlin 2.3+ explicit backing
+fields. `gplay-submission-checks` now documents full manifest decoding (binary
+AXML for APKs, aapt2 protobuf for App Bundles) across nine named scanners, and
+describes Google Play's target-API floor as a yearly moving requirement rather
+than a fixed 2025 number.
+(#133)
+
 ## 2026-07-25
 
 ### solopreneur 0.5.34 → 0.5.35
