@@ -1493,7 +1493,7 @@ downstream needs to change.**
 | `bugbot` | `bugbot`, `cursor` | github-bot | PR comment `bugbot run` (top-level only) | none | default | — |
 | `greptile` | `greptile` | github-bot | PR comment `@greptileai` | none | default | — |
 | `codex-cli` | `codex cli` | local-cli | `codex review --base main` | stdout `[P*]` | n/a | n/a |
-| `agy` | `agy` | local-cli | `agy --model … --print` | stdout + marker | n/a | n/a |
+| `agy` | `agy` | local-cli | `agy --print` (model pinned with `--model`) | stdout + marker | n/a | n/a |
 
 **Reviewer kinds:**
 - **github-bot** — triggered by a PR comment and polled for. Whether it *also*
@@ -1517,8 +1517,11 @@ drift.
 
 In the steps below, `REVIEWER_CMD` = the current reviewer's trigger command
 (the registry row's trigger) and `BOT_LOGIN` = the GitHub login the pollers
-scope author matches to — supplied by the detection block below, which resolves
-it from the gate rather than from a hardcoded default.
+scope author matches to. **Both come from the same row — the one
+`current_reviewer` names.** The detection block below supplies `BOT_LOGIN` by
+looking that reviewer up in `RESOLVED.available`, replacing the hardcoded
+default that used to live here. It is deliberately **not** taken from
+`RESOLVED.gate`, which resolves independently and can name a different reviewer.
 
 ### Reviewer activity detection (pre-flight, PR mode)
 
@@ -1650,7 +1653,7 @@ Interpret the result:
 |---|---|---|
 | `DETECTION_STATUS=unavailable` | API failure / rate limit | `resolve` runs on the cache alone; empty cache falls through to the default flow |
 | `available` empty | Nothing has ever acted here and nothing cached | Default flow (current behaviour) |
-| `available` non-empty | These reviewers act here | The existing single-reviewer loop continues; `RESOLVED.gate` supplies its reviewer (`BOT_LOGIN` seam). PR 2 rewires trigger/collect/terminal states |
+| `available` non-empty | These reviewers act here | The existing single-reviewer loop continues, still driven by `current_reviewer`; the seam looks that reviewer's login up in `available` (`BOT_LOGIN`). PR 2 rewires trigger/collect/terminal states onto `gate` |
 | `needsPrompt` true / `gate` null | Nothing eligible to gate | PR 1: fall through to the default flow; PR 2 adds the selection prompt |
 
 Detection only lists options — it never proves a bot is alive **right now**. A
