@@ -1995,8 +1995,18 @@ only files formal reviews (verified: PR #108's Gemini). Ids, never timestamps
 ```bash
 # Aggregate in jq, NOT in `gh --jq`: with --paginate, gh applies a `--jq` filter
 # to each page separately and prints one result per page, so `[.[].id] | max`
-# there yields one maximum per page. Without --jq, gh merges the pages into a
-# single array first, which is what these need.
+# there yields one maximum per page. Without --jq, gh merges array pages into a
+# single flat array first, which is what these need.
+#
+# DO NOT "fix" this by adding --slurp. Two reviewers have proposed it from the
+# manual's wording; the real command disagrees. Measured on gh 2.92.0 against a
+# deliberately paginated request (`?per_page=1`, 9 pages):
+#   … --paginate            | jq -s 'length'  → 1   (one merged array…)
+#   … --paginate            | jq -s '.[0]|length' → 9   (…holding every record)
+#   … --paginate --slurp    | jq 'length'     → 9   (an array of 9 page arrays)
+# --slurp would therefore make `.[]` yield arrays instead of objects and every
+# filter below would silently match nothing. gh also documents that --slurp
+# cannot be combined with --jq at all.
 CUR_ISSUE=$(gh api "repos/{owner}/{repo}/issues/{pr}/comments" --paginate \
   | jq '[.[].id] | max // 0')
 CUR_REVIEW_COMMENT=$(gh api "repos/{owner}/{repo}/pulls/{pr}/comments" --paginate \
