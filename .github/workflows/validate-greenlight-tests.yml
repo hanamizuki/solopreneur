@@ -1,0 +1,64 @@
+name: Validate greenlight tests
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/solopreneur/skills/greenlight/**'
+      - '.github/workflows/validate-greenlight-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/solopreneur/skills/greenlight/**'
+      - '.github/workflows/validate-greenlight-tests.yml'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      # The matrix leg has to be part of the group, as in validate-preview-tests.yml:
+      # without it the Node jobs share one group and cancel each other, leaving
+      # one version silently untested.
+      group: validate-greenlight-tests-${{ github.ref }}-${{ matrix.node }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        # '20' is the floor the scripts declare in their headers, and testing
+        # only a modern Node would let a floor break ship green. '24' is the
+        # current Active LTS. Same pair, same reasoning, as the preview suite.
+        node: ['20', '24']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Install Node ${{ matrix.node }}
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: ${{ matrix.node }}
+          # Deliberately no `cache:` — it keys on a lockfile and hard errors when
+          # there is none. This repo ships no package.json anywhere and the suite
+          # uses Node built-ins only.
+
+      - name: Run the greenlight skill test suite
+        working-directory: plugins/solopreneur/skills/greenlight
+        run: |
+          # failglob, or this gate can pass having run zero tests: with no match
+          # bash passes the pattern through literally, Node >= 22.6 treats it as
+          # its own glob, matches nothing, and exits 0 on "tests 0".
+          shopt -s failglob
+          # NOT `node --test tests/`: since Node 22.6 the positional arguments are
+          # glob patterns rather than paths, so a bare directory matches itself
+          # and Node tries to execute the directory as a test file.
+          if ! node --test tests/*.test.mjs; then
+            echo
+            echo "::error::The greenlight skill's test suite failed on Node ${{ matrix.node }}."
+            echo "::error::Reproduce with: cd plugins/solopreneur/skills/greenlight && node --test tests/*.test.mjs"
+            exit 1
+          fi
