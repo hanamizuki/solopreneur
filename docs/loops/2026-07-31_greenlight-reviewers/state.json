@@ -1,24 +1,36 @@
 {
-  "status": "pending",
+  "status": "done",
   "plan_dir": "docs/loops/2026-07-31_greenlight-reviewers",
-  "started_at": null,
-  "completed_at": null,
+  "started_at": "2026-07-31T01:17:51+0800",
+  "completed_at": "2026-07-31T04:49:12+0800",
+  "wave_task_id": null,
+  "wave_run_id": null,
   "prs": {
     "pr1": {
-      "number": null,
-      "status": "pending",
+      "number": 150,
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": {
+        "rounds": 10,
+        "fixed": 16,
+        "pushed_back": 2,
+        "reviewer": "codex-bot then codex-cli (bot failed round 5)"
+      }
     },
     "pr2": {
-      "number": null,
-      "status": "pending",
+      "number": 151,
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": {
+        "rounds": 10,
+        "fixed": 30,
+        "pushed_back": 3,
+        "reviewer": "codex-bot/codex-cli + coderabbit"
+      }
     }
   }
 }
