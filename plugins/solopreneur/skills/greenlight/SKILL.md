@@ -1577,12 +1577,18 @@ REPO_KEY=$(solopreneur_repo_key)
 FALLBACK_ORDER=$(read_solopreneur_config greenlight | jq -r '(.fallback_order // []) | join(",")')
 
 # Local CLIs never appear in GitHub activity, so their availability comes from
-# the pre-flight CLI gate instead. codex-cli is included whenever its gate
-# passed — it is the documented successor to codex-bot. agy is NOT included
-# automatically: switching model family is the user's call, so it is added only
-# on explicit request (see "Reviewer selection").
+# the same probe the pre-flight Codex CLI gate uses. codex-cli is included
+# whenever that probe passes — it is the documented successor to codex-bot. agy
+# is NOT included automatically: switching model family is the user's call, so
+# it is added only on explicit request (see "Reviewer selection").
+#
+# Re-probed here rather than testing $CODEX_INSTALLED / $CODEX_AUTH: pre-flight
+# Step 3 *prints* those as text for the reader, it never assigns them, so testing
+# them would read unset variables and silently drop codex-cli from every resolve.
 CLI_AVAILABLE=""
-[ "$CODEX_INSTALLED" = true ] && [ "$CODEX_AUTH" = true ] && CLI_AVAILABLE="codex-cli"
+if command -v codex >/dev/null 2>&1 && codex login status >/dev/null 2>&1; then
+  CLI_AVAILABLE="codex-cli"
+fi
 
 # All-or-nothing: a non-zero return (any source errored — rate limit / network)
 # degrades to `unavailable`. Only a fully successful sample yields `ok`. An
