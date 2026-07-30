@@ -11,6 +11,10 @@
  *               conversation | review-comment | formal-review
  *       stdout: {"bots":[{"login","lastSeen","evidence"}]}
  *
+ *   reviewer-state.mjs record --repo-key <K>
+ *       stdin:  {"observations":[{"login", "auto"?, "triggerable"?, "recipe"?}]}
+ *       stdout: the repo's whole greenlight_reviewers block after the merge
+ *
  * This script never calls `gh`, never derives the repo key, and never reads
  * `fallback_order` — all three are passed in. That keeps it testable and keeps
  * the five-layer config cascade in the one place that already implements it
@@ -23,7 +27,15 @@
  * stderr and set exitCode 1.
  */
 
-const SUBCOMMANDS = ['detect'];
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { recipeFor, recipeForLogin } from './reviewer-registry.mjs';
+
+const SUBCOMMANDS = ['detect', 'record'];
+
+/** The feature key this script owns. It never touches `greenlight`. */
+const FEATURE = 'greenlight_reviewers';
 
 /** Sources that prove a bot performs code review, not just automation. */
 const EVIDENCE_SOURCES = new Set(['review-comment', 'formal-review']);
@@ -85,6 +97,131 @@ function detect(tsv) {
   return [...byLogin.values()].sort((a, b) => (a.login < b.login ? -1 : a.login > b.login ? 1 : 0));
 }
 
+/** The primary config file, matching the shell helpers in shared/config.md. */
+function configPath() {
+  const base = process.env.CLAUDE_CONFIG_DIR
+    ? path.resolve(process.env.CLAUDE_CONFIG_DIR)
+    : path.join(os.homedir(), '.claude');
+  return path.join(base, 'solopreneur.json');
+}
+
+/**
+ * Read the config for writing.
+ *
+ * Only ENOENT may become `{}`. A parse failure, a permission error, or a
+ * non-object top level is fatal: the caller is about to rewrite this file, and
+ * treating "cannot understand it" as "it is empty" would replace the user's
+ * whole config with whatever this round happened to observe.
+ */
+function readConfigForWrite() {
+  let raw;
+  try {
+    raw = fs.readFileSync(configPath(), 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return {};
+    throw new InputError(`cannot read ${configPath()}: ${err.message}`);
+  }
+  if (!raw.trim()) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new InputError(`cannot parse ${configPath()} (malformed JSON): ${err.message}`);
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new InputError(`${configPath()} must contain a JSON object at the top level`);
+  }
+  return parsed;
+}
+
+/** Atomic replace via a private temp file in the same directory. */
+function writeConfig(cfg) {
+  const target = configPath();
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  // mkdtemp, not a predictable `${target}.tmp`: an attacker-planted symlink at
+  // a guessable path would otherwise be followed by the write.
+  const stage = fs.mkdtempSync(`${target}.`);
+  const tmp = path.join(stage, 'solopreneur.json');
+  try {
+    fs.writeFileSync(tmp, `${JSON.stringify(cfg, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+    fs.renameSync(tmp, target);
+  } finally {
+    fs.rmSync(stage, { recursive: true, force: true });
+  }
+}
+
+/** This repo's owned block, defaulted. */
+function reviewersBlock(cfg, repoKey) {
+  const block = cfg?.repos?.[repoKey]?.[FEATURE] ?? {};
+  return {
+    observed: block.observed && typeof block.observed === 'object' ? block.observed : {},
+  };
+}
+
+/** Minimal `--flag value` parser. Unknown flags are an error, not ignored. */
+function parseFlags(argv, allowed) {
+  const out = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    const flag = argv[i];
+    if (!flag.startsWith('--')) throw new InputError(`unexpected argument "${flag}"`);
+    const name = flag.slice(2);
+    if (!allowed.includes(name)) throw new InputError(`unknown flag "${flag}"`);
+    const value = argv[i + 1];
+    if (value === undefined || value.startsWith('--')) {
+      throw new InputError(`${flag} needs a value`);
+    }
+    out[name] = value;
+    i += 1;
+  }
+  return out;
+}
+
+/** Parse stdin as JSON, naming the input so the message is actionable. */
+function parseJsonStdin(raw) {
+  if (!raw.trim()) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new InputError(`cannot parse stdin as JSON: ${err.message}`);
+  }
+}
+
+/**
+ * Merge this round's observations into the per-repo cache.
+ *
+ * Each observation is a per-login field merge over three optional facts:
+ *   auto         — it commented without being triggered
+ *   triggerable  — false: a trigger got no response inside its own poll
+ *                  budget; true: a marked login acted again (the recovery path)
+ *   recipe       — an attended identify bound this login to a registry row
+ *
+ * An empty payload does not rewrite the file at all, so a quiet round cannot
+ * reformat or reorder a config the user hand-edited.
+ */
+function record({ observations = [], repoKey }) {
+  for (const obs of observations) {
+    if (!obs?.login) throw new InputError('every observation needs a login');
+    if (obs.recipe != null && !recipeFor(obs.recipe)) {
+      throw new InputError(`unknown recipe "${obs.recipe}"`);
+    }
+  }
+
+  const cfg = readConfigForWrite();
+  const current = reviewersBlock(cfg, repoKey);
+  if (observations.length === 0) return current;
+
+  const observed = { ...current.observed };
+  for (const { login, ...fields } of observations) {
+    observed[login] = { ...(observed[login] ?? {}), ...fields };
+  }
+
+  cfg.repos ??= {};
+  cfg.repos[repoKey] ??= {};
+  cfg.repos[repoKey][FEATURE] = { observed };
+  writeConfig(cfg);
+  return cfg.repos[repoKey][FEATURE];
+}
+
 function emit(payload) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);
 }
@@ -95,6 +232,13 @@ async function main() {
 
   if (sub === 'detect') {
     return emit({ bots: detect(await readStdin()) });
+  }
+
+  if (sub === 'record') {
+    const flags = parseFlags(process.argv.slice(3), ['repo-key']);
+    if (!flags['repo-key']) throw new InputError('record needs --repo-key');
+    const payload = parseJsonStdin(await readStdin());
+    return emit(record({ observations: payload.observations ?? [], repoKey: flags['repo-key'] }));
   }
 
   return usage(`unknown subcommand "${sub}"`);

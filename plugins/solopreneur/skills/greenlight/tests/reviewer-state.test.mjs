@@ -174,3 +174,171 @@ test('an unknown subcommand fails with usage', () => {
 test('no subcommand fails with usage', () => {
   assertFailed(run([]), /usage/i);
 });
+
+const KEY = 'github.com/o/r';
+const readBack = (dir) =>
+  JSON.parse(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'));
+const reviewersOf = (dir) => readBack(dir).repos[KEY].greenlight_reviewers;
+
+/** A config with both the shell-owned `greenlight` and script-owned key. */
+const CFG = ({ observed = {}, fallbackOrder = ['codex-bot'] } = {}) => ({
+  default: { greenlight: { fallback_order: fallbackOrder } },
+  repos: {
+    [KEY]: {
+      preview: { path: 'docs/preview' },
+      greenlight: { fallback_order: fallbackOrder },
+      greenlight_reviewers: { observed },
+    },
+    'github.com/other/repo': { greenlight: { fallback_order: ['gemini'] } },
+  },
+});
+
+test('record creates greenlight_reviewers on a fresh config', () => {
+  const dir = tmpConfigDir();
+  const { code } = run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'coderabbitai[bot]', auto: true }] }),
+    configDir: dir,
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(reviewersOf(dir).observed['coderabbitai[bot]'], { auto: true });
+});
+
+test('record merges into an existing entry without dropping fields', () => {
+  const dir = tmpConfigDir(CFG({ observed: { 'cursor[bot]': { recipe: 'bugbot', auto: false } } }));
+  run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'cursor[bot]', auto: true }] }),
+    configDir: dir,
+  });
+  assert.deepEqual(reviewersOf(dir).observed['cursor[bot]'], { recipe: 'bugbot', auto: true });
+});
+
+test('record writes triggerable:false for a reviewer that never answered', () => {
+  const dir = tmpConfigDir(CFG({ observed: { 'gemini-code-assist[bot]': { auto: false } } }));
+  run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'gemini-code-assist[bot]', triggerable: false }] }),
+    configDir: dir,
+  });
+  assert.equal(reviewersOf(dir).observed['gemini-code-assist[bot]'].triggerable, false);
+});
+
+test('record clears triggerable:false when the reviewer acts again', () => {
+  // The one-way-door fix: a marked reviewer that produces an item (or is
+  // deliberately retried in an attended run) gets triggerable:true written,
+  // which resolve's `!== false` filter re-admits.
+  const dir = tmpConfigDir(CFG({ observed: { 'gemini-code-assist[bot]': { triggerable: false } } }));
+  run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'gemini-code-assist[bot]', triggerable: true }] }),
+    configDir: dir,
+  });
+  assert.equal(reviewersOf(dir).observed['gemini-code-assist[bot]'].triggerable, true);
+});
+
+test('record stores an identify as a recipe on the observed login', () => {
+  const dir = tmpConfigDir(CFG({ observed: { 'mystery[bot]': { auto: true } } }));
+  run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'mystery[bot]', recipe: 'bugbot' }] }),
+    configDir: dir,
+  });
+  assert.deepEqual(reviewersOf(dir).observed['mystery[bot]'], { auto: true, recipe: 'bugbot' });
+});
+
+test('record never writes the shell-owned greenlight key', () => {
+  // The whole reason observations live under their own feature key: the shell
+  // helper replaces a feature subtree wholesale, and the five-layer read takes
+  // the first layer that has the feature at all. Sharing one subtree means
+  // either writer silently erases the other's work.
+  const dir = tmpConfigDir(CFG({ fallbackOrder: ['codex-bot', 'codex-cli'] }));
+  run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'coderabbitai[bot]', auto: true }] }),
+    configDir: dir,
+  });
+  const cfg = readBack(dir);
+  assert.deepEqual(cfg.repos[KEY].greenlight, { fallback_order: ['codex-bot', 'codex-cli'] });
+  assert.deepEqual(cfg.default.greenlight, { fallback_order: ['codex-bot', 'codex-cli'] });
+});
+
+test('record preserves sibling repos and sibling features', () => {
+  const dir = tmpConfigDir(CFG());
+  run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'coderabbitai[bot]', auto: true }] }),
+    configDir: dir,
+  });
+  const cfg = readBack(dir);
+  assert.deepEqual(cfg.repos['github.com/other/repo'], { greenlight: { fallback_order: ['gemini'] } });
+  assert.deepEqual(cfg.repos[KEY].preview, { path: 'docs/preview' });
+});
+
+test('record rejects an observation with no login', () => {
+  assertFailed(
+    run(['record', '--repo-key', KEY], { stdin: JSON.stringify({ observations: [{ auto: true }] }) }),
+    /login/i,
+  );
+});
+
+test('record rejects an unknown recipe in an observation', () => {
+  assertFailed(
+    run(['record', '--repo-key', KEY], {
+      stdin: JSON.stringify({ observations: [{ login: 'x[bot]', recipe: 'nope' }] }),
+    }),
+    /nope/,
+  );
+});
+
+test('record requires --repo-key', () => {
+  assertFailed(run(['record'], { stdin: '{"observations":[]}' }), /repo-key/);
+});
+
+test('record on an empty payload leaves the file byte-identical', () => {
+  const dir = tmpConfigDir(CFG({ observed: { 'cursor[bot]': { recipe: 'bugbot' } } }));
+  const before = fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8');
+  const { code } = run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [] }), configDir: dir,
+  });
+  assert.equal(code, 0);
+  assert.equal(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'), before);
+});
+
+test('record refuses to write when the config is malformed', () => {
+  // The dangerous version of this bug: treat a parse error as "no config",
+  // build {} plus the new entry, and rename it over the original. Every other
+  // repo and every default.* feature would be gone, silently, exit 0.
+  const broken = '{ "repos": { "github.com/o/r": { "greenlight": { } } },, }';
+  const dir = tmpConfigDir(broken);
+  assertFailed(
+    run(['record', '--repo-key', KEY], {
+      stdin: JSON.stringify({ observations: [{ login: 'x[bot]', auto: true }] }),
+      configDir: dir,
+    }),
+    /parse|malformed|invalid/i,
+  );
+  assert.equal(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'), broken,
+    'the original file must survive untouched');
+});
+
+test('record refuses a config whose top level is not an object', () => {
+  for (const bad of ['null', '[]', '"str"', '42']) {
+    const dir = tmpConfigDir(bad);
+    assertFailed(
+      run(['record', '--repo-key', KEY], {
+        stdin: JSON.stringify({ observations: [{ login: 'x[bot]', auto: true }] }),
+        configDir: dir,
+      }),
+      /object/i,
+    );
+    assert.equal(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'), bad);
+  }
+});
+
+test('record treats an absent config as empty and creates it', () => {
+  const dir = tmpDir();   // no solopreneur.json at all
+  const { code } = run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'x[bot]', auto: true }] }),
+    configDir: dir,
+  });
+  assert.equal(code, 0);
+  assert.equal(reviewersOf(dir).observed['x[bot]'].auto, true);
+});
+
+test('record rejects malformed stdin with a message naming the input', () => {
+  assertFailed(run(['record', '--repo-key', KEY], { stdin: '{not json' }), /stdin/i);
+});
