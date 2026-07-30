@@ -1603,16 +1603,33 @@ RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve 
 # Warnings are actionable config problems (a stale recipe id), not failures.
 printf '%s' "$RESOLVED" | jq -r '.warnings[]? | "note: " + .'
 
-# PR-1 seam: the existing single-reviewer loop keeps running unchanged and
-# reads its reviewer identity from the resolved gate. PR 2 replaces the
-# consumers (trigger / collect / terminal states) and removes this mapping.
-BOT_LOGIN=$(printf '%s' "$RESOLVED" | jq -r '.gate.login // empty')
+# The recipe_id of the reviewer this loop actually triggers. `current_reviewer`
+# is an alias spelling ("codex bot", "gemini", "codex cli"); map it to its
+# recipe_id with the registry table above — the same row that supplies
+# REVIEWER_CMD.
+CURRENT_RECIPE=<recipe_id of current_reviewer>
+
+# PR-1 seam: the existing single-reviewer loop keeps running unchanged, and its
+# poll identity must come from the SAME row as its trigger. Deliberately NOT
+# `.gate.login`: the gate is resolved independently from fallback_order, so on a
+# repo where codex is available `/greenlight external gemini` would post
+# `/gemini review` while polling for Codex's login — the real response is then
+# filtered out and the round times out. PR 2 moves trigger AND poll to
+# RESOLVED.gate together, which is when the two may safely converge.
+BOT_LOGIN=$(printf '%s' "$RESOLVED" | jq -r --arg r "$CURRENT_RECIPE" \
+  'first(.available[] | select(.recipe == $r) | .login) // empty')
 ```
 
-An **empty `BOT_LOGIN`** means no gate resolved (zero-history repo) or the gate
-is a local CLI, which has no login at all. Both are the "default flow" rows in
-the table below: take `BOT_LOGIN` from the registry row for `current_reviewer`,
-exactly as before this block existed. Never substitute a guessed login.
+Resolving through `available` (rather than straight from the registry table) is
+what lets a tool with no verified login work once it has been identified on this
+repo — the cache supplies the login the table cannot.
+
+An **empty `BOT_LOGIN`** means the current reviewer has not been seen here (or is
+a local CLI, which has no login and whose Flow B never polls GitHub). Fall back
+to the **verified login** column of that same registry row, exactly as before
+this block existed. Never substitute a guessed login: a `—` in that column means
+the tool can still be triggered, but nothing can be attributed to it until it
+answers once and is identified.
 
 Interpret the result:
 
