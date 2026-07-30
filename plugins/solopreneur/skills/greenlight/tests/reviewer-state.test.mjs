@@ -359,6 +359,38 @@ test('record refuses a non-object repos container instead of silently dropping t
   }
 });
 
+test('record refuses a malformed greenlight_reviewers block', () => {
+  // Same class as the repos containers: defaulting a block we cannot read to {}
+  // means the next write silently replaces whatever was actually in there.
+  const bad = [
+    '{"repos":{"github.com/o/r":{"greenlight_reviewers":[]}}}',
+    '{"repos":{"github.com/o/r":{"greenlight_reviewers":"nope"}}}',
+    '{"repos":{"github.com/o/r":{"greenlight_reviewers":{"observed":[]}}}}',
+  ];
+  for (const cfg of bad) {
+    const dir = tmpConfigDir(cfg);
+    assertFailed(
+      run(['record', '--repo-key', KEY], {
+        stdin: JSON.stringify({ observations: [{ login: 'x[bot]', auto: true }] }),
+        configDir: dir,
+      }),
+      /must be a JSON object/i,
+    );
+    assert.equal(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'), cfg);
+  }
+});
+
+test('record accepts a null greenlight_reviewers as unset', () => {
+  // The five-layer read treats null as "not set", so it must not be corruption.
+  const dir = tmpConfigDir('{"repos":{"github.com/o/r":{"greenlight_reviewers":null}}}');
+  const { code } = run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'x[bot]', auto: true }] }),
+    configDir: dir,
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(reviewersOf(dir).observed['x[bot]'], { auto: true });
+});
+
 test('record refuses an existing but blank config', () => {
   // Only ENOENT means "no config". An existing empty file is a truncated write
   // — writeConfig only ever renames a complete temp file into place — so

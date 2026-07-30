@@ -149,7 +149,19 @@ function readConfigForWrite() {
   return parsed;
 }
 
-/** Atomic replace via a private temp file in the same directory. */
+/**
+ * Atomic replace via a private temp file in the same directory.
+ *
+ * ponytail: the RENAME is atomic, the read-modify-write around it is not — two
+ * concurrent writers can each read, then each rename, and the later one wins.
+ * That is the config file's existing model, not something introduced here: both
+ * shell helpers do the same `cat` → `jq` → `mv` with no lock, so locking this
+ * writer alone would buy false confidence while a shell writer still clobbers.
+ * Acceptable because `observed` is a self-healing cache — a lost observation is
+ * simply re-observed next round, with no TTL to go stale. If this key ever
+ * holds something non-idempotent, move all three writers onto one lock file
+ * rather than adding a lock here.
+ */
 function writeConfig(cfg) {
   const target = configPath();
   fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -165,12 +177,25 @@ function writeConfig(cfg) {
   }
 }
 
-/** This repo's owned block, defaulted. */
+/**
+ * This repo's owned block, defaulted.
+ *
+ * Fails closed on a malformed shape for the same reason the repo containers do:
+ * substituting `{}` for a block we cannot read means the next write silently
+ * replaces whatever was there. `null` is tolerated as "unset" — that is how the
+ * five-layer read treats it — but an array or a scalar is corruption.
+ */
 function reviewersBlock(cfg, repoKey) {
-  const block = cfg?.repos?.[repoKey]?.[FEATURE] ?? {};
-  return {
-    observed: block.observed && typeof block.observed === 'object' ? block.observed : {},
-  };
+  const at = (suffix) => `repos[${JSON.stringify(repoKey)}].${FEATURE}${suffix}`;
+  const block = cfg?.repos?.[repoKey]?.[FEATURE];
+  if (block != null && !isPlainObject(block)) {
+    throw new InputError(`${configPath()}: ${at('')} must be a JSON object`);
+  }
+  const observed = block?.observed;
+  if (observed != null && !isPlainObject(observed)) {
+    throw new InputError(`${configPath()}: ${at('.observed')} must be a JSON object`);
+  }
+  return { observed: observed ?? {} };
 }
 
 /** Minimal `--flag value` parser. Unknown flags are an error, not ignored. */
