@@ -317,6 +317,14 @@ const csv = (value) => (value ? value.split(',').map((s) => s.trim()).filter(Boo
  * A stale --select or --gate degrades with a warning instead of failing: those
  * values may come from a days-old autopilot descriptor, and a stale token must
  * not turn an unattended run into an empty one.
+ *
+ * Known gap, owned by PR 2: `triggerable: false` entries are filtered out here
+ * and therefore appear in no output field, so the attended "retry a reviewer
+ * marked unresponsive" prompt has nothing to list, and `needsPrompt` is decided
+ * without them. That prompt is what defines the shape the entries need, so the
+ * output key lands with it rather than being guessed here. They must NOT simply
+ * be added to `available`, which feeds `collect` — a marked reviewer's comments
+ * must not start being harvested as findings.
  */
 function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
   const warnings = [];

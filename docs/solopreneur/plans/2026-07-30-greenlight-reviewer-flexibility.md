@@ -1918,6 +1918,19 @@ unresponsive, no CLI). Attended runs then ask **one** question offering:
   "marked unresponsive" note — the mark may date from a transient outage).
   Re-selecting clears it:
 
+  > **PR 2 must extend `resolve`'s output to make this list reachable.**
+  > `resolve` filters `triggerable !== false` *before* building `available`, so
+  > a marked reviewer appears in no output field and `needsPrompt` is computed
+  > without it — a repo whose only known reviewer is marked reports
+  > `available: []`, `needsPrompt: false`, and this prompt can never offer the
+  > retry. Add the marked entries as their own output key (they must stay out of
+  > `available`, which feeds `collect` — a marked reviewer's comments must not
+  > start being harvested as findings) and include them in the `needsPrompt`
+  > condition. Deliberately **not** done in PR 1: the field's shape depends on
+  > what this prompt needs to display, and shipping a guessed contract with no
+  > consumer is how dead API surface gets locked in by tests.
+  > (Raised by Codex CLI on PR #150, round 10.)
+
   ```bash
   printf '{"observations":[{"login":"%s","triggerable":true}]}' "$LOGIN" \
     | node "$SCRIPTS/reviewer-state.mjs" record --repo-key "$REPO_KEY"
