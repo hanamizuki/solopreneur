@@ -15,6 +15,11 @@
  *       stdin:  {"observations":[{"login", "auto"?, "triggerable"?, "recipe"?}]}
  *       stdout: the repo's whole greenlight_reviewers block after the merge
  *
+ *   reviewer-state.mjs resolve --repo-key <K> --fallback-order <ids>
+ *                              [--cli-available <ids>] [--select <ids>] [--gate <id>]
+ *       stdin:  {"bots":[…]} — the `detect` output
+ *       stdout: {"available","trigger","collect","gate","needsPrompt","warnings"}
+ *
  * This script never calls `gh`, never derives the repo key, and never reads
  * `fallback_order` — all three are passed in. That keeps it testable and keeps
  * the five-layer config cascade in the one place that already implements it
@@ -32,7 +37,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { recipeFor, recipeForLogin } from './reviewer-registry.mjs';
 
-const SUBCOMMANDS = ['detect', 'record'];
+const SUBCOMMANDS = ['detect', 'record', 'resolve'];
 
 /** The feature key this script owns. It never touches `greenlight`. */
 const FEATURE = 'greenlight_reviewers';
@@ -222,6 +227,158 @@ function record({ observations = [], repoKey }) {
   return cfg.repos[repoKey][FEATURE];
 }
 
+/** Read-only view. Same fail-closed rules as the write path. */
+function readConfig() {
+  return readConfigForWrite();
+}
+
+const csv = (value) => (value ? value.split(',').map((s) => s.trim()).filter(Boolean) : []);
+
+/**
+ * Decide this round's roles.
+ *
+ * Candidates come from two places that cannot be unified — a GitHub bot has a
+ * login, a local CLI never appears in GitHub data at all — so each carries its
+ * `kind` and its own gating eligibility:
+ *
+ *   bot   cached or detected login. Its recipe resolves cache-first (an
+ *         explicit identify wins), then via the registry's verified
+ *         knownLogins, then null. Gates when a recipe resolved.
+ *   cli   a local CLI that passed its availability gate. Gates — it runs
+ *         synchronously, so finishing *is* the end of the round.
+ *
+ * An unidentified bot (no recipe) is collected but never triggered and never
+ * gates. It must additionally carry review evidence: `type == "Bot"` proves
+ * automation, not code review, and dependabot's PR prose is not review
+ * feedback.
+ *
+ * The gate is always triggered, auto or not: a clean signal needs an
+ * addressable response. `auto` only exempts non-gate reviewers.
+ *
+ * A stale --select or --gate degrades with a warning instead of failing: those
+ * values may come from a days-old autopilot descriptor, and a stale token must
+ * not turn an unattended run into an empty one.
+ */
+function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
+  const warnings = [];
+  const { observed } = reviewersBlock(readConfig(), repoKey);
+
+  // Union of remembered and observed, keyed by login.
+  const merged = new Map();
+  for (const [login, rec] of Object.entries(observed)) merged.set(login, { login, ...rec });
+  for (const b of bots) {
+    const prev = merged.get(b.login) ?? { login: b.login };
+    merged.set(b.login, { ...prev, lastSeen: b.lastSeen, evidence: b.evidence === true });
+  }
+
+  const botCandidates = [...merged.values()]
+    .filter((r) => r.triggerable !== false)
+    .map((r) => {
+      let recipe = r.recipe ?? null;
+      if (recipe !== null && !recipeFor(recipe)) {
+        warnings.push(`cached recipe "${recipe}" is not in the registry; ignoring it for ${r.login}`);
+        recipe = null;
+      }
+      // A registry-verified login identifies itself: an App's bot login is
+      // app-scoped, identical on every repo. The cached recipe (an explicit
+      // identify) wins when both exist.
+      recipe ??= recipeForLogin(r.login)?.id ?? null;
+      return {
+        kind: 'bot',
+        id: r.login,
+        login: r.login,
+        recipe,
+        auto: r.auto === true,
+        evidence: r.evidence === true,
+        lastSeen: r.lastSeen ?? null,
+        canGate: recipe !== null,
+      };
+    })
+    // A recipe-bearing entry is a known reviewer; an unidentified one has to
+    // prove it reviews before its comments are treated as findings.
+    .filter((r) => r.recipe !== null || r.evidence);
+
+  const cliCandidates = cliAvailable
+    .filter((id) => {
+      const r = recipeFor(id);
+      if (r && r.kind === 'local-cli') return true;
+      warnings.push(`"${id}" is not a local-cli recipe; ignoring it`);
+      return false;
+    })
+    .map((id) => ({
+      kind: 'cli', id, login: null, recipe: recipeFor(id).id, auto: false, evidence: false,
+      lastSeen: null, canGate: true,
+    }));
+
+  const available = [...botCandidates, ...cliCandidates]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+  let wanted = select ? csv(select) : null;
+  let selected = wanted
+    ? available.filter((r) => wanted.includes(r.recipe) || wanted.includes(r.id))
+    : available;
+  if (wanted && selected.length === 0) {
+    warnings.push(`--select matched no available reviewer (${wanted.join(', ')}); ignoring it`);
+    wanted = null;
+    selected = available;
+  }
+
+  let gateEntry = null;
+  if (gate) {
+    const found = selected.find((r) => r.recipe === gate || r.id === gate);
+    if (found?.canGate) gateEntry = found;
+    else warnings.push(`--gate "${gate}" is not an available gate candidate; falling back to fallback-order`);
+  }
+  if (!gateEntry) {
+    for (const id of fallbackOrder) {
+      gateEntry = selected.find((r) => r.recipe === id && r.canGate) ?? null;
+      if (gateEntry) break;
+    }
+    gateEntry ??= selected.find((r) => r.canGate) ?? null;
+  }
+
+  const trigger = selected
+    .filter((r) => {
+      if (r.kind === 'cli') return true;
+      if (r.recipe === null) return false;
+      return !r.auto || r === gateEntry;
+    })
+    .map((r) => {
+      const recipe = recipeFor(r.recipe);
+      return {
+        kind: recipe.kind,
+        recipe: r.recipe,
+        triggerText: recipe.trigger,
+        handshake: recipe.handshake,
+        login: r.login,
+      };
+    });
+
+  const gatePayload = gateEntry
+    ? {
+      kind: gateEntry.kind,
+      id: gateEntry.id,
+      login: gateEntry.login,
+      recipe: gateEntry.recipe,
+      // The gate's own policy: a github-bot gate defines the poll window; a
+      // local-cli gate has none — it runs synchronously and its completion
+      // closes the round (SKILL.md branches on `kind`).
+      poll: recipeFor(gateEntry.recipe).poll ?? null,
+      handshake: recipeFor(gateEntry.recipe).handshake,
+    }
+    : null;
+
+  return {
+    available,
+    trigger,
+    collect: selected.filter((r) => r.login).map((r) => r.login),
+    gate: gatePayload,
+    // Ask only when something acts here but nothing can close a round.
+    needsPrompt: gateEntry === null && available.length > 0,
+    warnings,
+  };
+}
+
 function emit(payload) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);
 }
@@ -239,6 +396,24 @@ async function main() {
     if (!flags['repo-key']) throw new InputError('record needs --repo-key');
     const payload = parseJsonStdin(await readStdin());
     return emit(record({ observations: payload.observations ?? [], repoKey: flags['repo-key'] }));
+  }
+
+  if (sub === 'resolve') {
+    const flags = parseFlags(process.argv.slice(3),
+      ['repo-key', 'fallback-order', 'cli-available', 'select', 'gate']);
+    if (!flags['repo-key']) throw new InputError('resolve needs --repo-key');
+    if (flags['fallback-order'] === undefined) {
+      throw new InputError('resolve needs --fallback-order (read it with read_solopreneur_config)');
+    }
+    const { bots = [] } = parseJsonStdin(await readStdin());
+    return emit(resolve({
+      bots,
+      repoKey: flags['repo-key'],
+      fallbackOrder: csv(flags['fallback-order']),
+      cliAvailable: csv(flags['cli-available']),
+      select: flags.select,
+      gate: flags.gate,
+    }));
   }
 
   return usage(`unknown subcommand "${sub}"`);

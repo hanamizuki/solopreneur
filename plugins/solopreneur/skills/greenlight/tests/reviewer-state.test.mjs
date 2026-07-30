@@ -342,3 +342,190 @@ test('record treats an absent config as empty and creates it', () => {
 test('record rejects malformed stdin with a message naming the input', () => {
   assertFailed(run(['record', '--repo-key', KEY], { stdin: '{not json' }), /stdin/i);
 });
+
+const BOTS = (rows) => JSON.stringify({
+  bots: rows.map((r) => (typeof r === 'string'
+    ? { login: r, lastSeen: '2026-07-29T11:00:00Z', evidence: true }
+    : { lastSeen: '2026-07-29T11:00:00Z', evidence: true, ...r })),
+});
+
+/** resolve with the required flags defaulted. */
+function resolve(extra, { stdin, configDir } = {}) {
+  return run(['resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot', ...extra],
+    { stdin, configDir });
+}
+
+const CODEX = 'chatgpt-codex-connector[bot]';
+const RABBIT = 'coderabbitai[bot]';
+const GEMINI = 'gemini-code-assist[bot]';
+
+test('resolve merges detected bots with the cache', () => {
+  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { auto: true } } }));
+  const { code, stdout } = resolve([], { stdin: BOTS([CODEX]), configDir: dir });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.available.map((r) => r.id).sort(), [RABBIT, CODEX].sort());
+});
+
+test('resolve identifies a registry-known login with no config at all', () => {
+  // The migration path: on a fresh config the three long-standing bots must be
+  // full citizens immediately. An App's login is app-scoped, so the verified
+  // knownLogins row applies on every repo with zero learning.
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT]) });
+  const [bot] = JSON.parse(stdout).available;
+  assert.equal(bot.recipe, 'coderabbit');
+  assert.equal(bot.canGate, true);
+});
+
+test('resolve lets a cached identify override the registry mapping', () => {
+  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { recipe: 'bugbot' } } }));
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT]), configDir: dir });
+  assert.equal(JSON.parse(stdout).available[0].recipe, 'bugbot');
+});
+
+test('resolve excludes triggerable:false', () => {
+  const dir = tmpConfigDir(CFG({ observed: { [GEMINI]: { triggerable: false } } }));
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT, GEMINI]), configDir: dir });
+  assert.deepEqual(JSON.parse(stdout).available.map((r) => r.id), [RABBIT]);
+});
+
+test('resolve drops an unidentified bot with no review evidence', () => {
+  // dependabot shape. Without this it would be selected by default and its PR
+  // description would enter the finding-processing loop as review feedback.
+  const { stdout } = resolve([], {
+    stdin: BOTS([{ login: 'dependabot[bot]', evidence: false }, CODEX]),
+  });
+  assert.deepEqual(JSON.parse(stdout).available.map((r) => r.id), [CODEX]);
+});
+
+test('resolve keeps an unidentified bot that has review evidence, but bars it from gating', () => {
+  const { stdout } = resolve([], { stdin: BOTS([CODEX, 'brand-new[bot]']) });
+  const out = JSON.parse(stdout);
+  const fresh = out.available.find((r) => r.id === 'brand-new[bot]');
+  assert.equal(fresh.recipe, null);
+  assert.equal(fresh.canGate, false);
+  assert.ok(out.collect.includes('brand-new[bot]'), 'its findings are still collected');
+  assert.ok(!out.trigger.some((t) => t.login === 'brand-new[bot]'), 'but it is never triggered');
+});
+
+test('resolve admits an available local CLI and lets it gate', () => {
+  const { stdout } = resolve(['--cli-available', 'codex-cli'], { stdin: BOTS([]) });
+  const cli = JSON.parse(stdout).available.find((r) => r.kind === 'cli');
+  assert.equal(cli.id, 'codex-cli');
+  assert.equal(cli.canGate, true);
+});
+
+test('resolve marks a local CLI trigger with its kind so SKILL.md can branch', () => {
+  const { stdout } = resolve(['--cli-available', 'codex-cli'], { stdin: BOTS([]) });
+  const t = JSON.parse(stdout).trigger.find((x) => x.recipe === 'codex-cli');
+  assert.equal(t.kind, 'local-cli');
+});
+
+test('resolve omits a non-gate auto reviewer from trigger but keeps it in collect', () => {
+  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { auto: true }, [CODEX]: { auto: false } } }));
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT, CODEX]), configDir: dir });
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.trigger.map((t) => t.login), [CODEX]);
+  assert.ok(out.collect.includes(RABBIT));
+});
+
+test('resolve always triggers the gate, auto or not', () => {
+  // A clean signal needs an addressable response. Re-requesting a review from
+  // an auto bot is harmless, so the gate is exempt from the auto exemption.
+  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { auto: true } } }));
+  const { stdout } = resolve(['--gate', 'coderabbit'], { stdin: BOTS([RABBIT]), configDir: dir });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.login, RABBIT);
+  assert.ok(out.trigger.some((t) => t.login === RABBIT), 'the auto gate is still triggered');
+});
+
+test('resolve attaches the gate’s own poll policy and handshake', () => {
+  const { stdout } = resolve([], { stdin: BOTS([CODEX]) });
+  const { gate } = JSON.parse(stdout);
+  assert.equal(gate.recipe, 'codex-bot');
+  assert.deepEqual(gate.poll, { firstWaitSec: 60, intervalSec: 60, tries: 20 });
+  assert.equal(gate.handshake, 'reaction');
+});
+
+test('resolve trigger entries carry their handshake', () => {
+  const { stdout } = resolve([], { stdin: BOTS([CODEX]) });
+  const t = JSON.parse(stdout).trigger.find((x) => x.recipe === 'codex-bot');
+  assert.equal(t.handshake, 'reaction');
+});
+
+test('resolve picks the gate from fallback-order, skipping unavailable entries', () => {
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'gemini,codex-bot',
+  ], { stdin: BOTS([RABBIT, CODEX]) });
+  assert.equal(JSON.parse(stdout).gate.recipe, 'codex-bot', 'gemini is not available here');
+});
+
+test('resolve degrades a stale --gate to the fallback ladder with a warning', () => {
+  // A days-old autopilot descriptor may name a gate that has since been marked
+  // unresponsive. Failing hard would leave an unattended run with nothing.
+  const { code, stdout } = resolve(['--gate', 'bugbot'], { stdin: BOTS([CODEX]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'codex-bot');
+  assert.ok(out.warnings.some((w) => w.includes('bugbot')), 'names the stale gate');
+});
+
+test('resolve degrades a stale --select to the full set with a warning', () => {
+  const { code, stdout } = resolve(['--select', 'greptile'], { stdin: BOTS([CODEX]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.collect, [CODEX], 'falls back to everything available');
+  assert.ok(out.warnings.some((w) => w.includes('greptile')));
+});
+
+test('resolve honours a valid --select subset', () => {
+  const { stdout } = resolve(['--select', 'coderabbit'], { stdin: BOTS([RABBIT, CODEX]) });
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.collect, [RABBIT]);
+  assert.equal(out.gate.recipe, 'coderabbit', 'the gate stays inside the selection');
+});
+
+test('resolve degrades an unknown cached recipe instead of crashing', () => {
+  // A registry row renamed in a later release, or a hand-edited config. The old
+  // contract dereferenced recipeFor(...) directly and died with a TypeError on
+  // every run, with no hint that one stale string was the cause.
+  const dir = tmpConfigDir(CFG({ observed: { 'x[bot]': { recipe: 'retired-tool' } } }));
+  const { code, stdout } = resolve([], { stdin: BOTS(['x[bot]']), configDir: dir });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.available.find((r) => r.id === 'x[bot]').recipe, null);
+  assert.ok(out.warnings.some((w) => w.includes('retired-tool')), 'names the stale id');
+});
+
+test('resolve flags needsPrompt only when nothing can gate', () => {
+  // Unidentified bots exist but none can close a round: the attended path asks
+  // (identify / retry / add a CLI); the unattended path degrades.
+  const { stdout } = resolve([], { stdin: BOTS([{ login: 'brand-new[bot]' }]) });
+  assert.equal(JSON.parse(stdout).needsPrompt, true);
+});
+
+test('resolve does not prompt when fallback-order resolves a gate', () => {
+  // The common case must stay silent, however many reviewers act here.
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT, CODEX, GEMINI, 'brand-new[bot]']) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.needsPrompt, false);
+  assert.equal(out.gate.recipe, 'codex-bot');
+});
+
+test('resolve reports gate:null with exit 0 when nothing can gate', () => {
+  const { code, stdout } = resolve([], { stdin: BOTS([{ login: 'brand-new[bot]' }]) });
+  assert.equal(code, 0);
+  assert.equal(JSON.parse(stdout).gate, null);
+});
+
+test('resolve requires --repo-key and --fallback-order', () => {
+  assertFailed(run(['resolve', '--fallback-order', 'codex-bot'], { stdin: BOTS([]) }), /repo-key/);
+  assertFailed(run(['resolve', '--repo-key', KEY], { stdin: BOTS([]) }), /fallback-order/);
+});
+
+test('resolve never writes to the config', () => {
+  const dir = tmpConfigDir(CFG({ observed: { [CODEX]: { auto: false } } }));
+  const before = fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8');
+  resolve([], { stdin: BOTS([CODEX, 'brand-new[bot]']), configDir: dir });
+  assert.equal(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'), before);
+});
