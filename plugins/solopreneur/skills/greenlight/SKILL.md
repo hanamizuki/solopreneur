@@ -1827,6 +1827,13 @@ Keep an in-run `EXHAUSTED_GATES` list (recipe ids) and advance like this:
    explicitly is what makes the advance stick. Do **not** re-resolve with an empty
    `--fallback-order` hoping for a different answer: that puts `resolve` in its
    unconfigured branch, where it is free to pick the very gate just exhausted.
+6. **Exclude the exhausted reviewers from `--select` on that re-resolve**, listing
+   the remaining selected recipe ids explicitly. `EXHAUSTED_GATES` is a loop-side
+   list that `resolve` knows nothing about, so an exhausted reviewer stays in
+   `selected` and `trigger` posts to it again — every successor attempt would
+   re-trigger a reviewer that just answered "rate limited". This matters most for
+   `quota`, which writes no persistent mark; a `timeout` is additionally excluded
+   by the `triggerable: false` it records.
 
 `EXHAUSTED_GATES` is per-run, not persisted: a quota window reopens on its own
 schedule, and marking a rate-limited reviewer permanently unusable in config would
@@ -2076,11 +2083,19 @@ This step is important: `@codex review` comments sometimes don't trigger the bot
 
 #### Step 2: Wait for Feedback
 
-**Codex CLI mode** — Wait for stdout to complete (typically 1-3 min, set timeout 5 min). If stderr contains "usage limit" or exit code is non-zero → follow Fallback Logic (config or ask user).
+**Local CLI results** — Wait for stdout to complete (typically 1-3 min, set timeout 5 min). If stderr contains "usage limit" or exit code is non-zero → follow Fallback Logic (config or ask user).
 
 Parse stdout:
-- No `[P*]` tags, only summary paragraphs → no suggestions, review loop ends
-- Has `[P*]` tags → extract all suggestions, enter Step 3
+- Has `[P*]` tags → those are findings from that reviewer
+- No `[P*]` tags, only summary paragraphs → that reviewer found nothing
+
+**A clean CLI result does not end the loop unless that CLI is the gate.** A local
+CLI can be triggered as an ordinary non-gate reviewer while a GitHub bot gates the
+round (`--cli-available codex-cli` puts it in `trigger[]` either way). Ending on
+its clean stdout would skip the gate's whole wait window and discard every other
+reviewer's findings. CLI output feeds the shared classification in Step 2b like
+any other channel; only a CLI that **is** `RESOLVED.gate` closes the round by
+finishing.
 
 **GitHub bot mode** — the window belongs to the **gate**: it supplies both the
 identity that closes the round and the cadence for waiting on it.
@@ -2154,8 +2169,13 @@ formal_review_body() {   # $1 = login
 # into the payload.
 BODIED_FINDINGS=""
 for L in $(printf '%s' "$COLLECT" | jq -r '.[]'); do
-  [ "$L" != "$GATE_LOGIN" ] && BODY=$(bot_comment_body "$L") && [ -n "$BODY" ] \
-    && BODIED_FINDINGS="${BODIED_FINDINGS}=== ${L} (issue comment) ===
+  # The gate is INCLUDED. Its body is keyword-checked for quota / clean above,
+  # but a gate can just as easily report real findings in that same comment and
+  # open no thread at all; excluding it here would let those findings be read as
+  # "not a clean message, not a quota message" and the loop finish over them.
+  # Reuse the body already fetched for the gate rather than re-fetching it.
+  if [ "$L" = "$GATE_LOGIN" ]; then BODY="$GATE_COMMENT_BODY"; else BODY=$(bot_comment_body "$L"); fi
+  [ -n "$BODY" ] && BODIED_FINDINGS="${BODIED_FINDINGS}=== ${L} (issue comment) ===
 ${BODY}
 "
   RBODY=$(formal_review_body "$L")
@@ -2164,6 +2184,8 @@ ${RBODY}
 "
 done
 printf '%s' "$BODIED_FINDINGS"
+# These are candidate bodies, not automatic findings: a clean summary or a quota
+# notice contributes none. Read them for actual findings when classifying.
 
 # [C] 👍 reaction from the gate on the PR (clean signal fallback)
 # Codex bot inconsistently skips the "Didn't find" comment and only reacts with 👍.

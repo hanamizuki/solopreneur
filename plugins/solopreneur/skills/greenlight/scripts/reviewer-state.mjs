@@ -413,6 +413,18 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     }
     wanted = null;
     selected = available;
+  } else if (wanted) {
+    // Partial miss: some ids matched, some did not. Warning only on a total miss
+    // is the wrong threshold — the common shape is one live reviewer plus one
+    // that has since been marked or was never here, and running the reduced set
+    // in silence is indistinguishable from running the whole selection.
+    const missing = wanted.filter((id) => !selected.some((r) => r.recipe === id || r.id === id));
+    if (missing.length > 0) {
+      warnings.push(
+        `--select ${missing.map((m) => `"${m}"`).join(', ')} matched no available reviewer here; `
+        + 'continuing with the rest of the selection',
+      );
+    }
   }
 
   let gateEntry = null;
@@ -469,9 +481,19 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     // and collapsing it to a single seed would silently halve review coverage on
     // exactly the fresh-repo autopilot runs that pass a selection. Only the first
     // becomes the gate — one reviewer closes the round, the rest are collected.
-    const requested = [gate, ...csv(select)]
-      .filter((id) => recipeFor(id)?.kind === 'github-bot')
-      .map((id) => recipeFor(id).id);
+    // `select` is an authorization list here too: when one is present the seeds
+    // come only from it, and a `gate` naming something outside it is not honoured
+    // — the deferred warning below then reports the mismatch. Without this the
+    // seeded path would gate on a reviewer the caller excluded, which is exactly
+    // what a repo WITH history refuses to do.
+    const selIds = csv(select).map((id) => recipeFor(id)?.id).filter(Boolean);
+    const gateId = recipeFor(gate)?.id ?? null;
+    let requested = selIds.length > 0 ? selIds : [gateId].filter(Boolean);
+    if (gateId && requested.includes(gateId)) {
+      requested = [gateId, ...requested.filter((id) => id !== gateId)];
+    }
+    requested = requested.filter((id) => recipeFor(id).kind === 'github-bot');
+
     const seedIds = requested.length > 0
       ? [...new Set(requested)]
       : [recipeFor(fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot') ?? 'codex-bot')?.id]

@@ -719,6 +719,26 @@ test('a multi-reviewer --select seeds all of them, gating on the first', () => {
   assert.deepEqual(out.collect, [RABBIT, CODEX], 'both are harvested for findings');
 });
 
+test('a seeded gate stays inside an explicit selection', () => {
+  // select is an authorization list on the seeded path too. Seeding a gate the
+  // caller excluded would let an unlisted reviewer's clean pass end the loop —
+  // the very thing a repo WITH history refuses to do.
+  const { stdout } = resolve(['--select', 'coderabbit', '--gate', 'codex-bot'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'coderabbit');
+  assert.deepEqual(out.trigger.map((t) => t.recipe), ['coderabbit']);
+  assert.ok(out.warnings.some((w) => w.includes('codex-bot')), 'the excluded gate is reported');
+});
+
+test('resolve warns when only PART of a selection is available', () => {
+  // The silent-coverage-loss case: one live reviewer plus one that was never
+  // here reads exactly like a fully honoured selection without this.
+  const { stdout } = resolve(['--select', 'coderabbit,gemini'], { stdin: BOTS([RABBIT]) });
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.collect, [RABBIT]);
+  assert.ok(out.warnings.some((w) => w.includes('gemini')), 'names the reviewer not running');
+});
+
 test('an unseedable --select says so instead of silently using the default', () => {
   // A local CLI cannot be seeded: availability comes from its own gate, never
   // from being asked for. Falling back is right; doing it silently is not.
