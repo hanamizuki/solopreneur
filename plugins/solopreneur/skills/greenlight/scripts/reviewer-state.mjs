@@ -465,29 +465,42 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     // just asked for, and the same applies to a fresh-repo autopilot descriptor.
     // `select` is read raw rather than through `wanted`, which the degradation
     // above may already have cleared.
-    const seed = recipeFor(
-      [gate, ...csv(select)].find((id) => recipeFor(id)?.kind === 'github-bot')
-      ?? fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot')
-      ?? 'codex-bot',
-    );
-    if (seed) {
-      // The verified login may be absent (an unverified tool): triggering needs
-      // only the recipe string, so the trigger still goes out — nothing can just
-      // be attributed back until it answers once and is identified.
-      gateEntry = {
+    // Seed EVERY requested github-bot, not just one: `select=a,b` means "run both",
+    // and collapsing it to a single seed would silently halve review coverage on
+    // exactly the fresh-repo autopilot runs that pass a selection. Only the first
+    // becomes the gate — one reviewer closes the round, the rest are collected.
+    const requested = [gate, ...csv(select)]
+      .filter((id) => recipeFor(id)?.kind === 'github-bot')
+      .map((id) => recipeFor(id).id);
+    const seedIds = requested.length > 0
+      ? [...new Set(requested)]
+      : [recipeFor(fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot') ?? 'codex-bot')?.id]
+        .filter(Boolean);
+
+    // The verified login may be absent (an unverified tool): triggering needs only
+    // the recipe string, so the trigger still goes out — but nothing can be
+    // attributed back until it answers once and is identified. SKILL.md treats
+    // such a round as a probe; see "Seeded rounds" there.
+    const seeds = seedIds.map((id) => {
+      const r = recipeFor(id);
+      return {
         kind: 'bot',
-        id: seed.knownLogins[0] ?? seed.id,
-        login: seed.knownLogins[0] ?? null,
-        recipe: seed.id,
+        id: r.knownLogins[0] ?? r.id,
+        login: r.knownLogins[0] ?? null,
+        recipe: r.id,
         auto: false,
         evidence: false,
         lastSeen: null,
         canGate: true,
       };
-      selected = [gateEntry];
+    });
+
+    if (seeds.length > 0) {
+      [gateEntry] = seeds;
+      selected = seeds;
       warnings.push(
-        `no reviewer has acted on this repo yet; defaulting to "${seed.id}" — `
-        + 'if it is not installed here, the round simply times out',
+        `no reviewer has acted on this repo yet; seeding ${seedIds.map((i) => `"${i}"`).join(', ')} `
+        + `and gating on "${gateEntry.recipe}" — if it is not installed here, the round simply times out`,
       );
     }
   }

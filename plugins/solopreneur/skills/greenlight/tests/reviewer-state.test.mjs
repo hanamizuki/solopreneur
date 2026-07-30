@@ -709,6 +709,16 @@ test('an explicit --select seeds the requested tool too', () => {
   assert.equal(JSON.parse(stdout).gate.recipe, 'greptile');
 });
 
+test('a multi-reviewer --select seeds all of them, gating on the first', () => {
+  // select=a,b means run both. Collapsing to one seed would halve coverage on
+  // exactly the fresh-repo autopilot runs that bother to pass a selection.
+  const { stdout } = resolve(['--select', 'coderabbit,codex-bot'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.trigger.map((t) => t.recipe), ['coderabbit', 'codex-bot']);
+  assert.equal(out.gate.recipe, 'coderabbit', 'one reviewer closes the round');
+  assert.deepEqual(out.collect, [RABBIT, CODEX], 'both are harvested for findings');
+});
+
 test('a --gate naming a local CLI still degrades to the configured seed', () => {
   // Only a github-bot can be seeded: a CLI's availability comes from its own
   // gate, and claiming one is present because it was asked for would be a lie.

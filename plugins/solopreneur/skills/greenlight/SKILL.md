@@ -2147,12 +2147,23 @@ formal_review_body() {   # $1 = login
     jq -r --arg bot "$1" --argjson c "$CUR_FORMAL_REVIEW" \
        '[.[] | select((.user.login == $bot) and .id > $c)] | last | .body // empty'
 }
+# Accumulate into BODIED_FINDINGS, tagged with reviewer + channel. Printing alone
+# is not enough: Step 3 dispatches review THREADS, so a body-only finding would be
+# classified as `findings`, loop the round, and hand the fix subagent nothing to
+# act on — spinning to the round cap without ever addressing it. 3a carries this
+# into the payload.
+BODIED_FINDINGS=""
 for L in $(printf '%s' "$COLLECT" | jq -r '.[]'); do
   [ "$L" != "$GATE_LOGIN" ] && BODY=$(bot_comment_body "$L") && [ -n "$BODY" ] \
-    && printf '=== %s (issue comment) ===\n%s\n' "$L" "$BODY"
+    && BODIED_FINDINGS="${BODIED_FINDINGS}=== ${L} (issue comment) ===
+${BODY}
+"
   RBODY=$(formal_review_body "$L")
-  [ -n "$RBODY" ] && printf '=== %s (formal review) ===\n%s\n' "$L" "$RBODY"
+  [ -n "$RBODY" ] && BODIED_FINDINGS="${BODIED_FINDINGS}=== ${L} (formal review) ===
+${RBODY}
+"
 done
+printf '%s' "$BODIED_FINDINGS"
 
 # [C] 👍 reaction from the gate on the PR (clean signal fallback)
 # Codex bot inconsistently skips the "Didn't find" comment and only reacts with 👍.
@@ -2204,6 +2215,26 @@ round they land in the closing report instead of vanishing. This is what stops
 at all: it runs synchronously and finishing *is* the end of the round. After it
 returns, do one collection sweep across the three channels for the other
 collected logins, then classify.
+
+**Seeded rounds are probes, not gated rounds.** When `resolve` seeded this round
+(its warning says so — nothing has acted on this repo yet) and the seeded gate's
+recipe has **no verified login**, `GATE_LOGIN` is empty: checks [B] and [C] can
+match no author, so the round **will** classify as `timeout`. That is correct, not
+a defect — the trigger only needs the recipe string, but proving a round finished
+needs an identity, and this tool has never been seen here. Its purpose is to make
+the tool answer *once*. So for this round only:
+
+- **Collect every new Bot login past the cursors, not just `collect`.** Nothing
+  else is known about this repo, so there is no marked or unselected reviewer for
+  this widening to wrongly admit — and without it a tool that answered with real
+  findings would have them filtered away as "not in `collect`", making the probe
+  pointless.
+- Attended: offer to **identify** the responder immediately (Step 2c's last row) —
+  that is what turns the probe into a usable reviewer next run.
+- No response at all: **leave no state behind.** Do not write `triggerable: false`
+  for a login-less recipe — there is no login to key it on, and "we could not
+  attribute it" is not evidence that it cannot be triggered. Report that the tool
+  is probably not installed here and move on.
 
 #### Step 2b: Classify the round
 
@@ -2313,6 +2344,14 @@ author is not a Bot (humans always count) or its `[bot]`-stripped login is in
 closing report for the user to judge. Silently resolving it would erase a finding
 no one ever read.
 
+**Then append `$BODIED_FINDINGS` to the payload.** Threads are only one of the
+three channels a reviewer can speak on; the [B2] sweep already collected the issue
+comment and formal-review bodies that carry findings, and they must reach the fix
+subagent as feedback items alongside the threads. Dispatching threads alone is why
+a body-only finding could classify as `findings`, loop, and still hand the
+subagent nothing to act on. These items have **no thread id**, so they are never
+part of 3c's resolve list — they have nothing to resolve.
+
 **3b. Process feedback:**
 
 1. **Invoke `receiving-code-review` skill first** (via `Skill` tool) to load the processing mindset.
@@ -2321,6 +2360,8 @@ no one ever read.
 2. Check whether any suggestions were already pushed back in previous rounds. If so, reconsider. If still deciding to push back, consider whether to add a code comment or note in CONTEXT.md so the reviewer understands the reasoning. If the same issue has been raised multiple times, it can be ignored.
 3. **Dispatch subagent** (via `Agent` tool) to handle all unresolved threads. Prompt must include:
    - Full content of all unresolved threads (body, path, line, **thread id**)
+   - `$BODIED_FINDINGS` — the issue-comment / formal-review findings from 3a,
+     each tagged with its reviewer and channel, and marked as having no thread id
    - Instruction: "Use the `superpowers:receiving-code-review` skill framework to evaluate each suggestion. If the skill is not available, evaluate each suggestion on its own merits — fix genuine issues, push back on false positives with solid technical reasoning."
    - Instruction: "False positives require solid technical reasoning to push back"
    - Instruction: "After fixes, commit + push"
