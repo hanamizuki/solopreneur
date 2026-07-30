@@ -494,10 +494,22 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     }
     requested = requested.filter((id) => recipeFor(id).kind === 'github-bot');
 
+    // The configured ladder authorizes the implicit seed too. A ladder of only
+    // `codex-cli` that is unavailable here must resolve to gate:null and take the
+    // documented prompt-or-halt path — NOT quietly send the PR to codex-bot, a
+    // reviewer that ladder excludes. Only a genuinely unconfigured ladder gets
+    // the built-in default.
+    const ladderSeed = fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot')
+      ?? (fallbackOrder.length === 0 ? 'codex-bot' : null);
     const seedIds = requested.length > 0
       ? [...new Set(requested)]
-      : [recipeFor(fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot') ?? 'codex-bot')?.id]
-        .filter(Boolean);
+      : [ladderSeed && recipeFor(ladderSeed).id].filter(Boolean);
+    if (seedIds.length === 0 && fallbackOrder.length > 0) {
+      warnings.push(
+        `no reviewer has acted on this repo yet and fallback_order (${fallbackOrder.join(', ')}) `
+        + 'has no github-bot available to seed; nothing can gate this round',
+      );
+    }
 
     // The verified login may be absent (an unverified tool): triggering needs only
     // the recipe string, so the trigger still goes out — but nothing can be

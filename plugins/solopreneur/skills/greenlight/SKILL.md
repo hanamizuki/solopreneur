@@ -1668,6 +1668,14 @@ prompt below reads `available[]` / `marked[]`. **Re-run `resolve` after any writ
 that changes the answer** — an identify, a retry, or adding `agy` — rather than
 patching `RESOLVED` by hand.
 
+**Size S narrows the selection to one reviewer.** An empty `--select` means "every
+reviewer that acts here", so on a repo with several detected bots (or an authed
+Codex CLI alongside them) an S run would trigger and collect all of them — several
+paid or slow reviews per round, which is the exact cost boundary
+[S](#profile--what-each-size-gates) exists to draw. When `EFFECTIVE_SIZE == S`,
+re-run `resolve` once more with `--select "$(jq -r '.gate.recipe' <<<"$RESOLVED")"`
+so the round runs that reviewer alone. Sizes M and L keep the full set.
+
 Interpret the result:
 
 | Result | Meaning | What happens |
@@ -2142,12 +2150,30 @@ UNRESOLVED=$(gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int
 # Parameterized per login: a round now has several respondents. The GATE's body
 # is what the terminal-state table reads; the others feed the closing report.
 # Note: gh api --jq doesn't support --arg, must pipe to jq CLI.
-bot_comment_body() {   # $1 = login
+# A round with NO github-bot trigger (a local-CLI gate whose collected bots are
+# all `auto`) never assigns ROUND_TRIGGER_ID, and `--argjson tid ''` is a hard jq
+# error — "invalid JSON text passed to --argjson" — which would take out the whole
+# post-CLI sweep. CUR_ISSUE is the same round boundary, captured in Step 1.
+: "${ROUND_TRIGGER_ID:=$CUR_ISSUE}"
+
+# The newest body only — a verdict, for the quota / clean keyword checks. The
+# newest one is the one that stands.
+bot_latest_comment_body() {   # $1 = login
   gh api repos/{owner}/{repo}/issues/{pr}/comments --paginate | \
     jq -r --arg bot "$1" --argjson tid "$ROUND_TRIGGER_ID" \
        '[.[] | select((.user.login == $bot) and .id > $tid)] | last | .body // empty'
 }
-GATE_COMMENT_BODY=$(bot_comment_body "$GATE_LOGIN")
+GATE_COMMENT_BODY=$(bot_latest_comment_body "$GATE_LOGIN")
+
+# EVERY post-cursor body, for findings. A reviewer that posts a finding and then a
+# clean summary would otherwise have the finding thrown away by `last`, and the
+# round would classify clean over an unread item.
+bot_comment_bodies() {   # $1 = login
+  gh api repos/{owner}/{repo}/issues/{pr}/comments --paginate | \
+    jq -r --arg bot "$1" --argjson tid "$ROUND_TRIGGER_ID" \
+       '[.[] | select((.user.login == $bot) and .id > $tid) | .body]
+        | join("\n--- next comment ---\n")'
+}
 
 # [B2] The same read for EVERY collected login, across BOTH bodied channels.
 #
@@ -2157,10 +2183,11 @@ GATE_COMMENT_BODY=$(bot_comment_body "$GATE_LOGIN")
 # [A] sees neither, so without this a clean gate would end the loop while a
 # selected reviewer's findings sat unread. The gate's body decides quota / clean;
 # every other body is read purely for findings.
-formal_review_body() {   # $1 = login
+formal_review_bodies() {   # $1 = login — every post-cursor review body, same reason
   gh api "repos/{owner}/{repo}/pulls/{pr}/reviews" --paginate | \
     jq -r --arg bot "$1" --argjson c "$CUR_FORMAL_REVIEW" \
-       '[.[] | select((.user.login == $bot) and .id > $c)] | last | .body // empty'
+       '[.[] | select((.user.login == $bot) and .id > $c) | .body | select(. != "")]
+        | join("\n--- next review ---\n")'
 }
 # Accumulate into BODIED_FINDINGS, tagged with reviewer + channel. Printing alone
 # is not enough: Step 3 dispatches review THREADS, so a body-only finding would be
@@ -2173,12 +2200,11 @@ for L in $(printf '%s' "$COLLECT" | jq -r '.[]'); do
   # but a gate can just as easily report real findings in that same comment and
   # open no thread at all; excluding it here would let those findings be read as
   # "not a clean message, not a quota message" and the loop finish over them.
-  # Reuse the body already fetched for the gate rather than re-fetching it.
-  if [ "$L" = "$GATE_LOGIN" ]; then BODY="$GATE_COMMENT_BODY"; else BODY=$(bot_comment_body "$L"); fi
+  BODY=$(bot_comment_bodies "$L")
   [ -n "$BODY" ] && BODIED_FINDINGS="${BODIED_FINDINGS}=== ${L} (issue comment) ===
 ${BODY}
 "
-  RBODY=$(formal_review_body "$L")
+  RBODY=$(formal_review_bodies "$L")
   [ -n "$RBODY" ] && BODIED_FINDINGS="${BODIED_FINDINGS}=== ${L} (formal review) ===
 ${RBODY}
 "
@@ -2212,7 +2238,7 @@ is Step 2b's job:
 > WARNING: **When matching quota or clean pass, print the first 3 lines of `GATE_COMMENT_BODY`
 > for manual verification.** Bot boilerplate text may contain keywords like "limit" causing
 > false positives. Be especially vigilant if it matches on the first poll. The same applies to
-> any other login's body read through `bot_comment_body` — the keyword tables were tuned on
+> any other login's body read through `bot_latest_comment_body` — the keyword tables were tuned on
 > Codex and Gemini wording, and a newly added reviewer's phrasing is unverified.
 
 > WARNING: **When `UNRESOLVED > 0` is detected, enter Step 3 immediately — don't wait for

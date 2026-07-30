@@ -719,6 +719,19 @@ test('a multi-reviewer --select seeds all of them, gating on the first', () => {
   assert.deepEqual(out.collect, [RABBIT, CODEX], 'both are harvested for findings');
 });
 
+test('a configured ladder with no seedable bot resolves to gate:null, not codex-bot', () => {
+  // fallback_order authorizes the implicit seed too: a codex-cli-only ladder
+  // whose CLI is absent must take the prompt-or-halt path rather than quietly
+  // sending the PR to a reviewer that ladder excludes.
+  const { code, stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', 'codex-cli'],
+    { stdin: BOTS([]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.deepEqual(out.trigger, []);
+  assert.ok(out.warnings.some((w) => w.includes('codex-cli')), 'says why nothing can gate');
+});
+
 test('a seeded gate stays inside an explicit selection', () => {
   // select is an authorization list on the seeded path too. Seeding a gate the
   // caller excluded would let an unlisted reviewer's clean pass end the loop —
