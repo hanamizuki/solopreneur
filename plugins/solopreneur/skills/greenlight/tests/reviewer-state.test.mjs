@@ -359,6 +359,23 @@ test('record refuses a non-object repos container instead of silently dropping t
   }
 });
 
+test('record refuses an existing but blank config', () => {
+  // Only ENOENT means "no config". An existing empty file is a truncated write
+  // — writeConfig only ever renames a complete temp file into place — so
+  // treating it as {} would overwrite a config caught mid-recovery.
+  for (const blank of ['', '   \n']) {
+    const dir = tmpConfigDir(blank);
+    assertFailed(
+      run(['record', '--repo-key', KEY], {
+        stdin: JSON.stringify({ observations: [{ login: 'x[bot]', auto: true }] }),
+        configDir: dir,
+      }),
+      /empty/i,
+    );
+    assert.equal(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'), blank);
+  }
+});
+
 test('record treats an absent config as empty and creates it', () => {
   const dir = tmpDir();   // no solopreneur.json at all
   const { code } = run(['record', '--repo-key', KEY], {

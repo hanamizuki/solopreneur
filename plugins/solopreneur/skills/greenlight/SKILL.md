@@ -1634,6 +1634,13 @@ BOT_LOGIN=$(printf '%s' "$RESOLVED" | jq -r --arg r "$CURRENT_RECIPE" \
   'first(.available[] | select(.recipe == $r) | .login) // empty')
 ```
 
+**Re-evaluate both lines whenever `current_reviewer` changes.** Fallback Logic
+switches reviewers mid-run, and both are functions of the current reviewer — a
+switch that leaves them stale posts the new reviewer's trigger while polling the
+old one's login, the same desync as reading them from the gate, reached by a
+different route. This is the invariant the deleted `BOT_LOGIN="$CODEX_BOT"`
+block carried as "updated on each fallback switch"; it now belongs to the seam.
+
 Resolving through `available` (rather than straight from the registry table) is
 what will let a tool with no verified login work once it has been identified on
 this repo: `available` merges this round's detection with the per-repo cache, so
@@ -1697,8 +1704,10 @@ below):
 
 **With config (`${CLAUDE_CONFIG_DIR:-~/.claude}/solopreneur.json` has `greenlight` key):**
 Follow `fallback_order` sequentially. Each reviewer failure auto-switches to the
-next, notifying the user. Maintain the chosen reviewer for the rest of this cycle —
-no per-round reset.
+next, notifying the user **and re-evaluating `CURRENT_RECIPE` + `BOT_LOGIN` for
+the new reviewer** (the seam in the detection block) — otherwise the loop posts
+the new reviewer's trigger while still polling the previous one's login.
+Maintain the chosen reviewer for the rest of this cycle — no per-round reset.
 
 - If an entry names a **github-bot that detection did not find**, **warn before
   triggering — do not hard-fail**:

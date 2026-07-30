@@ -116,10 +116,10 @@ const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArr
 /**
  * Read the config for writing.
  *
- * Only ENOENT may become `{}`. A parse failure, a permission error, or a
- * non-object top level is fatal: the caller is about to rewrite this file, and
- * treating "cannot understand it" as "it is empty" would replace the user's
- * whole config with whatever this round happened to observe.
+ * Only ENOENT may become `{}`. A parse failure, a permission error, a blank
+ * file, or a non-object top level is fatal: the caller is about to rewrite this
+ * file, and treating "cannot understand it" as "it is empty" would replace the
+ * user's whole config with whatever this round happened to observe.
  */
 function readConfigForWrite() {
   let raw;
@@ -129,7 +129,14 @@ function readConfigForWrite() {
     if (err.code === 'ENOENT') return {};
     throw new InputError(`cannot read ${configPath()}: ${err.message}`);
   }
-  if (!raw.trim()) return {};
+  // A file that exists but holds nothing is a truncated write, not an empty
+  // config: `writeConfig` only ever renames a fully-written temp file into
+  // place, so this shape cannot come from us. Treating it as `{}` would let the
+  // next record replace a config that was mid-recovery — the same data loss the
+  // parse-error branch below refuses, arriving through a quieter door.
+  if (!raw.trim()) {
+    throw new InputError(`${configPath()} exists but is empty; refusing to overwrite a truncated config (delete it, or put {} in it, to start fresh)`);
+  }
   let parsed;
   try {
     parsed = JSON.parse(raw);
