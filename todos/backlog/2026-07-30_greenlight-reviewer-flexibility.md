@@ -215,7 +215,8 @@ auto-gate 這條路徑就拿不到任何等待政策。gate 要一併帶 `poll` 
 
 1. push 修好的 commit
 2. 決定這輪要主動觸發誰：選定的 reviewer 中 `auto != true` 且
-   `triggerable != false` 的，加上所有 `pending` 項（見〈綁定演算法〉的一輪一個限制）
+   `triggerable != false` 的，加上**隊列最前面的一個** `pending` 項（一輪最多綁定
+   一個，見〈綁定演算法〉）
 3. 發觸發指令（多個時並行）。`pending` 項只需要 recipe 的指令字串，不需要 login
 4. 開 poll 窗口：**逐 channel** 記錄當下游標上界（Source 1/2/3 各一份），依 gate 的
    `poll` 政策決定等多久
