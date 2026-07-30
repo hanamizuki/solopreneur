@@ -18,7 +18,8 @@
  *   reviewer-state.mjs resolve --repo-key <K> --fallback-order <ids>
  *                              [--cli-available <ids>] [--select <ids>] [--gate <id>]
  *       stdin:  {"bots":[…]} — the `detect` output
- *       stdout: {"available","trigger","collect","gate","needsPrompt","warnings"}
+ *       stdout: {"available","marked","trigger","collect","gate","needsPrompt",
+ *                "warnings"}
  *
  * This script never calls `gh`, never derives the repo key, and never reads
  * `fallback_order` — all three are passed in. That keeps it testable and keeps
@@ -318,13 +319,14 @@ const csv = (value) => (value ? value.split(',').map((s) => s.trim()).filter(Boo
  * values may come from a days-old autopilot descriptor, and a stale token must
  * not turn an unattended run into an empty one.
  *
- * Known gap, owned by PR 2: `triggerable: false` entries are filtered out here
- * and therefore appear in no output field, so the attended "retry a reviewer
- * marked unresponsive" prompt has nothing to list, and `needsPrompt` is decided
- * without them. That prompt is what defines the shape the entries need, so the
- * output key lands with it rather than being guessed here. They must NOT simply
- * be added to `available`, which feeds `collect` — a marked reviewer's comments
- * must not start being harvested as findings.
+ * `triggerable: false` entries go to their own `marked` key rather than into
+ * `available`. They must stay out of `available` because it feeds `collect` — a
+ * reviewer marked unresponsive must not have its comments harvested as findings
+ * — but they must still be reachable, or the attended "retry a reviewer marked
+ * unresponsive" prompt has nothing to list and can never clear the mark. For the
+ * same reason they count toward `needsPrompt`: a repo whose only known reviewer
+ * is marked has an empty `available`, and reporting "nothing to ask about" there
+ * would strand it with no gate and no way back.
  */
 function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
   const warnings = [];
@@ -338,40 +340,50 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     merged.set(b.login, { ...prev, lastSeen: b.lastSeen, evidence: b.evidence === true });
   }
 
-  const botCandidates = [...merged.values()]
-    .filter((r) => r.triggerable !== false)
-    .map((r) => {
-      let recipe = r.recipe ?? null;
-      if (recipe !== null) {
-        // Canonicalize on read too, so a config written before `record` started
-        // normalizing (or hand-edited with an alias) still matches
-        // fallback_order / --gate / --select, which all compare on recipe id.
-        const known = recipeFor(recipe);
-        if (known) {
-          recipe = known.id;
-        } else {
-          warnings.push(`cached recipe "${recipe}" is not in the registry; ignoring it for ${r.login}`);
-          recipe = null;
-        }
+  const shape = (r) => {
+    let recipe = r.recipe ?? null;
+    if (recipe !== null) {
+      // Canonicalize on read too, so a config written before `record` started
+      // normalizing (or hand-edited with an alias) still matches
+      // fallback_order / --gate / --select, which all compare on recipe id.
+      const known = recipeFor(recipe);
+      if (known) {
+        recipe = known.id;
+      } else {
+        warnings.push(`cached recipe "${recipe}" is not in the registry; ignoring it for ${r.login}`);
+        recipe = null;
       }
-      // A registry-verified login identifies itself: an App's bot login is
-      // app-scoped, identical on every repo. The cached recipe (an explicit
-      // identify) wins when both exist.
-      recipe ??= recipeForLogin(r.login)?.id ?? null;
-      return {
-        kind: 'bot',
-        id: r.login,
-        login: r.login,
-        recipe,
-        auto: r.auto === true,
-        evidence: r.evidence === true,
-        lastSeen: r.lastSeen ?? null,
-        canGate: recipe !== null,
-      };
-    })
+    }
+    // A registry-verified login identifies itself: an App's bot login is
+    // app-scoped, identical on every repo. The cached recipe (an explicit
+    // identify) wins when both exist.
+    recipe ??= recipeForLogin(r.login)?.id ?? null;
+    return {
+      kind: 'bot',
+      id: r.login,
+      login: r.login,
+      recipe,
+      auto: r.auto === true,
+      evidence: r.evidence === true,
+      lastSeen: r.lastSeen ?? null,
+      canGate: recipe !== null,
+    };
+  };
+
+  // Shape once, then partition — the recipe resolution above is identical for a
+  // marked reviewer and an active one, and the retry prompt needs the resolved
+  // recipe to offer anything meaningful.
+  const shaped = [...merged.values()]
+    .map((r) => ({ marked: r.triggerable === false, entry: shape(r) }))
     // A recipe-bearing entry is a known reviewer; an unidentified one has to
     // prove it reviews before its comments are treated as findings.
-    .filter((r) => r.recipe !== null || r.evidence);
+    .filter(({ entry }) => entry.recipe !== null || entry.evidence);
+
+  const botCandidates = shaped.filter((s) => !s.marked).map((s) => s.entry);
+  const marked = shaped
+    .filter((s) => s.marked)
+    .map(({ entry }) => ({ login: entry.login, recipe: entry.recipe, lastSeen: entry.lastSeen }))
+    .sort((a, b) => (a.login < b.login ? -1 : a.login > b.login ? 1 : 0));
 
   const cliCandidates = cliAvailable
     .filter((id) => {
@@ -393,16 +405,35 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     ? available.filter((r) => wanted.includes(r.recipe) || wanted.includes(r.id))
     : available;
   if (wanted && selected.length === 0) {
-    warnings.push(`--select matched no available reviewer (${wanted.join(', ')}); ignoring it`);
+    // Only a real degradation when there was something to match against. On a
+    // repo with no history at all the seed below honours the request instead, so
+    // warning here would contradict what actually happens.
+    if (available.length > 0) {
+      warnings.push(`--select matched no available reviewer (${wanted.join(', ')}); ignoring it`);
+    }
     wanted = null;
     selected = available;
+  } else if (wanted) {
+    // Partial miss: some ids matched, some did not. Warning only on a total miss
+    // is the wrong threshold — the common shape is one live reviewer plus one
+    // that has since been marked or was never here, and running the reduced set
+    // in silence is indistinguishable from running the whole selection.
+    const missing = wanted.filter((id) => !selected.some((r) => r.recipe === id || r.id === id));
+    if (missing.length > 0) {
+      warnings.push(
+        `--select ${missing.map((m) => `"${m}"`).join(', ')} matched no available reviewer here; `
+        + 'continuing with the rest of the selection',
+      );
+    }
   }
 
   let gateEntry = null;
   if (gate) {
     const found = selected.find((r) => r.recipe === gate || r.id === gate);
     if (found?.canGate) gateEntry = found;
-    else warnings.push(`--gate "${gate}" is not an available gate candidate; falling back to fallback-order`);
+    // The "stale gate" warning is deferred until after the seed below: on an
+    // empty repo the seed honours this exact request, and announcing a fallback
+    // that never happened would send the caller chasing the wrong reviewer.
   }
   if (!gateEntry) {
     for (const id of fallbackOrder) {
@@ -427,6 +458,117 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
         );
       }
     }
+  }
+
+  // First use, or detection down with an empty cache: nothing is known about this
+  // repo at all. Detection is an enhancement, never a gate — the pre-detection
+  // loop always had a reviewer on this path, posted its trigger, and let the
+  // timeout report the truth. Seeding keeps that promise; without it a fresh repo
+  // resolves to an empty round and no reviewer is ever asked at all.
+  //
+  // An explicit request wins over the configured default. This is the whole
+  // mechanism behind the attended "try a tool with no history here" option: the
+  // user names a recipe and its trigger goes out this round. Seeding the
+  // configured default instead would trigger a different reviewer than the one
+  // just asked for, and the same applies to a fresh-repo autopilot descriptor.
+  // `select` is read raw rather than through `wanted`, which the degradation
+  // above may already have cleared.
+  //
+  // Seed EVERY requested github-bot, not just one: `select=a,b` means "run both",
+  // and collapsing it to a single seed would silently halve review coverage on
+  // exactly the fresh-repo autopilot runs that pass a selection. Only the first
+  // becomes the gate — one reviewer closes the round, the rest are collected.
+  //
+  // `select` is an authorization list here too: when one is present the seeds
+  // come only from it, and a `gate` naming something outside it is not honoured
+  // — the deferred warning below then reports the mismatch. Without this the
+  // seeded path would gate on a reviewer the caller excluded, which is exactly
+  // what a repo WITH history refuses to do.
+  const selIds = csv(select).map((id) => recipeFor(id)?.id).filter(Boolean);
+  const gateId = recipeFor(gate)?.id ?? null;
+  let requested = selIds.length > 0 ? selIds : [gateId].filter(Boolean);
+  if (gateId && requested.includes(gateId)) {
+    requested = [gateId, ...requested.filter((id) => id !== gateId)];
+  }
+  // Only ids that are not already candidates: an available one was matched by the
+  // normal path above, and re-seeding it would duplicate the entry.
+  requested = requested.filter((id) => recipeFor(id).kind === 'github-bot'
+    && !available.some((r) => r.recipe === id));
+
+  // Two ways in. "Nothing is known about this repo at all" is the first-use /
+  // detection-down case: detection is an enhancement, never a gate, so the loop
+  // still gets a reviewer, posts its trigger, and lets the timeout report the
+  // truth. The second is an explicit request for a bot that is not a candidate
+  // here — that has to work even when unusable reviewers ARE known, because
+  // "try a tool with no history here" is offered precisely when the only known
+  // reviewers are unidentified or marked. Without it that prompt option can
+  // never take effect and just returns the user to the same prompt.
+  //
+  // What is NOT a way in: unusable reviewers plus no explicit request. That is
+  // the prompt path (needsPrompt), not a silent default.
+  const nothingKnown = available.length === 0 && marked.length === 0;
+  if (!gateEntry && (nothingKnown || requested.length > 0)) {
+    // The configured ladder authorizes the implicit seed too. A ladder of only
+    // `codex-cli` that is unavailable here must resolve to gate:null and take the
+    // documented prompt-or-halt path — NOT quietly send the PR to codex-bot, a
+    // reviewer that ladder excludes. Only a genuinely unconfigured ladder gets
+    // the built-in default, and only when nothing at all is known.
+    const ladderSeed = fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot')
+      ?? (fallbackOrder.length === 0 ? 'codex-bot' : null);
+    const seedIds = requested.length > 0
+      ? [...new Set(requested)]
+      : [nothingKnown && ladderSeed && recipeFor(ladderSeed).id].filter(Boolean);
+    if (seedIds.length === 0 && fallbackOrder.length > 0) {
+      warnings.push(
+        `no reviewer has acted on this repo yet and fallback_order (${fallbackOrder.join(', ')}) `
+        + 'has no github-bot available to seed; nothing can gate this round',
+      );
+    }
+
+    // The verified login may be absent (an unverified tool): triggering needs only
+    // the recipe string, so the trigger still goes out — but nothing can be
+    // attributed back until it answers once and is identified. SKILL.md treats
+    // such a round as a probe; see "Seeded rounds" there.
+    const seeds = seedIds.map((id) => {
+      const r = recipeFor(id);
+      return {
+        kind: 'bot',
+        id: r.knownLogins[0] ?? r.id,
+        login: r.knownLogins[0] ?? null,
+        recipe: r.id,
+        auto: false,
+        evidence: false,
+        lastSeen: null,
+        canGate: true,
+      };
+    });
+
+    if (seeds.length > 0) {
+      [gateEntry] = seeds;
+      selected = seeds;
+      warnings.push(
+        `no reviewer has acted on this repo yet; seeding ${seedIds.map((i) => `"${i}"`).join(', ')} `
+        + `and gating on "${gateEntry.recipe}" — if it is not installed here, the round simply times out`,
+      );
+      // An explicit selection that could not be honoured has to say so, the same
+      // way an unmet --gate does. A local CLI cannot be seeded — its availability
+      // comes from its own gate, never from being asked for — and an unknown id
+      // names nothing at all; either way the caller must not be left believing a
+      // reviewer it listed is running.
+      const dropped = csv(select).filter((id) => !seedIds.includes(recipeFor(id)?.id));
+      if (dropped.length > 0) {
+        warnings.push(
+          `--select ${dropped.map((d) => `"${d}"`).join(', ')} cannot be seeded on a repo with `
+          + 'no history (only github-bot recipes can be); not part of this round',
+        );
+      }
+    }
+  }
+
+  // Deferred from the --gate block above: warn only if the request genuinely did
+  // not survive, whether it lost to the ladder or to the seed.
+  if (gate && gateEntry?.recipe !== gate && gateEntry?.id !== gate) {
+    warnings.push(`--gate "${gate}" is not an available gate candidate; falling back to fallback-order`);
   }
 
   const trigger = selected
@@ -462,11 +604,13 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
 
   return {
     available,
+    marked,
     trigger,
     collect: selected.filter((r) => r.login).map((r) => r.login),
     gate: gatePayload,
-    // Ask only when something acts here but nothing can close a round.
-    needsPrompt: gateEntry === null && available.length > 0,
+    // Ask only when something is known here but nothing can close a round. A
+    // marked reviewer counts as "known": retrying it is one of the answers.
+    needsPrompt: gateEntry === null && (available.length > 0 || marked.length > 0),
     warnings,
   };
 }

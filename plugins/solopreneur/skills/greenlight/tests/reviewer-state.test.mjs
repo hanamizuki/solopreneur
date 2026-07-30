@@ -494,7 +494,32 @@ test('resolve canonicalizes a cached alias so the gate still matches', () => {
 test('resolve excludes triggerable:false', () => {
   const dir = tmpConfigDir(CFG({ observed: { [GEMINI]: { triggerable: false } } }));
   const { stdout } = resolve([], { stdin: BOTS([RABBIT, GEMINI]), configDir: dir });
-  assert.deepEqual(JSON.parse(stdout).available.map((r) => r.id), [RABBIT]);
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.available.map((r) => r.id), [RABBIT]);
+  assert.ok(!out.collect.includes(GEMINI), 'a marked reviewer is never harvested for findings');
+});
+
+test('resolve reports a marked reviewer under its own key, with its recipe', () => {
+  // The attended retry prompt lists these. They must carry a resolved recipe:
+  // "retry gemini-code-assist[bot]" is only actionable if the caller knows which
+  // registry row to re-trigger it from.
+  const dir = tmpConfigDir(CFG({ observed: { [GEMINI]: { triggerable: false } } }));
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT, GEMINI]), configDir: dir });
+  assert.deepEqual(JSON.parse(stdout).marked, [
+    { login: GEMINI, recipe: 'gemini', lastSeen: '2026-07-29T11:00:00Z' },
+  ]);
+});
+
+test('resolve prompts when the only known reviewer is marked', () => {
+  // Without `marked` in the condition this repo reports available:[] and
+  // needsPrompt:false — no gate, and no question that could ever restore one.
+  const dir = tmpConfigDir(CFG({ observed: { [CODEX]: { triggerable: false } } }));
+  const { stdout } = resolve([], { stdin: BOTS([]), configDir: dir });
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.available, []);
+  assert.equal(out.gate, null);
+  assert.equal(out.needsPrompt, true);
+  assert.deepEqual(out.marked.map((r) => r.login), [CODEX]);
 });
 
 test('resolve drops an unidentified bot with no review evidence', () => {
@@ -642,6 +667,132 @@ test('resolve does not prompt when fallback-order resolves a gate', () => {
   const out = JSON.parse(stdout);
   assert.equal(out.needsPrompt, false);
   assert.equal(out.gate.recipe, 'codex-bot');
+});
+
+test('resolve seeds the default reviewer on a repo with no history at all', () => {
+  // Detection is an enhancement, never a gate. Without a seed a first-use repo
+  // resolves to trigger:[] and gate:null, and the loop — which now consumes only
+  // those two — would post nothing and wait on nobody.
+  const { code, stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', ''],
+    { stdin: BOTS([]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'codex-bot');
+  assert.equal(out.gate.login, CODEX);
+  assert.deepEqual(out.trigger.map((t) => t.recipe), ['codex-bot']);
+  assert.deepEqual(out.available, [], 'seeding is not an observation — nothing was seen here');
+  assert.equal(out.needsPrompt, false);
+  assert.ok(out.warnings.some((w) => w.includes('codex-bot')), 'the default is announced');
+});
+
+test('resolve seeds from fallback_order rather than always codex-bot', () => {
+  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', 'coderabbit,codex-bot'],
+    { stdin: BOTS([]) });
+  assert.equal(JSON.parse(stdout).gate.recipe, 'coderabbit');
+});
+
+test('an explicit --gate wins the seed on a repo with no history', () => {
+  // This is the "try a tool with no history here" path: the user names a recipe
+  // and its trigger goes out this round. Seeding the configured default instead
+  // would post a different reviewer's trigger than the one just requested.
+  const { stdout } = resolve(['--gate', 'greptile'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'greptile');
+  assert.deepEqual(out.trigger.map((t) => t.triggerText), ['@greptileai']);
+  assert.equal(out.gate.login, null, 'greptile has no verified login — triggerable, not attributable');
+  assert.ok(!out.warnings.some((w) => w.includes('falling back')),
+    'the request was honoured, so nothing fell back');
+});
+
+test('an explicit --select seeds the requested tool too', () => {
+  const { stdout } = resolve(['--select', 'greptile'], { stdin: BOTS([]) });
+  assert.equal(JSON.parse(stdout).gate.recipe, 'greptile');
+});
+
+test('a multi-reviewer --select seeds all of them, gating on the first', () => {
+  // select=a,b means run both. Collapsing to one seed would halve coverage on
+  // exactly the fresh-repo autopilot runs that bother to pass a selection.
+  const { stdout } = resolve(['--select', 'coderabbit,codex-bot'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.trigger.map((t) => t.recipe), ['coderabbit', 'codex-bot']);
+  assert.equal(out.gate.recipe, 'coderabbit', 'one reviewer closes the round');
+  assert.deepEqual(out.collect, [RABBIT, CODEX], 'both are harvested for findings');
+});
+
+test('a configured ladder with no seedable bot resolves to gate:null, not codex-bot', () => {
+  // fallback_order authorizes the implicit seed too: a codex-cli-only ladder
+  // whose CLI is absent must take the prompt-or-halt path rather than quietly
+  // sending the PR to a reviewer that ladder excludes.
+  const { code, stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', 'codex-cli'],
+    { stdin: BOTS([]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.deepEqual(out.trigger, []);
+  assert.ok(out.warnings.some((w) => w.includes('codex-cli')), 'says why nothing can gate');
+});
+
+test('a seeded gate stays inside an explicit selection', () => {
+  // select is an authorization list on the seeded path too. Seeding a gate the
+  // caller excluded would let an unlisted reviewer's clean pass end the loop —
+  // the very thing a repo WITH history refuses to do.
+  const { stdout } = resolve(['--select', 'coderabbit', '--gate', 'codex-bot'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'coderabbit');
+  assert.deepEqual(out.trigger.map((t) => t.recipe), ['coderabbit']);
+  assert.ok(out.warnings.some((w) => w.includes('codex-bot')), 'the excluded gate is reported');
+});
+
+test('resolve warns when only PART of a selection is available', () => {
+  // The silent-coverage-loss case: one live reviewer plus one that was never
+  // here reads exactly like a fully honoured selection without this.
+  const { stdout } = resolve(['--select', 'coderabbit,gemini'], { stdin: BOTS([RABBIT]) });
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.collect, [RABBIT]);
+  assert.ok(out.warnings.some((w) => w.includes('gemini')), 'names the reviewer not running');
+});
+
+test('an unseedable --select says so instead of silently using the default', () => {
+  // A local CLI cannot be seeded: availability comes from its own gate, never
+  // from being asked for. Falling back is right; doing it silently is not.
+  const { stdout } = resolve(['--select', 'codex-cli'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'codex-bot');
+  assert.ok(out.warnings.some((w) => w.includes('codex-cli') && w.includes('--select')),
+    'the unmet selection is named');
+});
+
+test('a --gate naming a local CLI still degrades to the configured seed', () => {
+  // Only a github-bot can be seeded: a CLI's availability comes from its own
+  // gate, and claiming one is present because it was asked for would be a lie.
+  const { stdout } = resolve(['--gate', 'codex-cli'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'codex-bot');
+  assert.ok(out.warnings.some((w) => w.includes('codex-cli')), 'the unmet request is announced');
+});
+
+test('an explicit request seeds even when unusable reviewers are known here', () => {
+  // The "try a tool with no history here" option is offered exactly when the only
+  // known reviewers are unidentified or marked. If the seed required an EMPTY
+  // repo, picking a tool from that prompt would change nothing and drop the user
+  // straight back into the same prompt.
+  const dir = tmpConfigDir(CFG({ observed: { [GEMINI]: { triggerable: false } } }));
+  const { stdout } = resolve(['--gate', 'greptile'], {
+    stdin: BOTS([{ login: 'brand-new[bot]' }]), configDir: dir,
+  });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'greptile');
+  assert.deepEqual(out.trigger.map((t) => t.triggerText), ['@greptileai']);
+  assert.equal(out.needsPrompt, false, 'the prompt is answered, not repeated');
+});
+
+test('resolve does not seed when a reviewer is known but cannot gate', () => {
+  // An unidentified bot acts here: that is the attended prompt's case (identify
+  // it), not a case for silently defaulting to some other tool.
+  const { stdout } = resolve([], { stdin: BOTS([{ login: 'brand-new[bot]' }]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.needsPrompt, true);
 });
 
 test('resolve reports gate:null with exit 0 when nothing can gate', () => {

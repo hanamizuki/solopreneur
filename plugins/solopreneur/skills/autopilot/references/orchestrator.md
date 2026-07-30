@@ -63,6 +63,16 @@ both branches:
 2. Read the full content of `{PLAN_DIR}/{spec_file}`
 3. Read `references/pr-subagent-template.md` for the prompt template
 4. Assemble prompt: standard prefix + spec content + standard suffix
+5. **Substitute every template placeholder from this PR's descriptor**, using the
+   same rules as `/autopilot`'s inline dispatch (SKILL.md Step 5) and the
+   template's own Variable Reference table. That includes the optional
+   review-tuning fields: `{SIZE}` ← `size`, `{SELECT}` ← `select`, `{GATE}` ←
+   `gate`. **When a descriptor omits one, drop the whole clause that carries it**
+   (`size={SIZE}` / `select={SELECT}` / `gate={GATE}`) rather than leaving the
+   placeholder in the prompt — an unsubstituted `{GATE}` reaches greenlight as a
+   literal token and is parsed as a reviewer id that matches nothing. This
+   assembly is the scheduled and multi-PR path; skipping it here is why a
+   plan.yaml reviewer preference would otherwise apply only to run-now dispatch.
 
 Then branch on **Workflow tool availability** — check whether a `Workflow` tool
 is present in this session's available tools.
