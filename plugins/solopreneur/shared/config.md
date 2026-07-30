@@ -88,6 +88,35 @@ matrix — the layer that would differ most across sizes (E2E) is exactly the
 layer excluded here. A repo with no `verify` configured makes greenlight skip
 the inner loop and flag the run as having no objective verifier.
 
+## The `greenlight_reviewers` feature key
+
+Per-repo observations about the review bots on that repo, written **only** by
+`skills/greenlight/scripts/reviewer-state.mjs`. It is a **separate feature key
+from `greenlight`** on purpose: the five-layer read returns the whole subtree of
+whichever layer has the feature first, and `write_solopreneur_repo_config`
+replaces a feature subtree wholesale. Sharing one subtree would mean the script's
+observations either shadow `default.greenlight.fallback_order` or get deleted by
+the next helper write.
+
+```jsonc
+"greenlight_reviewers": {
+  "observed": {
+    "gemini-code-assist[bot]": { "auto": false, "triggerable": false },
+    "mystery[bot]":            { "recipe": "bugbot" }
+  }
+}
+```
+
+| Field | Written when | Meaning |
+|---|---|---|
+| `observed.<login>.recipe` | attended identify | which registry row this login is. Registry-verified logins (`knownLogins`) resolve automatically and need no entry; `null` / absent with no registry match = unidentified — findings still collected, never triggered, cannot gate |
+| `observed.<login>.auto` | observation | it comments without being triggered, so non-gate rounds skip prompting it (the gate is always triggered) |
+| `observed.<login>.triggerable` | self-healing | `false` after a trigger got no response within the reviewer's own poll budget; excluded until it acts again or an attended run retries it (both write `true` back) |
+
+`fallback_order` stays in `greenlight` and keeps its meaning, except it now
+orders **gate candidates**. The script never reads or writes it — greenlight
+resolves it through `read_solopreneur_config` and passes it in.
+
 ## Lookup order (read)
 
 `read_solopreneur_config <feature>` walks five layers, first non-null wins.
@@ -112,7 +141,7 @@ when the variable is unset.
 
 ## Write API
 
-Two writers; both write to the primary file only (fallback is never touched).
+Three writers; all write to the primary file only (fallback is never touched).
 
 - **`write_solopreneur_config <key> <jq_expr>`** — writes to
   `.default.<key>` in primary. Use for user-global preferences (e.g.
@@ -120,9 +149,18 @@ Two writers; both write to the primary file only (fallback is never touched).
 - **`write_solopreneur_repo_config <key> <jq_expr>`** — writes to
   `.repos[<repo-key>].<key>` in primary. Use for repo-specific state (e.g.
   `preview.path`, `todos`).
+- **`skills/greenlight/scripts/reviewer-state.mjs record`** — a Node writer, not
+  a shell helper, and the only one outside this file. It writes exactly one key,
+  `.repos[<repo-key>].greenlight_reviewers`, and never touches `greenlight`.
+  Single-writer ownership per feature key is what keeps the two sides from
+  erasing each other — see "The `greenlight_reviewers` feature key" above.
 
-Both helpers preserve sibling keys (atomic read-modify-write via `mktemp` +
-`mv`) and create the file + parent directory if missing.
+All three preserve sibling keys (atomic read-modify-write via a same-directory
+temp file + rename) and create the file + parent directory if missing. The Node
+writer additionally **refuses to write at all** when the existing file cannot be
+parsed — only a missing file counts as empty, because rewriting an
+unparseable config would replace every other repo's settings with one round's
+observations.
 
 ## Edge case: null vs false vs empty string
 
@@ -343,6 +381,13 @@ registered here by hand:
 - `preview/scripts/config-resolve.mjs` — `legacyPreviewValues()` and the
   layer 4/5 file locations restate this file's legacy layout in JavaScript. It
   only ever **reads and reports** that layout; it never writes a legacy file.
+- `greenlight/scripts/reviewer-state.mjs` — restates the primary file's location
+  (`$CLAUDE_CONFIG_DIR/solopreneur.json`, else `~/.claude/…`) in JavaScript, and
+  unlike every other entry in this list it **writes**: `record` merges into
+  `.repos[<repo-key>].greenlight_reviewers` and nothing else. It deliberately
+  does **not** restate the five-layer cascade — `fallback_order` is read by the
+  shell helper and passed in as a flag, so there is only ever one implementation
+  of the cascade to keep in sync.
 - `preview/scripts/config-migrate.mjs` — its own `legacyPreviewValues()`, plus
   two readers that restate the **two different cascades** described above:
   `readAutoProtect()` mirrors `deploy.sh:read_preview_config` (file-major —

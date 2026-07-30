@@ -500,7 +500,7 @@ vocabulary; no bot login is hardcoded here.
   Because S is external-only, its one reviewer must actually be available: when no
   explicit reviewer arg and no `fallback_order` are configured, resolve the starting
   `current_reviewer` to the **first available** external reviewer, preferring codex —
-  `codex-cli` when its pre-flight CLI gate passed, else a detected active-bot (prefer
+  `codex-cli` when its pre-flight CLI gate passed, else a detected github-bot (prefer
   `codex-bot`), else the `codex-bot` default with the existing not-detected warning.
   This reuses the pre-flight CLI gate and activity detection (registry vocabulary, no
   hardcoded logins), so an unattended S run uses the authed CLI instead of failing on
@@ -1481,51 +1481,51 @@ If no unresolved threads:
 
 ### Reviewer Registry
 
-**Single source of truth for every reviewer. Adding or removing a reviewer means
-editing this table (and the `REVIEWER_BOT_LOGINS` list below it) — nothing else
+**Single source of truth for every reviewer. Adding a reviewer is one row here
+and the matching row in `scripts/reviewer-registry.mjs` — nothing else
 downstream needs to change.**
 
-| config_id | aliases (arg) | bot login | kind | trigger | handshake | poll policy | wizard eligibility |
-|---|---|---|---|---|---|---|---|
-| `codex-bot` | `codex bot` | `chatgpt-codex-connector[bot]` | active-bot | PR comment `@codex review` | 👀 reaction on the trigger comment | 1 min × 20 | offered when detected on this repo (default start) |
-| `codex-cli` | `codex cli` | — (local; never in GitHub data) | local-cli | `codex review --base main` | synchronous stdout, parse `[P*]` | n/a (read stdout, 5 min timeout) | offered when the CLI gate passes (installed + authed) |
-| `gemini` | `gemini` | `gemini-code-assist[bot]` | active-bot | PR comment `/gemini review` | none (no reaction) — liveness proven only by response vs timeout | 3 min, then 2 min × 2 | offered only when detected on this repo (consumer Code Assist sunset 2026-07-17; **enterprise unaffected**) |
-| `agy` | `agy` | — (local; never in GitHub data) | local-cli | `agy --model "Gemini 3.1 Pro (High)" --print` (no tool-permission bypass — review is text-only over an untrusted diff) | synchronous stdout + completion marker | n/a (read stdout, `--print-timeout` default 5 min) | offered when the CLI gate passes; wired as the **post-commit** Phase 3 Gemini-family reviewer |
-| `coderabbit` | — | `coderabbitai[bot]` | passive-bot | auto-triggers on push (no manual trigger) | n/a | n/a | never offered as a trigger — shown as informational only |
+| recipe_id | aliases (arg) | kind | trigger | handshake | poll policy | verified login |
+|---|---|---|---|---|---|---|
+| `codex-bot` | `codex bot` | github-bot | PR comment `@codex review` | 👀 reaction | 60s first, 60s × 20 | `chatgpt-codex-connector[bot]` |
+| `gemini` | `gemini` | github-bot | PR comment `/gemini review` | none | 180s first, 120s × 2 | `gemini-code-assist[bot]` |
+| `coderabbit` | `coderabbit` | github-bot | PR comment `@coderabbitai review` | none | default | `coderabbitai[bot]` |
+| `bugbot` | `bugbot`, `cursor` | github-bot | PR comment `bugbot run` (top-level only) | none | default | — |
+| `greptile` | `greptile` | github-bot | PR comment `@greptileai` | none | default | — |
+| `codex-cli` | `codex cli` | local-cli | `codex review --base main` | stdout `[P*]` | n/a | n/a |
+| `agy` | `agy` | local-cli | `agy --print` (model pinned with `--model`) | stdout + marker | n/a | n/a |
 
 **Reviewer kinds:**
-- **active-bot** — a GitHub App you trigger with a PR comment and poll for. Offered
-  in the wizard **only when activity detection saw it act on this repo.**
-- **passive-bot** — auto-reviews on push; cannot be triggered on demand. Shown as
-  "also active here" but never selectable as the trigger.
-- **local-cli** — runs locally, reads stdout; it never appears in GitHub activity
-  data, so its availability is decided by a **CLI gate, not by detection.**
+- **github-bot** — triggered by a PR comment and polled for. Whether it *also*
+  reviews automatically on push is **observed**, not declared — see `auto` in
+  `shared/config.md`.
+- **local-cli** — runs locally and is read from stdout. Availability comes from
+  a CLI gate, not from activity detection, because a local CLI never appears in
+  GitHub data. It stays a legal PR-mode reviewer and gate.
 
-Three identifier spellings exist per reviewer — the `config_id` (canonical, used in
-`fallback_order`), the `aliases` (argument spellings a user types), and the `bot
-login` (what GitHub returns). The registry maps all three so config values and
-detected logins can be compared.
+**Verified login** is the App account a tool posts from. An App's bot login is
+app-scoped — identical on every repo — so a verified one is vendor knowledge.
+Only observed-and-verified logins are listed; guessing is unsafe
+(`cursor[bot]`, `cursor-com[bot]` and `bugbot[bot]` are all real accounts, and
+GitHub Copilot posts as `Copilot` with no `[bot]` suffix). A `—` tool still
+works: detection collects it by `type == "Bot"`, and an attended identify binds
+its login per repo (see Reviewer selection).
 
-```bash
-# Bot logins for active + passive reviewers. Activity detection filters
-# comment/review authors against this list; the pollers scope author matches to
-# the current reviewer's login. Keep in sync with the registry table above —
-# this list, not a second one, is the single materialized copy of the logins.
-CODEX_BOT="chatgpt-codex-connector[bot]"
-GEMINI_BOT="gemini-code-assist[bot]"
-CODERABBIT_BOT="coderabbitai[bot]"
-REVIEWER_BOT_LOGINS='["chatgpt-codex-connector[bot]","gemini-code-assist[bot]","coderabbitai[bot]"]'
+`scripts/reviewer-registry.mjs` is the executable copy of this table and the one
+the loop actually reads; `tests/skill-sync.test.mjs` fails CI when the two
+drift.
 
-# Current active reviewer's login (updated on each fallback switch). Default: Codex bot.
-BOT_LOGIN="$CODEX_BOT"
-```
-
-In the steps below, `REVIEWER_CMD` = the current reviewer's trigger command and
-`BOT_LOGIN` = its GitHub login (both taken from the registry row).
+In the steps below, `REVIEWER_CMD` = the current reviewer's trigger command
+(the registry row's trigger) and `BOT_LOGIN` = the GitHub login the pollers
+scope author matches to. **Both come from the same row — the one
+`current_reviewer` names.** The detection block below supplies `BOT_LOGIN` by
+looking that reviewer up in `RESOLVED.available`, replacing the hardcoded
+default that used to live here. It is deliberately **not** taken from
+`RESOLVED.gate`, which resolves independently and can name a different reviewer.
 
 ### Reviewer activity detection (pre-flight, PR mode)
 
-Which active-bots to offer is decided by what actually reviews **this** repo, not a
+Which reviewers to offer is decided by what actually reviews **this** repo, not a
 hardcoded list. Detection is an **enhancement, never a gate** — any failure falls
 straight through to the flow below.
 
@@ -1540,59 +1540,139 @@ to both comment endpoints.)
 # sample, not "all history".
 DETECT_PR_SCAN=20   # most-recent PRs to scan for formal-review-only bots
 
-# Emits raw "<login>\t<iso>" lines on stdout; returns NON-ZERO if ANY source
-# errored. Detection is all-or-nothing: a partial sample (e.g. Source 3 fails
-# while Source 1 works) would silently hide a bot that appears only in the missing
-# source — exactly the formal-review-only case (PR #108's Gemini) that Source 3
-# exists to catch — so the caller degrades to `unavailable` rather than a truncated
-# `ok`. Each source's error is captured via its own exit status, not swallowed.
+# Emits raw "<login>\t<type>\t<iso>\t<source>" lines on stdout; returns NON-ZERO
+# if ANY source errored. Detection is all-or-nothing: a partial sample (e.g.
+# Source 3 fails while Source 1 works) would silently hide a bot that appears only
+# in the missing source — exactly the formal-review-only case (PR #108's Gemini)
+# that Source 3 exists to catch — so the caller degrades to `unavailable` rather
+# than a truncated `ok`. Each source's error is captured via its own exit status,
+# not swallowed. The constant 4th column is the evidence channel: `type == "Bot"`
+# proves automation, not code review, so the reviewer test needs to know which
+# endpoint a row came from.
 collect_reviewer_activity() {
   local rc=0 chunk nums n
-  # Source 1: repo-level issue/PR conversation comments (summaries, quota notes)
+  # Source 1: conversation comments — summaries, quota notices, dependabot prose.
+  # Deliberately NOT evidence of code review (see the evidence rule below).
   chunk=$(gh api "repos/$OWNER/$REPO/issues/comments?sort=created&direction=desc&per_page=100" \
-            --jq '.[] | [.user.login, .created_at] | @tsv') || rc=1
+            --jq '.[] | [.user.login, .user.type, .created_at, "conversation"] | @tsv') || rc=1
   printf '%s\n' "$chunk"
-  # Source 2: repo-level inline review comments (code-level P-tags)
+  # Source 2: inline review comments — line-level findings.
   chunk=$(gh api "repos/$OWNER/$REPO/pulls/comments?sort=created&direction=desc&per_page=100" \
-            --jq '.[] | [.user.login, .created_at] | @tsv') || rc=1
+            --jq '.[] | [.user.login, .user.type, .created_at, "review-comment"] | @tsv') || rc=1
   printf '%s\n' "$chunk"
-  # Source 3: formal reviews, per-PR — a bot may leave ONLY a formal review
+  # Source 3: formal reviews, per-PR — a bot may leave ONLY one of these (verified: PR #108).
   nums=$(gh pr list --state all --limit "$DETECT_PR_SCAN" --json number --jq '.[].number') || rc=1
   for n in $nums; do
     chunk=$(gh api "repos/$OWNER/$REPO/pulls/$n/reviews" \
-              --jq '.[] | [.user.login, .submitted_at] | @tsv') || rc=1
+              --jq '.[] | [.user.login, .user.type, .submitted_at, "formal-review"] | @tsv') || rc=1
     printf '%s\n' "$chunk"
   done
   return $rc
 }
 
+SCRIPTS="${CLAUDE_SKILL_DIR}/"scripts
+REPO_KEY=$(solopreneur_repo_key)
+
+# fallback_order must come through the five-layer cascade: the existing writer
+# puts it at .default.greenlight (see "Fallback Logic"), so reading only the
+# repo layer would silently lose a user's configured order. The script never
+# reads it for exactly this reason.
+FALLBACK_ORDER=$(read_solopreneur_config greenlight | jq -r '(.fallback_order // []) | join(",")')
+
+# Local CLIs never appear in GitHub activity, so their availability comes from
+# the same probe the pre-flight Codex CLI gate uses. codex-cli is included
+# whenever that probe passes — it is the documented successor to codex-bot. agy
+# is NOT included automatically: switching model family is the user's call, so
+# it is added only on explicit request (see "Reviewer selection").
+#
+# Re-probed here rather than testing $CODEX_INSTALLED / $CODEX_AUTH: pre-flight
+# Step 3 *prints* those as text for the reader, it never assigns them, so testing
+# them would read unset variables and silently drop codex-cli from every resolve.
+CLI_AVAILABLE=""
+if command -v codex >/dev/null 2>&1 && codex login status >/dev/null 2>&1; then
+  CLI_AVAILABLE="codex-cli"
+fi
+
 # All-or-nothing: a non-zero return (any source errored — rate limit / network)
-# degrades to `unavailable` and runs the flow below unchanged. Only a fully
-# successful sample yields `ok`. An empty-but-successful sample (zero-history repo)
-# still returns 0 → `ok` with empty DETECTED.
+# degrades to `unavailable`. Only a fully successful sample yields `ok`. An
+# empty-but-successful sample (zero-history repo) still returns 0 → `ok` with an
+# empty bot list.
 if ACTIVITY=$(collect_reviewer_activity); then
-  # REST `.user.login` already carries the `[bot]` suffix, so it compares directly
-  # against REVIEWER_BOT_LOGINS with no normalization. (If you switch Source 3 to
-  # GraphQL for batching, GraphQL logins DROP `[bot]` — re-add it before comparing.)
-  DETECTED=$(printf '%s\n' "$ACTIVITY" \
-    | awk -F'\t' 'NF==2 && $2>seen[$1]{seen[$1]=$2} END{for(l in seen) print l"\t"seen[l]}' \
-    | while IFS=$'\t' read -r login at; do
-        printf '%s' "$REVIEWER_BOT_LOGINS" | jq -e --arg l "$login" 'index($l)' >/dev/null \
-          && printf '%s\t%s\n' "$login" "$at"
-      done)
+  DETECTED=$(printf '%s\n' "$ACTIVITY" | node "$SCRIPTS/reviewer-state.mjs" detect)
   DETECTION_STATUS=ok
 else
-  DETECTED=""; DETECTION_STATUS=unavailable
+  DETECTED='{"bots":[]}'; DETECTION_STATUS=unavailable
 fi
+
+# Runs in both branches: `resolve` reads the per-repo cache as well as this
+# round's sample, so an `unavailable` detection still produces a decision instead
+# of aborting — that is what keeps detection an enhancement and never a gate.
+# Note for PR 1: nothing writes that cache yet (the `record` write-back is PR 2),
+# so today an `unavailable` detection resolves against an empty cache and falls
+# through to the default flow. The read path is wired here so PR 2 only has to
+# add the writer.
+RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve \
+  --repo-key "$REPO_KEY" --fallback-order "$FALLBACK_ORDER" --cli-available "$CLI_AVAILABLE")
+
+# Warnings are actionable config problems (a stale recipe id), not failures.
+printf '%s' "$RESOLVED" | jq -r '.warnings[]? | "note: " + .'
+
+# The recipe_id of the reviewer this loop actually triggers. `current_reviewer`
+# is an alias spelling ("codex bot", "gemini", "codex cli"); map it to its
+# recipe_id with the registry table above — the same row that supplies
+# REVIEWER_CMD.
+CURRENT_RECIPE=<recipe_id of current_reviewer>
+
+# PR-1 seam: the existing single-reviewer loop keeps running unchanged, and its
+# poll identity must come from the SAME row as its trigger. Deliberately NOT
+# `.gate.login`: the gate is resolved independently from fallback_order, so on a
+# repo where codex is available `/greenlight external gemini` would post
+# `/gemini review` while polling for Codex's login — the real response is then
+# filtered out and the round times out. PR 2 moves trigger AND poll to
+# RESOLVED.gate together, which is when the two may safely converge.
+BOT_LOGIN=$(printf '%s' "$RESOLVED" | jq -r --arg r "$CURRENT_RECIPE" \
+  'first(.available[] | select(.recipe == $r) | .login) // empty')
+
+# The lookup is empty on a fresh repo, or when detection is down and the cache
+# has nothing — the reviewer is still perfectly triggerable, it has just never
+# been seen HERE. Fall back to that same registry row's verified login, filled
+# in from the table above exactly as CURRENT_RECIPE was. This must be part of
+# the block, not prose: polling with an empty login matches no author, so every
+# clean / quota / summary response is ignored until a false timeout.
+# A `—` in the verified-login column means leave it empty on purpose — the tool
+# can be triggered, but nothing can be attributed to it until it answers once
+# and is identified. Never substitute a guessed login.
+: "${BOT_LOGIN:=<verified login of CURRENT_RECIPE from the registry table, or empty when that column shows —>}"
 ```
+
+**Re-evaluate both lines whenever `current_reviewer` changes.** Fallback Logic
+switches reviewers mid-run, and both are functions of the current reviewer — a
+switch that leaves them stale posts the new reviewer's trigger while polling the
+old one's login, the same desync as reading them from the gate, reached by a
+different route. This is the invariant the deleted hardcoded-login block carried
+in its "updated on each fallback switch" note; it now belongs to the seam.
+
+Resolving through `available` (rather than straight from the registry table) is
+what will let a tool with no verified login work once it has been identified on
+this repo: `available` merges this round's detection with the per-repo cache, so
+the login comes from observation rather than from the table. Only the detection
+half is live in PR 1 — identify writes land with PR 2's `record` call.
+
+`BOT_LOGIN` therefore ends up empty in exactly one case: the current reviewer's
+registry row has no verified login either. That is a local CLI (Flow B reads
+stdout and never polls GitHub, so it needs none) or an unverified `—` tool on a
+repo where it has not answered yet. Both are correct as empty — what must never
+happen is an empty login reaching the poller for a reviewer whose login IS
+known, which is what the fallback line above prevents.
 
 Interpret the result:
 
-| Result | Meaning | What the wizard does |
+| Result | Meaning | What happens (PR 1) |
 |---|---|---|
-| `DETECTION_STATUS=unavailable` | API failure / rate limit | Skip detection; run the **current** flow (default codex-bot, ask on failure) |
-| `DETECTION_STATUS=ok`, `DETECTED` empty | Zero-history repo (no bot has acted here) | Run the **current** interactive flow |
-| `DETECTION_STATUS=ok`, `DETECTED` non-empty | These bots act here | Offer the detected **active-bots** (with their `last_seen`) in the wizard; note any detected **passive-bot** informationally |
+| `DETECTION_STATUS=unavailable` | API failure / rate limit | `resolve` runs on the cache alone; empty cache falls through to the default flow |
+| `available` empty | Nothing has ever acted here and nothing cached | Default flow (current behaviour) |
+| `available` non-empty | These reviewers act here | The existing single-reviewer loop continues, still driven by `current_reviewer`; the seam looks that reviewer's login up in `available` (`BOT_LOGIN`). PR 2 rewires trigger/collect/terminal states onto `gate` |
+| `needsPrompt` true / `gate` null | Nothing eligible to gate | PR 1: fall through to the default flow; PR 2 adds the selection prompt |
 
 Detection only lists options — it never proves a bot is alive **right now**. A
 low-traffic repo's history always looks fresh, and during the Gemini sunset window a
@@ -1612,25 +1692,35 @@ Otherwise → unavailable. Don't list Codex CLI when asking user for fallback op
 
 ### Fallback Logic
 
-The wizard presents the three reviewer kinds **separately**, and is entered only in
+The wizard presents the two reviewer kinds **separately**, and is entered only in
 the "without config" / exhausted paths below (never by an unattended caller — see
 below):
 
-- **Active bots** — list only the ones in `DETECTED`, each with its
-  `last_seen_in_sample`. The Gemini bot therefore appears **only** on repos with
-  recent Gemini activity. If detection was unavailable or empty, fall back to
-  offering the default (Codex bot) and note it wasn't confirmed on this repo.
+- **GitHub bots** — list the `RESOLVED.available` entries with `kind: "bot"`,
+  each with its `lastSeen`. The Gemini bot therefore appears **only** on repos
+  with recent Gemini activity. If detection was unavailable and the cache is
+  empty, fall back to offering the default (Codex bot) and note it wasn't
+  confirmed on this repo.
+
+  **Selectable in PR 1: `codex-bot` and `gemini` only.** Step 1's dispatch table
+  and the polling cadences below are still hardcoded to those two, so offering
+  any other recipe as the trigger would hand the loop a reviewer it has no
+  trigger or poll path for. Every other entry — an identified `coderabbit` /
+  `bugbot` / `greptile`, or an unidentified bot with `canGate: false` — is shown
+  **informationally**: it acts on this repo and its findings are read like any
+  other unresolved thread, but it is not the reviewer this loop drives. PR 2
+  makes dispatch registry-driven and turns these into selectable gates.
 - **Local CLIs** — offer Codex CLI when its gate passes (installed + authed). Never
   hidden for lack of GitHub activity — local CLIs never appear in GitHub data.
-- **Passive bots** — if CodeRabbit is in `DETECTED`, show one informational line
-  ("CodeRabbit auto-reviews on push here"). It is **not** a selectable trigger.
 
 **With config (`${CLAUDE_CONFIG_DIR:-~/.claude}/solopreneur.json` has `greenlight` key):**
 Follow `fallback_order` sequentially. Each reviewer failure auto-switches to the
-next, notifying the user. Maintain the chosen reviewer for the rest of this cycle —
-no per-round reset.
+next, notifying the user **and re-evaluating `CURRENT_RECIPE` + `BOT_LOGIN` for
+the new reviewer** (the seam in the detection block) — otherwise the loop posts
+the new reviewer's trigger while still polling the previous one's login.
+Maintain the chosen reviewer for the rest of this cycle — no per-round reset.
 
-- If an entry names an **active-bot that detection did not find**, **warn before
+- If an entry names a **github-bot that detection did not find**, **warn before
   triggering — do not hard-fail**:
   > "fallback_order lists `gemini` but no recent Gemini activity was detected on
   >  this repo. Trying it anyway; on no response it will time out and fall through."
@@ -1643,7 +1733,9 @@ no per-round reset.
    (attended) or **fail fast** (unattended):
 
    "{reviewer} couldn't complete review (reason: {reason}). Which reviewer to continue with?"
-   - Detected active-bots (e.g. "Codex bot — last seen {date}", "Gemini bot — last seen {date}")
+   - Detected github-bots (e.g. "Codex bot — last seen {date}", "Gemini bot — last seen {date}")
+     — **selectable ones only**, i.e. `codex-bot` / `gemini`, per the selectable
+     rule above; any other detected bot is listed informationally, not as a choice
    - Codex CLI — if the CLI gate passed (omit otherwise)
    - Skip, don't trigger another reviewer
 
