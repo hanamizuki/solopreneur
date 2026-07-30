@@ -341,6 +341,24 @@ test('record refuses a config whose top level is not an object', () => {
   }
 });
 
+test('record refuses a non-object repos container instead of silently dropping the write', () => {
+  // An array is the shape that fails OPEN: `repos ??= {}` keeps it, string keys
+  // assigned to an array vanish in JSON.stringify, so record used to rewrite the
+  // file, print the observation, and exit 0 having stored nothing.
+  for (const bad of ['{"repos":[]}', '{"repos":{"github.com/o/r":[]}}']) {
+    const dir = tmpConfigDir(bad);
+    assertFailed(
+      run(['record', '--repo-key', KEY], {
+        stdin: JSON.stringify({ observations: [{ login: 'x[bot]', auto: true }] }),
+        configDir: dir,
+      }),
+      /must be a JSON object/i,
+    );
+    assert.equal(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'), bad,
+      'the original file must survive untouched');
+  }
+});
+
 test('record treats an absent config as empty and creates it', () => {
   const dir = tmpDir();   // no solopreneur.json at all
   const { code } = run(['record', '--repo-key', KEY], {

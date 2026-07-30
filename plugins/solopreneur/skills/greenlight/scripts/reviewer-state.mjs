@@ -110,6 +110,9 @@ function configPath() {
   return path.join(base, 'solopreneur.json');
 }
 
+/** A JSON object — arrays and null excluded, as in preview/config-resolve.mjs. */
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
 /**
  * Read the config for writing.
  *
@@ -133,7 +136,7 @@ function readConfigForWrite() {
   } catch (err) {
     throw new InputError(`cannot parse ${configPath()} (malformed JSON): ${err.message}`);
   }
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+  if (!isPlainObject(parsed)) {
     throw new InputError(`${configPath()} must contain a JSON object at the top level`);
   }
   return parsed;
@@ -226,8 +229,18 @@ function record({ observations = [], repoKey }) {
     observed[login] = { ...(observed[login] ?? {}), ...fields };
   }
 
+  // The top-level check does not reach these nested containers, and an array is
+  // the shape that fails open: `??=` keeps it, string keys assigned to an array
+  // are dropped by JSON.stringify, and record would then rewrite the file,
+  // print the observation, and exit 0 having persisted nothing.
   cfg.repos ??= {};
+  if (!isPlainObject(cfg.repos)) {
+    throw new InputError(`${configPath()}: "repos" must be a JSON object`);
+  }
   cfg.repos[repoKey] ??= {};
+  if (!isPlainObject(cfg.repos[repoKey])) {
+    throw new InputError(`${configPath()}: repos[${JSON.stringify(repoKey)}] must be a JSON object`);
+  }
   cfg.repos[repoKey][FEATURE] = { observed };
   writeConfig(cfg);
   return cfg.repos[repoKey][FEATURE];
