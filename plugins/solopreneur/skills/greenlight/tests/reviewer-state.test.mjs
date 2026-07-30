@@ -494,7 +494,32 @@ test('resolve canonicalizes a cached alias so the gate still matches', () => {
 test('resolve excludes triggerable:false', () => {
   const dir = tmpConfigDir(CFG({ observed: { [GEMINI]: { triggerable: false } } }));
   const { stdout } = resolve([], { stdin: BOTS([RABBIT, GEMINI]), configDir: dir });
-  assert.deepEqual(JSON.parse(stdout).available.map((r) => r.id), [RABBIT]);
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.available.map((r) => r.id), [RABBIT]);
+  assert.ok(!out.collect.includes(GEMINI), 'a marked reviewer is never harvested for findings');
+});
+
+test('resolve reports a marked reviewer under its own key, with its recipe', () => {
+  // The attended retry prompt lists these. They must carry a resolved recipe:
+  // "retry gemini-code-assist[bot]" is only actionable if the caller knows which
+  // registry row to re-trigger it from.
+  const dir = tmpConfigDir(CFG({ observed: { [GEMINI]: { triggerable: false } } }));
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT, GEMINI]), configDir: dir });
+  assert.deepEqual(JSON.parse(stdout).marked, [
+    { login: GEMINI, recipe: 'gemini', lastSeen: '2026-07-29T11:00:00Z' },
+  ]);
+});
+
+test('resolve prompts when the only known reviewer is marked', () => {
+  // Without `marked` in the condition this repo reports available:[] and
+  // needsPrompt:false — no gate, and no question that could ever restore one.
+  const dir = tmpConfigDir(CFG({ observed: { [CODEX]: { triggerable: false } } }));
+  const { stdout } = resolve([], { stdin: BOTS([]), configDir: dir });
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.available, []);
+  assert.equal(out.gate, null);
+  assert.equal(out.needsPrompt, true);
+  assert.deepEqual(out.marked.map((r) => r.login), [CODEX]);
 });
 
 test('resolve drops an unidentified bot with no review evidence', () => {

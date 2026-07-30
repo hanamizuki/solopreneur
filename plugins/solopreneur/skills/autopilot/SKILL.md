@@ -320,6 +320,17 @@ After the user picks, write the artifacts per Step 3's table, then proceed to St
    - `{SIZE}`      = the PR's `size` (`s`/`m`/`l`) when the descriptor set one — Step 5
      of the suffix passes it to `/greenlight` as `size={SIZE}`. When unset, drop the
      `size={SIZE}` clause so no token is passed (greenlight then auto-classifies).
+   - `{SELECT}`    = the PR's `select` — the planned reviewer selection as a
+     comma-separated recipe list. Step 5 passes it as `select={SELECT}`. When the
+     descriptor set none, drop the `select={SELECT}` clause entirely.
+   - `{GATE}`      = the PR's `gate` — the recipe whose clean pass ends the review
+     loop, passed as `gate={GATE}`. Drop the clause when unset, exactly as with
+     `{SIZE}`.
+
+   Fill `{SELECT}` / `{GATE}` only from a preference the user actually stated while
+   planning. Autopilot does **not** resolve reviewers itself: greenlight owns that
+   decision, degrades a stale id with a warning at run time, and falls back to the
+   repo's `fallback_order` when neither token is passed.
 
    Leave `{PR_NUMBER}`, `{REPO_ROOT}`, `{WORKTREE_PATH}` as `{...}` literals — the
    subagent fills them in at runtime.

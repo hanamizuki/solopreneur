@@ -18,7 +18,8 @@
  *   reviewer-state.mjs resolve --repo-key <K> --fallback-order <ids>
  *                              [--cli-available <ids>] [--select <ids>] [--gate <id>]
  *       stdin:  {"bots":[…]} — the `detect` output
- *       stdout: {"available","trigger","collect","gate","needsPrompt","warnings"}
+ *       stdout: {"available","marked","trigger","collect","gate","needsPrompt",
+ *                "warnings"}
  *
  * This script never calls `gh`, never derives the repo key, and never reads
  * `fallback_order` — all three are passed in. That keeps it testable and keeps
@@ -318,13 +319,14 @@ const csv = (value) => (value ? value.split(',').map((s) => s.trim()).filter(Boo
  * values may come from a days-old autopilot descriptor, and a stale token must
  * not turn an unattended run into an empty one.
  *
- * Known gap, owned by PR 2: `triggerable: false` entries are filtered out here
- * and therefore appear in no output field, so the attended "retry a reviewer
- * marked unresponsive" prompt has nothing to list, and `needsPrompt` is decided
- * without them. That prompt is what defines the shape the entries need, so the
- * output key lands with it rather than being guessed here. They must NOT simply
- * be added to `available`, which feeds `collect` — a marked reviewer's comments
- * must not start being harvested as findings.
+ * `triggerable: false` entries go to their own `marked` key rather than into
+ * `available`. They must stay out of `available` because it feeds `collect` — a
+ * reviewer marked unresponsive must not have its comments harvested as findings
+ * — but they must still be reachable, or the attended "retry a reviewer marked
+ * unresponsive" prompt has nothing to list and can never clear the mark. For the
+ * same reason they count toward `needsPrompt`: a repo whose only known reviewer
+ * is marked has an empty `available`, and reporting "nothing to ask about" there
+ * would strand it with no gate and no way back.
  */
 function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
   const warnings = [];
@@ -338,40 +340,50 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     merged.set(b.login, { ...prev, lastSeen: b.lastSeen, evidence: b.evidence === true });
   }
 
-  const botCandidates = [...merged.values()]
-    .filter((r) => r.triggerable !== false)
-    .map((r) => {
-      let recipe = r.recipe ?? null;
-      if (recipe !== null) {
-        // Canonicalize on read too, so a config written before `record` started
-        // normalizing (or hand-edited with an alias) still matches
-        // fallback_order / --gate / --select, which all compare on recipe id.
-        const known = recipeFor(recipe);
-        if (known) {
-          recipe = known.id;
-        } else {
-          warnings.push(`cached recipe "${recipe}" is not in the registry; ignoring it for ${r.login}`);
-          recipe = null;
-        }
+  const shape = (r) => {
+    let recipe = r.recipe ?? null;
+    if (recipe !== null) {
+      // Canonicalize on read too, so a config written before `record` started
+      // normalizing (or hand-edited with an alias) still matches
+      // fallback_order / --gate / --select, which all compare on recipe id.
+      const known = recipeFor(recipe);
+      if (known) {
+        recipe = known.id;
+      } else {
+        warnings.push(`cached recipe "${recipe}" is not in the registry; ignoring it for ${r.login}`);
+        recipe = null;
       }
-      // A registry-verified login identifies itself: an App's bot login is
-      // app-scoped, identical on every repo. The cached recipe (an explicit
-      // identify) wins when both exist.
-      recipe ??= recipeForLogin(r.login)?.id ?? null;
-      return {
-        kind: 'bot',
-        id: r.login,
-        login: r.login,
-        recipe,
-        auto: r.auto === true,
-        evidence: r.evidence === true,
-        lastSeen: r.lastSeen ?? null,
-        canGate: recipe !== null,
-      };
-    })
+    }
+    // A registry-verified login identifies itself: an App's bot login is
+    // app-scoped, identical on every repo. The cached recipe (an explicit
+    // identify) wins when both exist.
+    recipe ??= recipeForLogin(r.login)?.id ?? null;
+    return {
+      kind: 'bot',
+      id: r.login,
+      login: r.login,
+      recipe,
+      auto: r.auto === true,
+      evidence: r.evidence === true,
+      lastSeen: r.lastSeen ?? null,
+      canGate: recipe !== null,
+    };
+  };
+
+  // Shape once, then partition — the recipe resolution above is identical for a
+  // marked reviewer and an active one, and the retry prompt needs the resolved
+  // recipe to offer anything meaningful.
+  const shaped = [...merged.values()]
+    .map((r) => ({ marked: r.triggerable === false, entry: shape(r) }))
     // A recipe-bearing entry is a known reviewer; an unidentified one has to
     // prove it reviews before its comments are treated as findings.
-    .filter((r) => r.recipe !== null || r.evidence);
+    .filter(({ entry }) => entry.recipe !== null || entry.evidence);
+
+  const botCandidates = shaped.filter((s) => !s.marked).map((s) => s.entry);
+  const marked = shaped
+    .filter((s) => s.marked)
+    .map(({ entry }) => ({ login: entry.login, recipe: entry.recipe, lastSeen: entry.lastSeen }))
+    .sort((a, b) => (a.login < b.login ? -1 : a.login > b.login ? 1 : 0));
 
   const cliCandidates = cliAvailable
     .filter((id) => {
@@ -462,11 +474,13 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
 
   return {
     available,
+    marked,
     trigger,
     collect: selected.filter((r) => r.login).map((r) => r.login),
     gate: gatePayload,
-    // Ask only when something acts here but nothing can close a round.
-    needsPrompt: gateEntry === null && available.length > 0,
+    // Ask only when something is known here but nothing can close a round. A
+    // marked reviewer counts as "known": retrying it is one of the answers.
+    needsPrompt: gateEntry === null && (available.length > 0 || marked.length > 0),
     warnings,
   };
 }

@@ -86,10 +86,22 @@ Branch on the Verdict line it emits:
 - gh pr create --title "{TITLE}" --body "Auto-created by Autopilot.\n\nSpec: {PLAN_DIR}/{SPEC_FILE}"
 
 ### 5. Auto Review
-Invoke the /greenlight skill to run the automated code review loop. When the plan
-set a size for this PR, pass it as the `size={SIZE}` token (e.g. `/greenlight size=m`)
-so review weight matches the planned risk; greenlight still recomputes the size from
-the real diff and takes the upward max, so the token never under-reviews.
+Invoke the /greenlight skill to run the automated code review loop, **always with the
+`unattended` token** — a dispatched run has no human to answer a reviewer-selection
+prompt, and `unattended` is what makes greenlight pick a defensible default gate and
+keep going instead of blocking on input.
+
+When the plan set a size for this PR, also pass `size={SIZE}` so review weight matches
+the planned risk; greenlight still recomputes the size from the real diff and takes the
+upward max, so the token never under-reviews. When the plan recorded a reviewer
+selection, pass `select={SELECT}` and `gate={GATE}` too. For example:
+
+    /greenlight unattended size=m select=coderabbit,codex-bot gate=codex-bot
+
+With no selection tokens, greenlight resolves reviewers from the per-repo config and
+uses the first available `fallback_order` entry as the gate. A stale token — a reviewer
+marked unresponsive since planning — degrades with a warning and never fails the run.
+
 Greenlight caps itself at its per-size max rounds (S 3 / M 5 / L 10); let it run to
 that cap rather than imposing a separate lower cap here, which would negate the size
 profile. If it stops with unresolved issues still open, report and halt.
@@ -188,4 +200,6 @@ How you emit the result depends on how you were dispatched:
 | `{PLAN_DIR}` | Plan directory path | `docs/loops/2026-03-29_mining` |
 | `{SPEC_FILE}` | plan.yaml `prs[].spec` | `pr2-collector.md` |
 | `{SIZE}` | plan.yaml `prs[].size` (`s`/`m`/`l`); **omit the `size=` token entirely when unset** | `m` |
+| `{SELECT}` | plan.yaml `prs[].select`; **omit the `select=` token entirely when unset** | `coderabbit,codex-bot` |
+| `{GATE}` | plan.yaml `prs[].gate`; **omit the `gate=` token entirely when unset** | `codex-bot` |
 | `{PR_NUMBER}` | Obtained after PR creation | `81` |

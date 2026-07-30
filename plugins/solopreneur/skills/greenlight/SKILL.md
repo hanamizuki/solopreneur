@@ -45,6 +45,8 @@ Automated review loop. Three modes:
 | `codex bot` / `codex cli` / `gemini` | Specify starting reviewer (combinable with `external`, PR mode only) | `/greenlight external gemini` |
 | `unattended` | Never prompt — on reviewer exhaustion, log and exit non-zero (fail fast). Passed by unattended callers (todos-babysit auto mode, autopilot dispatch). | `/greenlight external unattended` |
 | `size=s\|m\|l` | Advisory starting size for the [S/M/L profile](#sizing-sml-risk-profile). **Upward-only** — greenlight recomputes size from the real diff and takes `max`, so this can raise but never lower review weight. Passed by autopilot from the plan's `size` field. | `/greenlight size=m` |
+| `select=<ids>` | Comma-separated [registry](#reviewer-registry) recipe_ids to run this round. Omit to use every reviewer that acts on this repo. | `/greenlight select=coderabbit,codex-bot` |
+| `gate=<id>` | The recipe_id whose clean pass ends the loop (see [Reviewer selection](#reviewer-selection-pr-mode)). Omit to take the first available `fallback_order` entry. | `/greenlight gate=codex-bot` |
 | `post-commit [<SHA>\|<FROM>..<TO>]` | Force post-commit mode on a commit / range on `main` (pushed or local-only) | `/greenlight post-commit c1e7e256` |
 
 **Parsing rules:**
@@ -59,6 +61,12 @@ Automated review loop. Three modes:
   reviewer-spec parsing, like `unattended`; a malformed value is ignored. Not read
   in post-commit mode (it computes size from the resolved range) or uncommitted mode
   (unsized).
+- `select=` / `gate=` tokens (case-insensitive): PR mode only. Stripped before
+  reviewer-spec parsing on the **same line** as `unattended` and `size=` — a
+  token left in the remainder becomes part of the reviewer spec, so
+  `gate=codex-bot` would be looked up as a reviewer *named* `gate=codex-bot` and
+  miss on every lookup thereafter. Unknown or since-marked ids degrade with a
+  warning inside `resolve`; they never fail the run.
 - No keyword: mode comes from auto-detection (see Step 1 table).
 
 Arguments other than `post-commit` are ignored in **Uncommitted mode** and
@@ -498,8 +506,8 @@ vocabulary; no bot login is hardcoded here.
   skipped and the run goes straight to Phase 3, **still looping to a clean result**
   (S is not a single-pass mode — the cost cap is the round bound, not one shot).
   Because S is external-only, its one reviewer must actually be available: when no
-  explicit reviewer arg and no `fallback_order` are configured, resolve the starting
-  `current_reviewer` to the **first available** external reviewer, preferring codex —
+  explicit reviewer arg and no `fallback_order` are configured, resolve the round's
+  **gate** to the **first available** external reviewer, preferring codex —
   `codex-cli` when its pre-flight CLI gate passed, else a detected github-bot (prefer
   `codex-bot`), else the `codex-bot` default with the existing not-detected warning.
   This reuses the pre-flight CLI gate and activity detection (registry vocabulary, no
@@ -820,8 +828,19 @@ external_only = tokens has a token equal (case-insensitive) to "external"
 unattended    = tokens has a token equal (case-insensitive) to "unattended"
 size_arg      = value of a token matching (case-insensitive) "size=<s|m|l>", else ""
                 (a malformed size=… value is ignored — treated as "")
-reviewer_args = tokens with the "external"/"unattended"/"size=…" tokens dropped, rejoined + trimmed
+select_arg    = value of a token matching (case-insensitive) "select=<ids>" — a
+                comma-separated list of recipe_ids from the Reviewer Registry, else ""
+gate_arg      = value of a token matching (case-insensitive) "gate=<id>" — the one
+                recipe_id whose clean pass ends the loop, else ""
+reviewer_args = tokens with the "external"/"unattended"/"size=…"/"select=…"/"gate=…"
+                tokens dropped, rejoined + trimmed
 current_reviewer = reviewer_args non-empty ? reviewer_args : "codex bot"
+
+# The two selection tokens are handed straight to `resolve` (see Reviewer
+# selection). Both are validated there, and a stale one degrades with a warning
+# rather than failing — they may come from an autopilot descriptor written days
+# ago, and a stale token must not turn an unattended run into an empty one.
+SELECTED_RECIPES = select_arg
 
 # `unattended` (set by todos-babysit auto mode / autopilot dispatch): every
 # "ask the user" branch in Reviewer selection / Fallback Logic below becomes
@@ -833,6 +852,23 @@ if current_reviewer == "codex cli" and pre-flight detected CLI not installed or 
     - not installed: "Codex CLI not installed, switching to Codex GitHub bot. To install: npm install -g @openai/codex && codex login"
     - not authenticated: "Codex CLI not authenticated, switching to Codex GitHub bot. Run: !codex login"
   → current_reviewer = "codex bot"
+
+# Derived LAST, after the CLI gate above may have rewritten current_reviewer —
+# deriving it earlier would carry `codex-cli` into the gate on a machine where
+# the CLI just failed its availability check.
+#
+# A positional reviewer alias has always meant "this is the reviewer whose
+# verdict ends the loop", which is exactly what a gate is — so it feeds
+# GATE_RECIPE. Map the alias through the registry's `aliases (arg)` column to a
+# recipe_id; `resolve` compares on ids, so passing the alias spelling straight
+# through would match nothing.
+#
+# Left EMPTY when the caller named nobody. The "codex bot" default above exists
+# so the old single-reviewer prose has something to say; passing it as a gate
+# would let it silently outrank a configured fallback_order on every plain
+# `/greenlight` run.
+GATE_RECIPE = gate_arg non-empty ? gate_arg
+            : (reviewer_args non-empty ? <recipe_id of current_reviewer> : "")
 
 # Effective size (see Sizing). Run the cascade over the PR diff and take the
 # upward max of the passed token and the computed size:
@@ -1515,13 +1551,18 @@ its login per repo (see Reviewer selection).
 the loop actually reads; `tests/skill-sync.test.mjs` fails CI when the two
 drift.
 
-In the steps below, `REVIEWER_CMD` = the current reviewer's trigger command
-(the registry row's trigger) and `BOT_LOGIN` = the GitHub login the pollers
-scope author matches to. **Both come from the same row — the one
-`current_reviewer` names.** The detection block below supplies `BOT_LOGIN` by
-looking that reviewer up in `RESOLVED.available`, replacing the hardcoded
-default that used to live here. It is deliberately **not** taken from
-`RESOLVED.gate`, which resolves independently and can name a different reviewer.
+In the steps below **nothing re-derives a trigger string or a login from a
+name** — both come from `RESOLVED`, built once by the detection block:
+
+| Field | What it carries |
+|---|---|
+| `trigger[]` | One entry per reviewer to prompt this round: its `kind`, `triggerText`, `handshake` and `login` |
+| `collect[]` | The logins whose comments count as findings this round |
+| `gate` | The one reviewer whose clean pass ends the loop, **with its own `poll` policy and `handshake`** — a round's wait is as long as its gate needs, not a fixed cadence |
+| `available[]` / `marked[]` | Everything known here: eligible reviewers, and ones marked unresponsive that an attended run may retry |
+
+Deriving a login from a name is what the deleted hardcoded allowlist did, and
+it is why a newly installed reviewer used to be invisible.
 
 ### Reviewer activity detection (pre-flight, PR mode)
 
@@ -1607,72 +1648,34 @@ fi
 # Runs in both branches: `resolve` reads the per-repo cache as well as this
 # round's sample, so an `unavailable` detection still produces a decision instead
 # of aborting — that is what keeps detection an enhancement and never a gate.
-# Note for PR 1: nothing writes that cache yet (the `record` write-back is PR 2),
-# so today an `unavailable` detection resolves against an empty cache and falls
-# through to the default flow. The read path is wired here so PR 2 only has to
-# add the writer.
+#
+# Both selection flags are passed unconditionally. An empty value is a no-op
+# inside the script (`--select ""` selects everything, `--gate ""` falls back to
+# fallback_order), so there is no argv to assemble conditionally.
 RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve \
-  --repo-key "$REPO_KEY" --fallback-order "$FALLBACK_ORDER" --cli-available "$CLI_AVAILABLE")
+  --repo-key "$REPO_KEY" --fallback-order "$FALLBACK_ORDER" \
+  --cli-available "$CLI_AVAILABLE" --select "$SELECTED_RECIPES" --gate "$GATE_RECIPE")
 
-# Warnings are actionable config problems (a stale recipe id), not failures.
+# Warnings are actionable config problems (a stale recipe id, a `gate=` naming
+# someone who has since been marked unresponsive), not failures.
 printf '%s' "$RESOLVED" | jq -r '.warnings[]? | "note: " + .'
 
-# The recipe_id of the reviewer this loop actually triggers. `current_reviewer`
-# is an alias spelling ("codex bot", "gemini", "codex cli"); map it to its
-# recipe_id with the registry table above — the same row that supplies
-# REVIEWER_CMD.
-CURRENT_RECIPE=<recipe_id of current_reviewer>
-
-# PR-1 seam: the existing single-reviewer loop keeps running unchanged, and its
-# poll identity must come from the SAME row as its trigger. Deliberately NOT
-# `.gate.login`: the gate is resolved independently from fallback_order, so on a
-# repo where codex is available `/greenlight external gemini` would post
-# `/gemini review` while polling for Codex's login — the real response is then
-# filtered out and the round times out. PR 2 moves trigger AND poll to
-# RESOLVED.gate together, which is when the two may safely converge.
-BOT_LOGIN=$(printf '%s' "$RESOLVED" | jq -r --arg r "$CURRENT_RECIPE" \
-  'first(.available[] | select(.recipe == $r) | .login) // empty')
-
-# The lookup is empty on a fresh repo, or when detection is down and the cache
-# has nothing — the reviewer is still perfectly triggerable, it has just never
-# been seen HERE. Fall back to that same registry row's verified login, filled
-# in from the table above exactly as CURRENT_RECIPE was. This must be part of
-# the block, not prose: polling with an empty login matches no author, so every
-# clean / quota / summary response is ignored until a false timeout.
-# A `—` in the verified-login column means leave it empty on purpose — the tool
-# can be triggered, but nothing can be attributed to it until it answers once
-# and is identified. Never substitute a guessed login.
-: "${BOT_LOGIN:=<verified login of CURRENT_RECIPE from the registry table, or empty when that column shows —>}"
 ```
 
-**Re-evaluate both lines whenever `current_reviewer` changes.** Fallback Logic
-switches reviewers mid-run, and both are functions of the current reviewer — a
-switch that leaves them stale posts the new reviewer's trigger while polling the
-old one's login, the same desync as reading them from the gate, reached by a
-different route. This is the invariant the deleted hardcoded-login block carried
-in its "updated on each fallback switch" note; it now belongs to the seam.
-
-Resolving through `available` (rather than straight from the registry table) is
-what will let a tool with no verified login work once it has been identified on
-this repo: `available` merges this round's detection with the per-repo cache, so
-the login comes from observation rather than from the table. Only the detection
-half is live in PR 1 — identify writes land with PR 2's `record` call.
-
-`BOT_LOGIN` therefore ends up empty in exactly one case: the current reviewer's
-registry row has no verified login either. That is a local CLI (Flow B reads
-stdout and never polls GitHub, so it needs none) or an unverified `—` tool on a
-repo where it has not answered yet. Both are correct as empty — what must never
-happen is an empty login reaching the poller for a reviewer whose login IS
-known, which is what the fallback line above prevents.
+`RESOLVED` is the loop's whole reviewer vocabulary from here on: Step 1 triggers
+`trigger[]`, Step 2 waits on `gate` and harvests `collect[]`, and the selection
+prompt below reads `available[]` / `marked[]`. **Re-run `resolve` after any write
+that changes the answer** — an identify, a retry, or adding `agy` — rather than
+patching `RESOLVED` by hand.
 
 Interpret the result:
 
-| Result | Meaning | What happens (PR 1) |
+| Result | Meaning | What happens |
 |---|---|---|
-| `DETECTION_STATUS=unavailable` | API failure / rate limit | `resolve` runs on the cache alone; empty cache falls through to the default flow |
-| `available` empty | Nothing has ever acted here and nothing cached | Default flow (current behaviour) |
-| `available` non-empty | These reviewers act here | The existing single-reviewer loop continues, still driven by `current_reviewer`; the seam looks that reviewer's login up in `available` (`BOT_LOGIN`). PR 2 rewires trigger/collect/terminal states onto `gate` |
-| `needsPrompt` true / `gate` null | Nothing eligible to gate | PR 1: fall through to the default flow; PR 2 adds the selection prompt |
+| `DETECTION_STATUS=unavailable` | API failure / rate limit | `resolve` runs on the cache alone; an empty cache falls through to the default flow |
+| `available` and `marked` both empty | Nothing has ever acted here and nothing cached | Default flow: trigger `fallback_order`'s first entry (or the `codex bot` default) and let the timeout report the truth |
+| `available` non-empty, `gate` set | The common case | Run the round: trigger `trigger[]`, wait on `gate`, collect from `collect[]`. No prompt, however many reviewers act here |
+| `needsPrompt` true (`gate` null, but `available` or `marked` non-empty) | Reviewers are known here but none can close a round | Attended → the [selection prompt](#reviewer-selection-pr-mode). Unattended → degrade per Fallback Logic |
 
 Detection only lists options — it never proves a bot is alive **right now**. A
 low-traffic repo's history always looks fresh, and during the Gemini sunset window a
@@ -1690,6 +1693,79 @@ Otherwise → unavailable. Don't list Codex CLI when asking user for fallback op
 - `codex cli` → start with Codex CLI (must pass CLI gate; if fails, notify user and switch to codex bot)
 - `gemini` → start with the Gemini bot (legal even post-sunset — see the sunset note under Fallback Logic)
 
+### Reviewer selection (PR mode)
+
+**The default is silence.** When `RESOLVED.gate` is set, run with it — no
+prompt, however many reviewers act on this repo. `RESOLVED.needsPrompt` is true
+only when bots are known here but **none can close a round**: every one of them
+is unidentified, or marked unresponsive, and no local CLI is available.
+
+Attended runs then ask **one** question, offering:
+
+- **Identify an unidentified bot.** List every `available` entry with
+  `recipe: null` alongside its `lastSeen`; the user says which registry tool
+  that login belongs to. Write it back, then re-run `resolve`:
+
+  ```bash
+  printf '{"observations":[{"login":"%s","recipe":"%s"}]}' "$LOGIN" "$RECIPE" \
+    | node "$SCRIPTS/reviewer-state.mjs" record --repo-key "$REPO_KEY"
+  ```
+
+- **Retry a reviewer marked unresponsive.** These are `RESOLVED.marked` — shown
+  with a "marked unresponsive" note, because the mark may date from a transient
+  outage rather than a dead tool. Re-selecting clears it:
+
+  ```bash
+  printf '{"observations":[{"login":"%s","triggerable":true}]}' "$LOGIN" \
+    | node "$SCRIPTS/reviewer-state.mjs" record --repo-key "$REPO_KEY"
+  ```
+
+- **Add `agy`** to `--cli-available` for this run. Offered here and only here:
+  it is a local CLI that passes its gate whenever installed, but it is
+  Gemini-family — switching model family is the user's call, not something a
+  fallback chain should do silently. `codex-cli` needs no such prompt; it is the
+  documented successor to `codex-bot` in the same family, and `config.md`'s
+  recommended `fallback_order` already pairs them.
+
+- **Try a tool with no history here.** GitHub exposes no way to ask which Apps a
+  repo has installed (`/user/installations` needs an App token, the per-repo
+  endpoint needs an App JWT, and these reviewers create no check runs), so this
+  is a question, not a lookup. The user picks a registry recipe and its trigger
+  is posted this round — **a trigger needs only the recipe string, never a
+  login**. A responder matching the registry's verified logins identifies itself;
+  an unknown responder becomes an unidentified bot to identify next time; a
+  silent window **leaves no state behind**, so retrying later costs one more
+  answer and nothing else.
+
+- **Halt.**
+
+After any write, re-run `resolve` and continue with the new answer. Unattended
+runs never see this prompt — see the degradation rule under Fallback Logic.
+
+**Persisting an explicit gate.** When the gate was named explicitly (a `gate=`
+token or a positional reviewer alias) **and** `resolve` accepted it without a
+degradation warning, remember it so later runs start there. Do **not** persist a
+gate that merely fell out of `fallback_order` (nothing was learned) or one that
+degraded (the choice was already stale).
+
+Read the full five-layer subtree, move the gate to the front while **keeping the
+rest of the order**, and write the merged subtree back at the repo layer.
+Truncating to a single entry would disable the documented codex-bot → codex-cli
+succession; writing the whole merged object is what makes the repo layer's
+wholesale shadowing harmless, because the shadow then contains everything the
+five-layer read would have returned anyway:
+
+```bash
+CURRENT=$(read_solopreneur_config greenlight)
+write_solopreneur_repo_config greenlight "$(jq -nc \
+  --argjson cur "${CURRENT:-null}" --arg g "$GATE_RECIPE" \
+  '($cur // {}) | .fallback_order = ([$g] + ((.fallback_order // []) - [$g]))')"
+```
+
+Because the persisted gate lands at the head of `fallback_order`, the next run's
+plain `resolve` picks it up without any `gate=` token — the prompt never returns
+for a repo that has a working gate.
+
 ### Fallback Logic
 
 The wizard presents the two reviewer kinds **separately**, and is entered only in
@@ -1702,40 +1778,53 @@ below):
   empty, fall back to offering the default (Codex bot) and note it wasn't
   confirmed on this repo.
 
-  **Selectable in PR 1: `codex-bot` and `gemini` only.** Step 1's dispatch table
-  and the polling cadences below are still hardcoded to those two, so offering
-  any other recipe as the trigger would hand the loop a reviewer it has no
-  trigger or poll path for. Every other entry — an identified `coderabbit` /
-  `bugbot` / `greptile`, or an unidentified bot with `canGate: false` — is shown
-  **informationally**: it acts on this repo and its findings are read like any
-  other unresolved thread, but it is not the reviewer this loop drives. PR 2
-  makes dispatch registry-driven and turns these into selectable gates.
+  **Every entry with `canGate: true` is selectable** — dispatch reads its
+  `triggerText`, `handshake` and `poll` from the registry row, so an identified
+  `coderabbit` / `bugbot` / `greptile` is as drivable as `codex-bot`. Entries
+  with `canGate: false` are unidentified bots: shown **informationally**, their
+  findings collected like any other unresolved thread, but they cannot gate —
+  with no recipe there is no way to prompt them and therefore no way to know
+  they have finished.
 - **Local CLIs** — offer Codex CLI when its gate passes (installed + authed). Never
   hidden for lack of GitHub activity — local CLIs never appear in GitHub data.
 
 **With config (`${CLAUDE_CONFIG_DIR:-~/.claude}/solopreneur.json` has `greenlight` key):**
-Follow `fallback_order` sequentially. Each reviewer failure auto-switches to the
-next, notifying the user **and re-evaluating `CURRENT_RECIPE` + `BOT_LOGIN` for
-the new reviewer** (the seam in the detection block) — otherwise the loop posts
-the new reviewer's trigger while still polling the previous one's login.
-Maintain the chosen reviewer for the rest of this cycle — no per-round reset.
+`fallback_order` orders **gate candidates**. The gate is the first entry that is
+both available and `canGate`; when it times out it is recorded
+`triggerable: false` and the next entry takes over, with a notification. Non-gate
+reviewers are untouched by this fallback — they were never holding the loop open,
+so a switch does not disturb what is being collected. Maintain the chosen gate
+for the rest of this cycle — no per-round reset. **Re-run `resolve` on a switch**
+rather than editing `RESOLVED`: the new gate brings its own `poll` and
+`handshake`, and a hand-patched login would poll one reviewer while triggering
+another.
+
+Because `config.md`'s recommended order is `["codex-bot", "codex-cli"]`, a dead
+Codex bot falls to Codex CLI automatically — same model family, no prompt.
 
 - If an entry names a **github-bot that detection did not find**, **warn before
   triggering — do not hard-fail**:
   > "fallback_order lists `gemini` but no recent Gemini activity was detected on
   >  this repo. Trying it anyway; on no response it will time out and fall through."
-- If all entries fail: attended run → ask the user; **unattended run → halt with
-  `reason_class: transient-dependency`** (below).
+- **When every gate candidate is exhausted** — each tried and recorded
+  `triggerable: false` — or when `RESOLVED.gate` was null to begin with: attended
+  run → the [selection prompt](#reviewer-selection-pr-mode); **unattended run →
+  halt with `reason_class: transient-dependency`** (below). Findings already
+  collected from `auto` reviewers do **not** rescue this: with no triggerable
+  gate there is no way to establish that a round finished, so there is no
+  defensible clean signal. Report what was collected, then halt.
 
 **Without config (first use or unconfigured):**
-1. Use `current_reviewer` (default codex-bot, or user-specified) to trigger review
+1. Gate on `RESOLVED.gate` — with no `fallback_order` to authorize a ladder, that is
+   whichever available candidate `resolve` picked (the `gate=` token or positional
+   alias when the caller named one, else the first `canGate` entry).
 2. If it fails (quota, no response, CLI unavailable, etc.), **present the wizard**
    (attended) or **fail fast** (unattended):
 
    "{reviewer} couldn't complete review (reason: {reason}). Which reviewer to continue with?"
-   - Detected github-bots (e.g. "Codex bot — last seen {date}", "Gemini bot — last seen {date}")
-     — **selectable ones only**, i.e. `codex-bot` / `gemini`, per the selectable
-     rule above; any other detected bot is listed informationally, not as a choice
+   - Detected github-bots with `canGate: true` (e.g. "Codex bot — last seen {date}",
+     "CodeRabbit — last seen {date}"); unidentified bots are listed informationally,
+     not as a choice, because there is no way to prompt them
    - Codex CLI — if the CLI gate passed (omit otherwise)
    - Skip, don't trigger another reviewer
 
@@ -1763,6 +1852,13 @@ exhaustion, write the halt payload, and exit non-zero. The caller's own fail-saf
 takes over — todos-babysit leaves the PR and notifies; autopilot's orchestrator
 consumes the `reason_class` and routes a `transient-dependency` halt to wait-and-retry
 rather than straight to blocked. Never block on input.
+
+For **reviewer selection** specifically, an unattended run does not halt while a
+gate is still resolvable: the gate is the first available `fallback_order` entry
+and every `auto` reviewer is still collected. Unattended runs never identify,
+never retry a marked reviewer, and never add `agy` — those are attended
+decisions. A defensible default gate beats blocking on input; only an exhausted
+ladder halts.
 
 **Gemini compatibility (consumer sunset).** Consumer Gemini Code Assist stopped
 GitHub code review on 2026-07-17; **enterprise is unaffected**, so `gemini` stays a
@@ -1811,41 +1907,77 @@ UNRESOLVED=$(gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int
 ```
 
 - `UNRESOLVED == 0` → start from Step 1 (first round)
-- `UNRESOLVED > 0` → **initialize `current_reviewer` first (same rules as main loop)**, then jump to Step 3
+- `UNRESOLVED > 0` → **resolve this round's roles first** (the detection block's
+  `RESOLVED`, same as the main loop), then jump to Step 3
 
 ### Main Loop
 
 ```
 # ── Initialization (after pre-flight, before entering loop) ──
-# Argument parsing (see above): external_only, current_reviewer, and EFFECTIVE_SIZE
-# are set. SIZE_MAX_ROUNDS = 3 / 5 / 10 for S / M / L (see Sizing).
-# current_reviewer = reviewer_args non-empty ? reviewer_args : "codex bot"
+# Argument parsing (see above): external_only, SELECTED_RECIPES, GATE_RECIPE and
+# EFFECTIVE_SIZE are set. SIZE_MAX_ROUNDS = 3 / 5 / 10 for S / M / L (see Sizing).
+# The detection block has produced RESOLVED (trigger / collect / gate).
 
 round = 0
 LOOP (max SIZE_MAX_ROUNDS rounds — S 3 / M 5 / L 10; see Sizing):
   round += 1
-  1. Trigger review with current_reviewer (record TRIGGER_COMMENT_ID)
-  2. Poll for feedback (unresolved threads + issue comment ID comparison)
-     - No suggestions → end (clean pass)
-     - Quota exhausted → follow Fallback Logic (config or ask user), back to 1 (doesn't count as new round)
-     - Has suggestions → enter Step 3
-  3. Process feedback:
-     - Get all unresolved threads
-     - Evaluate each suggestion (fix or push back)
-     - If all pushed back and all are repeats from prior rounds → end (push-back exit)
-     - If fixes made → commit + push → resolve threads
-                     → maintain current reviewer → back to 1
+  1. Push this round's fixes (round 1: nothing to push).
+  2. Record the per-channel cursor ceilings (Step 1).
+  3. Trigger every entry in RESOLVED.trigger, in parallel (Step 1).
+  4. Open the wait window from RESOLVED.gate; collect from RESOLVED.collect (Step 2).
+  5. Classify the round into exactly one terminal state (Step 2b) — BEFORE fixing
+     anything.
+  6. Write observations back (Step 2c).
+  7. Act on the state:
+     findings → Step 3, then back to 1
+     quota    → next gate candidate per Fallback Logic, back to 3 (not a new round)
+     timeout  → mark, next gate candidate; candidates exhausted → halt
+     clean    → closing sweep, end the loop
 ```
 
 #### Step 1: Trigger Reviewer
 
-**Determine flow based on `current_reviewer`:**
+**First, record the per-channel cursor ceilings** — before posting anything.
+Feedback arrives on three channels and their ids are not comparable to each
+other, so one ceiling per channel. A single ceiling would miss a reviewer that
+only files formal reviews (verified: PR #108's Gemini). Ids, never timestamps
+(see [Feedback Detection Strategy](#feedback-detection-strategy)):
 
-| current_reviewer | Trigger method |
+```bash
+# Aggregate in jq, NOT in `gh --jq`: with --paginate, gh applies a `--jq` filter
+# to each page separately and prints one result per page, so `[.[].id] | max`
+# there yields one maximum per page. Without --jq, gh merges the pages into a
+# single array first, which is what these need.
+CUR_ISSUE=$(gh api "repos/{owner}/{repo}/issues/{pr}/comments" --paginate \
+  | jq '[.[].id] | max // 0')
+CUR_REVIEW_COMMENT=$(gh api "repos/{owner}/{repo}/pulls/{pr}/comments" --paginate \
+  | jq '[.[].id] | max // 0')
+CUR_FORMAL_REVIEW=$(gh api "repos/{owner}/{repo}/pulls/{pr}/reviews" --paginate \
+  | jq '[.[].id] | max // 0')
+```
+
+**Then trigger every entry in `RESOLVED.trigger`, in parallel**, branching on the
+entry's own `kind`:
+
+| `trigger[].kind` | Trigger method |
 |---|---|
-| `"codex bot"` | → Flow A (GitHub bot, command `@codex review`) |
-| `"codex cli"` | → Flow B (local CLI) |
-| `"gemini"` | → Flow A (GitHub bot, command `/gemini review`) |
+| `github-bot` | → Flow A: post the entry's `triggerText` as a top-level PR comment, then run its `handshake` |
+| `local-cli` | → Flow B: run it locally and read stdout |
+
+Entries **absent** from `trigger` are there on purpose: a non-gate `auto`
+reviewer (it reviews on push, so prompting it is noise) or an unidentified bot
+(no recipe, so there is nothing to post). **The gate is always in `trigger`** —
+`auto` or not — because a clean signal needs an addressable response, and
+re-requesting a review from an auto bot is harmless.
+
+```bash
+# TRIGGER_TIME is taken once, before any trigger is posted; Step 2's reaction
+# check compares against it.
+TRIGGER_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# ROUND_TRIGGER_ID = the LOWEST id among this round's trigger comments. Triggers
+# post in parallel, so using the gate's id would hide a faster reviewer whose
+# reply landed between the first trigger and the gate's.
+```
 
 **Flow B — Codex CLI mode**: Execute locally, wait for result directly (no polling needed).
 
@@ -1862,20 +1994,29 @@ git branch --show-current  # confirm not on main
 codex review --base main 2>&1
 ```
 
-**Flow A — GitHub bot mode** (Codex bot / Gemini): Comment on PR to trigger review, record the trigger comment's ID.
+**Flow A — GitHub bot mode**: Comment on the PR with the entry's `triggerText`, record that comment's ID.
 
 ```bash
-# Trigger and get comment URL (contains comment ID)
-TRIGGER_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-COMMENT_URL=$(gh pr comment <PR_NUMBER> --body "REVIEWER_CMD")
+# Trigger and get comment URL (contains comment ID). Once per `trigger[]` entry
+# of kind github-bot, using THAT entry's triggerText — never a name lookup.
+COMMENT_URL=$(gh pr comment <PR_NUMBER> --body "<entry.triggerText>")
 TRIGGER_COMMENT_ID=$(echo "$COMMENT_URL" | sed 's/.*-//')  # macOS-compatible, extract from issuecomment-{id}
 ```
 
-> **`TRIGGER_COMMENT_ID` is the primary filter for comment polling.** GitHub issue comment IDs
-> are globally monotonically increasing — bot reply IDs are always > trigger ID. `TRIGGER_TIME`
-> is used separately for reaction-based clean signal detection (see Step 2, check [C]).
+> **`ROUND_TRIGGER_ID` (the lowest of these) is the primary filter for comment polling.**
+> GitHub issue comment IDs are globally monotonically increasing — bot reply IDs are always
+> > the trigger ID. `TRIGGER_TIME` is used separately for reaction-based clean signal
+> detection (see Step 2, check [C]).
 
-**Confirm trigger succeeded (Codex bot only):** Codex bot adds a 👀 emoji reaction upon receiving the trigger. Wait 30 seconds after triggering and check for the reaction:
+**Confirm the trigger landed — per the entry's own `handshake`:**
+
+| `handshake` | What to do |
+|---|---|
+| `reaction` | The 👀 ladder below (verified for Codex bot: it reacts 👀 on receipt) |
+| `none` | Post once. Liveness is proven by response-vs-timeout instead — the approach the `gemini` row has always used |
+
+**The 👀 ladder** (`handshake: reaction` only). Wait 30 seconds after triggering
+and check for the reaction on that entry's own trigger comment:
 
 ```bash
 sleep 30
@@ -1885,8 +2026,10 @@ EYES_COUNT=$(gh api repos/{owner}/{repo}/issues/comments/{TRIGGER_COMMENT_ID}/re
 
 - **Has 👀 reaction** → trigger succeeded, proceed to Step 2
 - **No 👀 reaction** → wait another 30 seconds and recheck
-- **Still no 👀 on second check** → trigger failed, re-comment `@codex review` (max 2 retries)
-- **2 retries still fail** → follow Fallback Logic above (config or ask user)
+- **Still no 👀 on second check** → trigger failed, re-post the same `triggerText` (max 2 retries)
+- **2 retries still fail** → if this entry is the gate, follow Fallback Logic above
+  (next gate candidate, or ask / halt); if it is a non-gate reviewer, note it and
+  carry on — the round is not held open by a reviewer that was never gating it
 
 This step is important: `@codex review` comments sometimes don't trigger the bot. No 👀 means the bot didn't receive it — must re-trigger.
 
@@ -1898,69 +2041,171 @@ Parse stdout:
 - No `[P*]` tags, only summary paragraphs → no suggestions, review loop ends
 - Has `[P*]` tags → extract all suggestions, enter Step 3
 
-**GitHub bot mode** — Each poll checks three things:
+**GitHub bot mode** — the window belongs to the **gate**: it supplies both the
+identity that closes the round and the cadence for waiting on it.
 
 ```bash
-# [A] Unresolved review thread count (detect inline feedback)
+GATE_LOGIN=$(printf '%s' "$RESOLVED" | jq -r '.gate.login // empty')
+FIRST_WAIT=$(printf '%s' "$RESOLVED" | jq -r '.gate.poll.firstWaitSec')
+INTERVAL=$(printf   '%s' "$RESOLVED" | jq -r '.gate.poll.intervalSec')
+TRIES=$(printf      '%s' "$RESOLVED" | jq -r '.gate.poll.tries')
+
+# The logins whose comments count as findings this round.
+COLLECT=$(printf '%s' "$RESOLVED" | jq -c '.collect')
+```
+
+Each poll checks three things:
+
+```bash
+# [A] Unresolved review threads from a COLLECTED reviewer (detect inline feedback)
+#
+# Two shapes matter here. GraphQL reports a bot author WITHOUT the `[bot]`
+# suffix that REST carries (`chatgpt-codex-connector` vs
+# `chatgpt-codex-connector[bot]`), and `collect` holds REST spellings — so strip
+# the suffix before comparing or every thread is discarded. And a non-Bot author
+# is always kept: `collect` lists bots only, so matching on it alone would throw
+# away human review threads, which this loop has always processed.
 UNRESOLVED=$(gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int!){
   repository(owner:$owner,name:$repo){
     pullRequest(number:$pr){
       reviewThreads(first:100){
-        nodes{ isResolved }
+        nodes{ isResolved comments(first:1){ nodes{ author{ login __typename } } } }
       }
     }
   }
-}' -f owner=OWNER -f repo=REPO -F pr=PR_NUMBER \
-  --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved==false)] | length')
+}' -f owner=OWNER -f repo=REPO -F pr=PR_NUMBER | \
+  jq --argjson keep "$COLLECT" \
+     '[.data.repository.pullRequest.reviewThreads.nodes[]
+       | select(.isResolved == false)
+       | select(.comments.nodes[0].author as $a
+                | $a.__typename != "Bot"
+                  or (($keep | map(sub("\\[bot\\]$";""))) | index($a.login)) != null)] | length')
 
-# [B] Current active reviewer's issue comment with ID > TRIGGER_COMMENT_ID (detect summary)
-# Only check $BOT_LOGIN (current active reviewer) to avoid false positives from other bots
-# Note: gh api --jq doesn't support --arg, must pipe to jq CLI
-BOT_COMMENT_BODY=$(gh api repos/{owner}/{repo}/issues/{pr}/comments --paginate | \
-  jq -r --arg bot "$BOT_LOGIN" --argjson tid "$TRIGGER_COMMENT_ID" \
-     '[.[] | select((.user.login == $bot) and .id > $tid)] | last | .body // empty')
+# [B] A given login's issue comment with ID > ROUND_TRIGGER_ID (detect summary).
+#
+# Parameterized per login: a round now has several respondents. The GATE's body
+# is what the terminal-state table reads; the others feed the closing report.
+# Note: gh api --jq doesn't support --arg, must pipe to jq CLI.
+bot_comment_body() {   # $1 = login
+  gh api repos/{owner}/{repo}/issues/{pr}/comments --paginate | \
+    jq -r --arg bot "$1" --argjson tid "$ROUND_TRIGGER_ID" \
+       '[.[] | select((.user.login == $bot) and .id > $tid)] | last | .body // empty'
+}
+GATE_COMMENT_BODY=$(bot_comment_body "$GATE_LOGIN")
 
-# [C] 👍 reaction from current active reviewer on the PR (clean signal fallback)
+# [C] 👍 reaction from the gate on the PR (clean signal fallback)
 # Codex bot inconsistently skips the "Didn't find" comment and only reacts with 👍.
 THUMBSUP=$(gh api "repos/{owner}/{repo}/issues/{pr}/reactions" --paginate | \
-  jq --arg bot "$BOT_LOGIN" --arg since "$TRIGGER_TIME" \
+  jq --arg bot "$GATE_LOGIN" --arg since "$TRIGGER_TIME" \
      '[.[] | select(.user.login == $bot and .content == "+1" and .created_at > $since)] | length')
 ```
 
-The three checks determine the next action:
+The three checks decide **when the window closes** — what the round then *means*
+is Step 2b's job:
 
 | Priority | Condition | Action |
 |----------|-----------|--------|
-| 1 | `BOT_COMMENT_BODY` contains "quota exceeded"/"rate limit"/"usage limit"/"too many requests" | Switch reviewer immediately |
-| 2 | `BOT_COMMENT_BODY` contains "Didn't find"/"no issues"/"looks good"/"LGTM" | **Clean pass → end loop** |
-| 2.5 | `THUMBSUP > 0` (created after trigger) | **Clean pass → end loop** |
-| 3 | `UNRESOLVED > 0` | Has inline feedback → **enter Step 3 immediately** |
-| 4 | None of the above | Continue waiting |
+| 1 | `GATE_COMMENT_BODY` contains "quota exceeded"/"rate limit"/"usage limit"/"too many requests" | Close the window → classify |
+| 2 | `GATE_COMMENT_BODY` contains "Didn't find"/"no issues"/"looks good"/"LGTM" | Gate responded → close the window → classify |
+| 2.5 | `THUMBSUP > 0` (created after trigger) | Gate responded (👍-only clean signal) → close the window → classify |
+| 3 | `UNRESOLVED > 0` | Has inline feedback → close the window → classify (**enter Step 3 immediately**) |
+| 4 | None of the above | Continue waiting until the gate's poll budget is spent; then close the window → classify |
 
 > WARNING: **Priority order matters**: check issue comments first (clean pass or quota), then
 > unresolved threads. The bot may post a summary before inline comments — checking summary
 > first correctly identifies clean passes.
 
-> WARNING: **When matching quota or clean pass, print the first 3 lines of `BOT_COMMENT_BODY`
+> WARNING: **When matching quota or clean pass, print the first 3 lines of `GATE_COMMENT_BODY`
 > for manual verification.** Bot boilerplate text may contain keywords like "limit" causing
-> false positives. Be especially vigilant if it matches on the first poll.
+> false positives. Be especially vigilant if it matches on the first poll. The same applies to
+> any other login's body read through `bot_comment_body` — the keyword tables were tuned on
+> Codex and Gemini wording, and a newly added reviewer's phrasing is unverified.
 
 > WARNING: **When `UNRESOLVED > 0` is detected, enter Step 3 immediately — don't wait for
 > more threads.** Bots may send inline comments in batches, but waiting is unnecessary —
 > the next review round will naturally catch any that were missed. Waiting only wastes time
 > and violates the "process feedback when available" principle.
 
-**Polling cadence (Codex GitHub bot, after 👀 confirmed):**
+**Polling cadence — from `RESOLVED.gate.poll`, never a per-reviewer branch here:**
 
-Poll every 1 minute, max 20 times (20 minutes total):
-- Got response → enter Step 3 or end
-- 20 polls with no response → follow Fallback Logic (config or ask user)
+`sleep $FIRST_WAIT`, then up to `$TRIES` checks `$INTERVAL` apart. The registry
+row supplies the numbers (Codex bot 60s × 20, Gemini 180s then 120s × 2, anything
+unverified 180s then 120s × 3), so adding a reviewer never means editing this
+step.
 
-**Polling cadence (Gemini):**
-1. **First wait 3 minutes** (`sleep 180`) then check
-2. No response → wait **2 more minutes** (`sleep 120`) then check (2nd try)
-3. Still no response → wait **2 more minutes** (`sleep 120`) then check (3rd try)
-4. Three checks with no response (7 minutes total) → stop and tell user all reviewers are unresponsive
+**Deliberately not waiting for auto reviewers.** The window closes on the gate.
+An auto reviewer still mid-review is not waited for — every channel's ceiling
+rises monotonically, so its late findings arrive next round, and on the final
+round they land in the closing report instead of vanishing. This is what stops
+"collect four reviewers" from becoming "wait for the slowest one, every round".
+
+**When the gate is a local CLI** (`gate.kind == "cli"`), there is no poll window
+at all: it runs synchronously and finishing *is* the end of the round. After it
+returns, do one collection sweep across the three channels for the other
+collected logins, then classify.
+
+#### Step 2b: Classify the round
+
+**Silence is not a pass.** Classify every round into exactly one terminal state
+by walking this table top-down; the first matching row wins. **Classify before
+touching anything** — fixing first would let the loop end on a diff no reviewer
+has seen.
+
+| Precedence | State | Condition | Action |
+|---|---|---|---|
+| 1 | `findings` | New findings from **any** collected reviewer, gate included | Fix (Step 3), next round |
+| 2 | `quota` | No new findings, and the gate's response is a quota / rate-limit notice | Next gate candidate; candidates exhausted → halt |
+| 3 | `timeout` | No new findings, and the gate stayed silent through the whole window (no item, no 👍) | Record `triggerable: false`, next gate candidate; exhausted → halt. **Never clean** |
+| 4 | `clean` | The gate responded (item or 👍) and nobody produced a new finding | Closing sweep, report leftovers, end the loop |
+
+`findings` outranking `clean` is load-bearing: when the gate passes but another
+reviewer found something, that round must still loop — fixing and *then*
+declaring clean would end the loop on a diff no reviewer has reviewed. The
+opposite failure — a dead reviewer counting as a pass — is what row 3 blocks.
+
+`SIZE_MAX_ROUNDS` (S 3 / M 5 / L 10) is unchanged and is what bounds a chatty
+auto reviewer stretching the loop; at the cap, unresolved items go into the
+closing report. Size S is external-only with a single reviewer and its gate
+resolves straight from `fallback_order`, so the nothing-can-gate prompt does not
+arise there in practice.
+
+#### Step 2c: Observation write-back
+
+After closing the window, scan the three channels for everything past this
+round's cursors. **The scan is unfiltered by login** — the write-back has to see
+every Bot that acted, including ones nobody selected — while findings stay
+restricted to `collect`:
+
+```bash
+round_bot_activity() {   # every Bot login that acted since the cursors
+  {
+    gh api "repos/{owner}/{repo}/issues/{pr}/comments" --paginate \
+      | jq -r --argjson c "$CUR_ISSUE" '.[] | select(.id > $c and .user.type == "Bot") | .user.login'
+    gh api "repos/{owner}/{repo}/pulls/{pr}/comments" --paginate \
+      | jq -r --argjson c "$CUR_REVIEW_COMMENT" '.[] | select(.id > $c and .user.type == "Bot") | .user.login'
+    gh api "repos/{owner}/{repo}/pulls/{pr}/reviews" --paginate \
+      | jq -r --argjson c "$CUR_FORMAL_REVIEW" '.[] | select(.id > $c and .user.type == "Bot") | .user.login'
+  } | sort -u
+}
+```
+
+Build `$OBSERVATIONS` from that set plus `RESOLVED`:
+
+| Condition | Payload |
+|---|---|
+| Bot login produced an item, was **not** in `trigger` | `{login, auto: true}` |
+| login was in `trigger` **because non-auto** and produced an item | `{login, auto: false}` — check the entry's `auto` in `RESOLVED.available`; the gate's forced trigger never rewrites `auto` |
+| login was in `trigger`, stayed silent all window, **and** the window covered its own recipe's poll budget | `{login, triggerable: false}` — the gate always qualifies (the window *is* its budget); a non-gate reviewer slower than the gate's window is merely unobserved this round, not unresponsive |
+| a cached `triggerable: false` login produced any item | `{login, triggerable: true}` — self-healing back |
+| an unidentified Bot login produced an evidence-shaped item (review comment / formal review) | attended: offer identify (or leave it for the next selection prompt); unattended: nothing — its findings are already collected |
+
+```bash
+printf '%s' "$OBSERVATIONS" \
+  | node "$SCRIPTS/reviewer-state.mjs" record --repo-key "$REPO_KEY"
+```
+
+An empty payload is legal and rewrites nothing — a quiet round cannot reformat a
+hand-edited config.
 
 #### Step 3: Process Feedback (via Subagent)
 
@@ -1997,8 +2242,15 @@ gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int!){
   }]'
 ```
 
-> No timestamp filtering needed. Since all threads are resolved at each round's end,
-> unresolved threads here are exactly the feedback to process this round.
+> No timestamp filtering needed. Since all threads processed each round are resolved
+> at its end, unresolved threads here are exactly the feedback still outstanding.
+
+**Apply the same author filter as Step 2's check [A]** — keep a thread when its
+author is not a Bot (humans always count) or its `[bot]`-stripped login is in
+`collect`. A thread from a bot nobody selected, or one marked unresponsive, is
+**left unresolved on purpose**: it is not fixed, not resolved, and appears in the
+closing report for the user to judge. Silently resolving it would erase a finding
+no one ever read.
 
 **3b. Process feedback:**
 
@@ -2046,10 +2298,11 @@ for THREAD_ID in <all unresolved thread IDs>; do
 done
 ```
 
-**Resolve all processed threads** (both fixed and pushed-back). After confirming push succeeded,
-**maintain current reviewer** (no per-round reset), immediately return to Step 1 to trigger the
-next review round. No need to wait for CodeRabbit — it's a passive reviewer that auto-triggers
-on push; its unresolved threads will be naturally detected during the next Step 2 poll.
+**Resolve the threads processed this round** (both fixed and pushed-back) — and only
+those; see the author-filter note in 3a. After confirming push succeeded, **maintain the
+current gate** (no per-round reset), immediately return to Step 1 to trigger the next
+review round. No need to wait for a reviewer that is `auto` on this repo: it re-reviews on
+push by itself, and its threads are picked up by the next round's Step 2 poll.
 
 ### Exit Conditions
 
@@ -2057,8 +2310,12 @@ After each Step 3 fix-and-push, **must return to Step 1 for another round** unti
 these conditions is met:
 
 ### 1. No new suggestions (clean pass)
-- GitHub bot mode: Step 2 detects bot summary with "Didn't find" or similar positive message, and unresolved threads = 0
-- Codex CLI mode: stdout has no `[P*]` tags, only summary paragraphs
+- The round classified as **`clean`** in [Step 2b](#step-2b-classify-the-round):
+  the gate responded (an item or a 👍) and nobody produced a new finding. A silent
+  gate is `timeout`, never this.
+- Before ending, do one final sweep across the three channels for late arrivals and
+  **report anything unprocessed without fixing it** — a fix applied now would end the
+  loop on a diff no reviewer has looked at.
 
 ### 2. Only repeated/low-value suggestions (push-back exit)
 - All suggestions this round were already pushed back in previous rounds (same file + same topic)
@@ -2070,7 +2327,8 @@ these conditions is met:
 
 ### On exit:
 1. Notify user: "Review loop complete" + exit reason + last round's reviewer feedback
-2. Report: total rounds run, items fixed, items pushed back, which reviewer was used
+2. Report: total rounds run, items fixed, items pushed back, which gate closed the loop,
+   which other reviewers were collected, and any leftover items from the closing sweep
 3. Append the **Flags** section (Inner verify loop → Flags) if anything flagged this
    run — including "no objective verifier configured for this loop"; omit it
    otherwise. On a halt, report **blocked** and reference the `halts/` payload path.
