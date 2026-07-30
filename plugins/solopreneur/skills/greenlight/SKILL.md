@@ -1481,30 +1481,39 @@ If no unresolved threads:
 
 ### Reviewer Registry
 
-**Single source of truth for every reviewer. Adding or removing a reviewer means
-editing this table (and the `REVIEWER_BOT_LOGINS` list below it) — nothing else
+**Single source of truth for every reviewer. Adding a reviewer is one row here
+and the matching row in `scripts/reviewer-registry.mjs` — nothing else
 downstream needs to change.**
 
-| config_id | aliases (arg) | bot login | kind | trigger | handshake | poll policy | wizard eligibility |
-|---|---|---|---|---|---|---|---|
-| `codex-bot` | `codex bot` | `chatgpt-codex-connector[bot]` | active-bot | PR comment `@codex review` | 👀 reaction on the trigger comment | 1 min × 20 | offered when detected on this repo (default start) |
-| `codex-cli` | `codex cli` | — (local; never in GitHub data) | local-cli | `codex review --base main` | synchronous stdout, parse `[P*]` | n/a (read stdout, 5 min timeout) | offered when the CLI gate passes (installed + authed) |
-| `gemini` | `gemini` | `gemini-code-assist[bot]` | active-bot | PR comment `/gemini review` | none (no reaction) — liveness proven only by response vs timeout | 3 min, then 2 min × 2 | offered only when detected on this repo (consumer Code Assist sunset 2026-07-17; **enterprise unaffected**) |
-| `agy` | `agy` | — (local; never in GitHub data) | local-cli | `agy --model "Gemini 3.1 Pro (High)" --print` (no tool-permission bypass — review is text-only over an untrusted diff) | synchronous stdout + completion marker | n/a (read stdout, `--print-timeout` default 5 min) | offered when the CLI gate passes; wired as the **post-commit** Phase 3 Gemini-family reviewer |
-| `coderabbit` | — | `coderabbitai[bot]` | passive-bot | auto-triggers on push (no manual trigger) | n/a | n/a | never offered as a trigger — shown as informational only |
+| recipe_id | aliases (arg) | kind | trigger | handshake | poll policy | verified login |
+|---|---|---|---|---|---|---|
+| `codex-bot` | `codex bot` | github-bot | PR comment `@codex review` | 👀 reaction | 60s first, 60s × 20 | `chatgpt-codex-connector[bot]` |
+| `gemini` | `gemini` | github-bot | PR comment `/gemini review` | none | 180s first, 120s × 2 | `gemini-code-assist[bot]` |
+| `coderabbit` | `coderabbit` | github-bot | PR comment `@coderabbitai review` | none | default | `coderabbitai[bot]` |
+| `bugbot` | `bugbot`, `cursor` | github-bot | PR comment `bugbot run` (top-level only) | none | default | — |
+| `greptile` | `greptile` | github-bot | PR comment `@greptileai` | none | default | — |
+| `codex-cli` | `codex cli` | local-cli | `codex review --base main` | stdout `[P*]` | n/a | n/a |
+| `agy` | `agy` | local-cli | `agy --model … --print` | stdout + marker | n/a | n/a |
 
 **Reviewer kinds:**
-- **active-bot** — a GitHub App you trigger with a PR comment and poll for. Offered
-  in the wizard **only when activity detection saw it act on this repo.**
-- **passive-bot** — auto-reviews on push; cannot be triggered on demand. Shown as
-  "also active here" but never selectable as the trigger.
-- **local-cli** — runs locally, reads stdout; it never appears in GitHub activity
-  data, so its availability is decided by a **CLI gate, not by detection.**
+- **github-bot** — triggered by a PR comment and polled for. Whether it *also*
+  reviews automatically on push is **observed**, not declared — see `auto` in
+  `shared/config.md`.
+- **local-cli** — runs locally and is read from stdout. Availability comes from
+  a CLI gate, not from activity detection, because a local CLI never appears in
+  GitHub data. It stays a legal PR-mode reviewer and gate.
 
-Three identifier spellings exist per reviewer — the `config_id` (canonical, used in
-`fallback_order`), the `aliases` (argument spellings a user types), and the `bot
-login` (what GitHub returns). The registry maps all three so config values and
-detected logins can be compared.
+**Verified login** is the App account a tool posts from. An App's bot login is
+app-scoped — identical on every repo — so a verified one is vendor knowledge.
+Only observed-and-verified logins are listed; guessing is unsafe
+(`cursor[bot]`, `cursor-com[bot]` and `bugbot[bot]` are all real accounts, and
+GitHub Copilot posts as `Copilot` with no `[bot]` suffix). A `—` tool still
+works: detection collects it by `type == "Bot"`, and an attended identify binds
+its login per repo (see Reviewer selection).
+
+`scripts/reviewer-registry.mjs` is the executable copy of this table and the one
+the loop actually reads; `tests/skill-sync.test.mjs` fails CI when the two
+drift.
 
 ```bash
 # Bot logins for active + passive reviewers. Activity detection filters
