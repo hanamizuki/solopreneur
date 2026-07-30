@@ -1966,10 +1966,14 @@ UNRESOLVED=$(gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int
 round = 0
 LOOP (max SIZE_MAX_ROUNDS rounds — S 3 / M 5 / L 10; see Sizing):
   round += 1
-  1. Record the per-channel cursor ceilings (Step 1) — BEFORE the push. The push
-     is what wakes the auto reviewers, so a ceiling taken after it sits above
-     their response and that feedback is lost for good.
-  2. Push this round's fixes (round 1: nothing to push).
+  1. Cursor ceilings must already be recorded, taken BEFORE anything pushed. The
+     push wakes the auto reviewers, so a ceiling captured after it sits above
+     their response and that feedback is lost for good. Note that the fix
+     subagent pushes at the END of the previous round, so:
+       round 1      → capture here, at loop start
+       later rounds → captured in Step 3 of the previous round, immediately
+                      before the fix subagent was dispatched
+  2. (The previous round's fix push has already happened by this point.)
   3. Trigger every entry in RESOLVED.trigger, in parallel (Step 1).
   4. Open the wait window from RESOLVED.gate; collect from RESOLVED.collect (Step 2).
   5. Classify the round into exactly one terminal state (Step 2b) — BEFORE fixing
@@ -2000,7 +2004,15 @@ captured after the push therefore sits *above* that response, which drops out of
 this round — and the next round's ceiling rises past it too, so it is lost
 permanently. Capturing first also means genuinely late feedback from the previous
 round lands above the boundary and gets collected now, which is what "late
-findings arrive next round" promises:
+findings arrive next round" promises.
+
+**The fix subagent pushes, and it does so at the end of the previous round** — so
+"before the push" cannot mean "at the top of this step" for any round after the
+first. Capture the ceilings at the last moment before anything can push: round 1
+here, every later round in [Step 3](#step-3-process-feedback-via-subagent),
+immediately **before** dispatching the fix subagent. Re-capturing here on a later
+round would defeat the whole ordering, because the subagent's push already
+happened:
 
 ```bash
 # Aggregate in jq, NOT in `gh --jq`: with --paginate, gh applies a `--jq` filter
@@ -2040,12 +2052,27 @@ reviewer (it reviews on push, so prompting it is noise) or an unidentified bot
 re-requesting a review from an auto bot is harmless.
 
 ```bash
-# TRIGGER_TIME is taken once, before any trigger is posted; Step 2's reaction
-# check compares against it.
+# TRIGGER_TIME is taken once, before any trigger is posted.
 TRIGGER_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-# ROUND_TRIGGER_ID = the LOWEST id among this round's trigger comments. Triggers
-# post in parallel, so using the gate's id would hide a faster reviewer whose
-# reply landed between the first trigger and the gate's.
+
+# Two boundaries, because collection and conclusion need opposite biases:
+#
+#   ROUND_TRIGGER_ID  = the LOWEST id among this round's trigger comments.
+#                       COLLECT from here — wide. Triggers post in parallel, so a
+#                       narrower bound would hide a fast reviewer that replied
+#                       between the first trigger and the gate's.
+#   GATE_TRIGGER_ID   = the id of the GATE's OWN trigger comment.
+#   GATE_TRIGGER_TIME = the timestamp taken immediately before posting it.
+#                       CONCLUDE from here — narrow. A gate verdict that predates
+#                       its own trigger is about the PREVIOUS commit: with
+#                       parallel triggers a late clean comment for the old SHA can
+#                       land after some other reviewer's trigger, clear the wide
+#                       bound, and close the round without ever seeing this
+#                       round's fixes.
+#
+# Also capture the formal-review ceiling right after the gate's trigger goes out
+# (`GATE_REVIEW_FLOOR`), since review ids are not comparable to comment ids and
+# check [D] needs the same narrow bound.
 ```
 
 **Flow B — local CLI mode**: Execute locally, wait for result directly (no polling
@@ -2077,6 +2104,12 @@ git branch --show-current  # confirm not on main
 # of kind github-bot, using THAT entry's triggerText — never a name lookup.
 COMMENT_URL=$(gh pr comment <PR_NUMBER> --body "<entry.triggerText>")
 TRIGGER_COMMENT_ID=$(echo "$COMMENT_URL" | sed 's/.*-//')  # macOS-compatible, extract from issuecomment-{id}
+
+# When THIS entry is the gate, record its own boundaries — the narrow ones every
+# verdict check in Step 2 compares against.
+# (before posting it: GATE_TRIGGER_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+#                     GATE_REVIEW_FLOOR=$(gh api ".../pulls/{pr}/reviews" --paginate | jq '[.[].id] | max // 0'))
+# GATE_TRIGGER_ID="$TRIGGER_COMMENT_ID"
 ```
 
 > **`ROUND_TRIGGER_ID` (the lowest of these) is the primary filter for comment polling.**
@@ -2111,7 +2144,16 @@ This step is important: `@codex review` comments sometimes don't trigger the bot
 
 #### Step 2: Wait for Feedback
 
-**Local CLI results** — Wait for stdout to complete (typically 1-3 min, set timeout 5 min). If stderr contains "usage limit" or exit code is non-zero → follow Fallback Logic (config or ask user).
+**Local CLI results** — Wait for stdout to complete (typically 1-3 min, set timeout 5 min).
+
+On failure ("usage limit" in stderr, or a non-zero exit), **branch on whether that
+CLI is the gate**:
+
+- **It is `RESOLVED.gate`** → follow Fallback Logic (advance past the exhausted
+  gate, or ask / halt). The round has lost the thing that closes it.
+- **It is a non-gate reviewer** → note it and **carry on**; the gate's window is
+  untouched. Entering the ladder here would advance — or halt — a perfectly
+  healthy GitHub gate because one optional extra reviewer ran out of quota.
 
 Parse stdout:
 - Has `[P*]` tags → those are findings from that reviewer. **Accumulate them into
@@ -2175,19 +2217,23 @@ UNRESOLVED=$(gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int
 # is what the terminal-state table reads; the others feed the closing report.
 # Note: gh api --jq doesn't support --arg, must pipe to jq CLI.
 # A round with NO github-bot trigger (a local-CLI gate whose collected bots are
-# all `auto`) never assigns ROUND_TRIGGER_ID, and `--argjson tid ''` is a hard jq
-# error — "invalid JSON text passed to --argjson" — which would take out the whole
-# post-CLI sweep. CUR_ISSUE is the same round boundary, captured in Step 1.
+# all `auto`) assigns none of these, and `--argjson tid ''` is a hard jq error —
+# "invalid JSON text passed to --argjson" — which would take out the whole
+# post-CLI sweep. The Step 1 cursors are the same round boundary.
 : "${ROUND_TRIGGER_ID:=$CUR_ISSUE}"
+: "${GATE_TRIGGER_ID:=$CUR_ISSUE}"
+: "${GATE_REVIEW_FLOOR:=$CUR_FORMAL_REVIEW}"
+: "${GATE_TRIGGER_TIME:=$TRIGGER_TIME}"
 
-# The newest body only — a verdict, for the quota / clean keyword checks. The
-# newest one is the one that stands.
-bot_latest_comment_body() {   # $1 = login
+# The newest body only — a verdict, for the quota / clean keyword checks. Bounded
+# by the GATE's OWN trigger (narrow): a verdict that predates it is about the
+# previous commit and must not close this round. The newest one stands.
+bot_latest_comment_body() {   # $1 = login, $2 = boundary comment id
   gh api repos/{owner}/{repo}/issues/{pr}/comments --paginate | \
-    jq -r --arg bot "$1" --argjson tid "$ROUND_TRIGGER_ID" \
+    jq -r --arg bot "$1" --argjson tid "$2" \
        '[.[] | select((.user.login == $bot) and .id > $tid)] | last | .body // empty'
 }
-GATE_COMMENT_BODY=$(bot_latest_comment_body "$GATE_LOGIN")
+GATE_COMMENT_BODY=$(bot_latest_comment_body "$GATE_LOGIN" "$GATE_TRIGGER_ID")
 
 # EVERY post-cursor body, for findings. A reviewer that posts a finding and then a
 # clean summary would otherwise have the finding thrown away by `last`, and the
@@ -2246,8 +2292,9 @@ printf '%s' "$BODIED_FINDINGS"
 
 # [C] 👍 reaction from the gate on the PR (clean signal fallback)
 # Codex bot inconsistently skips the "Didn't find" comment and only reacts with 👍.
+# Narrow bound again — the gate's own trigger time, not the round's.
 THUMBSUP=$(gh api "repos/{owner}/{repo}/issues/{pr}/reactions" --paginate | \
-  jq --arg bot "$GATE_LOGIN" --arg since "$TRIGGER_TIME" \
+  jq --arg bot "$GATE_LOGIN" --arg since "$GATE_TRIGGER_TIME" \
      '[.[] | select(.user.login == $bot and .content == "+1" and .created_at > $since)] | length')
 
 # [D] A formal review from the gate past the cursor — read as an OBJECT, not a body.
@@ -2256,7 +2303,7 @@ THUMBSUP=$(gh api "repos/{owner}/{repo}/issues/{pr}/reactions" --paginate | \
 # all three channels, classifies as `timeout`, gets persisted triggerable:false,
 # and can halt an unattended run — on a reviewer that just approved the PR.
 GATE_REVIEW_STATE=$(gh api "repos/{owner}/{repo}/pulls/{pr}/reviews" --paginate | \
-  jq -r --arg bot "$GATE_LOGIN" --argjson c "$CUR_FORMAL_REVIEW" \
+  jq -r --arg bot "$GATE_LOGIN" --argjson c "$GATE_REVIEW_FLOOR" \
      '[.[] | select((.user.login == $bot) and .id > $c)] | last | .state // empty')
 ```
 
@@ -2336,8 +2383,8 @@ has seen.
 |---|---|---|---|
 | 1 | `findings` | New findings from **any** collected reviewer, gate included, on **any** of the three channels — inline threads (check [A]), post-cursor issue comments, or post-cursor formal review bodies (both from the [B2] per-login sweep) | Fix (Step 3), next round |
 | 2 | `quota` | No new findings, and the gate's response is a quota / rate-limit notice | Advance past it (Fallback Logic → "Advancing past an exhausted gate"); candidates exhausted → halt |
-| 3 | `timeout` | No new findings, and the gate stayed silent through the whole window — no comment, no 👍, **and no formal review** | Record `triggerable: false`, then advance the same way; exhausted → halt. **Never clean** |
-| 4 | `clean` | The gate responded (a comment, a 👍, or a formal review of any body — `GATE_REVIEW_STATE` set) and nobody produced a new finding | Closing sweep, report leftovers, end the loop |
+| 3 | `timeout` | No new findings, and a **bot** gate stayed silent through the whole window — no comment, no 👍, **and no formal review**. A CLI gate that exited successfully is never silent (row 4) | Record `triggerable: false`, then advance the same way; exhausted → halt. **Never clean** |
+| 4 | `clean` | Nobody produced a new finding **and** the gate responded: a bot gate via a comment, a 👍, or a formal review of any body (`GATE_REVIEW_STATE` set); a **CLI gate via exiting successfully** — it produces no comment, reaction or review at all, so completion *is* its response | Closing sweep, report leftovers, end the loop |
 
 `findings` outranking `clean` is load-bearing: when the gate passes but another
 reviewer found something, that round must still loop — fixing and *then*
@@ -2448,7 +2495,13 @@ part of 3c's resolve list; they have nothing to resolve.
    If the skill is not available, proceed without it — evaluate each suggestion using your own
    judgment on whether it's a genuine issue or a false positive.
 2. Check whether any suggestions were already pushed back in previous rounds. If so, reconsider. If still deciding to push back, consider whether to add a code comment or note in CONTEXT.md so the reviewer understands the reasoning. If the same issue has been raised multiple times, it can be ignored.
-3. **Dispatch subagent** (via `Agent` tool) to handle all unresolved threads. Prompt must include:
+3. **Re-capture the three cursor ceilings now, before dispatching.** The subagent
+   commits *and pushes*, and that push wakes every `auto` reviewer — so this is
+   the last moment at which a ceiling is guaranteed to sit below their response.
+   Capturing at the top of the next round instead would place the ceiling above
+   it, dropping that feedback from the next round and, since ceilings only rise,
+   from every round after. Use the same three commands as Step 1.
+4. **Dispatch subagent** (via `Agent` tool) to handle all unresolved threads. Prompt must include:
    - Full content of all unresolved threads (body, path, line, **thread id**)
    - `$BODIED_FINDINGS` — the issue-comment / formal-review findings from 3a,
      each tagged with its reviewer and channel, and marked as having no thread id
