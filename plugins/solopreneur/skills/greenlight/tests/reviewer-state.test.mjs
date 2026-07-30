@@ -275,6 +275,18 @@ test('record rejects an observation with no login', () => {
   );
 });
 
+test('record stores the canonical id when handed an alias', () => {
+  // recipeFor accepts aliases, but fallback_order / --gate / --select all match
+  // on recipe ids. Storing "cursor" verbatim passes validation and then matches
+  // nothing downstream — the identified reviewer becomes unreachable.
+  const dir = tmpConfigDir(CFG());
+  run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'mystery[bot]', recipe: 'cursor' }] }),
+    configDir: dir,
+  });
+  assert.equal(reviewersOf(dir).observed['mystery[bot]'].recipe, 'bugbot');
+});
+
 test('record rejects an unknown recipe in an observation', () => {
   assertFailed(
     run(['record', '--repo-key', KEY], {
@@ -381,6 +393,20 @@ test('resolve lets a cached identify override the registry mapping', () => {
   const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { recipe: 'bugbot' } } }));
   const { stdout } = resolve([], { stdin: BOTS([RABBIT]), configDir: dir });
   assert.equal(JSON.parse(stdout).available[0].recipe, 'bugbot');
+});
+
+test('resolve canonicalizes a cached alias so the gate still matches', () => {
+  // Backward compatibility for a config written before record normalized, or
+  // hand-edited with an alias: without this, --gate bugbot warns "not an
+  // available gate candidate" about the very reviewer that was identified.
+  const dir = tmpConfigDir(CFG({ observed: { 'mystery[bot]': { recipe: 'cursor' } } }));
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'bugbot', '--gate', 'bugbot',
+  ], { stdin: BOTS(['mystery[bot]']), configDir: dir });
+  const out = JSON.parse(stdout);
+  assert.equal(out.available[0].recipe, 'bugbot');
+  assert.equal(out.gate.recipe, 'bugbot');
+  assert.deepEqual(out.warnings, [], 'an identified reviewer must not warn about its own gate');
 });
 
 test('resolve excludes triggerable:false', () => {

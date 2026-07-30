@@ -217,6 +217,12 @@ function record({ observations = [], repoKey }) {
 
   const observed = { ...current.observed };
   for (const { login, ...fields } of observations) {
+    // Store the canonical id, never the alias the caller typed. `recipeFor`
+    // deliberately accepts aliases ("cursor" → bugbot), but every downstream
+    // match — fallback_order, --gate, --select — compares against recipe ids,
+    // so a stored alias would pass validation here and then match nothing.
+    // Safe to dereference: the loop above already rejected unknown recipes.
+    if (fields.recipe != null) fields.recipe = recipeFor(fields.recipe).id;
     observed[login] = { ...(observed[login] ?? {}), ...fields };
   }
 
@@ -275,9 +281,17 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     .filter((r) => r.triggerable !== false)
     .map((r) => {
       let recipe = r.recipe ?? null;
-      if (recipe !== null && !recipeFor(recipe)) {
-        warnings.push(`cached recipe "${recipe}" is not in the registry; ignoring it for ${r.login}`);
-        recipe = null;
+      if (recipe !== null) {
+        // Canonicalize on read too, so a config written before `record` started
+        // normalizing (or hand-edited with an alias) still matches
+        // fallback_order / --gate / --select, which all compare on recipe id.
+        const known = recipeFor(recipe);
+        if (known) {
+          recipe = known.id;
+        } else {
+          warnings.push(`cached recipe "${recipe}" is not in the registry; ignoring it for ${r.login}`);
+          recipe = null;
+        }
       }
       // A registry-verified login identifies itself: an App's bot login is
       // app-scoped, identical on every repo. The cached recipe (an explicit

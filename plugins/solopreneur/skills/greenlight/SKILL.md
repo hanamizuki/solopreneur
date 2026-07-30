@@ -1595,8 +1595,13 @@ else
   DETECTED='{"bots":[]}'; DETECTION_STATUS=unavailable
 fi
 
-# Runs in both branches: on `unavailable` the per-repo cache alone still yields a
-# usable decision, which is what keeps detection an enhancement and never a gate.
+# Runs in both branches: `resolve` reads the per-repo cache as well as this
+# round's sample, so an `unavailable` detection still produces a decision instead
+# of aborting — that is what keeps detection an enhancement and never a gate.
+# Note for PR 1: nothing writes that cache yet (the `record` write-back is PR 2),
+# so today an `unavailable` detection resolves against an empty cache and falls
+# through to the default flow. The read path is wired here so PR 2 only has to
+# add the writer.
 RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve \
   --repo-key "$REPO_KEY" --fallback-order "$FALLBACK_ORDER" --cli-available "$CLI_AVAILABLE")
 
@@ -1621,8 +1626,10 @@ BOT_LOGIN=$(printf '%s' "$RESOLVED" | jq -r --arg r "$CURRENT_RECIPE" \
 ```
 
 Resolving through `available` (rather than straight from the registry table) is
-what lets a tool with no verified login work once it has been identified on this
-repo — the cache supplies the login the table cannot.
+what will let a tool with no verified login work once it has been identified on
+this repo: `available` merges this round's detection with the per-repo cache, so
+the login comes from observation rather than from the table. Only the detection
+half is live in PR 1 — identify writes land with PR 2's `record` call.
 
 An **empty `BOT_LOGIN`** means the current reviewer has not been seen here (or is
 a local CLI, which has no login and whose Flow B never polls GitHub). Fall back

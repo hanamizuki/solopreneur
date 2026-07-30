@@ -37,6 +37,12 @@ jobs:
         node: ['20', '24']
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          # This job only runs Node's built-in test runner — it never fetches,
+          # pushes, or talks to the API. Leaving the default on would persist
+          # GITHUB_TOKEN into .git/config, readable by every later step
+          # including the test processes themselves (zizmor: artipacked).
+          persist-credentials: false
 
       - name: Install Node ${{ matrix.node }}
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
