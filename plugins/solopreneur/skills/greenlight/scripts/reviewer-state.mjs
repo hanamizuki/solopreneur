@@ -178,22 +178,37 @@ function writeConfig(cfg) {
 }
 
 /**
- * This repo's owned block, defaulted.
+ * This repo's owned block, with every container on the path to it validated.
  *
- * Fails closed on a malformed shape for the same reason the repo containers do:
- * substituting `{}` for a block we cannot read means the next write silently
- * replaces whatever was there. `null` is tolerated as "unset" — that is how the
- * five-layer read treats it — but an array or a scalar is corruption.
+ * All of the shape checking lives here, in the one function both subcommands
+ * call, so `record` and `resolve` cannot disagree about what a valid config is.
+ * Splitting it — some checks in the writer, some in the reader — is what let
+ * malformed shapes through one path while the other rejected them.
+ *
+ * Fails closed rather than defaulting: substituting `{}` for something we
+ * cannot read means the next write silently replaces it. `null` is tolerated as
+ * "unset" at every level, because that is how the five-layer read treats it; an
+ * array or a scalar is corruption.
  */
 function reviewersBlock(cfg, repoKey) {
-  const at = (suffix) => `repos[${JSON.stringify(repoKey)}].${FEATURE}${suffix}`;
-  const block = cfg?.repos?.[repoKey]?.[FEATURE];
-  if (block != null && !isPlainObject(block)) {
-    throw new InputError(`${configPath()}: ${at('')} must be a JSON object`);
-  }
-  const observed = block?.observed;
-  if (observed != null && !isPlainObject(observed)) {
-    throw new InputError(`${configPath()}: ${at('.observed')} must be a JSON object`);
+  const rk = JSON.stringify(repoKey);
+  const check = (value, what) => {
+    if (value != null && !isPlainObject(value)) {
+      throw new InputError(`${configPath()}: ${what} must be a JSON object`);
+    }
+    return value;
+  };
+
+  const repos = check(cfg.repos, '"repos"');
+  const repo = check(repos?.[repoKey], `repos[${rk}]`);
+  const block = check(repo?.[FEATURE], `repos[${rk}].${FEATURE}`);
+  const observed = check(block?.observed, `repos[${rk}].${FEATURE}.observed`);
+
+  // Per-login records too: a scalar or an array here gets spread into character
+  // or index keys by `record`'s merge and `resolve`'s union alike, quietly
+  // destroying the very entry the operation claims to update.
+  for (const [login, rec] of Object.entries(observed ?? {})) {
+    check(rec, `repos[${rk}].${FEATURE}.observed[${JSON.stringify(login)}]`);
   }
   return { observed: observed ?? {} };
 }
@@ -261,18 +276,11 @@ function record({ observations = [], repoKey }) {
     observed[login] = { ...(observed[login] ?? {}), ...fields };
   }
 
-  // The top-level check does not reach these nested containers, and an array is
-  // the shape that fails open: `??=` keeps it, string keys assigned to an array
-  // are dropped by JSON.stringify, and record would then rewrite the file,
-  // print the observation, and exit 0 having persisted nothing.
+  // Safe to create-if-missing: reviewersBlock above already rejected every
+  // non-object container on this path, so no `??=` here can preserve an array
+  // whose string keys JSON.stringify would then silently drop.
   cfg.repos ??= {};
-  if (!isPlainObject(cfg.repos)) {
-    throw new InputError(`${configPath()}: "repos" must be a JSON object`);
-  }
   cfg.repos[repoKey] ??= {};
-  if (!isPlainObject(cfg.repos[repoKey])) {
-    throw new InputError(`${configPath()}: repos[${JSON.stringify(repoKey)}] must be a JSON object`);
-  }
   cfg.repos[repoKey][FEATURE] = { observed };
   writeConfig(cfg);
   return cfg.repos[repoKey][FEATURE];

@@ -380,6 +380,21 @@ test('record refuses a malformed greenlight_reviewers block', () => {
   }
 });
 
+test('record refuses a malformed per-login record', () => {
+  // Spreading a scalar or an array yields character/index keys, so the merge
+  // would "update" the entry by destroying it.
+  const cfg = '{"repos":{"github.com/o/r":{"greenlight_reviewers":{"observed":{"x[bot]":[]}}}}}';
+  const dir = tmpConfigDir(cfg);
+  assertFailed(
+    run(['record', '--repo-key', KEY], {
+      stdin: JSON.stringify({ observations: [{ login: 'x[bot]', auto: true }] }),
+      configDir: dir,
+    }),
+    /observed\["x\[bot\]"\] must be a JSON object/i,
+  );
+  assert.equal(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'), cfg);
+});
+
 test('record accepts a null greenlight_reviewers as unset', () => {
   // The five-layer read treats null as "not set", so it must not be corruption.
   const dir = tmpConfigDir('{"repos":{"github.com/o/r":{"greenlight_reviewers":null}}}');
@@ -638,6 +653,21 @@ test('resolve reports gate:null with exit 0 when nothing can gate', () => {
 test('resolve requires --repo-key and --fallback-order', () => {
   assertFailed(run(['resolve', '--fallback-order', 'codex-bot'], { stdin: BOTS([]) }), /repo-key/);
   assertFailed(run(['resolve', '--repo-key', KEY], { stdin: BOTS([]) }), /fallback-order/);
+});
+
+test('resolve fails closed on the same malformed containers record rejects', () => {
+  // The read path shares one validator with the write path, so a shape that is
+  // fatal for record cannot be silently read as "no cache" here — that would
+  // pick a reviewer on evidence the config never actually contained.
+  const bad = [
+    '{"repos":[]}',
+    '{"repos":{"github.com/o/r":[]}}',
+    '{"repos":{"github.com/o/r":{"greenlight_reviewers":{"observed":{"x[bot]":"nope"}}}}}',
+  ];
+  for (const cfg of bad) {
+    assertFailed(resolve([], { stdin: BOTS([CODEX]), configDir: tmpConfigDir(cfg) }),
+      /must be a JSON object/i);
+  }
 });
 
 test('resolve never writes to the config', () => {
