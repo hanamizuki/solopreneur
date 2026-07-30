@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 greenlight 的 external reviewer 從硬編碼 login 白名單 + 純序列 fallback，改成通用 bot 偵測 + per-repo 觀測快取 + 使用者選定的 clean-pass gate。
+**Goal:** 把 greenlight 的 external reviewer 從硬編碼 login 白名單 + 純序列 fallback，改成通用 bot 偵測 + registry 已驗證 login + per-repo 觀測快取 + 使用者選定的 clean-pass gate。
 
-**Architecture:** detection 的過濾/合併/決策目前寫成 inline bash 讓 LLM 每次複製執行（`greenlight/SKILL.md:1549-1586`）。這些是純資料處理，抽成兩支 Node 腳本後可測、行為一致。registry 收成純資料表（每工具一行 trigger）；所有 per-repo 事實改由觀測寫進 config 的獨立 feature key。沿用 `preview` skill 已在 CI 跑的腳本 + `node --test` 架構。
+**Architecture:** detection 的決策目前寫成 inline bash 讓 LLM 每次複製執行（採樣 `greenlight/SKILL.md:1549-1567`、過濾與決策 `SKILL.md:1573-1586`）。這些是純資料處理，抽成兩支 Node 腳本後可測、行為一致。registry 收成純資料表（每工具一行 trigger；已驗證的全域 App login 記在 `knownLogins`）；per-repo 觀測由腳本寫進 config 的獨立 feature key。沿用 `preview` skill 已在 CI 跑的腳本 + `node --test` 架構。
 
 **Tech Stack:** Node.js >= 20（僅 `node:` built-ins）、`node:test` + `node:assert/strict`、`gh` CLI（由 SKILL.md 呼叫，不由腳本呼叫）、GitHub Actions。
 
@@ -12,15 +12,15 @@
 
 ## Global Constraints
 
-- **Node >= 20，只用 `node:` built-in 模組。** repo 全域沒有 `package.json`、沒有 lockfile、不裝任何依賴（理由見 `.github/workflows/validate-preview-tests.yml:44-49`）。
+- **Node >= 20，只用 `node:` built-in 模組。** repo 全域沒有 `package.json`、沒有 lockfile、不裝任何依賴（理由見 `.github/workflows/validate-preview-tests.yml:47-49`）。
 - **腳本的註解與文件字串一律英文**（repo 根有 `LICENSE`）。plan 與 todos 文件本身維持中文。
 - **腳本不呼叫 `gh`、不算 repo-key、不讀 `fallback_order`。** 三者都由 SKILL.md 傳入。`fallback_order` 必須由既有的 `read_solopreneur_config greenlight` 走完整五層取得後傳進來——腳本**不重新實作五層讀取**。
 - **單一 writer 原則：** 腳本獨佔 `repos[<key>].greenlight_reviewers`，shell helper 獨佔 `repos[<key>].greenlight` / `default.greenlight`。腳本永遠不寫 `greenlight` 這個 key。
 - **config 毀損必須 fail closed。** 只有「檔案不存在」可視為空設定；解析失敗、權限錯誤、頂層不是物件，一律致命錯誤且**不得寫入**。
-- **`--json` 是唯一機器可讀契約**（比照 `preview/scripts/config-resolve.mjs:12-15`）。
-- **錯誤處理沿用既有慣例：** `process.exitCode` + 讓 process 自然結束，不用 `process.exit()`（`config-resolve.mjs:618,622`）；使用者設定問題用專屬 error 型別印訊息，真正的 bug 才 throw（`config-resolve.mjs:59`）。
-- **腳本路徑一律 `"${CLAUDE_SKILL_DIR}/"scripts/x.mjs`。** 不是 `$CLAUDE_PLUGIN_ROOT`——後者是 per-plugin 而非 per-skill，且在 skill markdown 裡不會被替換（`todos/done/2026-05-16_vendored-impeccable-path-collision.md:112-114`）。引號位置照 `sync-vendored.sh:218-220` 的形式，以承受安裝路徑含空白。
-- **測試必須 hermetic**：env 用**白名單**而非 spread `process.env`，且 `HOME` 指向 fixture（照 `config-resolve.test.mjs:93`）。
+- **`--json` 是唯一機器可讀契約**（比照 `preview/scripts/config-resolve.mjs:12-14`）。
+- **錯誤處理沿用既有慣例：** `process.exitCode` + 讓 process 自然結束，不用 `process.exit()`（`config-resolve.mjs:618,622`）；使用者設定問題用專屬 error 型別印訊息，真正的 bug 才 throw（`config-resolve.mjs:59`）。**Stale 的使用者選擇（`--select` / `--gate` 指到不可用對象）是警告 + 降級，不是錯誤**——這兩個值可能來自幾天前的 autopilot descriptor（理由見 spec〈錯誤處理與降級〉）。
+- **腳本路徑一律 `"${CLAUDE_SKILL_DIR}/"scripts/x.mjs`。** 不是 `$CLAUDE_PLUGIN_ROOT`——後者是 per-plugin 而非 per-skill（`todos/done/2026-05-16_vendored-impeccable-path-collision.md:111-114`）。引號位置照 `plugins/solopreneur/scripts/sync-vendored.sh:218-223` 的形式，以承受安裝路徑含空白。
+- **測試必須 hermetic**：env 用**白名單**而非 spread `process.env`，且 `HOME` 指向 fixture（照 `config-resolve.test.mjs:92-98` 的 run helper，allowlist 在 `:95`）。
 - **不動 post-commit mode 與 uncommitted mode。** 只改 PR mode。
 - **不 bump plugin 版本**（版本只由 `/release` 動）。
 
@@ -30,10 +30,11 @@
 
 | 檔案 | 責任 |
 |---|---|
-| `greenlight/scripts/reviewer-registry.mjs` | 廠商知識：每工具的 trigger、handshake、poll。純資料 + 查詢，無 I/O。 |
+| `greenlight/scripts/reviewer-registry.mjs` | 廠商知識：每工具的 trigger、handshake、poll、已驗證 login。純資料 + 查詢，無 I/O。 |
 | `greenlight/scripts/reviewer-state.mjs` | 三個 subcommand：`detect`（過濾活動樣本並判定 reviewer 資格）、`record`（觀測回寫）、`resolve`（決定這輪角色）。唯一 I/O 是 config 檔與 stdin/stdout。 |
-| `greenlight/tests/reviewer-registry.test.mjs` | registry 表格完整性（fails closed）+ alias 查詢。 |
+| `greenlight/tests/reviewer-registry.test.mjs` | registry 表格完整性（fails closed）+ alias / login 查詢。 |
 | `greenlight/tests/reviewer-state.test.mjs` | 三個 subcommand 的 CLI 契約 + config 安全。 |
+| `greenlight/tests/skill-sync.test.mjs` | SKILL.md 的人讀表格與 registry 一致（CI 常駐，取代一次性手動檢查）。 |
 | `.github/workflows/validate-greenlight-tests.yml` | CI gate。 |
 | `greenlight/SKILL.md` | registry 瘦身、detection 接上腳本、選擇與 gate、loop 流程、argument token。 |
 | `shared/config.md` | `greenlight_reviewers` 欄位說明 + 兩處失真 invariant。 |
@@ -43,10 +44,10 @@
 
 **PR 邊界（兩個 PR）：**
 
-- **PR 1 = Task 1–7**：腳本 + 測試 + CI + SKILL.md 的 registry/detection 接上 + config.md。上線效果：CodeRabbit 可觸發、通用偵測生效、未識別 bot 的 finding 被收。loop 終止語意**不變**（仍是現有的單一 reviewer clean），所以不引入 gate 相關風險。
-- **PR 2 = Task 8–10**：選擇與 gate 互動、四個終端狀態的 loop、綁定演算法、autopilot 交接。
+- **PR 1 = Task 1–7**：腳本 + 測試 + CI + SKILL.md 的 registry/detection 接上 + config.md。上線效果：`type == "Bot"` 通用偵測生效、三個既有 bot 經 `knownLogins` 自動識別、觀測快取開始累積。**loop 語意不變**——既有單一 reviewer 流程照跑，透過 seam 從 `RESOLVED.gate` 取得 reviewer 身分（Task 7 Step 2）。
+- **PR 2 = Task 8–10**：選擇與 gate 互動、四個終端狀態的 loop、多 reviewer 收集、autopilot 交接。
 
-原計畫的三 PR 拆法已放棄：純腳本的 PR 沒有 user-facing 價值，而 PR 2 若只接一半會讓 loop 語意處於中間狀態。
+原計畫的三 PR 拆法已放棄：純腳本的 PR 沒有 user-facing 價值，而 PR 2 若只接一半會讓 loop 語意處於中間狀態。原設計的 pending 佇列 + 自動綁定子系統於 review 後**整包刪除**——消去法歸屬對已留言過的 bot（含 migration 場景的全部三個既有 bot）永遠失效，且會被窗口雜訊誤綁；由 registry `knownLogins` + attended identify 取代（理由詳見 spec〈識別〉）。
 
 ---
 
@@ -60,7 +61,7 @@
 
 **Interfaces:**
 - Consumes: 無
-- Produces: `RECIPES`（key = recipe id）、`DEFAULT_POLL`、`recipeFor(idOrAlias) -> {id, ...recipe} | null`。Task 3 的 `record` 與 Task 4 的 `resolve` 只 import `recipeFor`。
+- Produces: `RECIPES`（key = recipe id）、`DEFAULT_POLL`、`recipeFor(idOrAlias) -> {id, ...recipe} | null`、`recipeForLogin(login) -> {id, ...recipe} | null`。Task 3 的 `record` 只 import `recipeFor`；Task 4 的 `resolve` import 兩者。
 
 - [ ] **Step 1: 寫 failing test**
 
@@ -81,7 +82,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RECIPES, DEFAULT_POLL, recipeFor } from '../scripts/reviewer-registry.mjs';
+import { RECIPES, DEFAULT_POLL, recipeFor, recipeForLogin } from '../scripts/reviewer-registry.mjs';
 
 const KINDS = new Set(['github-bot', 'local-cli']);
 
@@ -113,7 +114,7 @@ test('every recipe declares a known kind', () => {
   }
 });
 
-test('every recipe declares a non-empty aliases array', () => {
+test('every recipe declares an aliases array', () => {
   for (const [id, r] of Object.entries(RECIPES)) {
     assert.ok(Array.isArray(r.aliases), `${id}.aliases is not an array`);
   }
@@ -153,13 +154,38 @@ test('aliases never collide with each other or with any canonical id', () => {
   }
 });
 
-test('the three newly added tools use the default poll policy', () => {
+test('every recipe declares a knownLogins array', () => {
+  for (const [id, r] of Object.entries(RECIPES)) {
+    assert.ok(Array.isArray(r.knownLogins), `${id}.knownLogins is not an array`);
+  }
+});
+
+test('no login is claimed by two recipes', () => {
+  const seen = new Map();
+  for (const [id, r] of Object.entries(RECIPES)) {
+    for (const login of r.knownLogins) {
+      assert.ok(!seen.has(login), `login "${login}" claimed by both ${seen.get(login)} and ${id}`);
+      seen.set(login, id);
+    }
+  }
+});
+
+test('recipeForLogin resolves a verified login', () => {
+  assert.equal(recipeForLogin('coderabbitai[bot]').id, 'coderabbit');
+  assert.equal(recipeForLogin('chatgpt-codex-connector[bot]').id, 'codex-bot');
+  assert.equal(recipeForLogin('gemini-code-assist[bot]').id, 'gemini');
+});
+
+test('recipeForLogin returns null for unknown logins and non-strings', () => {
+  for (const input of ['dependabot[bot]', 'hanamizuki', '', undefined, null, 42]) {
+    assert.equal(recipeForLogin(input), null, `expected null for ${JSON.stringify(input)}`);
+  }
+});
+
+test('the three newly added tools use the safe defaults', () => {
   for (const id of ['coderabbit', 'bugbot', 'greptile']) {
     assert.ok(RECIPES[id], `${id} missing from registry`);
     assert.equal(RECIPES[id].handshake, 'none');
-    // deepEqual on a distinct copy: if the rows shared the DEFAULT_POLL object
-    // by reference this would compare an object to itself and never fail.
-    assert.notEqual(RECIPES[id].poll, DEFAULT_POLL, `${id}.poll must be a copy`);
     assert.deepEqual(RECIPES[id].poll, DEFAULT_POLL);
   }
 });
@@ -184,30 +210,30 @@ Expected: FAIL — `Cannot find module '../scripts/reviewer-registry.mjs'`
  * Requires Node.js >= 20. No I/O, no dependencies — pure data plus lookup.
  *
  * What belongs here: facts identical for every user of a tool — the comment
- * that triggers it, whether it acknowledges a trigger, how long to wait. What
- * must NOT be here: anything varying per repo or per user.
+ * that triggers it, whether it acknowledges a trigger, how long to wait, and
+ * the login it posts from once that login has been verified. What must NOT be
+ * here: anything varying per repo or per user.
  *
- * There is deliberately no bot-login field. A tool's GitHub login cannot be
- * known from outside: probing found `cursor[bot]`, `cursor-com[bot]` and
- * `bugbot[bot]` to all be real accounts, and GitHub Copilot posts as `Copilot`
- * with no `[bot]` suffix. Logins are observed at trigger time and cached per
- * repo by reviewer-state.mjs.
+ * `knownLogins` holds VERIFIED App logins only. A GitHub App's bot login is
+ * app-scoped — the same account posts on every repo — so a verified login is
+ * vendor knowledge, not a per-repo observation. But logins must never be
+ * guessed: probing found `cursor[bot]`, `cursor-com[bot]` and `bugbot[bot]` to
+ * all be real accounts, and GitHub Copilot posts as `Copilot` with no `[bot]`
+ * suffix. An empty array means "unverified": the tool still works — detection
+ * collects it by user type, and an attended identify binds its login per repo
+ * (reviewer-state.mjs `record`).
  *
- * Nor is there an auto-review field. Whether a tool reviews automatically is a
+ * There is no auto-review field. Whether a tool reviews automatically is a
  * per-user setting (Bugbot exposes it in Cursor's personal settings;
  * `@coderabbitai pause` turns CodeRabbit's off), invisible from the repo. It is
  * observed, not declared.
  *
  * Adding a tool is one row whose only required thought is the trigger string:
- * `handshake: 'none'` plus a copy of DEFAULT_POLL is the safe fallback, proven
- * by the `gemini` row which has never had a handshake.
+ * `handshake: 'none'`, `poll: DEFAULT_POLL` and `knownLogins: []` are the safe
+ * fallbacks, proven by the `gemini` row which has never had a handshake.
  */
 
-/**
- * Fallback timing for a tool whose acknowledgement behaviour is unverified.
- * Spread into each row rather than shared by reference — sharing would make
- * `deepEqual(row.poll, DEFAULT_POLL)` compare an object to itself.
- */
+/** Fallback timing for a tool whose acknowledgement behaviour is unverified. */
 export const DEFAULT_POLL = Object.freeze({ firstWaitSec: 180, intervalSec: 120, tries: 3 });
 
 export const RECIPES = {
@@ -216,6 +242,7 @@ export const RECIPES = {
     kind: 'github-bot',
     trigger: '@codex review',
     handshake: 'reaction',            // verified: 👀 on the triggering comment
+    knownLogins: ['chatgpt-codex-connector[bot]'],
     poll: { firstWaitSec: 60, intervalSec: 60, tries: 20 },
   },
   gemini: {
@@ -223,6 +250,7 @@ export const RECIPES = {
     kind: 'github-bot',
     trigger: '/gemini review',
     handshake: 'none',
+    knownLogins: ['gemini-code-assist[bot]'],
     poll: { firstWaitSec: 180, intervalSec: 120, tries: 2 },
   },
   coderabbit: {
@@ -230,33 +258,38 @@ export const RECIPES = {
     kind: 'github-bot',
     trigger: '@coderabbitai review',  // `full review` re-reviews from scratch
     handshake: 'none',
-    poll: { ...DEFAULT_POLL },
+    knownLogins: ['coderabbitai[bot]'],
+    poll: DEFAULT_POLL,
   },
   bugbot: {
     aliases: ['bugbot', 'cursor'],
     kind: 'github-bot',
     trigger: 'bugbot run',            // top-level comment only
     handshake: 'none',
-    poll: { ...DEFAULT_POLL },
+    knownLogins: [],                  // cursor[bot] / cursor-com[bot] / bugbot[bot] all exist; unverified
+    poll: DEFAULT_POLL,
   },
   greptile: {
     aliases: ['greptile'],
     kind: 'github-bot',
     trigger: '@greptileai',
     handshake: 'none',
-    poll: { ...DEFAULT_POLL },
+    knownLogins: [],
+    poll: DEFAULT_POLL,
   },
   'codex-cli': {
     aliases: ['codex cli'],
     kind: 'local-cli',
     trigger: 'codex review --base',
     handshake: 'stdout',
+    knownLogins: [],
   },
   agy: {
     aliases: ['agy'],
     kind: 'local-cli',
     trigger: 'agy --print',
     handshake: 'stdout-marker',
+    knownLogins: [],
   },
 };
 
@@ -273,6 +306,19 @@ export function recipeFor(idOrAlias) {
   }
   return null;
 }
+
+/**
+ * Resolve a GitHub login to its recipe via the verified-login list.
+ * Exact match only — guessing from the name is exactly what this registry
+ * refuses to do. Returns null for anything unverified.
+ */
+export function recipeForLogin(login) {
+  if (typeof login !== 'string' || !login) return null;
+  for (const [id, recipe] of Object.entries(RECIPES)) {
+    if (recipe.knownLogins.includes(login)) return { id, ...recipe };
+  }
+  return null;
+}
 ```
 
 - [ ] **Step 4: 跑測試確認通過**
@@ -281,14 +327,18 @@ export function recipeFor(idOrAlias) {
 cd plugins/solopreneur/skills/greenlight && node --test tests/reviewer-registry.test.mjs
 ```
 
-Expected: PASS，11 個 test 全綠
+Expected: PASS，15 個 test 全綠
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add plugins/solopreneur/skills/greenlight/scripts/reviewer-registry.mjs \
         plugins/solopreneur/skills/greenlight/tests/reviewer-registry.test.mjs
-git commit -m "feat(greenlight): add reviewer registry as pure data with lookup"
+git commit -m "feat(greenlight): add reviewer registry as pure data with lookup
+
+One row per tool: trigger, handshake, poll, and the verified app-scoped
+login where one is known. Unverified logins stay empty — they are learned
+per repo via identify, never guessed."
 ```
 
 ---
@@ -303,7 +353,7 @@ git commit -m "feat(greenlight): add reviewer registry as pure data with lookup"
 - Consumes: 無
 - Produces: CLI `reviewer-state.mjs detect`。stdin 吃四欄 TSV `login<TAB>type<TAB>iso<TAB>source`，`source` ∈ `conversation` / `review-comment` / `formal-review`。stdout 印 `{"bots":[{"login","lastSeen","evidence"}]}`，依 login 排序。`evidence` 為布林——只有 `review-comment` 或 `formal-review` 算 reviewer 證據。
 
-**背景：** 這取代 `SKILL.md:1577-1582` 的 awk + jq pipeline。兩個行為變更：過濾條件從三筆硬編碼 login 改成 `type == "Bot"`；並保留證據來源，因為 `type == "Bot"` 認的是自動化而非 review 能力——dependabot / CI bot / release bot 全都是 `Bot`，而它們只出現在 conversation channel。
+**背景：** 這取代 `SKILL.md:1573-1586` 的 awk + jq pipeline。兩個行為變更：過濾條件從比對三筆硬編碼 login（`REVIEWER_BOT_LOGINS`，`SKILL.md:1517`）改成 `type == "Bot"`；並保留證據來源，因為 `type == "Bot"` 認的是自動化而非 review 能力——dependabot / CI bot / release bot 全都是 `Bot`，而它們只出現在 conversation channel。
 
 - [ ] **Step 1: 寫 failing test**
 
@@ -642,14 +692,13 @@ code reviewer."
 - Produces: CLI `reviewer-state.mjs record --repo-key <K>`。stdin 吃
 
 ```json
-{"observations":[{"login":"coderabbitai[bot]","auto":true}],
- "bind":{"recipe":"greptile","login":"greptile-apps[bot]"},
- "dropPending":["bugbot"]}
+{"observations":[{"login":"coderabbitai[bot]","auto":true},
+                 {"login":"mystery[bot]","recipe":"bugbot"}]}
 ```
 
-寫進 `repos[<K>].greenlight_reviewers`（`observed` 逐 login merge、`pending` 增減），stdout 印寫入後的整個 `greenlight_reviewers`。另 `record --repo-key <K> --add-pending <recipe>` 把一個 recipe 排進 `pending`。
+每筆 observation 逐 login **merge**（`auto` / `triggerable` / `recipe` 三個 optional 欄位），寫進 `repos[<K>].greenlight_reviewers.observed`，stdout 印寫入後的整個 `greenlight_reviewers`。`recipe` 欄是 attended identify 的落點；`triggerable: true` 是被誤標 reviewer 的平反路徑（單向門變雙向，spec〈錯誤處理與降級〉）。
 
-**這個 task 承載三個 Critical 的修正**：config 毀損 fail closed、觀測值落在獨立 feature key（不與 `greenlight` 同 subtree）、`pending` 的持久化。
+**這個 task 承載兩個 Critical 的修正**：config 毀損 fail closed、觀測值落在獨立 feature key（不與 `greenlight` 同 subtree）。
 
 - [ ] **Step 1: 寫 failing test**
 
@@ -662,13 +711,13 @@ const readBack = (dir) =>
 const reviewersOf = (dir) => readBack(dir).repos[KEY].greenlight_reviewers;
 
 /** A config with both the shell-owned `greenlight` and script-owned key. */
-const CFG = ({ observed = {}, pending = [], fallbackOrder = ['codex-bot'] } = {}) => ({
+const CFG = ({ observed = {}, fallbackOrder = ['codex-bot'] } = {}) => ({
   default: { greenlight: { fallback_order: fallbackOrder } },
   repos: {
     [KEY]: {
       preview: { path: 'docs/preview' },
       greenlight: { fallback_order: fallbackOrder },
-      greenlight_reviewers: { observed, pending },
+      greenlight_reviewers: { observed },
     },
     'github.com/other/repo': { greenlight: { fallback_order: ['gemini'] } },
   },
@@ -694,12 +743,33 @@ test('record merges into an existing entry without dropping fields', () => {
 });
 
 test('record writes triggerable:false for a reviewer that never answered', () => {
-  const dir = tmpConfigDir(CFG({ observed: { 'gemini-code-assist[bot]': { recipe: 'gemini' } } }));
+  const dir = tmpConfigDir(CFG({ observed: { 'gemini-code-assist[bot]': { auto: false } } }));
   run(['record', '--repo-key', KEY], {
     stdin: JSON.stringify({ observations: [{ login: 'gemini-code-assist[bot]', triggerable: false }] }),
     configDir: dir,
   });
   assert.equal(reviewersOf(dir).observed['gemini-code-assist[bot]'].triggerable, false);
+});
+
+test('record clears triggerable:false when the reviewer acts again', () => {
+  // The one-way-door fix: a marked reviewer that produces an item (or is
+  // deliberately retried in an attended run) gets triggerable:true written,
+  // which resolve's `!== false` filter re-admits.
+  const dir = tmpConfigDir(CFG({ observed: { 'gemini-code-assist[bot]': { triggerable: false } } }));
+  run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'gemini-code-assist[bot]', triggerable: true }] }),
+    configDir: dir,
+  });
+  assert.equal(reviewersOf(dir).observed['gemini-code-assist[bot]'].triggerable, true);
+});
+
+test('record stores an identify as a recipe on the observed login', () => {
+  const dir = tmpConfigDir(CFG({ observed: { 'mystery[bot]': { auto: true } } }));
+  run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'mystery[bot]', recipe: 'bugbot' }] }),
+    configDir: dir,
+  });
+  assert.deepEqual(reviewersOf(dir).observed['mystery[bot]'], { auto: true, recipe: 'bugbot' });
 });
 
 test('record never writes the shell-owned greenlight key', () => {
@@ -726,40 +796,6 @@ test('record preserves sibling repos and sibling features', () => {
   const cfg = readBack(dir);
   assert.deepEqual(cfg.repos['github.com/other/repo'], { greenlight: { fallback_order: ['gemini'] } });
   assert.deepEqual(cfg.repos[KEY].preview, { path: 'docs/preview' });
-});
-
-test('record --add-pending queues a recipe without a login', () => {
-  const dir = tmpConfigDir(CFG());
-  const { code } = run(['record', '--repo-key', KEY, '--add-pending', 'greptile'], { configDir: dir });
-  assert.equal(code, 0);
-  assert.deepEqual(reviewersOf(dir).pending, ['greptile']);
-});
-
-test('record --add-pending is idempotent and rejects unknown recipes', () => {
-  const dir = tmpConfigDir(CFG({ pending: ['greptile'] }));
-  run(['record', '--repo-key', KEY, '--add-pending', 'greptile'], { configDir: dir });
-  assert.deepEqual(reviewersOf(dir).pending, ['greptile']);
-  assertFailed(run(['record', '--repo-key', KEY, '--add-pending', 'nope'], { configDir: dir }), /nope/);
-});
-
-test('record bind moves a pending recipe into observed with its learned login', () => {
-  const dir = tmpConfigDir(CFG({ pending: ['greptile', 'bugbot'] }));
-  run(['record', '--repo-key', KEY], {
-    stdin: JSON.stringify({ bind: { recipe: 'greptile', login: 'greptile-apps[bot]' } }),
-    configDir: dir,
-  });
-  const r = reviewersOf(dir);
-  assert.deepEqual(r.pending, ['bugbot'], 'the bound recipe leaves the queue');
-  assert.equal(r.observed['greptile-apps[bot]'].recipe, 'greptile');
-});
-
-test('record dropPending removes a recipe that never answered', () => {
-  const dir = tmpConfigDir(CFG({ pending: ['greptile', 'bugbot'] }));
-  run(['record', '--repo-key', KEY], {
-    stdin: JSON.stringify({ dropPending: ['greptile'] }),
-    configDir: dir,
-  });
-  assert.deepEqual(reviewersOf(dir).pending, ['bugbot']);
 });
 
 test('record rejects an observation with no login', () => {
@@ -854,7 +890,7 @@ Expected: FAIL — `unknown subcommand "record"`（Task 2 的 11 個仍綠）
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { recipeFor } from './reviewer-registry.mjs';
+import { recipeFor, recipeForLogin } from './reviewer-registry.mjs';
 
 /** The feature key this script owns. It never touches `greenlight`. */
 const FEATURE = 'greenlight_reviewers';
@@ -912,12 +948,11 @@ function writeConfig(cfg) {
   }
 }
 
-/** This repo's owned block, with both halves defaulted. */
+/** This repo's owned block, defaulted. */
 function reviewersBlock(cfg, repoKey) {
   const block = cfg?.repos?.[repoKey]?.[FEATURE] ?? {};
   return {
     observed: block.observed && typeof block.observed === 'object' ? block.observed : {},
-    pending: Array.isArray(block.pending) ? block.pending : [],
   };
 }
 
@@ -956,50 +991,35 @@ function parseJsonStdin(raw) {
 /**
  * Merge this round's observations into the per-repo cache.
  *
- * Three independent edits, any combination of which may be present:
- *   observations  — per-login field merge (auto / triggerable / recipe)
- *   bind          — a pending recipe learned its login; move it to observed
- *   dropPending   — a pending recipe that never answered; forget it
+ * Each observation is a per-login field merge over three optional facts:
+ *   auto         — it commented without being triggered
+ *   triggerable  — false: a trigger got no response inside its own poll
+ *                  budget; true: a marked login acted again (the recovery path)
+ *   recipe       — an attended identify bound this login to a registry row
  *
  * An empty payload does not rewrite the file at all, so a quiet round cannot
  * reformat or reorder a config the user hand-edited.
  */
-function record({ observations = [], bind = null, dropPending = [], repoKey, addPending = null }) {
+function record({ observations = [], repoKey }) {
   for (const obs of observations) {
     if (!obs?.login) throw new InputError('every observation needs a login');
     if (obs.recipe != null && !recipeFor(obs.recipe)) {
       throw new InputError(`unknown recipe "${obs.recipe}"`);
     }
   }
-  if (bind && (!bind.recipe || !bind.login)) {
-    throw new InputError('bind needs both a recipe and a login');
-  }
-  if (bind && !recipeFor(bind.recipe)) throw new InputError(`unknown recipe "${bind.recipe}"`);
-  if (addPending && !recipeFor(addPending)) throw new InputError(`unknown recipe "${addPending}"`);
 
   const cfg = readConfigForWrite();
   const current = reviewersBlock(cfg, repoKey);
-
-  const noop = observations.length === 0 && !bind && dropPending.length === 0
-    && (!addPending || current.pending.includes(addPending));
-  if (noop) return current;
+  if (observations.length === 0) return current;
 
   const observed = { ...current.observed };
-  let pending = [...current.pending];
-
   for (const { login, ...fields } of observations) {
     observed[login] = { ...(observed[login] ?? {}), ...fields };
   }
-  if (bind) {
-    observed[bind.login] = { ...(observed[bind.login] ?? {}), recipe: bind.recipe };
-    pending = pending.filter((id) => id !== bind.recipe);
-  }
-  if (dropPending.length) pending = pending.filter((id) => !dropPending.includes(id));
-  if (addPending && !pending.includes(addPending)) pending.push(addPending);
 
   cfg.repos ??= {};
   cfg.repos[repoKey] ??= {};
-  cfg.repos[repoKey][FEATURE] = { observed, pending };
+  cfg.repos[repoKey][FEATURE] = { observed };
   writeConfig(cfg);
   return cfg.repos[repoKey][FEATURE];
 }
@@ -1009,13 +1029,10 @@ dispatch 加入：
 
 ```javascript
   if (sub === 'record') {
-    const flags = parseFlags(process.argv.slice(3), ['repo-key', 'add-pending']);
+    const flags = parseFlags(process.argv.slice(3), ['repo-key']);
     if (!flags['repo-key']) throw new InputError('record needs --repo-key');
-    // --add-pending is a standalone edit and takes no stdin.
-    const payload = flags['add-pending'] ? {} : parseJsonStdin(await readStdin());
-    return emit(record({
-      ...payload, repoKey: flags['repo-key'], addPending: flags['add-pending'] ?? null,
-    }));
+    const payload = parseJsonStdin(await readStdin());
+    return emit(record({ observations: payload.observations ?? [], repoKey: flags['repo-key'] }));
   }
 ```
 
@@ -1025,7 +1042,7 @@ dispatch 加入：
 cd plugins/solopreneur/skills/greenlight && node --test tests/*.test.mjs
 ```
 
-Expected: PASS，共 39 個 test（11 registry + 28 state）
+Expected: PASS，共 41 個 test（15 registry + 26 state：11 detect + 15 record）
 
 - [ ] **Step 5: Commit**
 
@@ -1037,7 +1054,8 @@ git commit -m "feat(greenlight): add reviewer-state record subcommand
 Observations land in repos[<key>].greenlight_reviewers, a feature key this
 script owns exclusively, so neither the five-layer read nor the shell
 helper's whole-subtree write can erase them. A malformed or unreadable
-config is fatal and never overwritten."
+config is fatal and never overwritten. triggerable is a two-way door:
+false marks a silent reviewer, true is the recovery path."
 ```
 
 ---
@@ -1049,7 +1067,7 @@ config is fatal and never overwritten."
 - Modify: `plugins/solopreneur/skills/greenlight/tests/reviewer-state.test.mjs`
 
 **Interfaces:**
-- Consumes: Task 1 的 `recipeFor`、Task 2 的 `detect` 輸出、Task 3 的 config 層
+- Consumes: Task 1 的 `recipeFor` / `recipeForLogin`、Task 2 的 `detect` 輸出、Task 3 的 config 層
 - Produces: CLI
 
 ```
@@ -1064,23 +1082,29 @@ stdin 吃 `{"bots":[...]}`，stdout 印：
   "available": [
     {"kind":"bot","id":"coderabbitai[bot]","login":"coderabbitai[bot]",
      "recipe":"coderabbit","auto":true,"evidence":true,"lastSeen":"...","canGate":true},
-    {"kind":"pending","id":"greptile","login":null,"recipe":"greptile","canGate":false},
+    {"kind":"bot","id":"brand-new[bot]","login":"brand-new[bot]",
+     "recipe":null,"auto":false,"evidence":true,"lastSeen":"...","canGate":false},
     {"kind":"cli","id":"codex-cli","login":null,"recipe":"codex-cli","canGate":true}
   ],
   "trigger": [{"kind":"github-bot","recipe":"codex-bot","triggerText":"@codex review",
-               "login":"chatgpt-codex-connector[bot]"}],
-  "collect": ["coderabbitai[bot]","chatgpt-codex-connector[bot]"],
+               "handshake":"reaction","login":"chatgpt-codex-connector[bot]"}],
+  "collect": ["brand-new[bot]","chatgpt-codex-connector[bot]","coderabbitai[bot]"],
   "gate": {"kind":"bot","id":"...","login":"...","recipe":"codex-bot",
            "poll":{"firstWaitSec":60,"intervalSec":60,"tries":20},"handshake":"reaction"},
-  "bindingCandidate": "greptile",
   "needsPrompt": false,
   "warnings": []
 }
 ```
 
-Task 8 吃 `available` / `needsPrompt` / `warnings`；Task 9 吃 `trigger` / `collect` / `gate` / `bindingCandidate`。
+Task 8 吃 `available` / `needsPrompt` / `warnings`；Task 9 吃 `trigger` / `collect` / `gate`。
 
 **`--fallback-order` 是參數而非讀 config。** `fallback_order` 落在 `.default.greenlight`（現有 writer 是 `write_solopreneur_config`，`SKILL.md:1656`），要正確取得必須走完整五層。SKILL.md 已有 `read_solopreneur_config greenlight` 能做這件事，腳本不重複實作。
+
+**recipe 的解析順序：快取 identify 優先於 registry。** `observed[login].recipe`（使用者明確指認）> `recipeForLogin(login)`（registry 已驗證 login）> `null`（未識別）。快取裡的 stale recipe id 降級為 registry 查詢再 fallback 到 null，附 warning。
+
+**gate 一律被觸發，含 `auto` 的。** clean 訊號需要明確的回應對象；對 auto bot 多發一次 review 指令無害。`auto` 只豁免非 gate reviewer 的觸發（spec〈Reviewer 選擇與 gate〉）。
+
+**stale 的 `--select` / `--gate` 是警告 + 降級，不是錯誤。** 這兩個值可能來自幾天前寫的 autopilot descriptor，期間 reviewer 可能已被標 `triggerable: false`。`--select` 匹配不到任何對象 → 視同未指定；`--gate` 指到不可 gate 的對象 → 落回 fallback-order 梯子。與快取 stale recipe 的降級方向一致。
 
 **`codex-cli` 自動接手 / `agy` 要問，語意不在腳本裡。** 腳本只吃 `--cli-available`。SKILL.md 在 CLI gate 通過時傳 `codex-cli`；`agy` 只在使用者明確同意後才加入。而「codex-bot 失敗自動落到 codex-cli」由 `fallback_order` 本身表達（`config.md` 推薦的預設 `["codex-bot","codex-cli"]` 正是這個順序），不需要腳本內建規則。
 
@@ -1096,45 +1120,56 @@ const BOTS = (rows) => JSON.stringify({
 });
 
 /** resolve with the required flags defaulted. */
-function resolve(extra, { stdin, configDir }) {
+function resolve(extra, { stdin, configDir } = {}) {
   return run(['resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot', ...extra],
     { stdin, configDir });
 }
 
 const CODEX = 'chatgpt-codex-connector[bot]';
 const RABBIT = 'coderabbitai[bot]';
+const GEMINI = 'gemini-code-assist[bot]';
 
 test('resolve merges detected bots with the cache', () => {
-  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { recipe: 'coderabbit', auto: true } } }));
+  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { auto: true } } }));
   const { code, stdout } = resolve([], { stdin: BOTS([CODEX]), configDir: dir });
   assert.equal(code, 0);
   const out = JSON.parse(stdout);
   assert.deepEqual(out.available.map((r) => r.id).sort(), [RABBIT, CODEX].sort());
 });
 
+test('resolve identifies a registry-known login with no config at all', () => {
+  // The migration path: on a fresh config the three long-standing bots must be
+  // full citizens immediately. An App's login is app-scoped, so the verified
+  // knownLogins row applies on every repo with zero learning.
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT]) });
+  const [bot] = JSON.parse(stdout).available;
+  assert.equal(bot.recipe, 'coderabbit');
+  assert.equal(bot.canGate, true);
+});
+
+test('resolve lets a cached identify override the registry mapping', () => {
+  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { recipe: 'bugbot' } } }));
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT]), configDir: dir });
+  assert.equal(JSON.parse(stdout).available[0].recipe, 'bugbot');
+});
+
 test('resolve excludes triggerable:false', () => {
-  const dir = tmpConfigDir(CFG({ observed: {
-    [RABBIT]: { recipe: 'coderabbit', auto: true },
-    'gemini-code-assist[bot]': { recipe: 'gemini', triggerable: false },
-  } }));
-  const { stdout } = resolve([], { stdin: BOTS([RABBIT, 'gemini-code-assist[bot]']), configDir: dir });
+  const dir = tmpConfigDir(CFG({ observed: { [GEMINI]: { triggerable: false } } }));
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT, GEMINI]), configDir: dir });
   assert.deepEqual(JSON.parse(stdout).available.map((r) => r.id), [RABBIT]);
 });
 
 test('resolve drops an unidentified bot with no review evidence', () => {
   // dependabot shape. Without this it would be selected by default and its PR
   // description would enter the finding-processing loop as review feedback.
-  const dir = tmpConfigDir(CFG());
   const { stdout } = resolve([], {
     stdin: BOTS([{ login: 'dependabot[bot]', evidence: false }, CODEX]),
-    configDir: dir,
   });
   assert.deepEqual(JSON.parse(stdout).available.map((r) => r.id), [CODEX]);
 });
 
 test('resolve keeps an unidentified bot that has review evidence, but bars it from gating', () => {
-  const dir = tmpConfigDir(CFG());
-  const { stdout } = resolve([], { stdin: BOTS([CODEX, 'brand-new[bot]']), configDir: dir });
+  const { stdout } = resolve([], { stdin: BOTS([CODEX, 'brand-new[bot]']) });
   const out = JSON.parse(stdout);
   const fresh = out.available.find((r) => r.id === 'brand-new[bot]');
   assert.equal(fresh.recipe, null);
@@ -1143,101 +1178,81 @@ test('resolve keeps an unidentified bot that has review evidence, but bars it fr
   assert.ok(!out.trigger.some((t) => t.login === 'brand-new[bot]'), 'but it is never triggered');
 });
 
-test('resolve surfaces pending recipes as candidates that cannot gate', () => {
-  const dir = tmpConfigDir(CFG({ pending: ['greptile'] }));
-  const { stdout } = resolve([], { stdin: BOTS([CODEX]), configDir: dir });
-  const pending = JSON.parse(stdout).available.find((r) => r.kind === 'pending');
-  assert.equal(pending.id, 'greptile');
-  assert.equal(pending.login, null);
-  assert.equal(pending.canGate, false, 'nobody to wait for yet');
-});
-
-test('resolve triggers a pending recipe without a login', () => {
-  // The deadlock this design exists to break: triggering needs only the recipe.
-  const dir = tmpConfigDir(CFG({ pending: ['greptile'] }));
-  const { stdout } = resolve([], { stdin: BOTS([CODEX]), configDir: dir });
-  const out = JSON.parse(stdout);
-  const t = out.trigger.find((x) => x.recipe === 'greptile');
-  assert.equal(t.triggerText, '@greptileai');
-  assert.equal(t.login, null);
-  assert.equal(out.bindingCandidate, 'greptile');
-});
-
-test('resolve binds at most one pending recipe per round', () => {
-  const dir = tmpConfigDir(CFG({ pending: ['greptile', 'bugbot'] }));
-  const { stdout } = resolve([], { stdin: BOTS([CODEX]), configDir: dir });
-  const out = JSON.parse(stdout);
-  assert.equal(out.bindingCandidate, 'greptile', 'the queue head only');
-  assert.equal(out.trigger.filter((t) => t.login === null).length, 1,
-    'a second unbound trigger would make the response unattributable');
-});
-
 test('resolve admits an available local CLI and lets it gate', () => {
-  const dir = tmpConfigDir(CFG());
-  const { stdout } = resolve(['--cli-available', 'codex-cli'], { stdin: BOTS([]), configDir: dir });
+  const { stdout } = resolve(['--cli-available', 'codex-cli'], { stdin: BOTS([]) });
   const cli = JSON.parse(stdout).available.find((r) => r.kind === 'cli');
   assert.equal(cli.id, 'codex-cli');
   assert.equal(cli.canGate, true);
 });
 
 test('resolve marks a local CLI trigger with its kind so SKILL.md can branch', () => {
-  const dir = tmpConfigDir(CFG());
-  const { stdout } = resolve(['--cli-available', 'codex-cli'], { stdin: BOTS([]), configDir: dir });
+  const { stdout } = resolve(['--cli-available', 'codex-cli'], { stdin: BOTS([]) });
   const t = JSON.parse(stdout).trigger.find((x) => x.recipe === 'codex-cli');
   assert.equal(t.kind, 'local-cli');
 });
 
-test('resolve omits auto reviewers from trigger but keeps them in collect', () => {
-  const dir = tmpConfigDir(CFG({ observed: {
-    [RABBIT]: { recipe: 'coderabbit', auto: true },
-    [CODEX]: { recipe: 'codex-bot', auto: false },
-  } }));
+test('resolve omits a non-gate auto reviewer from trigger but keeps it in collect', () => {
+  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { auto: true }, [CODEX]: { auto: false } } }));
   const { stdout } = resolve([], { stdin: BOTS([RABBIT, CODEX]), configDir: dir });
   const out = JSON.parse(stdout);
   assert.deepEqual(out.trigger.map((t) => t.login), [CODEX]);
   assert.ok(out.collect.includes(RABBIT));
 });
 
+test('resolve always triggers the gate, auto or not', () => {
+  // A clean signal needs an addressable response. Re-requesting a review from
+  // an auto bot is harmless, so the gate is exempt from the auto exemption.
+  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { auto: true } } }));
+  const { stdout } = resolve(['--gate', 'coderabbit'], { stdin: BOTS([RABBIT]), configDir: dir });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.login, RABBIT);
+  assert.ok(out.trigger.some((t) => t.login === RABBIT), 'the auto gate is still triggered');
+});
+
 test('resolve attaches the gate’s own poll policy and handshake', () => {
-  const dir = tmpConfigDir(CFG({ observed: { [CODEX]: { recipe: 'codex-bot' } } }));
-  const { stdout } = resolve([], { stdin: BOTS([CODEX]), configDir: dir });
+  const { stdout } = resolve([], { stdin: BOTS([CODEX]) });
   const { gate } = JSON.parse(stdout);
   assert.equal(gate.recipe, 'codex-bot');
   assert.deepEqual(gate.poll, { firstWaitSec: 60, intervalSec: 60, tries: 20 });
   assert.equal(gate.handshake, 'reaction');
 });
 
-test('resolve attaches a poll policy to an auto gate too', () => {
-  // The case the previous contract could not express: an auto reviewer is
-  // excluded from `trigger`, so if poll policy lived only there, gating on
-  // CodeRabbit would leave the round with no wait policy at all.
-  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { recipe: 'coderabbit', auto: true } } }));
-  const { stdout } = resolve(['--gate', 'coderabbit'], { stdin: BOTS([RABBIT]), configDir: dir });
-  const { gate, trigger } = JSON.parse(stdout);
-  assert.equal(gate.login, RABBIT);
-  assert.equal(typeof gate.poll.firstWaitSec, 'number');
-  assert.ok(!trigger.some((t) => t.login === RABBIT), 'still not triggered');
+test('resolve trigger entries carry their handshake', () => {
+  const { stdout } = resolve([], { stdin: BOTS([CODEX]) });
+  const t = JSON.parse(stdout).trigger.find((x) => x.recipe === 'codex-bot');
+  assert.equal(t.handshake, 'reaction');
 });
 
 test('resolve picks the gate from fallback-order, skipping unavailable entries', () => {
-  const dir = tmpConfigDir(CFG({ observed: {
-    [RABBIT]: { recipe: 'coderabbit', auto: true },
-    [CODEX]: { recipe: 'codex-bot' },
-  } }));
   const { stdout } = run([
     'resolve', '--repo-key', KEY, '--fallback-order', 'gemini,codex-bot',
-  ], { stdin: BOTS([RABBIT, CODEX]), configDir: dir });
+  ], { stdin: BOTS([RABBIT, CODEX]) });
   assert.equal(JSON.parse(stdout).gate.recipe, 'codex-bot', 'gemini is not available here');
 });
 
-test('resolve rejects a gate that cannot gate', () => {
-  const dir = tmpConfigDir(CFG({ pending: ['greptile'] }));
-  assertFailed(resolve(['--gate', 'greptile'], { stdin: BOTS([CODEX]), configDir: dir }), /gate/i);
+test('resolve degrades a stale --gate to the fallback ladder with a warning', () => {
+  // A days-old autopilot descriptor may name a gate that has since been marked
+  // unresponsive. Failing hard would leave an unattended run with nothing.
+  const { code, stdout } = resolve(['--gate', 'bugbot'], { stdin: BOTS([CODEX]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'codex-bot');
+  assert.ok(out.warnings.some((w) => w.includes('bugbot')), 'names the stale gate');
 });
 
-test('resolve rejects a gate that is not available', () => {
-  const dir = tmpConfigDir(CFG());
-  assertFailed(resolve(['--gate', 'bugbot'], { stdin: BOTS([CODEX]), configDir: dir }), /bugbot/);
+test('resolve degrades a stale --select to the full set with a warning', () => {
+  const { code, stdout } = resolve(['--select', 'greptile'], { stdin: BOTS([CODEX]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.collect, [CODEX], 'falls back to everything available');
+  assert.ok(out.warnings.some((w) => w.includes('greptile')));
+});
+
+test('resolve honours a valid --select subset', () => {
+  const { stdout } = resolve(['--select', 'coderabbit'], { stdin: BOTS([RABBIT, CODEX]) });
+  const out = JSON.parse(stdout);
+  assert.deepEqual(out.collect, [RABBIT]);
+  assert.equal(out.gate.recipe, 'coderabbit', 'the gate stays inside the selection');
 });
 
 test('resolve degrades an unknown cached recipe instead of crashing', () => {
@@ -1252,51 +1267,23 @@ test('resolve degrades an unknown cached recipe instead of crashing', () => {
   assert.ok(out.warnings.some((w) => w.includes('retired-tool')), 'names the stale id');
 });
 
-test('resolve flags needsPrompt above two candidates', () => {
-  const dir = tmpConfigDir(CFG({ observed: {
-    [RABBIT]: { recipe: 'coderabbit' }, [CODEX]: { recipe: 'codex-bot' },
-    'cursor[bot]': { recipe: 'bugbot' },
-  } }));
-  const { stdout } = resolve([], { stdin: BOTS([RABBIT, CODEX, 'cursor[bot]']), configDir: dir });
+test('resolve flags needsPrompt only when nothing can gate', () => {
+  // Unidentified bots exist but none can close a round: the attended path asks
+  // (identify / retry / add a CLI); the unattended path degrades.
+  const { stdout } = resolve([], { stdin: BOTS([{ login: 'brand-new[bot]' }]) });
   assert.equal(JSON.parse(stdout).needsPrompt, true);
 });
 
-test('resolve does not prompt for two candidates', () => {
-  const dir = tmpConfigDir(CFG({ observed: {
-    [RABBIT]: { recipe: 'coderabbit' }, [CODEX]: { recipe: 'codex-bot' },
-  } }));
-  const { stdout } = resolve([], { stdin: BOTS([RABBIT, CODEX]), configDir: dir });
-  assert.equal(JSON.parse(stdout).needsPrompt, false);
+test('resolve does not prompt when fallback-order resolves a gate', () => {
+  // The common case must stay silent, however many reviewers act here.
+  const { stdout } = resolve([], { stdin: BOTS([RABBIT, CODEX, GEMINI, 'brand-new[bot]']) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.needsPrompt, false);
+  assert.equal(out.gate.recipe, 'codex-bot');
 });
 
-test('resolve does not prompt when the caller already chose', () => {
-  const dir = tmpConfigDir(CFG({ observed: {
-    [RABBIT]: { recipe: 'coderabbit' }, [CODEX]: { recipe: 'codex-bot' },
-    'cursor[bot]': { recipe: 'bugbot' },
-  } }));
-  const stdin = BOTS([RABBIT, CODEX, 'cursor[bot]']);
-  for (const extra of [
-    ['--select', 'coderabbit,codex-bot'],
-    ['--gate', 'codex-bot'],
-  ]) {
-    const { stdout } = resolve(extra, { stdin, configDir: dir });
-    assert.equal(JSON.parse(stdout).needsPrompt, false, `still prompting with ${extra[0]}`);
-  }
-});
-
-test('resolve rejects a selection that matches nothing', () => {
-  // A stale select= token from an autopilot descriptor written days earlier
-  // would otherwise yield an empty round with gate: null and exit 0.
-  const dir = tmpConfigDir(CFG({ observed: { [CODEX]: { recipe: 'codex-bot' } } }));
-  assertFailed(resolve(['--select', 'greptile'], { stdin: BOTS([CODEX]), configDir: dir }),
-    /select|match/i);
-});
-
-test('resolve reports gate:null when nothing can gate, rather than guessing', () => {
-  const dir = tmpConfigDir(CFG({ pending: ['greptile'] }));
-  const { code, stdout } = resolve([], {
-    stdin: BOTS([{ login: 'brand-new[bot]', evidence: true }]), configDir: dir,
-  });
+test('resolve reports gate:null with exit 0 when nothing can gate', () => {
+  const { code, stdout } = resolve([], { stdin: BOTS([{ login: 'brand-new[bot]' }]) });
   assert.equal(code, 0);
   assert.equal(JSON.parse(stdout).gate, null);
 });
@@ -1307,7 +1294,7 @@ test('resolve requires --repo-key and --fallback-order', () => {
 });
 
 test('resolve never writes to the config', () => {
-  const dir = tmpConfigDir(CFG({ observed: { [CODEX]: { recipe: 'codex-bot' } } }));
+  const dir = tmpConfigDir(CFG({ observed: { [CODEX]: { auto: false } } }));
   const before = fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8');
   resolve([], { stdin: BOTS([CODEX, 'brand-new[bot]']), configDir: dir });
   assert.equal(fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8'), before);
@@ -1341,23 +1328,31 @@ const csv = (value) => (value ? value.split(',').map((s) => s.trim()).filter(Boo
 /**
  * Decide this round's roles.
  *
- * Candidates come from three places that cannot be unified — a GitHub bot has a
- * login, a pending recipe has none yet, and a local CLI never appears in GitHub
- * data at all — so each carries its `kind` and its own gating eligibility:
+ * Candidates come from two places that cannot be unified — a GitHub bot has a
+ * login, a local CLI never appears in GitHub data at all — so each carries its
+ * `kind` and its own gating eligibility:
  *
- *   bot      cached or detected login. Gates when it has a usable recipe.
- *   pending  a recipe the user added whose login is not yet known. Never gates:
- *            with nobody to wait for there is no way to tell a round finished.
- *   cli      a local CLI that passed its availability gate. Gates — it runs
- *            synchronously, so finishing *is* the end of the round.
+ *   bot   cached or detected login. Its recipe resolves cache-first (an
+ *         explicit identify wins), then via the registry's verified
+ *         knownLogins, then null. Gates when a recipe resolved.
+ *   cli   a local CLI that passed its availability gate. Gates — it runs
+ *         synchronously, so finishing *is* the end of the round.
  *
  * An unidentified bot (no recipe) is collected but never triggered and never
  * gates. It must additionally carry review evidence: `type == "Bot"` proves
- * automation, not code review, and dependabot's PR prose is not review feedback.
+ * automation, not code review, and dependabot's PR prose is not review
+ * feedback.
+ *
+ * The gate is always triggered, auto or not: a clean signal needs an
+ * addressable response. `auto` only exempts non-gate reviewers.
+ *
+ * A stale --select or --gate degrades with a warning instead of failing: those
+ * values may come from a days-old autopilot descriptor, and a stale token must
+ * not turn an unattended run into an empty one.
  */
 function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
   const warnings = [];
-  const { observed, pending } = reviewersBlock(readConfig(), repoKey);
+  const { observed } = reviewersBlock(readConfig(), repoKey);
 
   // Union of remembered and observed, keyed by login.
   const merged = new Map();
@@ -1371,10 +1366,14 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     .filter((r) => r.triggerable !== false)
     .map((r) => {
       let recipe = r.recipe ?? null;
-      if (recipe && !recipeFor(recipe)) {
-        warnings.push(`cached recipe "${recipe}" is not in the registry; treating ${r.login} as unidentified`);
+      if (recipe !== null && !recipeFor(recipe)) {
+        warnings.push(`cached recipe "${recipe}" is not in the registry; ignoring it for ${r.login}`);
         recipe = null;
       }
+      // A registry-verified login identifies itself: an App's bot login is
+      // app-scoped, identical on every repo. The cached recipe (an explicit
+      // identify) wins when both exist.
+      recipe ??= recipeForLogin(r.login)?.id ?? null;
       return {
         kind: 'bot',
         id: r.login,
@@ -1390,17 +1389,6 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     // prove it reviews before its comments are treated as findings.
     .filter((r) => r.recipe !== null || r.evidence);
 
-  const pendingCandidates = pending
-    .filter((id) => {
-      if (recipeFor(id)) return true;
-      warnings.push(`pending recipe "${id}" is not in the registry; ignoring it`);
-      return false;
-    })
-    .map((id) => ({
-      kind: 'pending', id, login: null, recipe: id, auto: false, evidence: false,
-      lastSeen: null, canGate: false,
-    }));
-
   const cliCandidates = cliAvailable
     .filter((id) => {
       const r = recipeFor(id);
@@ -1413,45 +1401,26 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
       lastSeen: null, canGate: true,
     }));
 
-  const available = [...botCandidates, ...pendingCandidates, ...cliCandidates]
+  const available = [...botCandidates, ...cliCandidates]
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-  const wanted = select ? csv(select) : null;
-  const selected = wanted
+  let wanted = select ? csv(select) : null;
+  let selected = wanted
     ? available.filter((r) => wanted.includes(r.recipe) || wanted.includes(r.id))
     : available;
   if (wanted && selected.length === 0) {
-    throw new InputError(`--select matched no available reviewer: ${wanted.join(', ')}`);
+    warnings.push(`--select matched no available reviewer (${wanted.join(', ')}); ignoring it`);
+    wanted = null;
+    selected = available;
   }
-
-  // One pending binding per round: two unbound triggers in one window make the
-  // responses unattributable, so the rest of the queue waits its turn.
-  const bindingCandidate = selected.find((r) => r.kind === 'pending')?.id ?? null;
-
-  const trigger = selected
-    .filter((r) => {
-      if (r.kind === 'pending') return r.id === bindingCandidate;
-      if (r.kind === 'cli') return true;
-      return !r.auto && r.recipe !== null;
-    })
-    .map((r) => {
-      const recipe = recipeFor(r.recipe);
-      return { kind: recipe.kind, recipe: r.recipe, triggerText: recipe.trigger, login: r.login };
-    });
 
   let gateEntry = null;
   if (gate) {
     const found = selected.find((r) => r.recipe === gate || r.id === gate);
-    if (!found) throw new InputError(`--gate "${gate}" is not among the available reviewers`);
-    if (!found.canGate) {
-      throw new InputError(
-        `--gate "${gate}" cannot gate: ${found.kind === 'pending'
-          ? 'its login is not bound yet'
-          : 'it has no recipe, so it cannot be triggered'}`,
-      );
-    }
-    gateEntry = found;
-  } else {
+    if (found?.canGate) gateEntry = found;
+    else warnings.push(`--gate "${gate}" is not an available gate candidate; falling back to fallback-order`);
+  }
+  if (!gateEntry) {
     for (const id of fallbackOrder) {
       gateEntry = selected.find((r) => r.recipe === id && r.canGate) ?? null;
       if (gateEntry) break;
@@ -1459,14 +1428,32 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     gateEntry ??= selected.find((r) => r.canGate) ?? null;
   }
 
+  const trigger = selected
+    .filter((r) => {
+      if (r.kind === 'cli') return true;
+      if (r.recipe === null) return false;
+      return !r.auto || r === gateEntry;
+    })
+    .map((r) => {
+      const recipe = recipeFor(r.recipe);
+      return {
+        kind: recipe.kind,
+        recipe: r.recipe,
+        triggerText: recipe.trigger,
+        handshake: recipe.handshake,
+        login: r.login,
+      };
+    });
+
   const gatePayload = gateEntry
     ? {
       kind: gateEntry.kind,
       id: gateEntry.id,
       login: gateEntry.login,
       recipe: gateEntry.recipe,
-      // The gate's own policy, not the triggered set's: an auto gate is never
-      // in `trigger`, so this is the only place its timing can be read.
+      // The gate's own policy: a github-bot gate defines the poll window; a
+      // local-cli gate has none — it runs synchronously and its completion
+      // closes the round (SKILL.md branches on `kind`).
       poll: recipeFor(gateEntry.recipe).poll ?? null,
       handshake: recipeFor(gateEntry.recipe).handshake,
     }
@@ -1477,9 +1464,8 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     trigger,
     collect: selected.filter((r) => r.login).map((r) => r.login),
     gate: gatePayload,
-    bindingCandidate,
-    // Only ask when the caller expressed no preference at all.
-    needsPrompt: !wanted && !gate && available.length > 2,
+    // Ask only when something acts here but nothing can close a round.
+    needsPrompt: gateEntry === null && available.length > 0,
     warnings,
   };
 }
@@ -1513,7 +1499,7 @@ dispatch 加入：
 cd plugins/solopreneur/skills/greenlight && node --test tests/*.test.mjs
 ```
 
-Expected: PASS，共 62 個 test（11 registry + 51 state）
+Expected: PASS，共 63 個 test（15 registry + 48 state：11 detect + 15 record + 22 resolve）
 
 - [ ] **Step 5: Commit**
 
@@ -1522,10 +1508,10 @@ git add plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs \
         plugins/solopreneur/skills/greenlight/tests/reviewer-state.test.mjs
 git commit -m "feat(greenlight): add reviewer-state resolve subcommand
 
-Three candidate kinds with separate gating eligibility. A pending recipe is
-triggerable without a login, which breaks the bind deadlock. The gate
-carries its own poll policy so an auto reviewer can gate. An unknown cached
-recipe degrades with a warning instead of crashing the run."
+Recipes resolve cache-first, then via registry-verified logins, so the
+long-standing bots are full citizens on a fresh config. The gate is always
+triggered, auto or not, and carries its own poll policy. Stale --select or
+--gate values degrade with a warning instead of failing the run."
 ```
 
 ---
@@ -1610,7 +1596,7 @@ jobs:
           fi
 ```
 
-- [ ] **Step 2: 本機驗證兩個 Node 版本都綠**
+- [ ] **Step 2: 本機驗證**
 
 ```bash
 cd /Users/Hana/Agents/nana/repos/solopreneur/plugins/solopreneur/skills/greenlight
@@ -1638,21 +1624,23 @@ git commit -m "ci: gate the greenlight skill test suite"
 - Consumes: Task 1 的 `RECIPES`
 - Produces: 瘦身後的 registry 段，供 Task 7–9 引用
 
+**注意：** `SKILL.md:1509-1521` 的硬編碼 login bash 區塊（`CODEX_BOT` / `GEMINI_BOT` / `CODERABBIT_BOT` / `REVIEWER_BOT_LOGINS` / `BOT_LOGIN`）**在本 task 先不動**——後面的 poll / feedback 段落仍讀 `$BOT_LOGIN`，要等 Task 7 的 seam 給出替代來源才能刪，否則 PR 1 的中間 commit 會留下懸空引用。
+
 - [ ] **Step 1: 換掉表格**
 
-把 `SKILL.md:1488-1494` 的表格換成下表。**刪掉 `bot login` 與 `wizard eligibility` 兩欄**（前者是 per-repo 觀測值，後者由 `resolve` 的 `available` 決定）：
+把 `SKILL.md:1488-1494` 的表格換成下表。**刪掉 wizard-eligibility 欄**（由 `resolve` 的 `canGate` 決定）；login 欄改為 **verified login**（僅已驗證的全域 App 帳號，未驗證留 `—`）：
 
-| recipe_id | aliases (arg) | kind | trigger | handshake | poll policy |
-|---|---|---|---|---|---|
-| `codex-bot` | `codex bot` | github-bot | PR comment `@codex review` | 👀 reaction | 60s first, 60s × 20 |
-| `gemini` | `gemini` | github-bot | PR comment `/gemini review` | none | 180s first, 120s × 2 |
-| `coderabbit` | `coderabbit` | github-bot | PR comment `@coderabbitai review` | none | default |
-| `bugbot` | `bugbot`, `cursor` | github-bot | PR comment `bugbot run` (top-level only) | none | default |
-| `greptile` | `greptile` | github-bot | PR comment `@greptileai` | none | default |
-| `codex-cli` | `codex cli` | local-cli | `codex review --base main` | stdout `[P*]` | n/a |
-| `agy` | `agy` | local-cli | `agy --model … --print` | stdout + marker | n/a |
+| recipe_id | aliases (arg) | kind | trigger | handshake | poll policy | verified login |
+|---|---|---|---|---|---|---|
+| `codex-bot` | `codex bot` | github-bot | PR comment `@codex review` | 👀 reaction | 60s first, 60s × 20 | `chatgpt-codex-connector[bot]` |
+| `gemini` | `gemini` | github-bot | PR comment `/gemini review` | none | 180s first, 120s × 2 | `gemini-code-assist[bot]` |
+| `coderabbit` | `coderabbit` | github-bot | PR comment `@coderabbitai review` | none | default | `coderabbitai[bot]` |
+| `bugbot` | `bugbot`, `cursor` | github-bot | PR comment `bugbot run` (top-level only) | none | default | — |
+| `greptile` | `greptile` | github-bot | PR comment `@greptileai` | none | default | — |
+| `codex-cli` | `codex cli` | local-cli | `codex review --base main` | stdout `[P*]` | n/a | n/a |
+| `agy` | `agy` | local-cli | `agy --model … --print` | stdout + marker | n/a | n/a |
 
-- [ ] **Step 2: 改寫 kinds 說明並刪掉硬編碼 login 清單**
+- [ ] **Step 2: 改寫 kinds 說明**
 
 把 `SKILL.md:1496-1502` 換成兩類，`passive-bot` 這個分類消失：
 
@@ -1665,47 +1653,27 @@ git commit -m "ci: gate the greenlight skill test suite"
   a CLI gate, not from activity detection, because a local CLI never appears in
   GitHub data. It stays a legal PR-mode reviewer and gate.
 
-There is deliberately **no bot-login column**. A tool's GitHub login cannot be
-known from outside — `cursor[bot]`, `cursor-com[bot]` and `bugbot[bot]` are all
-real accounts, and GitHub Copilot posts as `Copilot` with no `[bot]` suffix.
-Logins are learned at trigger time and cached per repo.
+**Verified login** is the App account a tool posts from. An App's bot login is
+app-scoped — identical on every repo — so a verified one is vendor knowledge.
+Only observed-and-verified logins are listed; guessing is unsafe
+(`cursor[bot]`, `cursor-com[bot]` and `bugbot[bot]` are all real accounts, and
+GitHub Copilot posts as `Copilot` with no `[bot]` suffix). A `—` tool still
+works: detection collects it by `type == "Bot"`, and an attended identify binds
+its login per repo (see Reviewer selection).
 
 `scripts/reviewer-registry.mjs` is the executable copy of this table and the one
-the loop actually reads; keep this table in sync with it.
+the loop actually reads; `tests/skill-sync.test.mjs` fails CI when the two
+drift.
 ```
 
-刪除 `SKILL.md:1509-1521` 整個 bash 區塊（`CODEX_BOT` / `GEMINI_BOT` / `CODERABBIT_BOT` / `REVIEWER_BOT_LOGINS` / `BOT_LOGIN`）。那份三筆的硬編碼清單被 `detect` 的 `type == "Bot"` 過濾取代。
-
-- [ ] **Step 3: 驗證兩份表一致**
-
-```bash
-cd /Users/Hana/Agents/nana/repos/solopreneur/plugins/solopreneur/skills/greenlight
-node --input-type=module -e '
-import { RECIPES } from "./scripts/reviewer-registry.mjs";
-import fs from "node:fs";
-const md = fs.readFileSync("SKILL.md", "utf8");
-let bad = 0;
-for (const [id, r] of Object.entries(RECIPES)) {
-  if (!md.includes("`" + id + "`")) { console.error("missing row:", id); bad++; continue; }
-  // The trigger string is the one field worth checking mechanically — it is the
-  // only per-tool knowledge, and a stale one sends the wrong comment.
-  if (!md.includes(r.trigger)) { console.error("trigger not in SKILL.md:", id, r.trigger); bad++; }
-}
-if (md.includes("REVIEWER_BOT_LOGINS")) { console.error("hardcoded login list still present"); bad++; }
-if (bad) process.exitCode = 1; else console.log("registry and SKILL.md agree");
-'
-```
-
-Expected: `registry and SKILL.md agree`
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add plugins/solopreneur/skills/greenlight/SKILL.md
 git commit -m "refactor(greenlight): trim reviewer registry to vendor knowledge
 
-Drop the bot-login and wizard-eligibility columns and the hardcoded
-REVIEWER_BOT_LOGINS list. Fold passive-bot into github-bot: auto-review is
+Drop the wizard-eligibility column, restrict the login column to verified
+app-scoped accounts, and fold passive-bot into github-bot: auto-review is
 observed per repo, not a property of the tool."
 ```
 
@@ -1714,16 +1682,17 @@ observed per repo, not a property of the tool."
 ### Task 7: detection 接上腳本 + config.md 文件
 
 **Files:**
-- Modify: `plugins/solopreneur/skills/greenlight/SKILL.md:1526-1601`
+- Modify: `plugins/solopreneur/skills/greenlight/SKILL.md:1526-1601`（detection 段）與 `:1509-1521`（硬編碼 login 區塊，本 task 刪除）
+- Create: `plugins/solopreneur/skills/greenlight/tests/skill-sync.test.mjs`
 - Modify: `plugins/solopreneur/shared/config.md`
 
 **Interfaces:**
 - Consumes: Task 2 的 `detect`、Task 4 的 `resolve`
-- Produces: `RESOLVED`（`resolve` 的 JSON），供 Task 8–9 使用
+- Produces: `RESOLVED`（`resolve` 的 JSON）與 PR-1 seam（`BOT_LOGIN`），供既有 loop 與 Task 8–9 使用
 
 - [ ] **Step 1: 採樣加上來源欄**
 
-`collect_reviewer_activity()` 的三個來源保留，每個 `--jq` 加 `.user.type` 並附一個常數來源標記，成為四欄 TSV：
+`collect_reviewer_activity()`（`SKILL.md:1549-1567`）的三個來源保留，每個 `--jq` 加 `.user.type` 並附一個常數來源標記，成為四欄 TSV：
 
 ```bash
 # Source 1: conversation comments — summaries, quota notices, dependabot prose.
@@ -1738,12 +1707,12 @@ chunk=$(gh api "repos/$OWNER/$REPO/pulls/$n/reviews" \
           --jq '.[] | [.user.login, .user.type, .submitted_at, "formal-review"] | @tsv') || rc=1
 ```
 
-- [ ] **Step 2: 過濾與決策改呼叫腳本**
+- [ ] **Step 2: 過濾與決策改呼叫腳本，並建立 PR-1 seam**
 
 把 `SKILL.md:1573-1586` 的 awk + jq 整段換成：
 
 ```bash
-SCRIPTS="${CLAUDE_SKILL_DIR}/scripts"
+SCRIPTS="${CLAUDE_SKILL_DIR}/"scripts
 REPO_KEY=$(solopreneur_repo_key)
 
 # fallback_order must come through the five-layer cascade: the existing writer
@@ -1756,7 +1725,7 @@ FALLBACK_ORDER=$(read_solopreneur_config greenlight | jq -r '(.fallback_order //
 # the pre-flight CLI gate instead. codex-cli is included whenever its gate
 # passed — it is the documented successor to codex-bot. agy is NOT included
 # automatically: switching model family is the user's call, so it is added only
-# after the selection prompt (see "Reviewer selection").
+# on explicit request (see "Reviewer selection").
 CLI_AVAILABLE=""
 [ "$CODEX_INSTALLED" = true ] && [ "$CODEX_AUTH" = true ] && CLI_AVAILABLE="codex-cli"
 
@@ -1773,24 +1742,70 @@ RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve 
   --repo-key "$REPO_KEY" --fallback-order "$FALLBACK_ORDER" --cli-available "$CLI_AVAILABLE")
 
 # Warnings are actionable config problems (a stale recipe id), not failures.
-printf '%s' "$RESOLVED" | jq -r '.warnings[]?' | while read -r w; do echo "note: $w"; done
+printf '%s' "$RESOLVED" | jq -r '.warnings[]? | "note: " + .'
+
+# PR-1 seam: the existing single-reviewer loop keeps running unchanged and
+# reads its reviewer identity from the resolved gate. PR 2 replaces the
+# consumers (trigger / collect / terminal states) and removes this mapping.
+BOT_LOGIN=$(printf '%s' "$RESOLVED" | jq -r '.gate.login // empty')
 ```
+
+**同一步刪掉 `SKILL.md:1509-1521` 整個 bash 區塊**（`CODEX_BOT` / `GEMINI_BOT` / `CODERABBIT_BOT` / `REVIEWER_BOT_LOGINS` / `BOT_LOGIN` 的硬編碼定義）。三筆的白名單被 `detect` 的 `type == "Bot"` 過濾取代；`BOT_LOGIN` 改由上面的 seam 供應，後續 poll / feedback 段落（`SKILL.md:1690` 起）不需要改就能繼續運作。
 
 - [ ] **Step 3: 更新結果解讀表**
 
-把 `SKILL.md:1591-1595` 換成：
+把 `SKILL.md:1591-1595` 換成（PR-1 語意——loop 仍是單一 reviewer；PR 2 才接 `trigger` / `collect`）：
 
-| Result | Meaning | What happens |
+| Result | Meaning | What happens (PR 1) |
 |---|---|---|
 | `DETECTION_STATUS=unavailable` | API failure / rate limit | `resolve` runs on the cache alone; empty cache falls through to the default flow |
 | `available` empty | Nothing has ever acted here and nothing cached | Default flow (current behaviour) |
-| `available` non-empty | These reviewers act here | Use `trigger` / `collect` / `gate` from `RESOLVED` |
-| `needsPrompt` true | More than two candidates and no explicit choice | Run the selection prompt (Task 8) |
-| `gate` null | Nothing eligible to gate (only unidentified bots or unbound pending) | Cannot establish a clean signal — treat as the exhausted-gate path |
+| `available` non-empty | These reviewers act here | The existing single-reviewer loop continues; `RESOLVED.gate` supplies its reviewer (`BOT_LOGIN` seam). PR 2 rewires trigger/collect/terminal states |
+| `needsPrompt` true / `gate` null | Nothing eligible to gate | PR 1: fall through to the default flow; PR 2 adds the selection prompt |
 
 保留 `SKILL.md:1597-1601`「detection 只列選項、不證明存活」那段——該論述在新架構下依然成立，且正是 `triggerable: false` 自我修復存在的理由。
 
-- [ ] **Step 4: 補 config.md**
+- [ ] **Step 4: 加 skill-sync 測試（常駐取代一次性手動檢查）**
+
+`tests/skill-sync.test.mjs`：
+
+```javascript
+/**
+ * Keeps SKILL.md's human-readable registry table in sync with the executable
+ * registry. The trigger string is the one field worth checking mechanically —
+ * it is the only per-tool knowledge, and a stale one sends the wrong comment.
+ * Runs in the same suite as everything else, so CI enforces it on every PR.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { RECIPES } from '../scripts/reviewer-registry.mjs';
+
+const md = fs.readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'SKILL.md'), 'utf8');
+
+test('every registry row appears in SKILL.md with its trigger', () => {
+  for (const [id, r] of Object.entries(RECIPES)) {
+    assert.ok(md.includes(`\`${id}\``), `missing row: ${id}`);
+    assert.ok(md.includes(r.trigger), `trigger for ${id} not in SKILL.md: ${r.trigger}`);
+  }
+});
+
+test('the hardcoded login allowlist stays deleted', () => {
+  assert.ok(!md.includes('REVIEWER_BOT_LOGINS'), 'hardcoded login list crept back in');
+});
+```
+
+```bash
+cd plugins/solopreneur/skills/greenlight && node --test tests/*.test.mjs
+```
+
+Expected: PASS，共 65 個 test（63 + 2 sync）
+
+- [ ] **Step 5: 補 config.md**
 
 在 `config.md` 的 `greenlight` 範例附近新增：
 
@@ -1807,17 +1822,18 @@ the next helper write.
 
 ```json
 "greenlight_reviewers": {
-  "observed": { "coderabbitai[bot]": { "recipe": "coderabbit", "auto": true } },
-  "pending":  ["greptile"]
+  "observed": {
+    "gemini-code-assist[bot]": { "auto": false, "triggerable": false },
+    "mystery[bot]":            { "recipe": "bugbot" }
+  }
 }
 ```
 
 | Field | Written when | Meaning |
 |---|---|---|
-| `observed.<login>.recipe` | first successful trigger | which registry row this login is; `null` = unidentified — findings still collected, never triggered, cannot gate |
-| `observed.<login>.auto` | observation | it comments without being triggered, so it is never prompted |
-| `observed.<login>.triggerable` | self-healing | `false` after a trigger got no response; excluded until removed by hand |
-| `pending` | user adds a tool by name | recipe known, login not yet; the next round triggers it and binds the responder |
+| `observed.<login>.recipe` | attended identify | which registry row this login is. Registry-verified logins (`knownLogins`) resolve automatically and need no entry; `null` / absent with no registry match = unidentified — findings still collected, never triggered, cannot gate |
+| `observed.<login>.auto` | observation | it comments without being triggered, so non-gate rounds skip prompting it (the gate is always triggered) |
+| `observed.<login>.triggerable` | self-healing | `false` after a trigger got no response within the reviewer's own poll budget; excluded until it acts again or an attended run retries it (both write `true` back) |
 
 `fallback_order` stays in `greenlight` and keeps its meaning, except it now
 orders **gate candidates**. The script never reads or writes it — greenlight
@@ -1827,9 +1843,9 @@ resolves it through `read_solopreneur_config` and passes it in.
 同時修掉兩處會失真的 invariant：
 
 - `config.md:115` 的「Two writers; both write to the primary file only」→ 改為三個 writer，並說明第三個是 Node、只碰 `greenlight_reviewers`。
-- `config.md:340-345` 的其他語言 writer 註冊表 → 新增 `reviewer-state.mjs` 一列，並註明它**會寫**（既有的 `config-resolve.mjs` 一列註明只讀，兩者對比要清楚），因為該表存在的理由就是 grep 只找得到 bash。
+- `config.md:340-345` 的其他語言 writer 註冊清單 → 新增 `reviewer-state.mjs` 一條，並註明它**會寫**（既有的 `config-resolve.mjs` 一條註明只讀，兩者對比要清楚），因為該清單存在的理由就是 grep 只找得到 bash。
 
-- [ ] **Step 5: 用真 repo 驗證**
+- [ ] **Step 6: 用真 repo 驗證**
 
 ```bash
 cd /Users/Hana/Agents/nana/repos/solopreneur
@@ -1839,23 +1855,29 @@ OWNER=hanamizuki REPO=solopreneur
     --jq '.[] | [.user.login, .user.type, .created_at, "conversation"] | @tsv'
   gh api "repos/$OWNER/$REPO/pulls/comments?sort=created&direction=desc&per_page=100" \
     --jq '.[] | [.user.login, .user.type, .created_at, "review-comment"] | @tsv'
-} | node plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs detect | jq .
+} | node plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs detect \
+  | node plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs resolve \
+      --repo-key github.com/hanamizuki/solopreneur --fallback-order codex-bot,codex-cli \
+  | jq .
 ```
 
-Expected: 三筆 bot——`chatgpt-codex-connector[bot]`、`coderabbitai[bot]`、`gemini-code-assist[bot]`，`evidence` 皆為 `true`（三者都有 inline review comment）。**沒有** `hanamizuki`（type User）。
+Expected: `available` 三筆——`chatgpt-codex-connector[bot]` / `coderabbitai[bot]` / `gemini-code-assist[bot]`，**各自帶正確 recipe**（`knownLogins` 自動識別，無需任何 config）、`evidence` 皆 `true`、`canGate` 皆 `true`；`gate.recipe == "codex-bot"`；**沒有** `hanamizuki`（type User）。
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add plugins/solopreneur/skills/greenlight/SKILL.md plugins/solopreneur/shared/config.md
+git add plugins/solopreneur/skills/greenlight/SKILL.md \
+        plugins/solopreneur/skills/greenlight/tests/skill-sync.test.mjs \
+        plugins/solopreneur/shared/config.md
 git commit -m "refactor(greenlight): drive detection through reviewer-state
 
 Sample the same three sources but tag each with its channel, so review
-evidence can be told apart from mere automation. fallback_order still comes
-from the five-layer shell cascade and is passed into the script."
+evidence can be told apart from mere automation. The hardcoded login
+allowlist is gone; the existing loop reads its reviewer from the resolved
+gate until PR 2 rewires the consumers."
 ```
 
-**PR 1 收尾：** 開 PR，標題 `feat(greenlight): detection-driven reviewers`。內文列出行為變更：CodeRabbit 可觸發、通用偵測取代 login 白名單、未識別但有 review 證據的 bot 其 finding 會被收、loop 終止語意**未變**（gate 在 PR 2）。
+**PR 1 收尾：** 開 PR，標題 `feat(greenlight): detection-driven reviewers`。內文列出行為變更：通用偵測取代 login 白名單、三個既有 bot 經 `knownLogins` 自動識別（真 repo 驗證輸出附上）、觀測快取開始累積、loop 終止語意**未變**（gate 與多 reviewer 收集在 PR 2）。
 
 ---
 
@@ -1864,8 +1886,8 @@ from the five-layer shell cascade and is passed into the script."
 ### Task 8: Reviewer 選擇與 gate 互動
 
 **Files:**
-- Modify: `plugins/solopreneur/skills/greenlight/SKILL.md:1613-1663`（Fallback Logic 段）
-- Modify: `plugins/solopreneur/skills/greenlight/SKILL.md:809-835`（Argument Parsing）
+- Modify: `plugins/solopreneur/skills/greenlight/SKILL.md:1613-1688`（Fallback Logic 段）
+- Modify: `plugins/solopreneur/skills/greenlight/SKILL.md:806-843`（PR mode parsing 段）
 
 **Interfaces:**
 - Consumes: Task 4 的 `available` / `needsPrompt` / `warnings`
@@ -1878,37 +1900,54 @@ from the five-layer shell cascade and is passed into the script."
 ```markdown
 ### Reviewer selection (PR mode)
 
-`RESOLVED.needsPrompt` is true when more than two candidates are available and
-the caller expressed no preference. Ask two questions in one exchange:
+The default is silence: when `RESOLVED.gate` is set, run with it — no prompt,
+however many reviewers act here. `RESOLVED.needsPrompt` is true only when bots
+act on this repo but none can close a round (all unidentified or marked
+unresponsive, no CLI). Attended runs then ask **one** question offering:
 
-1. **Which reviewers this round?** (multi-select) List every `available` entry
-   with its `lastSeen`, annotated by kind:
-   - `kind: "bot"`, `auto: true` → "reviews automatically"
-   - `kind: "bot"`, `recipe: null` → "unidentified — findings collected, cannot be triggered or gate"
-   - `kind: "pending"` → "added by you, login not yet known — will bind this round"
-   - `kind: "cli"` → "local CLI"
-2. **Which reviewer's clean pass gates the loop?** (single-select) Offer only
-   entries with `canGate: true`.
+- **Identify** an unidentified bot: list every `available` entry with
+  `recipe: null` and its `lastSeen`; the user names the registry tool a login
+  belongs to. Write it back and re-resolve:
 
-Also offer **"add one not listed"**, backed by the registry table: a tool
-installed today has no history, and GitHub gives no way to enumerate installed
-Apps (`/user/installations` → 403 for a `gh` token, `/repos/{o}/{r}/installation`
-→ 401 without an App JWT, and check-runs show only `github-actions` for the
-review bots verified here). The user picks the tool name; queue it and let the
-binding algorithm learn the login:
+  ```bash
+  printf '{"observations":[{"login":"%s","recipe":"%s"}]}' "$LOGIN" "$RECIPE" \
+    | node "$SCRIPTS/reviewer-state.mjs" record --repo-key "$REPO_KEY"
+  ```
 
-```bash
-node "$SCRIPTS/reviewer-state.mjs" record --repo-key "$REPO_KEY" --add-pending "$RECIPE"
+- **Retry** a reviewer marked `triggerable: false` (list these with a
+  "marked unresponsive" note — the mark may date from a transient outage).
+  Re-selecting clears it:
+
+  ```bash
+  printf '{"observations":[{"login":"%s","triggerable":true}]}' "$LOGIN" \
+    | node "$SCRIPTS/reviewer-state.mjs" record --repo-key "$REPO_KEY"
+  ```
+
+- **Add `agy`** to `--cli-available` for this run. Offered here and only here:
+  it is a local CLI that passes its gate whenever installed, but it is
+  Gemini-family — switching model family is the user's call, not something a
+  fallback chain should do silently. `codex-cli` needs no such prompt: it is
+  the documented successor to `codex-bot` in the same family, and `config.md`'s
+  recommended `fallback_order` already pairs them.
+
+- **Try a tool with no history here**: the user picks a registry recipe; post
+  its trigger this round — a trigger needs only the recipe string, never a
+  login. A responder matching the registry's verified logins identifies
+  itself; an unknown responder shows up as an unidentified bot to identify
+  next time; a silent window leaves no state behind.
+
+- **Halt.**
+
+After any write, re-run `resolve` and continue. Unattended runs never see this
+prompt — see the degradation rule under Fallback Logic.
 ```
 
-**`agy` is offered here and only here.** It is a local CLI that passes its gate
-whenever installed, but it is Gemini-family: switching model family is the user's
-call, not something a fallback chain should do silently. If chosen, add it to
-`--cli-available` for this run. `codex-cli` needs no such prompt — it is the
-documented successor to `codex-bot` in the same model family, and
-`config.md`'s recommended `fallback_order` already pairs them.
+- [ ] **Step 2: 明確選擇的 token 與 persist**
 
-Feed the answers back and re-resolve:
+接著上面的段落補：
+
+```markdown
+When the caller chose explicitly, pass the choice through:
 
 ```bash
 RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve \
@@ -1916,17 +1955,32 @@ RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve 
   --cli-available "$CLI_AVAILABLE" --select "$SELECTED_RECIPES" --gate "$GATE_RECIPE")
 ```
 
-Persist the gate choice so the next run does not ask again. **Use the shell
-helper, which owns `greenlight`** — and note it replaces that feature subtree
-wholesale, which is safe here precisely because observations live under
-`greenlight_reviewers`:
+A stale value (the named reviewer has since been marked unresponsive or never
+acted here) degrades inside `resolve` — warning plus fall back to
+`fallback_order` — so a days-old autopilot descriptor can never produce an
+empty round.
+
+Persist an explicit gate choice so later runs start from it. Read the full
+five-layer subtree, move the gate to the front while **keeping the rest of the
+order** (truncating to one entry would disable the documented codex-bot →
+codex-cli succession), and write the merged subtree to the repo layer. Writing
+the whole merged object is what makes the repo layer's wholesale shadowing
+harmless — the shadow contains everything the five-layer read would have
+returned:
 
 ```bash
-write_solopreneur_repo_config greenlight "{fallback_order:[\"$GATE_RECIPE\"]}"
-```
+CURRENT=$(read_solopreneur_config greenlight)
+write_solopreneur_repo_config greenlight "$(jq -nc \
+  --argjson cur "${CURRENT:-null}" --arg g "$GATE_RECIPE" \
+  '($cur // {}) | .fallback_order = ([$g] + ((.fallback_order // []) - [$g]))')"
 ```
 
-- [ ] **Step 2: 新增 invocation token**
+Because the persisted gate lands at the head of `fallback_order`, the next
+run's plain `resolve` picks it without `--gate` — the prompt never returns for
+a repo that has a working gate.
+```
+
+- [ ] **Step 3: 新增 invocation token**
 
 greenlight 的參數是 token 風格（`external`、`unattended`、`size=m`），**不是** `--flag`（那是腳本層）。新增兩個：
 
@@ -1935,39 +1989,43 @@ greenlight 的參數是 token 風格（`external`、`unattended`、`size=m`）�
 
 兩者**必須**加進 `SKILL.md:823` 的 token-dropping 行（目前丟掉 `external` / `unattended` / `size=…`）。否則 `gate=codex-bot` 會 survive 進 `reviewer_args`，被當成 reviewer 名字，`current_reviewer` 變成字面字串 `gate=codex-bot`，之後每次查表都失敗。擴充同一行，不要加第二輪解析。
 
-- [ ] **Step 3: 更新 Fallback Logic**
+- [ ] **Step 4: 更新 Fallback Logic**
 
 把 `SKILL.md:1628-1638`「With config」改成：
 
 ```markdown
 **With config:** `fallback_order` orders **gate candidates**. The gate is the
-first entry that is available *and* `canGate`; when it fails, it is recorded
-`triggerable: false` and the next entry takes over. Non-gate reviewers are
-untouched by this fallback — they were never holding the loop open.
+first entry that is available *and* `canGate`; when it times out, it is
+recorded `triggerable: false` and the next entry takes over. Non-gate
+reviewers are untouched by this fallback — they were never holding the loop
+open.
 
 Because `config.md`'s recommended order is `["codex-bot", "codex-cli"]`, a dead
 Codex bot falls to Codex CLI automatically: same model family, no prompt.
 
 **When every gate candidate is exhausted** — each tried and recorded
 `triggerable: false` — or when `RESOLVED.gate` is null to begin with, the
-existing escalation applies unchanged: attended runs ask, unattended runs
-**halt** with `reason_class: transient-dependency` (`SKILL.md:1637-1638`).
-Findings collected from `auto` reviewers do **not** rescue this: with no
-triggerable gate there is no way to establish that a round finished, so there is
-no defensible clean signal. Report what was collected, then halt.
+existing escalation applies unchanged: attended runs ask (the selection prompt
+above), unattended runs **halt** with `reason_class: transient-dependency`
+(`SKILL.md:1637-1638`). Findings collected from `auto` reviewers do **not**
+rescue this: with no triggerable gate there is no way to establish that a
+round finished, so there is no defensible clean signal. Report what was
+collected, then halt.
 ```
 
 在 unattended 段（`SKILL.md:1665-1673`）後補：
 
 ```markdown
-For reviewer selection specifically an unattended run does **not** halt: the gate
-becomes the first available `fallback_order` entry and every auto reviewer is
-still collected. Blocking on input is worse than a defensible default gate.
+For reviewer selection specifically an unattended run does **not** halt while a
+gate is resolvable: the gate is the first available `fallback_order` entry and
+every auto reviewer is still collected. Unattended runs never identify, never
+retry a marked reviewer, and never add `agy` — those are attended decisions.
+Blocking on input is worse than a defensible default gate.
 ```
 
 保留 `SKILL.md:1675-1682` 的 Gemini sunset 段原樣。
 
-- [ ] **Step 4: 走查一致性**
+- [ ] **Step 5: 走查一致性**
 
 ```bash
 cd /Users/Hana/Agents/nana/repos/solopreneur/plugins/solopreneur/skills/greenlight
@@ -1977,29 +2035,35 @@ grep -n "select=\|gate=" SKILL.md
 grep -n "wizard eligibility" SKILL.md || echo "ok: no stale wizard-eligibility reference"
 ```
 
-Expected: `select=` / `gate=` 在選擇流程、resolve 呼叫、Argument Parsing 的丟棄行都出現；無殘留 `wizard eligibility`。
+Expected: `select=` / `gate=` 在選擇流程、resolve 呼叫、PR mode parsing 的丟棄行都出現；無殘留 `wizard eligibility`。
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add plugins/solopreneur/skills/greenlight/SKILL.md
 git commit -m "feat(greenlight): add reviewer selection and clean-pass gate
 
-More than two candidates prompts for which to use and which gates.
-fallback_order now orders gate candidates, so codex-cli succeeds codex-bot
-automatically while agy stays opt-in."
+The default is silence: a resolvable gate runs without prompting. The
+prompt appears only when nothing can gate, and offers identify, retry,
+agy, or halt. An explicit gate choice is persisted by prepending it to the
+merged fallback_order at the repo layer, so succession survives."
 ```
 
 ---
 
-### Task 9: Poll 窗口、終端狀態與綁定
+### Task 9: Poll 窗口、終端狀態與觀測回寫
 
 **Files:**
-- Modify: `plugins/solopreneur/skills/greenlight/SKILL.md`（Phase 3 external loop，PR mode 部分）
+- Modify: `plugins/solopreneur/skills/greenlight/SKILL.md`（Phase 3 external loop，PR mode 部分；含 Feedback Detection Strategy 段 `SKILL.md:1690` 起的參數化）
 
 **Interfaces:**
-- Consumes: Task 4 的 `trigger` / `collect` / `gate` / `bindingCandidate`；Task 3 的 `record`
-- Produces: 一輪的完整流程與 `record` 的 payload
+- Consumes: Task 4 的 `trigger` / `collect` / `gate`；Task 3 的 `record`
+- Produces: 一輪的完整流程與 `record` 的 payload；移除 Task 7 的 PR-1 seam
+
+**兩個必須保留的既有機制**（改寫時整段覆蓋掉就是 regression）：
+
+1. **👀 handshake 確認梯**（`SKILL.md:1786-1799`）：`@codex review` 有時觸發不了 bot，無 👀 要重貼（上限 2 次）。新流程按 `trigger[].handshake == "reaction"` 套用，`none` 的發一次即可。
+2. **👍-only clean 訊號**（Feedback Detection priority 2.5，`SKILL.md:1831-1844`）：codex bot 有時不留言只按 👍。「gate 回應了」的判定必須含 👍 reaction，否則健康 bot 的 clean pass 會被分類成 `timeout` → 被誤標 `triggerable: false`。quota 關鍵字表與「匹配到 quota/clean 時印前三行人工確認」的警告（`SKILL.md:1846-1854`）一併保留，逐 login 參數化（原本吃單一 `$BOT_LOGIN`）。
 
 - [ ] **Step 1: 改寫一輪的流程**
 
@@ -2013,46 +2077,58 @@ Each round:
    reviewer that only files formal reviews. **Never filter by timestamp**
    (existing rule).
 3. Trigger every entry in `RESOLVED.trigger`, in parallel, branching on `kind`:
-   - `github-bot` → post `triggerText` as a top-level PR comment
-   - `local-cli` → run it via the existing Flow B (synchronous, read stdout)
-   Entries absent from `trigger` are `auto` (needs no prompting) or recipe-less
-   (cannot be prompted).
-4. Open the poll window using **`RESOLVED.gate.poll`** and `gate.handshake`.
-5. Inside the window collect new items from **every** login in `collect`, not
-   only the triggered ones, across all three channels.
-6. Close the window when the gate produces a new item, or on timeout. This holds
-   when the gate is `auto`: the test is "did the gate produce something new", not
-   "did it answer a trigger", so gating on CodeRabbit works.
-7. Write observations and bindings (Step 2 below).
-8. Merge and dedupe findings across all sources, then hand them to the existing
-   finding-processing flow, adversarial verification included.
-9. Classify the round into exactly one terminal state (Step 3 below).
+   - `github-bot` → post `triggerText` as a top-level PR comment, then run the
+     handshake for that entry: `reaction` → the existing 👀 ladder (wait 30s,
+     recheck once, re-comment on silence, max 2 retries); `none` → post once.
+   - `local-cli` → run it via the existing Flow B (synchronous, read stdout).
+   Entries absent from `trigger` are non-gate `auto` reviewers (need no
+   prompting) or recipe-less (cannot be prompted). The gate itself is always
+   in `trigger` — auto or not.
+4. Open the wait window from **`RESOLVED.gate`**:
+   - `gate.kind == "bot"` → poll on `gate.poll`.
+   - `gate.kind == "cli"` → no poll window: the CLI's synchronous completion
+     closes the round. After it returns, do one collection sweep across the
+     three channels for the other selected logins.
+5. Inside the window scan each channel's new items. The scan itself is
+   **unfiltered** (observation write-back needs to see every Bot login);
+   findings are taken only from logins in `collect`. Check the gate's 👍
+   reaction alongside its comments (priority 2.5).
+6. Close the window when the gate produces a new item **or a 👍-only
+   reaction**, or on timeout.
+7. **Classify before touching anything** — exactly one terminal state by the
+   precedence table below. Fixing before classifying would let the loop end on
+   a diff no reviewer has seen.
+8. Act on the state: `findings` → merge, dedupe, hand to the existing
+   finding-processing flow (adversarial verification included), then next
+   round. `clean` → one final sweep for late arrivals, report anything
+   unprocessed (do **not** fix it — fixing now would end the loop on an
+   unreviewed diff), end. `timeout` / `quota` → observation write-back, next
+   gate candidate or halt.
+9. Write observations (Step 2 below).
 
 **Deliberately not waiting for auto reviewers.** The window closes on the gate.
 An auto reviewer still mid-review is not waited for — every channel's ceiling
-rises monotonically, so its late findings arrive next round. Nothing is lost; it
-is deferred by one round. This is what stops "collect four reviewers" from
-becoming "wait for the slowest one, every round".
+rises monotonically, so its late findings arrive next round; on the final
+round they land in the closing report instead of vanishing. This is what stops
+"collect four reviewers" from becoming "wait for the slowest one, every
+round".
 ```
 
-- [ ] **Step 2: 觀測與綁定回寫**
+- [ ] **Step 2: 觀測回寫**
 
 ```markdown
-After closing the window, build `$OBSERVATIONS` from what the window actually
-showed. Each row below is decidable from the collected items plus
-`RESOLVED.trigger`:
+After closing the window, build `$OBSERVATIONS` from the unfiltered channel
+scan (Bot-typed logins only) plus `RESOLVED`:
 
 | Condition | Payload |
 |---|---|
-| login produced an item, was **not** in `trigger` | `observations: [{login, auto: true}]` |
-| login was in `trigger` and produced an item | `observations: [{login, auto: false}]` |
-| login was in `trigger` and stayed silent all window | `observations: [{login, triggerable: false}]` |
-| exactly one **new unbound** login appeared and `bindingCandidate` was triggered | `bind: {recipe: bindingCandidate, login: <that login>}` |
-| `bindingCandidate` was triggered and **no** new unbound login appeared | `dropPending: [bindingCandidate]` |
-| **more than one** new unbound login appeared | attended: ask which; unattended: neither `bind` nor `dropPending` — leave them `recipe: null` so findings are still collected |
+| Bot login produced an item, was **not** in `trigger` | `{login, auto: true}` |
+| login was in `trigger` **because non-auto** and produced an item | `{login, auto: false}` (the gate's forced trigger never rewrites `auto` — check the entry's `auto` in `RESOLVED.available`) |
+| login was in `trigger`, stayed silent all window, **and** the window covered its own recipe's poll budget | `{login, triggerable: false}` (the gate always qualifies — the window *is* its budget; a non-gate reviewer slower than the gate's window is simply unobserved this round, not unresponsive) |
+| a cached `triggerable: false` login produced any item | `{login, triggerable: true}` (self-healing back) |
+| an unidentified Bot login produced an evidence-shaped item (review comment / formal review) | attended: offer identify (may also be done at the next selection prompt); unattended: nothing — findings from unidentified bots are already collected |
 
-"New unbound" = a login in this window's items that is absent from
-`RESOLVED.available`. Then:
+Then:
 
 ```bash
 printf '%s' "$OBSERVATIONS" \
@@ -2062,64 +2138,71 @@ printf '%s' "$OBSERVATIONS" \
 An empty payload is legal and rewrites nothing.
 ```
 
-- [ ] **Step 3: 四個終端狀態**
+- [ ] **Step 3: 四個終端狀態（優先序判定）**
 
 ```markdown
-**Silence is not a pass.** Classify every round into exactly one state; only the
-first ends the loop:
+**Silence is not a pass.** Classify every round into exactly one state by
+walking this table top-down; the first matching row wins:
 
-| State | Condition | Action |
-|---|---|---|
-| `clean` | the gate **produced an item** and it carried no new findings | end the loop |
-| `findings` | new findings from any collected reviewer | fix, next round |
-| `timeout` | the gate stayed silent through the whole window | record `triggerable: false`, move to the next gate candidate; candidates exhausted → halt. **Never clean** |
-| `quota` | the gate's item is a quota / rate-limit notice | same path as `timeout` |
+| Precedence | State | Condition | Action |
+|---|---|---|---|
+| 1 | `findings` | new findings from **any** collected reviewer, gate included | fix, next round |
+| 2 | `quota` | no new findings, and the gate's response is a quota / rate-limit notice | next gate candidate; candidates exhausted → halt |
+| 3 | `timeout` | no new findings, and the gate stayed silent through the whole window (no item, no 👍) | record `triggerable: false`, next gate candidate; exhausted → halt. **Never clean** |
+| 4 | `clean` | the gate responded (item or 👍) and nobody produced a new finding | final sweep, report leftovers, end the loop |
 
-This distinction is load-bearing. Treating "no new findings" as clean would make
-a dead reviewer equal a passing review — the one direction a review gate must
-never fail in.
+`findings` outranking `clean` is load-bearing: when the gate passes but another
+reviewer found something, that round must loop — fixing and then declaring
+clean would end the loop on a diff no reviewer has reviewed. The other
+direction (a dead reviewer counting as a pass) is blocked by row 3.
 
-`SIZE_MAX_ROUNDS` (S=3 / M=5 / L=10) is unchanged. Size S is external-only with
-a single reviewer, which is therefore the gate, so the >2 selection prompt cannot
+`SIZE_MAX_ROUNDS` (S=3 / M=5 / L=10) is unchanged and is what bounds a chatty
+auto reviewer stretching the loop; at the cap the unresolved items go into the
+closing report. Size S is external-only with a single reviewer — its gate
+resolves straight from `fallback_order`, so the nothing-can-gate prompt cannot
 trigger under S.
 ```
+
+同步移除 Task 7 的 PR-1 seam（`BOT_LOGIN` mapping）——本 task 之後 poll / feedback 消費端直接吃 `RESOLVED.gate` 與 `collect`，逐 login 參數化。
 
 - [ ] **Step 4: 實跑驗證（需要一個開著的 PR）**
 
 四項，各對應一個設計主張。逐項記錄結果：
 
 ```bash
-# 1. CodeRabbit 可觸發（PR 1 的核心主張，也驗證 OSS 方案下 chat 指令可用）
+# 1. CodeRabbit 可觸發（動機 1 的核心主張，也驗證 OSS 方案下 chat 指令可用）
 gh pr comment <PR> --body "@coderabbitai review"
 sleep 180
 gh api "repos/hanamizuki/solopreneur/pulls/<PR>/comments" \
   --jq '[.[] | select(.user.login=="coderabbitai[bot]")] | length'
+#    若過程中出現 CodeRabbit 的 rate-limit 通知，抄下原文措辭，
+#    對照 quota 關鍵字表確認匹配得到（M6：新 bot 的 quota 偵測未驗證過）
 
-# 2. 綁定流程走完整路徑——不可手動塞入猜測的 login 代替
-node plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs \
-  record --repo-key github.com/hanamizuki/solopreneur --add-pending greptile
-#    然後跑一輪 greenlight，確認：發出了 `@greptileai`；窗口內沒有新未綁定 login；
-#    收尾後 pending 已清空（dropPending 生效）
+# 2. timeout 不等於 clean
+#    把 gate 設成一個已知不會回應的 reviewer（gemini，consumer 方案已 sunset），
+#    確認該輪回報 timeout、寫入 triggerable:false、換下一個 gate 候補、
+#    且**沒有**結束 loop
 jq '.repos["github.com/hanamizuki/solopreneur"].greenlight_reviewers' \
   "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
 
-# 3. timeout 不等於 clean
-#    把 gate 設成一個已知不會回應的 reviewer，確認該輪回報 timeout、
-#    寫入 triggerable:false、且**沒有**結束 loop
+# 3. 無歷史工具的完整路徑——不可手動塞入猜測的 login 代替
+#    attended 跑一輪，走「Try a tool with no history」選 greptile：
+#    確認發出了 `@greptileai`；整窗無回應後**沒有任何狀態被寫入** config；
+#    （若有回應則走 identify，確認寫入 observed[login].recipe）
+
 # 4. unattended 不等待輸入
-#    在有 >2 候選的 repo 上跑 `/greenlight external unattended`
+#    在多 reviewer 的 repo 上跑 `/greenlight external unattended`，全程無提示，
+#    gate 為 fallback_order 第一個可用者
 ```
 
-Expected: 1 有回應；2 `pending` 清空且沒有捏造的 login 進 `observed`；3 回報 `timeout` 並換 gate；4 全程無提示。
+Expected: 1 有回應；2 回報 `timeout`、標記寫入、gate 換手、loop 未結束；3 無回應時 config 逐位元不變；4 全程無提示。
 
 **自動化測不到的兩處，只能走查**（誠實記錄，不要假裝有覆蓋）：
 
 | 行為 | 為什麼測不到 | 怎麼確認 |
 |---|---|---|
-| 窗口內出現**兩個**新未綁定 login 時不綁定 | 決策在 SKILL.md 的 prompt 層。腳本只收 SKILL.md 已經決定好的 `bind` payload，看不到「窗口裡有幾個新 login」 | 讀 Step 2 的表格，確認該列存在且 unattended 分支明確寫「neither `bind` nor `dropPending`」 |
-| 四個終端狀態的分類 | 同上——`clean` / `timeout` 的判定發生在 prompt 層 | 上面實跑第 3 項；另確認 Step 3 的表沒有任何一列把沉默導向 `clean` |
-
-腳本層對這兩者能保證的只有：`record` 在沒有 `bind` 時不會憑空綁定（Task 3 的 empty-payload 測試），以及 `resolve` 一輪只給一個 `bindingCandidate`（Task 4）。剩下的靠 prompt 走查。
+| 終端狀態的優先序分類 | `clean` / `findings` / `timeout` 的判定發生在 prompt 層 | 上面實跑第 2 項；另確認 Step 3 的表把 `findings` 放在第 1 列、沉默沒有任何一列導向 `clean` |
+| 觀測 payload 的組裝 | 六種條件對應的 payload 由 SKILL.md 決定，腳本只驗證欄位合法性 | 讀 Step 2 的表格逐列對照；腳本層保證的是 `record` 不憑空發明欄位（Task 3 的 empty-payload 與 schema 驗證測試） |
 
 - [ ] **Step 5: Commit**
 
@@ -2127,9 +2210,11 @@ Expected: 1 有回應；2 `pending` 清空且沒有捏造的 login 進 `observed
 git add plugins/solopreneur/skills/greenlight/SKILL.md
 git commit -m "feat(greenlight): per-channel poll window with four terminal states
 
-Trigger non-auto reviewers in parallel, collect from all selected logins
-across all three channels, close on the gate. A silent gate is a timeout,
-never a clean pass. One pending recipe binds per round."
+Trigger everything in parallel (the gate always included, auto or not),
+collect from all selected logins across all three channels, close on the
+gate's item or thumbs-up. findings outranks clean so the loop never ends
+on an unreviewed diff; a silent gate is a timeout, never a pass, and
+triggerable is written only within a reviewer's own poll budget."
 ```
 
 ---
@@ -2145,15 +2230,17 @@ never a clean pass. One pending recipe binds per round."
 - Consumes: Task 8 的 `select=` / `gate=` token
 - Produces: `{SELECT}` / `{GATE}` 兩個 dispatch-time 變數與對應的 descriptor 欄位
 
-**現況**（已查證）：autopilot 不直接呼叫 greenlight。它把變數代入 `references/pr-subagent-template.md`，由被 dispatch 的 worktree subagent 在其 Step 5 執行 `/greenlight size=m`（`pr-subagent-template.md:90`）。plan.yaml 的完整 schema 在 `references/schemas.md`（`autopilot/SKILL.md:174` 指向它），新欄位必須在那裡定義。既有的 `{SIZE}` 是要照抄的先例。
+**現況**（已查證）：autopilot 不直接呼叫 greenlight。它把變數代入 `references/pr-subagent-template.md`，由被 dispatch 的 worktree subagent 在其 Step 5 執行 `/greenlight size=m`（`pr-subagent-template.md:90`）。plan.yaml 的完整 schema 在 `references/schemas.md`（`autopilot/SKILL.md:176` 指向它），新欄位必須在那裡定義；既有的 `size` 欄（`schemas.md:16` 範例、`:52` 欄位表）是要照抄的先例。
+
+**刻意不做規劃期預解析**：原設計在 autopilot 規劃階段跨 sibling skill 呼叫 `resolve` 並複製選擇 UX，代價是路徑拼接的脆弱性與第二份互動流程，而收益只有「descriptor 可以預填」。規劃者**可以**把使用者明講的偏好寫進 `select` / `gate`（optional 欄位），解析與降級一律由 greenlight 自己做——stale 值在 `resolve` 內降級（Task 4），unattended 的預設 gate 由 `fallback_order` 決定（Task 8）。
 
 - [ ] **Step 1: schema 定義新欄位**
 
 在 `references/schemas.md` 的 PR descriptor 定義中新增兩個 optional 欄位，措辭比照既有 `size`：
 
 ```markdown
-| `select` | optional | Comma-separated reviewer recipe ids for `/greenlight`. Resolved during the interactive planning phase; omit to let greenlight resolve from per-repo config. |
-| `gate`   | optional | The recipe whose clean pass gates the review loop. Omit to use the first available `fallback_order` entry. |
+| `select` | optional | Comma-separated reviewer recipe ids for `/greenlight`. Set it only when the user stated a preference during planning; omit to let greenlight resolve from per-repo config. Stale ids degrade with a warning at run time. |
+| `gate`   | optional | The recipe whose clean pass gates the review loop. Omit to use the first available `fallback_order` entry. Stale values degrade the same way. |
 ```
 
 - [ ] **Step 2: 加入 dispatch-time 變數**
@@ -2168,33 +2255,7 @@ never a clean pass. One pending recipe binds per round."
      `gate={GATE}`. Drop the clause when unset, exactly as with `{SIZE}`.
 ```
 
-- [ ] **Step 3: 規劃階段問一次**
-
-autopilot 的規劃階段互動、dispatch 之後不互動，所以問答必須在規劃時完成。在產出 descriptor 的步驟加入：
-
-```markdown
-While still interactive, resolve the reviewer selection once for this repo:
-
-```bash
-REPO_KEY=$(solopreneur_repo_key)
-FALLBACK_ORDER=$(read_solopreneur_config greenlight | jq -r '(.fallback_order // []) | join(",")')
-RESOLVED=$(… | node "${CLAUDE_SKILL_DIR}/"../greenlight/scripts/reviewer-state.mjs resolve \
-  --repo-key "$REPO_KEY" --fallback-order "$FALLBACK_ORDER")
-```
-
-If `RESOLVED.needsPrompt` is true, ask greenlight's two selection questions here
-and write the answers into the descriptor's `select` / `gate` fields. Asking now
-is the whole point — the dispatched agent cannot.
-```
-
-That path reaches across sibling skills, which holds because `autopilot` and
-`greenlight` are both skills of the **same** plugin and therefore always share a
-parent directory. Step 5's grep confirms the resolved path. If it ever fails to
-resolve, degrade rather than block: skip the pre-resolution, leave `select` /
-`gate` unset, and let the dispatched `unattended` run pick its default gate —
-the descriptor fields are optional precisely so this is survivable.
-
-- [ ] **Step 4: 模板傳遞 token 並明確帶 `unattended`**
+- [ ] **Step 3: 模板傳遞 token 並明確帶 `unattended`**
 
 改 `references/pr-subagent-template.md:88-95`。除了新 token，**還要明確加上 `unattended`**——目前的 invocation 沒有它（`pr-subagent-template.md:90` 只有 `size={SIZE}`），而新的降級行為（不問、不 halt、用預設 gate）是綁在該 token 上的：
 
@@ -2208,10 +2269,12 @@ pass `size={SIZE}`; when it recorded a reviewer selection, also pass
     /greenlight unattended size=m select=coderabbit,codex-bot gate=codex-bot
 
 With no selection tokens, greenlight resolves from the per-repo config and falls
-back to the first available `fallback_order` entry as gate.
+back to the first available `fallback_order` entry as gate. Stale tokens (a
+reviewer marked unresponsive since planning) degrade with a warning — they
+never fail the run.
 ```
 
-- [ ] **Step 5: 走查一致性**
+- [ ] **Step 4: 走查一致性**
 
 ```bash
 cd /Users/Hana/Agents/nana/repos/solopreneur
@@ -2226,7 +2289,7 @@ grep -n "select\|gate" plugins/solopreneur/skills/autopilot/references/schemas.m
 
 Expected: 四個 grep 都有命中；token 拼法兩邊一致（`select=` / `gate=`，非 `--select`）。
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add plugins/solopreneur/skills/autopilot/SKILL.md \
@@ -2234,10 +2297,10 @@ git add plugins/solopreneur/skills/autopilot/SKILL.md \
         plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md
 git commit -m "feat(autopilot): pass reviewer selection through to greenlight
 
-Resolve the selection during interactive planning and hand it to the
-dispatched subagent as select=/gate= tokens, mirroring size=. The dispatched
-invocation now carries `unattended` explicitly, which is what the
-no-prompt fallback is keyed on."
+Optional select=/gate= descriptor fields mirror size=, filled only from a
+user-stated preference during planning. The dispatched invocation now
+carries unattended explicitly, which is what the no-prompt fallback is
+keyed on; stale tokens degrade inside greenlight instead of failing."
 ```
 
 **PR 2 收尾：** 開 PR，標題 `feat(greenlight): selectable gate and multi-reviewer collection`。內文附 Task 9 Step 4 的四項實跑結果。
