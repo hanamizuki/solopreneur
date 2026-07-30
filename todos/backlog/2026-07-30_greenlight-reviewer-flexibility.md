@@ -1,8 +1,9 @@
 # greenlight external reviewer 改成偵測驅動 + 可選 gate
 
 把 external reviewer 從「硬編碼 login 白名單 + 序列 fallback」改成「通用偵測 +
-per-repo 觀測快取 + 使用者選定 gate」。新裝的 review bot 不必改 skill 就能貢獻
-意見；registry 只保留廠商知識（觸發指令一行）。
+per-repo 觀測快取 + 使用者選定 gate」。留下 review 形狀證據的新 bot 不必改 skill
+就能貢獻意見；registry 只保留廠商知識（觸發指令一行）。local-cli 在 PR mode 的既有
+角色保留。
 
 ## 動機
 
@@ -64,6 +65,22 @@ clean pass 當終點。
 review 叫不動，只有 summary）、public repo 走 Open Source plan（Pro+ 功能全開）；
 Bugbot 是用量計費。從外部無從得知使用者買了什麼，但觀測不需要知道。
 
+### 觸發身分與輪詢身分必須分開
+
+第一列的「觸發後綁定 login」有個陷阱：如果把「發指令」和「等回應」都掛在同一個
+login 上，就會鎖死——要有 login 才能觸發，要觸發才能學到 login。
+
+拆開就沒有循環：
+
+| 動作 | 需要什麼 | 不需要什麼 |
+|---|---|---|
+| 發觸發指令 | recipe（指令字串） | login |
+| 等待與歸屬回應 | login | — |
+
+所以一個只有 recipe、還沒有 login 的 reviewer 照樣觸發得出去；等待階段等的不是
+「某個特定 login」，而是「任何新出現的未綁定 Bot」，回應者就是它。這是整份設計裡
+唯一需要新狀態的地方（見〈綁定演算法〉）。
+
 ### 兩份資料的分工
 
 **Registry — 只留廠商知識。** 刪掉 `bot login` 欄（那是 per-repo 觀測值）。`kind`
@@ -83,34 +100,70 @@ Bugbot 是用量計費。從外部無從得知使用者買了什麼，但觀測�
 驗證的做法）+ 通用 poll（3min 首等，2min × 3）。**新增一個 bot 的成本因此是一行
 trigger 指令**，handshake 與 poll 都有安全預設，不需要預先知道。
 
-**Config — 存所有觀測值**，落在 `repos[<repo-key>].greenlight`（現有 config
-layering 第 1 層，不需新增機制）：
+**Config — 存所有觀測值**，落在 **`repos[<repo-key>].greenlight_reviewers`**，一個
+與 `greenlight` 並列的**獨立 feature key**：
 
 ```json
-"reviewers": {
-  "coderabbitai[bot]":            { "recipe": "coderabbit", "auto": true },
-  "chatgpt-codex-connector[bot]": { "recipe": "codex-bot",  "auto": false },
-  "gemini-code-assist[bot]":      { "recipe": "gemini", "auto": false, "triggerable": false },
-  "some-new-bot[bot]":            { "recipe": null, "auto": true }
+"greenlight_reviewers": {
+  "observed": {
+    "coderabbitai[bot]":            { "recipe": "coderabbit", "auto": true },
+    "chatgpt-codex-connector[bot]": { "recipe": "codex-bot",  "auto": false },
+    "gemini-code-assist[bot]":      { "recipe": "gemini", "auto": false, "triggerable": false },
+    "some-new-bot[bot]":            { "recipe": null, "auto": true }
+  },
+  "pending": ["greptile"]
 }
 ```
 
 | 欄位 | 來源 | 意義 |
 |---|---|---|
-| key | 偵測（`.user.type == "Bot"`） | 唯一無法預知的資訊 |
+| `observed` key | 偵測（`.user.type == "Bot"`） | 唯一無法預知的資訊 |
 | `recipe` | 觸發後自動綁定 | 對到 registry 哪一列；`null` = 未識別出工具身分 |
 | `auto` | 觀測 | 沒被觸發也會留言 |
 | `triggerable: false` | 自我修復 | 發過指令但無回應 |
+| `pending` | 使用者手動加入 | 已知 recipe、還沒綁到 login，等第一次觸發 |
+
+**為什麼是獨立 feature key 而不是 `greenlight.reviewers`。** config 的五層讀取是
+**per-feature、整棵 subtree、層間不合併**（`shared/config.md:93-96`），而現有
+`fallback_order` 的 writer 落在 `.default.greenlight`（`greenlight/SKILL.md:1656`）。
+若觀測值寫進 `repos[<key>].greenlight`，layer 1 就會命中一棵沒有 `fallback_order`
+的 subtree，把 user-global 的設定永久遮蔽——破壞一條這次根本沒碰的程式碼路徑。
+`write_solopreneur_repo_config` 也是整棵替換（`config.md:303` 的 jq 是 `.[$fk] = $v`，
+只承諾保留 sibling **features**，不保留 subtree 內的 key），所以存 gate 選擇會把
+`reviewers` 整個刪掉。拆成獨立 feature key 同時避開這兩個問題。
+
+**因此 `fallback_order` 不由腳本讀。** 它由 SKILL.md 用現成的
+`read_solopreneur_config greenlight` 走完整五層取得後傳入——腳本不重新實作那五層，
+也永遠不寫 `greenlight` 這個 key。單一 writer 原則：腳本獨佔
+`greenlight_reviewers`，shell helper 獨佔 `greenlight`。
 
 ### 兩層彈性
 
-- **第一層（零維護）**：任何 `.user.type == "Bot"` 的新 bot，只要它自己會在 PR 上
-  留意見，finding 立刻被收進 loop。`recipe: null` 也照收。裝了新工具什麼都不用設定
-  就開始有用。
+- **第一層（零維護）**：任何 `.user.type == "Bot"` 且**留下 review 形狀證據**的新
+  bot，finding 立刻被收進 loop。`recipe: null` 也照收。裝了新工具什麼都不用設定就
+  開始有用。
 - **第二層（需要 recipe）**：只有「主動催它」才需要 registry 那行 trigger。
 
-detection 的改動因此只有一處：過濾條件從比對 `REVIEWER_BOT_LOGINS` 改成
-`.user.type == "Bot"`。三個來源的採樣邏輯與 all-or-nothing 降級行為不變。
+**「review 形狀證據」是必要的門檻，不是額外嚴格。** `.user.type == "Bot"` 認的是
+自動化，不是 review 能力——dependabot、release bot、CI bot、deployment bot 全都是
+`Bot`。而預設選取是「所有 available」，所以若只看 type，dependabot 的 PR 描述會被
+當成 review finding 送進處理流程。
+
+門檻的判準剛好落在現有三個採樣來源的分工上，不需要新資料：
+
+| 來源 | 內容 | 算 reviewer 證據？ |
+|---|---|---|
+| Source 1 `issues/comments` | PR 對話留言（摘要、配額通知、dependabot 的說明） | ❌ 不算 |
+| Source 2 `pulls/comments` | inline review comment（逐行意見） | ✅ 算 |
+| Source 3 `pulls/<n>/reviews` | formal review | ✅ 算 |
+
+dependabot 只出現在 Source 1，自然被濾掉；三個現有 review bot 在 Source 2/3 都有
+大量紀錄（見〈動機 1〉的實測表）。所以 detect 必須保留「證據來自哪個來源」，不能只
+回傳 login + lastSeen。
+
+detection 的改動因此有兩處：過濾條件從比對 `REVIEWER_BOT_LOGINS` 改成
+`.user.type == "Bot"`，且每筆活動要帶來源標記以判定 reviewer 資格。三個來源的採樣
+邏輯與 all-or-nothing 降級行為不變。
 
 ### Reviewer 選擇與 gate
 
@@ -118,19 +171,43 @@ detection 的改動因此只有一處：過濾條件從比對 `REVIEWER_BOT_LOGI
 當 gate（單選）。清單附各自的 `last_seen`，並提供「還有其他嗎」的開口讓使用者從
 recipe 清單手動補（見〈偵測不到的情況〉）。
 
-「可用」= 偵測到且 `triggerable != false` 的，加上 config 裡手動補進來的。
-`recipe: null`（未識別工具身分）的 bot **可以**被選入——它們的 finding 照收——但
-**不能當 gate**：沒有 recipe 就無法主動觸發，也就無從判定它這輪是否已經講完。
+候選來源有三種，能否當 gate 的資格各不相同：
+
+| 候選 | 來源 | 可當 gate？ |
+|---|---|---|
+| `observed` 且有 recipe | 偵測 / 快取 | ✅ |
+| `observed` 但 `recipe: null` | 偵測到的未識別 bot | ❌ 沒有 recipe 就無法主動觸發，無從判定它這輪講完了 |
+| `pending`（有 recipe、無 login） | 使用者手動加入 | ❌ 首輪不知道等誰；綁定成功後下一輪起才有資格 |
+| local-cli（`codex-cli` / `agy`） | CLI 可用性 gate，不在 GitHub 活動裡 | ✅ 見下 |
+
+`triggerable: false` 的一律排除在候選之外。
+
+**local-cli 在 PR mode 保留，角色明確。** 它們沒有 bot login，永遠不會出現在偵測
+結果裡，所以可用性由既有的 CLI gate 決定（`greenlight/SKILL.md:719`）而非活動偵測。
+這不是新增能力——PR mode 的 `current_reviewer` 表本來就有 `"codex cli"` → Flow B
+（`SKILL.md:1754`），且 `config.md` 三處推薦的預設 `fallback_order` 都是
+`["codex-bot", "codex-cli"]`。若把 local-cli 排除在新架構外，這個文件推薦的預設會
+靜默失效。兩者的處理不同：
+
+- **`codex-cli`：codex-bot 失敗時自動接手**，不詢問。它同步跑完就是一輪結束，天然
+  適合當 gate，且與 codex-bot 同模型家族，接手後 review 標準一致。
+- **`agy`：不自動使用，必須詢問**。它是 Gemini 家族，換模型家族是使用者該知道的
+  事，不該在 fallback 鏈上靜默發生。
 
 gate 語意：
 
 | | 行為 |
 |---|---|
-| gate reviewer | 它這輪沒有新 finding → loop 結束 |
+| gate reviewer | 它這輪**回應了且沒有新 finding** → loop 結束 |
 | 其他 reviewer | finding 照收照修，但它們沒 clean 不阻擋結束 |
 | 收尾 | 結束時把非 gate reviewer 尚未處理的意見列進報告，交使用者判斷 |
 
 沒有 gate 概念的話「四個都要」會變成「四個都得閉嘴才算過」，實務上收斂不了。
+
+**gate 的契約必須含它自己的 poll 政策。** 一輪的等待時間取決於 gate 是誰，而 gate
+可能是 `auto`（例如選 CodeRabbit 當 gate）——`auto` reviewer 刻意不被主動觸發，所以
+它的 poll 政策不會出現在「要觸發的清單」裡。若 gate 的契約只有 login 與 recipe，
+auto-gate 這條路徑就拿不到任何等待政策。gate 要一併帶 `poll` 與 `handshake`。
 
 `fallback_order` 的角色隨之從「唯一 reviewer 的候補順序」變成「gate 的候補順序」。
 
@@ -138,21 +215,34 @@ gate 語意：
 
 1. push 修好的 commit
 2. 決定這輪要主動觸發誰：選定的 reviewer 中 `auto != true` 且
-   `triggerable != false` 的
-3. 發觸發指令（多個時並行）
-4. 開 poll 窗口：記錄各來源當下的 comment id 上界
+   `triggerable != false` 的，加上所有 `pending` 項（見〈綁定演算法〉的一輪一個限制）
+3. 發觸發指令（多個時並行）。`pending` 項只需要 recipe 的指令字串，不需要 login
+4. 開 poll 窗口：**逐 channel** 記錄當下游標上界（Source 1/2/3 各一份），依 gate 的
+   `poll` 政策決定等多久
 5. 窗口內收集**所有**選定 reviewer 的新 comment（不只被觸發的那些）
-6. 關窗條件：gate reviewer 出現新 comment，或逾時。gate 本身是 `auto` 時同樣適用
-   ——判定看的是「它有沒有出現新 comment」，不是「它有沒有回應觸發」，所以 gate
-   選 auto bot（例如 CodeRabbit）也成立
+6. 關窗條件：gate 出現新 comment，或逾時。gate 本身是 `auto` 時同樣適用——判定看的是
+   「它有沒有出現新 comment」，不是「它有沒有回應觸發」，所以 gate 選 auto bot
+   （例如 CodeRabbit）也成立
 7. 觀測回寫：窗口內未被觸發卻留言的標 `auto: true`；被觸發卻無回應的標
-   `triggerable: false`
+   `triggerable: false`；成功綁定的 `pending` 移進 `observed`
 8. finding 合併去重 → 進現有處理流程（含 adversarial verify）
-9. gate reviewer 這輪無新 finding → clean，結束；否則修完回到第 1 步
+9. 判定終端狀態（見下表）；`findings` 則修完回到第 1 步
 
 關鍵取捨：**不為 auto bot 額外等待**。gate 回應就關窗，auto bot 那時沒講完就算
-了——comment id 上界遞增，遲到的意見下一輪自然被撿到，一則都不會漏，只是延後
+了——各 channel 的游標上界遞增，遲到的意見下一輪自然被撿到，一則都不會漏，只是延後
 一輪。
+
+**沉默不等於通過。** 一輪必須落在四個互斥的終端狀態之一，其中只有第一個能結束 loop：
+
+| 狀態 | 條件 | 動作 |
+|---|---|---|
+| `clean` | gate **回應了**，且它這輪沒有新 finding | 結束 loop |
+| `findings` | 收到新 finding | 修，下一輪 |
+| `timeout` | gate 整個窗口沉默 | 標 `triggerable: false` → 換下一個 gate 候補；候補用盡則 halt。**絕不當 clean** |
+| `quota` | 回應內容是配額／rate limit 通知 | 同 `timeout` 的處理路徑 |
+
+這條是必要的：把「沒有新 finding」直接當成 clean，會讓一個掛掉的 reviewer 等於一次
+通過——review gate 最不該有的失效方向。
 
 `SIZE_MAX_ROUNDS`（S=3 / M=5 / L=10）沿用。S 是 external-only 單一 reviewer，
 那個唯一 reviewer 就是 gate，「超過 2 個要問」在 S 下不觸發。
@@ -171,21 +261,38 @@ gate 語意：
 GitHub 不讓一般 token 查「這個 repo 裝了哪些 App」，所以只能問使用者。這剛好跟
 上面的 reviewer 選擇合併成同一次互動，不額外增加打擾。
 
-手動補的 bot 只需要挑工具名，login 不必填：第一次觸發後窗口內冒出的新 Bot login
-自動綁定。之後偵測就看得到，不會再問第二次。
+手動補的 bot 只需要挑工具名，login 不必填——寫進 `pending`，第一次觸發後綁定。
 
-窗口內同時出現多個未綁定的新 login 時（罕見）才問是哪一個；unattended 模式下不
-猜，留 `recipe: null` 只收 finding。
+### 綁定演算法
+
+`pending` 項的生命週期，每一步都不需要預先知道 login：
+
+1. 使用者從 recipe 清單挑一個工具（例如 `greptile`）→ 寫進 `pending`
+2. 下一輪照樣對它發觸發指令（只用 recipe 的指令字串）
+3. 窗口內出現的**新未綁定 Bot login** 就是它 → 綁定，移進 `observed`
+4. 窗口內沒有任何新未綁定 login → 該 `pending` 項移除並記為不可用（自我修復；使用者
+   選了一個這個 repo 上其實沒裝的工具）
+
+**一輪最多綁定一個 `pending` 項。** 同時觸發兩個未綁定的 recipe，窗口內冒出兩個新
+login 就無法歸屬。多個 `pending` 排隊逐輪處理，不並行。
+
+`pending` 項在綁定成功前不能當 gate：不知道等誰，就無從判定一輪結束。綁定後下一輪
+起才有 gate 資格。
+
+窗口內同時出現多個未綁定的新 login 時（例如恰好有第三方 bot 同時首次發言），不猜：
+attended 問使用者是哪一個，unattended 則不綁定、留 `recipe: null` 只收 finding。
 
 ## 錯誤處理與降級
 
 | 情境 | 行為 |
 |---|---|
-| gate reviewer 觸發無回應 | 標 `triggerable: false`，落到 `fallback_order` 下一個當 gate，通知使用者 |
-| 選定的 reviewer 全部失敗 | 沿用現有 halt（`reason_class: transient-dependency`） |
+| gate 觸發無回應 | 標 `triggerable: false`，落到 `fallback_order` 下一個當 gate，通知使用者 |
+| gate 候補全部用盡 | halt（`reason_class: transient-dependency`）。`auto` reviewer 收到的 finding **不能**拯救這種情況——沒有可觸發的 gate 就無從確認一輪結束，也就沒有可辯護的 clean 訊號 |
 | detection 失敗 | 沿用「enhancement, never a gate」：改用 config 快取；快取也沒有則走現有預設流程 |
 | config 快取過期（bot 已移除） | 觸發逾時 → 就地標 `triggerable: false` 寫回 config，下次不再叫 |
-| unattended 且 config 無選擇紀錄 | 不問也不 halt：gate = `fallback_order` 第一個，auto bot 的 finding 照收，降級跑完 |
+| config 檔毀損或無法讀取 | **中止，不寫入**。只有「檔案不存在」可以視為空設定；解析失敗或權限錯誤一律當致命錯誤——若把兩者都當成空設定，接著寫檔就會把使用者整個 `solopreneur.json` 換成只剩剛寫的那一筆 |
+| config 快取裡有無效 recipe | 降級為未識別（只收 finding、不觸發）並回報是哪個 id 過期，不要因為一個過期字串就整個 run 崩掉 |
+| unattended 且 config 無選擇紀錄 | 不問也不 halt：gate = `fallback_order` 第一個可用者，auto bot 的 finding 照收，降級跑完 |
 
 快取一律走「用到時自我修復」，不做 TTL、不做背景重掃——錯的資料在下次被使用時
 就被打掉。現況已有活例子可驗：`~/Agents/claude/builder/solopreneur.json` 的
@@ -200,6 +307,18 @@ unattended 執行階段只讀不問。
 只動 **PR mode**。post-commit mode（Codex CLI + agy 並行）與 uncommitted mode
 （Codex CLI 單獨）不變。
 
+受影響檔案（本次範圍內，不得遺漏）：
+
+| 檔案 | 為什麼 |
+|---|---|
+| `greenlight/SKILL.md` | registry 表格、detection、選擇與 gate、loop 流程、argument parsing 新 token |
+| `greenlight/scripts/` + `tests/` | 新增決策腳本與測試 |
+| `.github/workflows/` | 新增測試 gate（含 `timeout-minutes` 與 matrix-aware `concurrency`） |
+| `shared/config.md` | 新增 `greenlight_reviewers` 欄位說明；更新「兩個 writer」與其他語言 writer 註冊表兩處 invariant |
+| `autopilot/SKILL.md` | dispatch-time 變數 |
+| `autopilot/references/pr-subagent-template.md` | 傳遞 token，並明確帶 `unattended` |
+| `autopilot/references/schemas.md` | plan.yaml 的契約來源，新增 optional 欄位要在此定義 |
+
 不做：
 - GitHub Copilot code review。它的觸發形態是「加為 reviewer」（`gh pr edit
   --add-reviewer`）而非 PR 留言，registry 的 trigger 欄位容納不了。等真的要用再
@@ -208,16 +327,27 @@ unattended 執行階段只讀不問。
 
 ## 驗證方式
 
-SKILL.md 是 prompt 而非可執行碼，只能實跑驗證。四項各對應一個設計主張：
+決策邏輯（偵測過濾、候選合併、gate 選擇、觀測回寫）抽成腳本後可用
+`node --test` 自動驗證，比照 `preview` skill 的既有架構。只有 SKILL.md 的 prompt
+部分需要實跑。
 
-1. 在真 PR 上發 `@coderabbitai review` 並確認有回應 → 驗證動機 1（CodeRabbit
-   可觸發），同時驗證 OSS 方案下 chat 指令可用
-2. 把未安裝的 `greptile` 加進選定清單 → 觸發後應逾時並自動寫入
-   `triggerable: false` → 驗證自我修復
-3. 一輪 loop 後檢查 config 的 `reviewers` 是否正確寫入 login / `auto` 觀測值 →
-   驗證觀測回寫
-4. 以 `unattended` 跑一次多 reviewer 的 repo → 確認不等待輸入、gate 落在
-   `fallback_order` 第一個
+自動化必須覆蓋的、光靠實跑抓不到的案例：
+
+1. **config 毀損不得寫入** — 餵一個有多餘逗號的 config，斷言中止且原檔逐位元不變
+2. **`greenlight` 與 `greenlight_reviewers` 互不影響** — 寫觀測值後，斷言
+   `.default.greenlight.fallback_order` 仍被五層讀取取得
+3. **未識別 bot 的門檻** — 只出現在 Source 1 的 bot（dependabot 形狀）不得成為候選；
+   出現在 Source 2/3 的必須成為候選
+4. **綁定演算法** — 一個 `pending` + 窗口內一個新 login → 綁定；兩個新 login → 不綁
+5. **`timeout` 不等於 `clean`** — gate 沉默的那一輪不得回報 clean
+
+實跑驗證（需要真 PR）：
+
+6. 發 `@coderabbitai review` 確認有回應 → 驗證動機 1，同時驗證 OSS 方案下 chat
+   指令可用
+7. 把未安裝的 `greptile` 加進 `pending` → 走完整綁定流程並逾時 → 驗證自我修復。
+   **不可用手動塞入猜測的 login 代替**：那會繞過整個綁定路徑，正是要測的東西
+8. 以 `unattended` 跑一次多 reviewer 的 repo → 確認不等待輸入
 
 ## 查證紀錄
 
