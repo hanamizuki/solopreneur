@@ -719,6 +719,16 @@ test('a multi-reviewer --select seeds all of them, gating on the first', () => {
   assert.deepEqual(out.collect, [RABBIT, CODEX], 'both are harvested for findings');
 });
 
+test('an unseedable --select says so instead of silently using the default', () => {
+  // A local CLI cannot be seeded: availability comes from its own gate, never
+  // from being asked for. Falling back is right; doing it silently is not.
+  const { stdout } = resolve(['--select', 'codex-cli'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'codex-bot');
+  assert.ok(out.warnings.some((w) => w.includes('codex-cli') && w.includes('--select')),
+    'the unmet selection is named');
+});
+
 test('a --gate naming a local CLI still degrades to the configured seed', () => {
   // Only a github-bot can be seeded: a CLI's availability comes from its own
   // gate, and claiming one is present because it was asked for would be a lie.

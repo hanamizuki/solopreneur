@@ -53,7 +53,7 @@ prs:
 | `prs[].type` | ✅ | `code` or `docs` |
 | `prs[].size` | ❌ | Optional review-size hint (`s` / `m` / `l`) for `/greenlight`'s [S/M/L profile](../../greenlight/SKILL.md). Advisory and **upward-only** — greenlight recomputes the size from the real diff and takes `max(size, computed)`, so this can raise but never lower review weight. Omit to let greenlight classify from the diff alone. |
 | `prs[].select` | ❌ | Comma-separated reviewer recipe ids for `/greenlight` (see its [Reviewer Registry](../../greenlight/SKILL.md#reviewer-registry)). Set it **only** when the user stated a preference during planning; omit to let greenlight resolve from the per-repo config. Ids that have gone stale by run time degrade with a warning, never a failure. |
-| `prs[].gate` | ❌ | The recipe id whose clean pass gates the review loop. Omit to use the first available `fallback_order` entry. Stale values degrade the same way. |
+| `prs[].gate` | ❌ | The recipe id whose clean pass gates the review loop. Omit to use the first available `fallback_order` entry — or, when `select` narrows the set and no `fallback_order` entry falls inside it, the first selected reviewer that can gate. That is deliberate: `select` is an authorization list, so gating on a reviewer the caller listed is never a surprise. Stale values degrade the same way. |
 | `prs[].subagent` | ✅ | Implementation subagent type |
 | `prs[].depends_on` | ✅ | List of dependent PR ids; empty array = no dependencies |
 | `prs[].spec` | ✅ | Spec filename (relative to plan directory) |

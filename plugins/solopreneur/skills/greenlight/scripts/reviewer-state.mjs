@@ -502,6 +502,18 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
         `no reviewer has acted on this repo yet; seeding ${seedIds.map((i) => `"${i}"`).join(', ')} `
         + `and gating on "${gateEntry.recipe}" — if it is not installed here, the round simply times out`,
       );
+      // An explicit selection that could not be honoured has to say so, the same
+      // way an unmet --gate does. A local CLI cannot be seeded — its availability
+      // comes from its own gate, never from being asked for — and an unknown id
+      // names nothing at all; either way the caller must not be left believing a
+      // reviewer it listed is running.
+      const dropped = csv(select).filter((id) => !seedIds.includes(recipeFor(id)?.id));
+      if (dropped.length > 0) {
+        warnings.push(
+          `--select ${dropped.map((d) => `"${d}"`).join(', ')} cannot be seeded on a repo with `
+          + 'no history (only github-bot recipes can be); not part of this round',
+        );
+      }
     }
   }
 
