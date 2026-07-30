@@ -441,6 +441,41 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     }
   }
 
+  // First use, or detection down with an empty cache: nothing is known about this
+  // repo at all. Detection is an enhancement, never a gate — the pre-detection
+  // loop always had a reviewer on this path, posted its trigger, and let the
+  // timeout report the truth. Seeding keeps that promise; without it a fresh repo
+  // resolves to an empty round and no reviewer is ever asked at all.
+  //
+  // Strictly "nothing known": when reviewers ARE known here but none can gate,
+  // that is the prompt path (needsPrompt), not a silent default. An available
+  // local CLI also lands in `available`, so this cannot fire past one.
+  if (!gateEntry && available.length === 0 && marked.length === 0) {
+    const seed = recipeFor(
+      fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot') ?? 'codex-bot',
+    );
+    if (seed) {
+      // The verified login may be absent (an unverified tool): triggering needs
+      // only the recipe string, so the trigger still goes out — nothing can just
+      // be attributed back until it answers once and is identified.
+      gateEntry = {
+        kind: 'bot',
+        id: seed.knownLogins[0] ?? seed.id,
+        login: seed.knownLogins[0] ?? null,
+        recipe: seed.id,
+        auto: false,
+        evidence: false,
+        lastSeen: null,
+        canGate: true,
+      };
+      selected = [gateEntry];
+      warnings.push(
+        `no reviewer has acted on this repo yet; defaulting to "${seed.id}" — `
+        + 'if it is not installed here, the round simply times out',
+      );
+    }
+  }
+
   const trigger = selected
     .filter((r) => {
       if (r.kind === 'cli') return true;

@@ -669,6 +669,37 @@ test('resolve does not prompt when fallback-order resolves a gate', () => {
   assert.equal(out.gate.recipe, 'codex-bot');
 });
 
+test('resolve seeds the default reviewer on a repo with no history at all', () => {
+  // Detection is an enhancement, never a gate. Without a seed a first-use repo
+  // resolves to trigger:[] and gate:null, and the loop — which now consumes only
+  // those two — would post nothing and wait on nobody.
+  const { code, stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', ''],
+    { stdin: BOTS([]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'codex-bot');
+  assert.equal(out.gate.login, CODEX);
+  assert.deepEqual(out.trigger.map((t) => t.recipe), ['codex-bot']);
+  assert.deepEqual(out.available, [], 'seeding is not an observation — nothing was seen here');
+  assert.equal(out.needsPrompt, false);
+  assert.ok(out.warnings.some((w) => w.includes('codex-bot')), 'the default is announced');
+});
+
+test('resolve seeds from fallback_order rather than always codex-bot', () => {
+  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', 'coderabbit,codex-bot'],
+    { stdin: BOTS([]) });
+  assert.equal(JSON.parse(stdout).gate.recipe, 'coderabbit');
+});
+
+test('resolve does not seed when a reviewer is known but cannot gate', () => {
+  // An unidentified bot acts here: that is the attended prompt's case (identify
+  // it), not a case for silently defaulting to some other tool.
+  const { stdout } = resolve([], { stdin: BOTS([{ login: 'brand-new[bot]' }]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.needsPrompt, true);
+});
+
 test('resolve reports gate:null with exit 0 when nothing can gate', () => {
   const { code, stdout } = resolve([], { stdin: BOTS([{ login: 'brand-new[bot]' }]) });
   assert.equal(code, 0);

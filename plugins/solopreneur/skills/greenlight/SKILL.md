@@ -1802,6 +1802,30 @@ another.
 Because `config.md`'s recommended order is `["codex-bot", "codex-cli"]`, a dead
 Codex bot falls to Codex CLI automatically — same model family, no prompt.
 
+**Advancing past an exhausted gate.** `quota` and `timeout` both mean "this gate
+cannot close the round", and **both must exclude it before re-resolving**. Simply
+re-running `resolve` does not advance: it is a pure function of the same inputs and
+returns the same gate. `timeout` at least writes `triggerable: false`, but `quota`
+writes nothing at all — so a quota'd gate would be re-triggered forever on a retry
+that deliberately does not count as a new round.
+
+Keep an in-run `EXHAUSTED_GATES` list (recipe ids) and advance like this:
+
+1. Add the exhausted gate's recipe to `EXHAUSTED_GATES`.
+2. Next candidate = the first `fallback_order` entry that is available, `canGate`,
+   and **not** in `EXHAUSTED_GATES`. With no `fallback_order` configured, any
+   available `canGate` entry not in `EXHAUSTED_GATES`.
+3. No candidate left → the ladder is exhausted (attended: the selection prompt;
+   unattended: halt with `reason_class: transient-dependency`).
+4. Otherwise re-run `resolve` with `--gate <next candidate>` — naming it
+   explicitly is what makes the advance stick. Do **not** re-resolve with an empty
+   `--fallback-order` hoping for a different answer: that puts `resolve` in its
+   unconfigured branch, where it is free to pick the very gate just exhausted.
+
+`EXHAUSTED_GATES` is per-run, not persisted: a quota window reopens on its own
+schedule, and marking a rate-limited reviewer permanently unusable in config would
+be exactly the stale-cache problem `triggerable` self-healing exists to avoid.
+
 - If an entry names a **github-bot that detection did not find**, **warn before
   triggering — do not hard-fail**:
   > "fallback_order lists `gemini` but no recent Gemini activity was detected on
@@ -1930,8 +1954,12 @@ LOOP (max SIZE_MAX_ROUNDS rounds — S 3 / M 5 / L 10; see Sizing):
   6. Write observations back (Step 2c).
   7. Act on the state:
      findings → Step 3, then back to 1
-     quota    → next gate candidate per Fallback Logic, back to 3 (not a new round)
-     timeout  → mark, next gate candidate; candidates exhausted → halt
+     quota    → advance past the exhausted gate (Fallback Logic: add it to
+                EXHAUSTED_GATES, re-resolve with --gate <next>), back to 3
+                (not a new round). NEVER re-resolve unchanged — the same gate
+                comes back and the retry spins forever.
+     timeout  → record triggerable:false, then advance the same way;
+                no candidate left → halt
      clean    → closing sweep, end the loop
 ```
 
@@ -1979,19 +2007,26 @@ TRIGGER_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # reply landed between the first trigger and the gate's.
 ```
 
-**Flow B — Codex CLI mode**: Execute locally, wait for result directly (no polling needed).
+**Flow B — local CLI mode**: Execute locally, wait for result directly (no polling
+needed). **Run the entry's own recipe** — the selection prompt can put either local
+CLI in `trigger[]`, so hardcoding one here would run Codex when the user chose
+`agy`, or fail outright on a machine where only `agy` is installed:
+
+| When `trigger[].recipe` is | Command |
+|---|---|
+| recipe `codex-cli` | `codex review --base main 2>&1` — parse `[P*]` tags from stdout |
+| recipe `agy` | The **same** `agy --print` invocation post-commit Phase 3 uses: model pinned to the Gemini family, `AGY_MAX_DIFF_BYTES` argv guard, per-invocation nonce completion marker, no tool-permission bypass. Take the diff from `git diff main...HEAD` instead of a commit range, and parse `[P*]` tags the same way |
 
 > WARNING: **Do not `cd`**: Execute in the current working directory. Never change directories.
 > In worktree workflows, the current directory is already the feature branch; any `cd`
-> (including to repo root) would make Codex run on main, resulting in empty diffs
+> (including to repo root) would make the CLI run on main, resulting in empty diffs
 > or reviewing the wrong changes.
 > Pre-check: `git branch --show-current` should show the feature branch, not `main`.
 
 ```bash
 # Verify correct directory first
 git branch --show-current  # confirm not on main
-# Execute review
-codex review --base main 2>&1
+# Then run the command from the table above for THIS entry's recipe.
 ```
 
 **Flow A — GitHub bot mode**: Comment on the PR with the entry's `triggerText`, record that comment's ID.
@@ -2093,6 +2128,17 @@ bot_comment_body() {   # $1 = login
 }
 GATE_COMMENT_BODY=$(bot_comment_body "$GATE_LOGIN")
 
+# Run it for EVERY collected login, not just the gate. A reviewer can deliver its
+# whole verdict as one issue comment and open no inline thread at all — check [A]
+# would see nothing, and a clean gate would then end the loop while a selected
+# reviewer's finding sat unread. The gate's body decides quota / clean; the others
+# are read purely for findings.
+for L in $(printf '%s' "$COLLECT" | jq -r '.[]'); do
+  [ "$L" = "$GATE_LOGIN" ] && continue
+  BODY=$(bot_comment_body "$L")
+  [ -n "$BODY" ] && printf '=== %s ===\n%s\n' "$L" "$BODY"
+done
+
 # [C] 👍 reaction from the gate on the PR (clean signal fallback)
 # Codex bot inconsistently skips the "Didn't find" comment and only reacts with 👍.
 THUMBSUP=$(gh api "repos/{owner}/{repo}/issues/{pr}/reactions" --paginate | \
@@ -2153,9 +2199,9 @@ has seen.
 
 | Precedence | State | Condition | Action |
 |---|---|---|---|
-| 1 | `findings` | New findings from **any** collected reviewer, gate included | Fix (Step 3), next round |
-| 2 | `quota` | No new findings, and the gate's response is a quota / rate-limit notice | Next gate candidate; candidates exhausted → halt |
-| 3 | `timeout` | No new findings, and the gate stayed silent through the whole window (no item, no 👍) | Record `triggerable: false`, next gate candidate; exhausted → halt. **Never clean** |
+| 1 | `findings` | New findings from **any** collected reviewer, gate included — from inline threads (check [A]) **or** from a post-cursor issue comment by any `collect` login (the per-login `bot_comment_body` sweep) | Fix (Step 3), next round |
+| 2 | `quota` | No new findings, and the gate's response is a quota / rate-limit notice | Advance past it (Fallback Logic → "Advancing past an exhausted gate"); candidates exhausted → halt |
+| 3 | `timeout` | No new findings, and the gate stayed silent through the whole window (no item, no 👍) | Record `triggerable: false`, then advance the same way; exhausted → halt. **Never clean** |
 | 4 | `clean` | The gate responded (item or 👍) and nobody produced a new finding | Closing sweep, report leftovers, end the loop |
 
 `findings` outranking `clean` is load-bearing: when the gate passes but another
