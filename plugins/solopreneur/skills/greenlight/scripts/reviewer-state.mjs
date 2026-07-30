@@ -466,44 +466,58 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
   // timeout report the truth. Seeding keeps that promise; without it a fresh repo
   // resolves to an empty round and no reviewer is ever asked at all.
   //
-  // Strictly "nothing known": when reviewers ARE known here but none can gate,
-  // that is the prompt path (needsPrompt), not a silent default. An available
-  // local CLI also lands in `available`, so this cannot fire past one.
-  if (!gateEntry && available.length === 0 && marked.length === 0) {
-    // An explicit request wins over the configured default. This is the whole
-    // mechanism behind the attended "try a tool with no history here" option:
-    // the user names a recipe and its trigger goes out this round. Seeding the
-    // configured default instead would trigger a different reviewer than the one
-    // just asked for, and the same applies to a fresh-repo autopilot descriptor.
-    // `select` is read raw rather than through `wanted`, which the degradation
-    // above may already have cleared.
-    // Seed EVERY requested github-bot, not just one: `select=a,b` means "run both",
-    // and collapsing it to a single seed would silently halve review coverage on
-    // exactly the fresh-repo autopilot runs that pass a selection. Only the first
-    // becomes the gate — one reviewer closes the round, the rest are collected.
-    // `select` is an authorization list here too: when one is present the seeds
-    // come only from it, and a `gate` naming something outside it is not honoured
-    // — the deferred warning below then reports the mismatch. Without this the
-    // seeded path would gate on a reviewer the caller excluded, which is exactly
-    // what a repo WITH history refuses to do.
-    const selIds = csv(select).map((id) => recipeFor(id)?.id).filter(Boolean);
-    const gateId = recipeFor(gate)?.id ?? null;
-    let requested = selIds.length > 0 ? selIds : [gateId].filter(Boolean);
-    if (gateId && requested.includes(gateId)) {
-      requested = [gateId, ...requested.filter((id) => id !== gateId)];
-    }
-    requested = requested.filter((id) => recipeFor(id).kind === 'github-bot');
+  // An explicit request wins over the configured default. This is the whole
+  // mechanism behind the attended "try a tool with no history here" option: the
+  // user names a recipe and its trigger goes out this round. Seeding the
+  // configured default instead would trigger a different reviewer than the one
+  // just asked for, and the same applies to a fresh-repo autopilot descriptor.
+  // `select` is read raw rather than through `wanted`, which the degradation
+  // above may already have cleared.
+  //
+  // Seed EVERY requested github-bot, not just one: `select=a,b` means "run both",
+  // and collapsing it to a single seed would silently halve review coverage on
+  // exactly the fresh-repo autopilot runs that pass a selection. Only the first
+  // becomes the gate — one reviewer closes the round, the rest are collected.
+  //
+  // `select` is an authorization list here too: when one is present the seeds
+  // come only from it, and a `gate` naming something outside it is not honoured
+  // — the deferred warning below then reports the mismatch. Without this the
+  // seeded path would gate on a reviewer the caller excluded, which is exactly
+  // what a repo WITH history refuses to do.
+  const selIds = csv(select).map((id) => recipeFor(id)?.id).filter(Boolean);
+  const gateId = recipeFor(gate)?.id ?? null;
+  let requested = selIds.length > 0 ? selIds : [gateId].filter(Boolean);
+  if (gateId && requested.includes(gateId)) {
+    requested = [gateId, ...requested.filter((id) => id !== gateId)];
+  }
+  // Only ids that are not already candidates: an available one was matched by the
+  // normal path above, and re-seeding it would duplicate the entry.
+  requested = requested.filter((id) => recipeFor(id).kind === 'github-bot'
+    && !available.some((r) => r.recipe === id));
 
+  // Two ways in. "Nothing is known about this repo at all" is the first-use /
+  // detection-down case: detection is an enhancement, never a gate, so the loop
+  // still gets a reviewer, posts its trigger, and lets the timeout report the
+  // truth. The second is an explicit request for a bot that is not a candidate
+  // here — that has to work even when unusable reviewers ARE known, because
+  // "try a tool with no history here" is offered precisely when the only known
+  // reviewers are unidentified or marked. Without it that prompt option can
+  // never take effect and just returns the user to the same prompt.
+  //
+  // What is NOT a way in: unusable reviewers plus no explicit request. That is
+  // the prompt path (needsPrompt), not a silent default.
+  const nothingKnown = available.length === 0 && marked.length === 0;
+  if (!gateEntry && (nothingKnown || requested.length > 0)) {
     // The configured ladder authorizes the implicit seed too. A ladder of only
     // `codex-cli` that is unavailable here must resolve to gate:null and take the
     // documented prompt-or-halt path — NOT quietly send the PR to codex-bot, a
     // reviewer that ladder excludes. Only a genuinely unconfigured ladder gets
-    // the built-in default.
+    // the built-in default, and only when nothing at all is known.
     const ladderSeed = fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot')
       ?? (fallbackOrder.length === 0 ? 'codex-bot' : null);
     const seedIds = requested.length > 0
       ? [...new Set(requested)]
-      : [ladderSeed && recipeFor(ladderSeed).id].filter(Boolean);
+      : [nothingKnown && ladderSeed && recipeFor(ladderSeed).id].filter(Boolean);
     if (seedIds.length === 0 && fallbackOrder.length > 0) {
       warnings.push(
         `no reviewer has acted on this repo yet and fallback_order (${fallbackOrder.join(', ')}) `

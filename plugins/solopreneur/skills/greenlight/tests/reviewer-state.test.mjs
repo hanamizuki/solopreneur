@@ -771,6 +771,21 @@ test('a --gate naming a local CLI still degrades to the configured seed', () => 
   assert.ok(out.warnings.some((w) => w.includes('codex-cli')), 'the unmet request is announced');
 });
 
+test('an explicit request seeds even when unusable reviewers are known here', () => {
+  // The "try a tool with no history here" option is offered exactly when the only
+  // known reviewers are unidentified or marked. If the seed required an EMPTY
+  // repo, picking a tool from that prompt would change nothing and drop the user
+  // straight back into the same prompt.
+  const dir = tmpConfigDir(CFG({ observed: { [GEMINI]: { triggerable: false } } }));
+  const { stdout } = resolve(['--gate', 'greptile'], {
+    stdin: BOTS([{ login: 'brand-new[bot]' }]), configDir: dir,
+  });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'greptile');
+  assert.deepEqual(out.trigger.map((t) => t.triggerText), ['@greptileai']);
+  assert.equal(out.needsPrompt, false, 'the prompt is answered, not repeated');
+});
+
 test('resolve does not seed when a reviewer is known but cannot gate', () => {
   // An unidentified bot acts here: that is the attended prompt's case (identify
   // it), not a case for silently defaulting to some other tool.
