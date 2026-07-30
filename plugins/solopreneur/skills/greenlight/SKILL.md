@@ -1815,9 +1815,15 @@ Keep an in-run `EXHAUSTED_GATES` list (recipe ids) and advance like this:
 2. Next candidate = the first `fallback_order` entry that is available, `canGate`,
    and **not** in `EXHAUSTED_GATES`. With no `fallback_order` configured, any
    available `canGate` entry not in `EXHAUSTED_GATES`.
-3. No candidate left → the ladder is exhausted (attended: the selection prompt;
+3. **When `select=` is active, candidates must come from inside that selection.**
+   `resolve` resolves `--gate` within the selected subset, so naming a successor
+   outside it is silently rejected and the ladder re-picks the reviewer just
+   exhausted — the same infinite retry, reached through the selection path. A
+   selection with no remaining candidate **is** exhaustion; never widen or drop
+   `select=` to find one, which would run reviewers the caller excluded.
+4. No candidate left → the ladder is exhausted (attended: the selection prompt;
    unattended: halt with `reason_class: transient-dependency`).
-4. Otherwise re-run `resolve` with `--gate <next candidate>` — naming it
+5. Otherwise re-run `resolve` with `--gate <next candidate>` — naming it
    explicitly is what makes the advance stick. Do **not** re-resolve with an empty
    `--fallback-order` hoping for a different answer: that puts `resolve` in its
    unconfigured branch, where it is free to pick the very gate just exhausted.
@@ -2128,15 +2134,24 @@ bot_comment_body() {   # $1 = login
 }
 GATE_COMMENT_BODY=$(bot_comment_body "$GATE_LOGIN")
 
-# Run it for EVERY collected login, not just the gate. A reviewer can deliver its
-# whole verdict as one issue comment and open no inline thread at all — check [A]
-# would see nothing, and a clean gate would then end the loop while a selected
-# reviewer's finding sat unread. The gate's body decides quota / clean; the others
-# are read purely for findings.
+# [B2] The same read for EVERY collected login, across BOTH bodied channels.
+#
+# A reviewer can deliver its whole verdict without ever opening an inline thread:
+# as one issue comment, or as a formal review body — the very shape Source 3 of
+# detection exists to catch (PR #108's Gemini left ONLY a formal review). Check
+# [A] sees neither, so without this a clean gate would end the loop while a
+# selected reviewer's findings sat unread. The gate's body decides quota / clean;
+# every other body is read purely for findings.
+formal_review_body() {   # $1 = login
+  gh api "repos/{owner}/{repo}/pulls/{pr}/reviews" --paginate | \
+    jq -r --arg bot "$1" --argjson c "$CUR_FORMAL_REVIEW" \
+       '[.[] | select((.user.login == $bot) and .id > $c)] | last | .body // empty'
+}
 for L in $(printf '%s' "$COLLECT" | jq -r '.[]'); do
-  [ "$L" = "$GATE_LOGIN" ] && continue
-  BODY=$(bot_comment_body "$L")
-  [ -n "$BODY" ] && printf '=== %s ===\n%s\n' "$L" "$BODY"
+  [ "$L" != "$GATE_LOGIN" ] && BODY=$(bot_comment_body "$L") && [ -n "$BODY" ] \
+    && printf '=== %s (issue comment) ===\n%s\n' "$L" "$BODY"
+  RBODY=$(formal_review_body "$L")
+  [ -n "$RBODY" ] && printf '=== %s (formal review) ===\n%s\n' "$L" "$RBODY"
 done
 
 # [C] 👍 reaction from the gate on the PR (clean signal fallback)
@@ -2199,7 +2214,7 @@ has seen.
 
 | Precedence | State | Condition | Action |
 |---|---|---|---|
-| 1 | `findings` | New findings from **any** collected reviewer, gate included — from inline threads (check [A]) **or** from a post-cursor issue comment by any `collect` login (the per-login `bot_comment_body` sweep) | Fix (Step 3), next round |
+| 1 | `findings` | New findings from **any** collected reviewer, gate included, on **any** of the three channels — inline threads (check [A]), post-cursor issue comments, or post-cursor formal review bodies (both from the [B2] per-login sweep) | Fix (Step 3), next round |
 | 2 | `quota` | No new findings, and the gate's response is a quota / rate-limit notice | Advance past it (Fallback Logic → "Advancing past an exhausted gate"); candidates exhausted → halt |
 | 3 | `timeout` | No new findings, and the gate stayed silent through the whole window (no item, no 👍) | Record `triggerable: false`, then advance the same way; exhausted → halt. **Never clean** |
 | 4 | `clean` | The gate responded (item or 👍) and nobody produced a new finding | Closing sweep, report leftovers, end the loop |

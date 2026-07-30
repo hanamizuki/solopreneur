@@ -691,6 +691,33 @@ test('resolve seeds from fallback_order rather than always codex-bot', () => {
   assert.equal(JSON.parse(stdout).gate.recipe, 'coderabbit');
 });
 
+test('an explicit --gate wins the seed on a repo with no history', () => {
+  // This is the "try a tool with no history here" path: the user names a recipe
+  // and its trigger goes out this round. Seeding the configured default instead
+  // would post a different reviewer's trigger than the one just requested.
+  const { stdout } = resolve(['--gate', 'greptile'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'greptile');
+  assert.deepEqual(out.trigger.map((t) => t.triggerText), ['@greptileai']);
+  assert.equal(out.gate.login, null, 'greptile has no verified login — triggerable, not attributable');
+  assert.ok(!out.warnings.some((w) => w.includes('falling back')),
+    'the request was honoured, so nothing fell back');
+});
+
+test('an explicit --select seeds the requested tool too', () => {
+  const { stdout } = resolve(['--select', 'greptile'], { stdin: BOTS([]) });
+  assert.equal(JSON.parse(stdout).gate.recipe, 'greptile');
+});
+
+test('a --gate naming a local CLI still degrades to the configured seed', () => {
+  // Only a github-bot can be seeded: a CLI's availability comes from its own
+  // gate, and claiming one is present because it was asked for would be a lie.
+  const { stdout } = resolve(['--gate', 'codex-cli'], { stdin: BOTS([]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'codex-bot');
+  assert.ok(out.warnings.some((w) => w.includes('codex-cli')), 'the unmet request is announced');
+});
+
 test('resolve does not seed when a reviewer is known but cannot gate', () => {
   // An unidentified bot acts here: that is the attended prompt's case (identify
   // it), not a case for silently defaulting to some other tool.

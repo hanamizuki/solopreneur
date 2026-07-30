@@ -405,7 +405,12 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     ? available.filter((r) => wanted.includes(r.recipe) || wanted.includes(r.id))
     : available;
   if (wanted && selected.length === 0) {
-    warnings.push(`--select matched no available reviewer (${wanted.join(', ')}); ignoring it`);
+    // Only a real degradation when there was something to match against. On a
+    // repo with no history at all the seed below honours the request instead, so
+    // warning here would contradict what actually happens.
+    if (available.length > 0) {
+      warnings.push(`--select matched no available reviewer (${wanted.join(', ')}); ignoring it`);
+    }
     wanted = null;
     selected = available;
   }
@@ -414,7 +419,9 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
   if (gate) {
     const found = selected.find((r) => r.recipe === gate || r.id === gate);
     if (found?.canGate) gateEntry = found;
-    else warnings.push(`--gate "${gate}" is not an available gate candidate; falling back to fallback-order`);
+    // The "stale gate" warning is deferred until after the seed below: on an
+    // empty repo the seed honours this exact request, and announcing a fallback
+    // that never happened would send the caller chasing the wrong reviewer.
   }
   if (!gateEntry) {
     for (const id of fallbackOrder) {
@@ -451,8 +458,17 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
   // that is the prompt path (needsPrompt), not a silent default. An available
   // local CLI also lands in `available`, so this cannot fire past one.
   if (!gateEntry && available.length === 0 && marked.length === 0) {
+    // An explicit request wins over the configured default. This is the whole
+    // mechanism behind the attended "try a tool with no history here" option:
+    // the user names a recipe and its trigger goes out this round. Seeding the
+    // configured default instead would trigger a different reviewer than the one
+    // just asked for, and the same applies to a fresh-repo autopilot descriptor.
+    // `select` is read raw rather than through `wanted`, which the degradation
+    // above may already have cleared.
     const seed = recipeFor(
-      fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot') ?? 'codex-bot',
+      [gate, ...csv(select)].find((id) => recipeFor(id)?.kind === 'github-bot')
+      ?? fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot')
+      ?? 'codex-bot',
     );
     if (seed) {
       // The verified login may be absent (an unverified tool): triggering needs
@@ -474,6 +490,12 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
         + 'if it is not installed here, the round simply times out',
       );
     }
+  }
+
+  // Deferred from the --gate block above: warn only if the request genuinely did
+  // not survive, whether it lost to the ladder or to the seed.
+  if (gate && gateEntry?.recipe !== gate && gateEntry?.id !== gate) {
+    warnings.push(`--gate "${gate}" is not an available gate candidate; falling back to fallback-order`);
   }
 
   const trigger = selected
