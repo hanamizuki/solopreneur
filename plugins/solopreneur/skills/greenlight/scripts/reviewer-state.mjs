@@ -393,7 +393,24 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
       gateEntry = selected.find((r) => r.recipe === id && r.canGate) ?? null;
       if (gateEntry) break;
     }
-    gateEntry ??= selected.find((r) => r.canGate) ?? null;
+    // Only pick an arbitrary candidate when the caller expressed no ordering, or
+    // expressed a narrower explicit one via --select. A configured
+    // fallback_order is an authorization list, not a hint: gating on someone
+    // outside it — while reporting needsPrompt:false, so nobody is ever told —
+    // would let an unlisted reviewer's clean pass end the loop. An exhausted
+    // ladder is the documented prompt-or-halt case instead. (This is also why
+    // the codex-bot -> codex-cli succession is expressed by putting codex-cli
+    // IN fallback_order, rather than as a rule in here.)
+    if (!gateEntry) {
+      if (fallbackOrder.length === 0 || wanted) {
+        gateEntry = selected.find((r) => r.canGate) ?? null;
+      } else if (selected.some((r) => r.canGate)) {
+        warnings.push(
+          `no reviewer from fallback_order (${fallbackOrder.join(', ')}) is available here; `
+          + 'not gating on an unlisted reviewer',
+        );
+      }
+    }
   }
 
   const trigger = selected

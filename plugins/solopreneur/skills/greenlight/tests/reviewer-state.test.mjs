@@ -571,6 +571,30 @@ test('resolve degrades a stale --select to the full set with a warning', () => {
   assert.ok(out.warnings.some((w) => w.includes('greptile')));
 });
 
+test('resolve leaves the gate unset when a configured ladder is exhausted', () => {
+  // fallback_order is an authorization list, not a hint. Gating on a reviewer
+  // the user never listed — and saying needsPrompt:false about it — would let an
+  // unlisted bot's clean pass end the loop. Exhausted ladder is prompt-or-halt.
+  const { code, stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'bugbot,greptile',
+  ], { stdin: BOTS([RABBIT, CODEX]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.needsPrompt, true, 'the caller must be told, not silently re-gated');
+  assert.ok(out.warnings.some((w) => w.includes('bugbot')), 'names the unavailable ladder');
+});
+
+test('resolve still picks any available gate when no ladder was configured', () => {
+  // The unconfigured case keeps its old behaviour — there is no authorization
+  // list to overstep, so any gating candidate is a defensible default.
+  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', ''],
+    { stdin: BOTS([RABBIT]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'coderabbit');
+  assert.deepEqual(out.warnings, []);
+});
+
 test('resolve honours a valid --select subset', () => {
   const { stdout } = resolve(['--select', 'coderabbit'], { stdin: BOTS([RABBIT, CODEX]) });
   const out = JSON.parse(stdout);
