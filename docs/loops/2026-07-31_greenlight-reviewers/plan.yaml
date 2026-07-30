@@ -1,0 +1,39 @@
+name: "Greenlight reviewer flexibility"
+source_todo: "todos/backlog/2026-07-30_greenlight-reviewer-flexibility.md"
+created_at: "2026-07-31"
+
+prs:
+  - id: pr1
+    branch: feature/greenlight-detection
+    title: "feat(greenlight): detection-driven reviewers"
+    type: code
+    size: l
+    # Namespaced on purpose: the Workflow agent registry and the Agent tool both
+    # resolve plugin agents as <plugin>:<agent>; the bare name fails with
+    # "agent type not found" (verified 2026-07-16). Pass through verbatim.
+    subagent: ai-engineer:ai-engineer
+    depends_on: []
+    spec: pr1-detection.md
+    files:
+      - plugins/solopreneur/skills/greenlight/scripts/reviewer-registry.mjs
+      - plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs
+      - plugins/solopreneur/skills/greenlight/tests/reviewer-registry.test.mjs
+      - plugins/solopreneur/skills/greenlight/tests/reviewer-state.test.mjs
+      - plugins/solopreneur/skills/greenlight/tests/skill-sync.test.mjs
+      - .github/workflows/validate-greenlight-tests.yml
+      - plugins/solopreneur/skills/greenlight/SKILL.md
+      - plugins/solopreneur/shared/config.md
+
+  - id: pr2
+    branch: feature/greenlight-gate
+    title: "feat(greenlight): selectable gate and multi-reviewer collection"
+    type: code
+    size: m
+    subagent: ai-engineer:ai-engineer
+    depends_on: [pr1]
+    spec: pr2-gate.md
+    files:
+      - plugins/solopreneur/skills/greenlight/SKILL.md
+      - plugins/solopreneur/skills/autopilot/SKILL.md
+      - plugins/solopreneur/skills/autopilot/references/schemas.md
+      - plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md
