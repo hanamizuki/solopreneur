@@ -1671,10 +1671,18 @@ below):
 
 - **GitHub bots** — list the `RESOLVED.available` entries with `kind: "bot"`,
   each with its `lastSeen`. The Gemini bot therefore appears **only** on repos
-  with recent Gemini activity. An entry with `canGate: false` is unidentified —
-  offer it as informational only, since without a recipe there is no trigger to
-  send. If detection was unavailable and the cache is empty, fall back to
-  offering the default (Codex bot) and note it wasn't confirmed on this repo.
+  with recent Gemini activity. If detection was unavailable and the cache is
+  empty, fall back to offering the default (Codex bot) and note it wasn't
+  confirmed on this repo.
+
+  **Selectable in PR 1: `codex-bot` and `gemini` only.** Step 1's dispatch table
+  and the polling cadences below are still hardcoded to those two, so offering
+  any other recipe as the trigger would hand the loop a reviewer it has no
+  trigger or poll path for. Every other entry — an identified `coderabbit` /
+  `bugbot` / `greptile`, or an unidentified bot with `canGate: false` — is shown
+  **informationally**: it acts on this repo and its findings are read like any
+  other unresolved thread, but it is not the reviewer this loop drives. PR 2
+  makes dispatch registry-driven and turns these into selectable gates.
 - **Local CLIs** — offer Codex CLI when its gate passes (installed + authed). Never
   hidden for lack of GitHub activity — local CLIs never appear in GitHub data.
 
@@ -1697,6 +1705,8 @@ no per-round reset.
 
    "{reviewer} couldn't complete review (reason: {reason}). Which reviewer to continue with?"
    - Detected github-bots (e.g. "Codex bot — last seen {date}", "Gemini bot — last seen {date}")
+     — **selectable ones only**, i.e. `codex-bot` / `gemini`, per the selectable
+     rule above; any other detected bot is listed informationally, not as a choice
    - Codex CLI — if the CLI gate passed (omit otherwise)
    - Skip, don't trigger another reviewer
 
