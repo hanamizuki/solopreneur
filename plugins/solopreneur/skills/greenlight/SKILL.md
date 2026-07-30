@@ -1632,14 +1632,25 @@ CURRENT_RECIPE=<recipe_id of current_reviewer>
 # RESOLVED.gate together, which is when the two may safely converge.
 BOT_LOGIN=$(printf '%s' "$RESOLVED" | jq -r --arg r "$CURRENT_RECIPE" \
   'first(.available[] | select(.recipe == $r) | .login) // empty')
+
+# The lookup is empty on a fresh repo, or when detection is down and the cache
+# has nothing — the reviewer is still perfectly triggerable, it has just never
+# been seen HERE. Fall back to that same registry row's verified login, filled
+# in from the table above exactly as CURRENT_RECIPE was. This must be part of
+# the block, not prose: polling with an empty login matches no author, so every
+# clean / quota / summary response is ignored until a false timeout.
+# A `—` in the verified-login column means leave it empty on purpose — the tool
+# can be triggered, but nothing can be attributed to it until it answers once
+# and is identified. Never substitute a guessed login.
+: "${BOT_LOGIN:=<verified login of CURRENT_RECIPE from the registry table, or empty when that column shows —>}"
 ```
 
 **Re-evaluate both lines whenever `current_reviewer` changes.** Fallback Logic
 switches reviewers mid-run, and both are functions of the current reviewer — a
 switch that leaves them stale posts the new reviewer's trigger while polling the
 old one's login, the same desync as reading them from the gate, reached by a
-different route. This is the invariant the deleted `BOT_LOGIN="$CODEX_BOT"`
-block carried as "updated on each fallback switch"; it now belongs to the seam.
+different route. This is the invariant the deleted hardcoded-login block carried
+in its "updated on each fallback switch" note; it now belongs to the seam.
 
 Resolving through `available` (rather than straight from the registry table) is
 what will let a tool with no verified login work once it has been identified on
@@ -1647,12 +1658,12 @@ this repo: `available` merges this round's detection with the per-repo cache, so
 the login comes from observation rather than from the table. Only the detection
 half is live in PR 1 — identify writes land with PR 2's `record` call.
 
-An **empty `BOT_LOGIN`** means the current reviewer has not been seen here (or is
-a local CLI, which has no login and whose Flow B never polls GitHub). Fall back
-to the **verified login** column of that same registry row, exactly as before
-this block existed. Never substitute a guessed login: a `—` in that column means
-the tool can still be triggered, but nothing can be attributed to it until it
-answers once and is identified.
+`BOT_LOGIN` therefore ends up empty in exactly one case: the current reviewer's
+registry row has no verified login either. That is a local CLI (Flow B reads
+stdout and never polls GitHub, so it needs none) or an unverified `—` tool on a
+repo where it has not answered yet. Both are correct as empty — what must never
+happen is an empty login reaching the poller for a reviewer whose login IS
+known, which is what the fallback line above prevents.
 
 Interpret the result:
 
