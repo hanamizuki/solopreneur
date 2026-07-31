@@ -529,6 +529,9 @@ function extractFindingIgnoreValueRaw(finding, rule = normalizeIgnoreRule(findin
     const primary = text.match(/Primary font:\s*([^()\n;]+)/i);
     if (primary) return cleanIgnoreValueDisplay(primary[1]);
 
+    const googleLabel = text.match(/Google Fonts:\s*([^()\n;]+)/i);
+    if (googleLabel) return cleanIgnoreValueDisplay(googleLabel[1]);
+
     const family = text.match(/font-family\s*:\s*["']?([^'",;\n]+)/i);
     if (family) return cleanIgnoreValueDisplay(family[1]);
 
