@@ -151,7 +151,7 @@ if (hasFlag('schema')) {
     canonCard: { label: 'The category standard', thesis: 'What this category ships, executed impeccably.', viewport: 'The arrangement a visitor expects, at full craft.', sketch: '.impeccable/sketches/canon.webp' },
     steer: true,
   }, null, 2));
-  console.log('\nOption ids return verbatim in ANSWER; "reroll" and "canon" are reserved. hero/board/sketch accept URLs or local paths; sketch slots may point at files that do not exist yet (serve first, generate after; the page polls until they land, so never block serving on generation). hero on a challenger is the inspiration it draws from and renders picture-in-picture beside the sketch, never as the promise of the build. canonCard renders the standing exit as a subordinate card with the same anatomy; without it, canon stays a quiet footer action. Include canon only for visual-direction rounds; never present it as your own recommendation. Keep thesis and each fact to one short sentence: the card front shows thesis, identity, and a two-line risk, while first viewport and the case read on the card back behind the Details chip, so long facts cost the reader a flip, not the page its scanability.');
+  console.log('\nOption ids return verbatim in ANSWER; "reroll" and "canon" are reserved. hero/board/sketch accept URLs or local paths; sketch slots may point at files that do not exist yet (serve first, generate after; the page polls until they land, so never block serving on generation). hero on a challenger is the inspiration it draws from and renders picture-in-picture beside the sketch, never as the promise of the build. canonCard renders the standing exit as a subordinate card with the same anatomy; without it, canon stays a quiet footer action. Include canon only for visual-direction rounds; never present it as your own recommendation. Keep thesis and each fact to one short sentence: the card front shows thesis, identity, and a two-line risk, while first viewport and the case read on the card back behind the Details chip, so long facts cost the reader a flip, not the page its scanability. Sketch aspect follows the surface: portrait at device viewport for native or mobile-first surfaces, landscape otherwise; the page adapts its cards to either.');
   process.exit(0);
 }
 
@@ -161,15 +161,25 @@ if (hasFlag('wait')) {
   const pollSec = Number(arg('poll', '60'));
   const deadline = Date.now() + pollSec * 1000;
   const answered = () => fs.existsSync(answerFile(key));
+  // Liveness must survive sandboxes: a sandboxed --wait cannot signal the
+  // daemon (kill throws EPERM even for a living process), so a fresh page
+  // heartbeat in the state file is the primary proof of life, the kill probe
+  // is secondary, and EPERM specifically means "exists, but the sandbox
+  // blocks signals", never "dead". Treating EPERM as death told one session
+  // the user had walked away while they were still reading the board.
   const alive = () => {
-    try { process.kill(JSON.parse(fs.readFileSync(stateFile(key), 'utf8')).pid, 0); return true; }
-    catch { return false; }
+    try {
+      const state = JSON.parse(fs.readFileSync(stateFile(key), 'utf8'));
+      if (state.lastBeat && Date.now() - state.lastBeat < 12000) return true;
+      try { process.kill(state.pid, 0); return true; }
+      catch (err) { return err.code === 'EPERM'; }
+    } catch { return false; }
   };
   let sawClose = false;
   while (Date.now() < deadline) {
     if (answered()) break;
     if (!alive()) {
-      console.log('serve-question: the question server is gone with no answer');
+      console.log('serve-question: the question server is gone with no answer. This is a server failure, not a user decision: restart it with --start and the same payload, reopen the URL for the user, and wait again. Never proceed without their choice while their browser session is open.');
       process.exit(2);
     }
     try {
@@ -441,7 +451,10 @@ function page() {
      its axis with snap points and the arrows page it card by card. */
   .grid { --deck-inset: max(clamp(1rem, 5vw, 4rem), calc((100vw - 90rem) / 2)); display: flex; gap: 1.6rem; width: 100%; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 6px var(--deck-inset); scroll-padding-inline: var(--deck-inset); align-items: stretch; }
   .grid::-webkit-scrollbar { display: none; }
-  .grid > .card { flex: 0 0 clamp(20rem, 27vw, 27rem); scroll-snap-align: center; }
+  /* Wide enough that the sketch carries the card: at 27vw the imagery read
+     as a thumbnail above a column of copy, and the copy won the attention
+     contest the sketch is supposed to win. */
+  .grid > .card { flex: 0 0 clamp(24rem, 34vw, 34rem); scroll-snap-align: center; }
   .nav { position: absolute; z-index: 6; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: oklch(7% 0.006 95 / 0.78); border: 1px solid var(--ks-rule); color: var(--ks-kinpaku); cursor: pointer; backdrop-filter: blur(6px); transition: border-color .2s, color .2s, opacity .2s; }
   .nav:hover { border-color: var(--ks-kinpaku-deep); color: var(--ks-kinpaku-pale); }
   .nav[disabled] { opacity: .25; cursor: default; }
@@ -491,8 +504,13 @@ function page() {
      region entirely instead of reserving a blank 16:9 void. */
   .face.text-only .kicker { position: static; align-self: flex-start; margin: 14px 0 0 14px; }
   .face.text-only .body { padding-top: 12px; }
-  .media { position: relative; width: 100%; aspect-ratio: 16/9; flex: none; }
+  /* 16/10 matches the landscape sketch frame; portrait art overrides the
+     slot with its own exact ratio at load (see the load listener), and the
+     deck narrows so portrait cards line up side by side. */
+  .media { position: relative; width: 100%; aspect-ratio: 16/10; flex: none; }
+  .grid.portrait-media > .card { flex-basis: clamp(14rem, 19vw, 19rem); }
   .media img { width: 100%; height: 100%; object-fit: cover; display: block; background: linear-gradient(100deg, var(--ks-graphite) 40%, var(--ks-graphite-2) 50%, var(--ks-graphite) 60%); }
+  .media > img:not([hidden]) { cursor: zoom-in; }
   .face.back { background: var(--ks-lacquer-raised); }
   .back-bar { margin-top: auto; background: var(--ks-lacquer-raised); }
   .hero-blank { width: 100%; height: 100%; background: linear-gradient(100deg, var(--ks-graphite) 40%, var(--ks-graphite-2) 50%, var(--ks-graphite) 60%); }
@@ -754,6 +772,30 @@ function page() {
     const card = b.closest('.card');
     const face = card.classList.contains('flipped') ? '.face.back' : '.face.front';
     const img = card.querySelector(face + ' .media img:not([hidden])');
+    if (!img || !img.getAttribute('src')) return;
+    lightboxImg.src = img.getAttribute('src');
+    lightbox.hidden = false;
+    requestAnimationFrame(() => lightbox.classList.add('open'));
+  }));
+  // Portrait art (native / mobile-first surfaces): the slot takes the
+  // image's own ratio so nothing crops, and the whole deck narrows so
+  // portrait cards sit side by side. Load events don't bubble; capture.
+  document.addEventListener('load', (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || !img.matches('.media > img')) return;
+    if (img.naturalHeight > img.naturalWidth * 1.05) {
+      const m = img.closest('.media');
+      m.classList.add('portrait');
+      m.style.aspectRatio = img.naturalWidth + ' / ' + img.naturalHeight;
+      document.querySelector('.grid')?.classList.add('portrait-media');
+    }
+  }, true);
+
+  // The whole image is the zoom target, not just the expand chip; the chip
+  // stays as the visible affordance. Chip and PIP handlers stop propagation,
+  // so this fires only for clicks on the art itself.
+  document.querySelectorAll('.media').forEach(m => m.addEventListener('click', () => {
+    const img = m.querySelector(':scope > img:not([hidden])');
     if (!img || !img.getAttribute('src')) return;
     lightboxImg.src = img.getAttribute('src');
     lightbox.hidden = false;

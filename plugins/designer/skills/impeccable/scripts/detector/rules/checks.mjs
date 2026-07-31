@@ -1062,9 +1062,11 @@ function collectMarqueeKeyframes(content) {
 // bound to a keyframe loop that travels a large horizontal distance.
 // Rotation/opacity animations never qualify (no X travel); JS-driven
 // carousels with user controls have no infinite CSS X-loop to match.
-function scanCssTextForMarquee(content) {
+// `content` is CSS-bearing text; `markup` (defaulting to the same string
+// for single-corpus callers) is where the <marquee> tag itself lives.
+function scanCssTextForMarquee(content, markup = content) {
   const findings = [];
-  if (/<marquee\b/i.test(content)) {
+  if (/<marquee\b/i.test(markup)) {
     findings.push({ id: 'marquee', snippet: '<marquee> element' });
   }
   const marqueeKeyframes = collectMarqueeKeyframes(content);
@@ -1243,10 +1245,14 @@ function selectorHitsLandmark(content, selector, ranges) {
 // element sits inside a header/nav landmark is the hero liveness cliché
 // and is promoted to error severity; occurrences elsewhere keep the
 // registry default severity.
-function scanCssTextForPulsingDot(content) {
+//
+// `content` is CSS-bearing text (rules and keyframes); `markup` — defaulting
+// to the same string for single-corpus callers like the regex source
+// engine — is where landmark ranges and Tailwind class attributes live.
+function scanCssTextForPulsingDot(content, markup = content) {
   const customProps = collectCssCustomProps(content);
   const keyframes = collectPulseKeyframes(content);
-  const heroRanges = landmarkSourceRanges(content);
+  const heroRanges = landmarkSourceRanges(markup);
   const findings = [];
   const seen = new Set();
 
@@ -1295,7 +1301,7 @@ function scanCssTextForPulsingDot(content) {
 
     if (seen.has(selector)) continue;
     seen.add(selector);
-    const inLandmark = selectorHitsLandmark(content, selector, heroRanges);
+    const inLandmark = selectorHitsLandmark(markup, selector, heroRanges);
     findings.push({
       id: 'pulsing-dot',
       snippet: `${selector} — ${w}x${h}px dot with infinite "${pulseName}" animation${inLandmark ? ' in header/nav' : ''}`,
@@ -1305,10 +1311,11 @@ function scanCssTextForPulsingDot(content) {
   }
 
   // Tailwind utilities: animate-ping / animate-pulse on a tiny rounded-full
-  // element declared entirely in the class attribute.
+  // element declared entirely in the class attribute. Scanned in the markup
+  // corpus so the match index lines up with the landmark ranges.
   const classRe = /class\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
   let cm;
-  while ((cm = classRe.exec(content)) !== null) {
+  while ((cm = classRe.exec(markup)) !== null) {
     const cls = cm[1] || cm[2] || '';
     const anim = cls.match(/\banimate-(ping|pulse)\b/);
     if (!anim) continue;
@@ -1389,20 +1396,64 @@ function scanHtmlForShapeAssembledIllustration(html) {
   return findings;
 }
 
+// Scoped scan corpora for the page-level pattern checks. CSS-property
+// regexes run over the whole source string fire on documentation ABOUT
+// css — `<code>background-clip: text</code>` prose, <pre> samples, HTML
+// comments — so the checks scan only the strings that actually style the
+// page:
+//   styleText — <style> block contents plus style="…" attribute values.
+//     Attribute values keep their `style="…"` form so block-scoped
+//     scanners (grid background) keep treating each attribute as one
+//     declaration block, exactly as they did against raw source. Engines
+//     that already read more CSS (linked stylesheets) prepend it.
+//   classText — class attribute values, for utility-class scans.
+// Markup-shaped checks (inline <svg> scenes, <img> tags, <marquee>,
+// landmark ranges) and rendered-text checks (theater phrases) keep the
+// full source. This extraction serves callers without a parsed document
+// (the browser bundle scanning outerHTML); attribute reads are tag-scoped
+// so escaped code samples (&lt;div style="…"&gt;) never contribute. The
+// static engine passes richer corpora built from its parsed document.
+// Bare CSS input (no markup at all) is its own style text, which keeps
+// direct checkHtmlPatterns(css) callers behaving as before.
+function buildHtmlPatternCorpora(html) {
+  const source = String(html || '');
+  if (!/<[a-zA-Z!/]/.test(source)) {
+    return { styleText: source, classText: source };
+  }
+  const styleParts = [];
+  const classParts = [];
+  const styleBlockRe = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+  let m;
+  while ((m = styleBlockRe.exec(source)) !== null) styleParts.push(m[1]);
+  const tagRe = /<[a-zA-Z][^>]*>/g;
+  while ((m = tagRe.exec(source)) !== null) {
+    const tag = m[0];
+    const sm = tag.match(/\bstyle\s*=\s*("[^"]*"|'[^']*')/i);
+    if (sm) styleParts.push(`style=${sm[1]}`);
+    const cm = tag.match(/\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+    if (cm) classParts.push(cm[1] ?? cm[2] ?? '');
+  }
+  return { styleText: styleParts.join('\n'), classText: classParts.join('\n') };
+}
+
 /**
  * Regex-on-HTML checks shared between browser and Node page-level detection.
- * These don't need DOM access, just the raw HTML string.
+ * These don't need DOM access, just the raw HTML string. CSS-property and
+ * utility-class patterns scan the scoped corpora (styleText / classText —
+ * see buildHtmlPatternCorpora) so prose about css never flags; only the
+ * markup-shaped and rendered-text checks read the full source.
  */
-function checkHtmlPatterns(html) {
+function checkHtmlPatterns(html, corpora) {
+  const { styleText, classText } = corpora || buildHtmlPatternCorpora(html);
   const findings = [];
 
   // --- Color ---
 
   // AI color palette: purple/violet
   const purpleHexRe = /#(?:7c3aed|8b5cf6|a855f7|9333ea|7e22ce|6d28d9|6366f1|764ba2|667eea)\b/gi;
-  if (purpleHexRe.test(html)) {
+  if (purpleHexRe.test(styleText)) {
     const purpleTextRe = /(?:(?:^|;)\s*color\s*:\s*(?:.*?)(?:#(?:7c3aed|8b5cf6|a855f7|9333ea|7e22ce|6d28d9))|gradient.*?#(?:7c3aed|8b5cf6|a855f7|764ba2|667eea))/gi;
-    if (purpleTextRe.test(html)) {
+    if (purpleTextRe.test(styleText)) {
       findings.push({ id: 'ai-color-palette', snippet: 'Purple/violet accent colors detected' });
     }
   }
@@ -1410,15 +1461,15 @@ function checkHtmlPatterns(html) {
   // Gradient text (background-clip: text + gradient)
   const gradientRe = /(?:-webkit-)?background-clip\s*:\s*text/gi;
   let gm;
-  while ((gm = gradientRe.exec(html)) !== null) {
+  while ((gm = gradientRe.exec(styleText)) !== null) {
     const start = Math.max(0, gm.index - 200);
-    const context = html.substring(start, gm.index + gm[0].length + 200);
+    const context = styleText.substring(start, gm.index + gm[0].length + 200);
     if (/gradient/i.test(context)) {
       findings.push({ id: 'gradient-text', snippet: 'background-clip: text + gradient' });
       break;
     }
   }
-  if (/\bbg-clip-text\b/.test(html) && /\bbg-gradient-to-/.test(html)) {
+  if (/\bbg-clip-text\b/.test(classText) && /\bbg-gradient-to-/.test(classText)) {
     findings.push({ id: 'gradient-text', snippet: 'bg-clip-text + bg-gradient (Tailwind)' });
   }
 
@@ -1427,10 +1478,10 @@ function checkHtmlPatterns(html) {
   // Side-tab accent stripe drawn as an absolutely-positioned pseudo-element
   // (no border property involved, so the element-level border checks and
   // the border-left regexes never see it).
-  findings.push(...scanCssTextForPseudoStripe(html));
+  findings.push(...scanCssTextForPseudoStripe(styleText));
 
   // Side-tab accent stripe drawn as a single-edge inset box-shadow.
-  findings.push(...scanCssTextForInsetStripe(html));
+  findings.push(...scanCssTextForInsetStripe(styleText));
 
   // --- Layout ---
 
@@ -1438,20 +1489,20 @@ function checkHtmlPatterns(html) {
   const spacingValues = [];
   const spacingRe = /(?:padding|margin)(?:-(?:top|right|bottom|left))?\s*:\s*(\d+)px/gi;
   let sm;
-  while ((sm = spacingRe.exec(html)) !== null) {
+  while ((sm = spacingRe.exec(styleText)) !== null) {
     const v = parseInt(sm[1], 10);
     if (v > 0 && v < 200) spacingValues.push(v);
   }
   const gapRe = /gap\s*:\s*(\d+)px/gi;
-  while ((sm = gapRe.exec(html)) !== null) {
+  while ((sm = gapRe.exec(styleText)) !== null) {
     spacingValues.push(parseInt(sm[1], 10));
   }
   const twSpaceRe = /\b(?:p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap)-(\d+)\b/g;
-  while ((sm = twSpaceRe.exec(html)) !== null) {
+  while ((sm = twSpaceRe.exec(classText)) !== null) {
     spacingValues.push(parseInt(sm[1], 10) * 4);
   }
   const remSpacingRe = /(?:padding|margin)(?:-(?:top|right|bottom|left))?\s*:\s*([\d.]+)rem/gi;
-  while ((sm = remSpacingRe.exec(html)) !== null) {
+  while ((sm = remSpacingRe.exec(styleText)) !== null) {
     const v = Math.round(parseFloat(sm[1]) * 16);
     if (v > 0 && v < 200) spacingValues.push(v);
   }
@@ -1475,7 +1526,7 @@ function checkHtmlPatterns(html) {
 
   // Bounce/elastic animation names
   const bounceRe = /animation(?:-name)?\s*:\s*([^;{}]*(?:bounce|elastic|wobble|jiggle|spring)[^;{}]*)/gi;
-  const bounceMatch = bounceRe.exec(html);
+  const bounceMatch = bounceRe.exec(styleText);
   if (bounceMatch) {
     const animationToken = bounceMatch[1]
       .split(/[,\s]+/)
@@ -1486,7 +1537,7 @@ function checkHtmlPatterns(html) {
   // Overshoot cubic-bezier
   const bezierRe = /cubic-bezier\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)/g;
   let bm;
-  while ((bm = bezierRe.exec(html)) !== null) {
+  while ((bm = bezierRe.exec(styleText)) !== null) {
     const y1 = parseFloat(bm[2]), y2 = parseFloat(bm[4]);
     if (y1 < -0.1 || y1 > 1.1 || y2 < -0.1 || y2 > 1.1) {
       findings.push({ id: 'bounce-easing', snippet: `cubic-bezier(${bm[1]}, ${bm[2]}, ${bm[3]}, ${bm[4]})` });
@@ -1497,7 +1548,7 @@ function checkHtmlPatterns(html) {
   // Layout property transitions
   const transRe = /transition(?:-property)?\s*:\s*([^;{}]+)/gi;
   let tm;
-  while ((tm = transRe.exec(html)) !== null) {
+  while ((tm = transRe.exec(styleText)) !== null) {
     const val = tm[1].toLowerCase();
     if (/\ball\b/.test(val)) continue;
     const found = val.match(/\b(?:(?:max|min)-)?(?:width|height)\b|\bpadding(?:-(?:top|right|bottom|left))?\b|\bmargin(?:-(?:top|right|bottom|left))?\b/gi);
@@ -1507,30 +1558,32 @@ function checkHtmlPatterns(html) {
     }
   }
 
-  // Pulsing status dots (tiny circular elements on infinite pulse animations)
-  findings.push(...scanCssTextForPulsingDot(html));
+  // Pulsing status dots (tiny circular elements on infinite pulse animations).
+  // The CSS rules come from styleText; the markup carries the landmark
+  // ranges and Tailwind class attributes.
+  findings.push(...scanCssTextForPulsingDot(styleText, html));
 
   // Shape-assembled illustrations (large pictorial SVGs built from primitives)
   findings.push(...scanHtmlForShapeAssembledIllustration(html));
 
   // Auto-scrolling marquees (<marquee> or infinite horizontal loop animations)
-  findings.push(...scanCssTextForMarquee(html));
+  findings.push(...scanCssTextForMarquee(styleText, html));
 
   // --- Dark glow / chromatic halo shadows ---
 
-  const glowHits = scanCssTextForGlow(html);
+  const glowHits = scanCssTextForGlow(styleText);
   if (glowHits.length > 0) {
     findings.push({ id: 'dark-glow', snippet: glowHits[0].snippet });
   }
 
   // Radial-gradient background halo (gradient-drawn sibling of dark-glow)
-  const haloHits = scanCssTextForRadialHalo(html);
+  const haloHits = scanCssTextForRadialHalo(styleText);
   if (haloHits.length > 0) {
     findings.push({ id: 'radial-halo', snippet: haloHits[0].snippet });
   }
 
   // --- Generated-UI tells: repeating-gradient stripes ---
-  if (/repeating-(?:linear|radial|conic)-gradient\s*\(/i.test(html)) {
+  if (/repeating-(?:linear|radial|conic)-gradient\s*\(/i.test(styleText)) {
     findings.push({ id: 'repeating-stripes-gradient', snippet: 'repeating-gradient decorative stripes' });
   }
 
@@ -1547,7 +1600,7 @@ function checkHtmlPatterns(html) {
   // in for the second axis. Colors like `oklch(96% 0.012 82 / 0.055)` carry
   // nested parens, so match the hairline stop directly rather than parsing
   // whole gradient layers.
-  const gridHits = scanCssTextForGridBackground(html);
+  const gridHits = scanCssTextForGridBackground(styleText);
   if (gridHits.length > 0) {
     findings.push({ id: 'codex-grid-background', snippet: gridHits[0].snippet });
   }
@@ -1569,7 +1622,7 @@ function checkHtmlPatterns(html) {
   // hover:rotate / hover:translate utility on an <img>. Each distinct
   // mechanism is its own finding.
   const imgHoverCss = /\bimg\b[^,{}]*:hover\b[^{}]*\{[^}]*\btransform\s*:\s*(?:scale|rotate|translate|matrix|skew)/i;
-  if (imgHoverCss.test(html)) {
+  if (imgHoverCss.test(styleText)) {
     findings.push({ id: 'image-hover-transform', snippet: 'img:hover { transform } rule' });
   }
   const imgTagRe = /<img\b[^>]*\bclass\s*=\s*"([^"]*)"/gi;
@@ -2470,7 +2523,11 @@ function isKickerCandidate(opts) {
     || isSmallCaps;
   if (!isUppercased) return false;
   if (!(kickerFontSize > 0 && kickerFontSize <= 14)) return false;
-  const minTrackedSpacing = Math.max(1, kickerFontSize * 0.08);
+  // Proportional only, no absolute floor: the wild's most common recipe is
+  // 0.08em at a sub-13px size, which computes to under 1px and sailed past
+  // the old Math.max(1, ...) floor (observed live: a page whose kickers were
+  // literally class="kicker" produced zero findings).
+  const minTrackedSpacing = kickerFontSize * 0.06;
   if (!(kickerLetterSpacing >= minTrackedSpacing)) return false;
   return true;
 }
@@ -3854,12 +3911,6 @@ function checkTypography() {
       if (isBrandFontOnOwnDomain(font)) continue;
       findings.push({ type: 'overused-font', detail: `Primary font: ${font} (${Math.round(share * 100)}% of text)` });
     }
-
-    // Single-font check: only one distinct primary font across all text
-    if (fontUsage.size === 1) {
-      const only = [...fontUsage.keys()][0];
-      findings.push({ type: 'single-font', detail: `only font used is ${only}` });
-    }
   }
 
   const sizes = new Set();
@@ -4119,14 +4170,6 @@ function checkPageTypography(doc, win) {
 
   for (const font of overusedFound) {
     findings.push({ id: 'overused-font', snippet: `Primary font: ${font}` });
-  }
-
-  // Single font
-  if (fonts.size === 1) {
-    const els = doc.querySelectorAll('*');
-    if (els.length >= 20) {
-      findings.push({ id: 'single-font', snippet: `only font used is ${[...fonts][0]}` });
-    }
   }
 
   // Flat type hierarchy
@@ -5450,6 +5493,7 @@ export {
   cssLengthToPx,
   scanCssTextForPulsingDot,
   scanHtmlForShapeAssembledIllustration,
+  buildHtmlPatternCorpora,
   checkHtmlPatterns,
   readOwnBackgroundColor,
   resolveBackground,

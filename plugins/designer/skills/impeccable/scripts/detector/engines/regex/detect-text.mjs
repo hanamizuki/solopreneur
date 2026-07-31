@@ -12,7 +12,8 @@ import { profileFindings, profileStep } from '../../profile/profiler.mjs';
 // Regex fallback (non-HTML files: CSS, JSX, TSX, etc.)
 // ---------------------------------------------------------------------------
 
-const hasRounded = (line) => /\brounded(?:-\w+)?\b/.test(line);
+const hasRounded = (line) =>
+  /\brounded(?:-\w+)?\b/.test(line.replace(/\brounded-none\b/g, ''));
 const hasBorderRadius = (line) => /border-radius/i.test(line);
 const isSafeElement = (line) => /<(?:blockquote|nav[\s>]|pre[\s>]|code[\s>]|a\s|input[\s>]|span[\s>])/i.test(line);
 
@@ -240,24 +241,6 @@ const REGEX_MATCHERS = [
 ];
 
 const REGEX_ANALYZERS = [
-  // Single font
-  (content, filePath) => {
-    const fontFamilyRe = /font-family\s*:\s*([^;}]+)/gi;
-    const fonts = new Set();
-    let m;
-    while ((m = fontFamilyRe.exec(content)) !== null) {
-      for (const f of m[1].split(',').map(f => f.trim().replace(/^['"]|['"]$/g, '').toLowerCase())) {
-        if (f && !GENERIC_FONTS.has(f)) fonts.add(f);
-      }
-    }
-    for (const f of extractGoogleFontFamilies(content)) fonts.add(f);
-    if (fonts.size !== 1 || content.split('\n').length < 20) return [];
-    const name = [...fonts][0];
-    const lines = content.split('\n');
-    let line = 1;
-    for (let i = 0; i < lines.length; i++) { if (lines[i].toLowerCase().includes(name)) { line = i + 1; break; } }
-    return [finding('single-font', filePath, `only font used is ${name}`, line)];
-  },
   // Flat type hierarchy
   (content, filePath) => {
     const sizes = new Set();
@@ -625,10 +608,11 @@ const TEXT_CONTENT_ANALYZER_IDS = [
 function runTextContentAnalyzers(content, filePath, options = {}) {
   const profile = options?.profile;
   if (!shouldRunPageAnalyzers(content, filePath)) return [];
-  // The 3 text-content analyzers are at indices 3-5 in REGEX_ANALYZERS.
+  // The 3 text-content analyzers are at indices 2-4 in REGEX_ANALYZERS
+  // (single-font's removal on 2026-07-29 shifted every index down one).
   const findings = [];
   for (let i = 0; i < TEXT_CONTENT_ANALYZER_IDS.length; i++) {
-    const analyzer = REGEX_ANALYZERS[3 + i];
+    const analyzer = REGEX_ANALYZERS[2 + i];
     const ruleId = TEXT_CONTENT_ANALYZER_IDS[i];
     findings.push(...profileFindings(profile, {
       engine: 'regex',
@@ -749,7 +733,6 @@ function detectText(content, filePath, options = {}) {
   // Page-level analyzers only run on full pages
   if (shouldRunPageAnalyzers(content, filePath)) {
     const analyzerIds = [
-      'single-font',
       'flat-type-hierarchy',
       'monotonous-spacing',
       'em-dash-overuse',
