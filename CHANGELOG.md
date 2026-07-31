@@ -8,6 +8,35 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-07-31
+
+### solopreneur 0.5.36 → 0.5.37
+`/greenlight` stops hardcoding which review bots it can see. PR-mode
+detection now recognizes any GitHub App that actually reviews on your
+repo — CodeRabbit, Cursor, Copilot, and whatever comes next qualify with
+zero config — while conversation-only automation (dependabot, CI
+notifiers) is never mistaken for a reviewer. CodeRabbit graduated from
+"passive, observe-only" to a triggerable reviewer like the rest. A round
+can now drive several reviewers at once: `select=<ids>` chooses which
+reviewers run, `gate=<id>` chooses the one whose clean pass ends the
+loop, and what a run learns about your repo's reviewers is cached
+per-repo in `solopreneur.json` so later rounds build on it. `/autopilot`
+dispatches pass the new tokens and always run unattended, so scheduled
+runs never stall on a reviewer prompt.
+(#150, #151)
+
+### ai-engineer 0.3.13 → 0.3.14
+Housekeeping: re-pinned the vendored `senior-prompt-engineer` skill to
+upstream's latest revision (2026-07-27). Upstream moved without changing
+this skill, so content is identical — the release just brings the
+recorded provenance current.
+(#131)
+
+### neo4j-dev 0.0.7 → 0.0.8
+Housekeeping: no skill or agent changes — realigns the generated
+Codex-surface manifest that had lagged one release behind the plugin
+version.
+
 ## 2026-07-28
 
 ### solopreneur 0.5.35 → 0.5.36
