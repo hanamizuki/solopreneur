@@ -2,9 +2,10 @@
 
 **Status:** Approved architecture. Rollout PRs 1–4 are on `main`; the PR 5a
 marketer vertical slice resumed after a Codex 0.147.0 retest removed the old
-headless-delegation blocker. The corrected final-byte local matrix has passed;
-the final git-ref matrix and remaining merge gates are still pending. The slice
-has not merged or shipped.
+headless-delegation blocker. Local-path and fresh git-ref matrices passed at
+`954fc64` and proved the terminal-completion shortcut, but a later blocker
+ruling changed the router wording that defines that lifecycle contract. Both
+matrices must rerun on the new final bytes. The slice has not merged or shipped.
 **Date:** 2026-07-08
 **Current review:** 2026-08-09
 **Affected plugins:** all seven (`solopreneur`, `designer`, `marketer`,
@@ -236,19 +237,22 @@ constraints, evidence paths, and bounded assumptions. The child does not
 delegate again.
 
 After an accepted Codex spawn, the child is the selected execution path. The
-outer budget is fifteen polling cycles. Each cycle calls `wait_agent` once with
-a 60-second timeout and then checks the canonical child status; early mailbox
-wake-ups still consume a cycle. A timeout or progress message before the cycle
-budget is not a child failure. A missing canonical path is treated as not found.
-While the child remains pending or running and cycles remain, the parent does
-not send or follow up, interrupt it, retry, start the delegated work inline, or
-answer. Only a completed child result is integrated. A rejected call, missing
-path, or tool-reported errored or shutdown state enters the
-zero-additional-agent inline fallback.
+outer budget is fifteen wait cycles. Each cycle calls `wait_agent` once with a
+60-second timeout; early mailbox wake-ups still consume a cycle. An exact
+canonical child completion injected by that wake is integrated immediately and
+ends polling. A timeout, progress-only message, or unknown non-terminal wake
+instead requires a `list_agents` check of the canonical child status and is not
+itself a child failure. A missing canonical path is treated as not found. While
+the child remains pending or running and cycles remain, the parent does not send
+or follow up, interrupt it, retry, start the delegated work inline, or answer.
+Only a completed child result is integrated. A rejected call, missing path, or
+tool-reported errored or shutdown state enters the zero-additional-agent inline
+fallback.
 
-After the fifteenth cycle, a still-pending or running child is interrupted once;
-the parent marks delegation failed, makes no further agent calls, and uses the
-minimal inline fallback. That path cannot satisfy live delegation acceptance.
+If the fifteenth non-completing cycle reports a still-pending or running child,
+it is interrupted once; the parent marks delegation failed, makes no further
+agent calls, and uses the minimal inline fallback. That path cannot satisfy live
+delegation acceptance.
 Explicit user cancellation or replacement may interrupt sooner but does not
 authorize completing the original delegated work inline or reporting it as
 successful delegation. An unexpected interrupted state instead surfaces
@@ -305,26 +309,46 @@ Validation is layered so deterministic failures do not consume model calls:
    Parse persisted parent/child rollout linkage and reject narrated-only
    delegation, a full-history fork error, a wrong agent identity, nested
    delegation, a missing child result, or any parent send, follow-up, or
-   interruption before the child terminal result. Polling timeouts and progress
-   messages remain non-terminal. Exhausting fifteen 60-second polling cycles is
-   a defined product fallback but still fails this live delegation gate. This
-   is a maintainer gate, not public CI, because it uses authentication and model
-   quota.
+   interruption before the child terminal result. An exact terminal-completion
+   wake is integrated immediately and ends polling without a list check. Only a
+   timeout, progress-only message, or unknown non-terminal wake requires a
+   canonical status check; every wait still consumes one of fifteen cycles.
+   Exhausting those cycles is a defined product fallback but still fails this
+   live delegation gate. This is a maintainer gate, not public CI, because it
+   uses authentication and model quota.
 
 The first local-path matrix passed on 2026-08-09, but it covered the router
 revision before the lifecycle rule above. The first git-ref attempt then showed
 R08 interrupting a still-running child after repeated polling timeouts. That
 attempt failed, and the earlier local result cannot satisfy the merge criterion.
 
-The corrected final-byte local matrix has now passed. R02 and R07 passed on
-`codex exec`; R08 and R09 passed in the interactive TUI. Every case made one
-exact `agent_type="marketer"`, `fork_turns="none"` call, produced one direct
-marketer child and no nested or generic replacement, delivered the child's
+The later local-path and fresh git-ref matrices passed at `954fc64`. R02 and
+R07 passed on `codex exec`; R08 and R09 passed in the interactive TUI. Every
+case made one exact
+`agent_type="marketer"`, `fork_turns="none"` call, produced one direct marketer
+child and no nested, generic replacement, or extra root, delivered the child's
 complete final result, and reached one root-parent final answer and task
-completion. The TUI cases allowed the running child to complete after seven
-R08 polling cycles and eight R09 polling cycles, with no parent send,
-follow-up, or interrupt before acceptance. The fresh final git-ref matrix is
-still pending, so PR 5a has neither satisfied its merge gate nor shipped.
+completion. No parent `send_message`, `followup_task`, or `interrupt_agent`
+call occurred before the recorded completion. Each fresh per-case git-ref
+install resolved that exact SHA, reproduced the source router and agent bytes in
+the installed snapshot and managed agent, and reported bootstrap `Installed`
+followed by `Unchanged`.
+
+The git-ref coordinator used one wait/list cycle for R02, three for R07, six
+waits and five list checks for R08, and eight wait/list cycles for R09. R08's
+sixth wait delivered the exact terminal completion, so the coordinator
+integrated it without another list check; only a timeout, progress-only, or
+unknown wake required that follow-up status check. This is retained as
+calibration evidence for agent distribution, routing, lifecycle behavior, and
+recorded output anchors. It does not certify marketer skill parity or complete
+content quality.
+
+A subsequent blocker ruling made that shortcut explicit in the router wording:
+terminal completion integrates and stops immediately, while only timeout,
+progress-only, or unknown non-terminal wakes proceed to `list_agents`. Because
+the router bytes changed, `954fc64` is no longer final-byte merge acceptance.
+The complete local-path and fresh git-ref R02/R07/R08/R09 matrices are pending
+on the new final SHA. PR 5a has not merged or shipped.
 
 The versioned router eval fixture freezes twelve non-sensitive decision-boundary
 inputs and their expected route, spawn count, agent identity, history fork, and
@@ -353,7 +377,7 @@ contract drift without replacing the pinned gate.
 | 2 | Vendored `$N` escape prerequisite | complete |
 | 3 | Move non-skill directories to `vendor/` and `shared/` | complete |
 | 4 | Generate seven manifests and marketplace; add drift/install CI | complete |
-| 5a | Marketer TOML, router, secure bootstrap, and live delegation gate | active; corrected local accepted, final git-ref pending |
+| 5a | Marketer TOML, router, secure bootstrap, and live delegation gate | active; `954fc64` calibration passed, new-final-byte local and git-ref matrices pending |
 | 5b | Five remaining TOMLs and six remaining routers | blocked on 5a acceptance |
 | 6 | Native vocabulary and workflow compatibility audit | pending |
 | 7 | Complete public install and release documentation | pending |
@@ -364,6 +388,10 @@ and Linux, and authenticated acceptance records a real marketer child for the
 complete R02/R07/R08/R09 matrix from both the local-path and git-ref installs.
 The generated project copy must remain byte-identical to its source, and Claude
 must continue to load only the Markdown sibling.
+
+The `954fc64` runs remain valid lifecycle calibration, but the authenticated
+local-path and git-ref distribution criterion must be repeated on the new final
+router bytes. CI, review, and merge remain pending.
 
 ## Remaining questions
 

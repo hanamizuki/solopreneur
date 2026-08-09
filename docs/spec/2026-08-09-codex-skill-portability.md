@@ -10,10 +10,12 @@ architecture baseline contains 104 and the PR 5a/v2 feature tree contains 106
 **Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md), [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)
 
 The related specs remain authoritative for agent-distribution status. PR 5a/v2
-has passed its corrected final-byte local matrix after fixing the child-
-lifecycle gap found by its first git-ref matrix. The final git-ref matrix and
-remaining merge gates are pending; PR 5a/v2 has not merged or shipped. This
-changes no skill support status and does not certify marketer skill portability.
+passed local-path and fresh git-ref matrices at `954fc64`, demonstrating the
+terminal-completion shortcut after the first git-ref attempt exposed a lifecycle
+failure. A later blocker ruling changed the router wording that defines that
+contract, so both matrices are pending on the new final bytes. PR 5a/v2 has not
+merged or shipped. This changes no skill support status and does not certify
+marketer skill portability or complete content quality.
 
 ## Problem
 
@@ -379,10 +381,12 @@ interruption. Those same scenarios become the cross-engine conformance suite.
 ## Relationship to agent distribution
 
 The marketer agent pilot and skill portability are independent tracks. The v2
-redo is active: the corrected final-byte local matrix passed after the first
-git-ref attempt exposed a lifecycle failure, and the fresh final git-ref matrix
-remains pending. It answers whether Codex can install, discover, and dispatch a
-custom marketer agent. This spec answers whether a skill executed by that agent
+redo is active: local-path and fresh git-ref matrices passed at `954fc64` after
+the first git-ref attempt exposed a lifecycle failure. Those runs demonstrated
+the terminal-completion shortcut, but a subsequent router wording change makes
+them calibration rather than final-byte merge acceptance. The complete
+R02/R07/R08/R09 matrices are pending on both installation paths for the new
+final SHA. This spec separately answers whether a skill executed by that agent
 or by the parent satisfies the same cross-platform behavioral contract.
 
 Evidence does not transfer between the tracks: a linked child thread does not
@@ -395,7 +399,7 @@ agent-distribution prerequisite and does not certify marketer skill parity.
 | PR | Scope | Gate |
 | --- | --- | --- |
 | 1. Architecture | This independent spec and backlog update | No runtime, pilot-document, or packaging change |
-| 2. Marketer PR 5a/v2 | Resolve the paused agent-distribution vertical slice and update its authoritative pilot documents | Accepted current evidence; new delivery skills bring their own acceptance evidence; no marketer domain-skill parity claim |
+| 2. Marketer PR 5a/v2 | Resolve the paused agent-distribution vertical slice and update its authoritative pilot documents | `954fc64` lifecycle calibration passed; new-final-byte local and git-ref matrices plus CI/review/merge pending; no marketer domain-skill parity claim |
 | 3. Registry | Add the complete compatibility registry, conditional schema validation, and generated inventory report | Every skill discovered at that commit is re-audited; expected count is 106 if PR 2 lands first; existing Claude skills may enter as `legacy` |
 | 4. Publication fixture | Prove and implement the Codex publication view | Local and git-ref installs expose only registry-included skills through the declared root; inert snapshot bytes do not count as exposure |
 | 5. Shared foundations | Add one executable config/plugin-root resolver and platform-resource validation | No bulk vocabulary rewrite; existing Claude behavior remains unchanged |

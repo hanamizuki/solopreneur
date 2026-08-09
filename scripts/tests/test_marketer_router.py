@@ -112,8 +112,16 @@ class MarketerRouterTests(unittest.TestCase):
         source = ROUTER.read_text(encoding="utf-8")
         normalized = " ".join(source.split())
         polling = (
-            "A polling timeout or progress message before the cycle budget is "
-            "exhausted is not a child failure."
+            "A polling timeout, progress-only message, or other wake without a "
+            "completed result before the cycle budget is exhausted is not a "
+            "child failure."
+        )
+        completed_wake = (
+            "If the wake injects the exact canonical child's completed final "
+            "result, integrate it immediately and stop polling."
+        )
+        status_check = (
+            "Otherwise, inspect the spawned canonical path with `list_agents`."
         )
         running = (
             "While the child is `pending_init` or `running` and cycles remain, "
@@ -123,13 +131,17 @@ class MarketerRouterTests(unittest.TestCase):
         completed = "Integrate only a `completed` child result."
         terminal = "the tool reports the child as `errored` or `shutdown`"
 
-        self.assertIn("The outer liveness budget is 15 polling cycles.", normalized)
+        self.assertIn("The outer liveness budget is 15 wait cycles.", normalized)
         self.assertIn(
-            "Each cycle calls `wait_agent` once with `timeout_ms=60000`, then "
-            "inspects the spawned canonical path with `list_agents`",
+            "Each cycle calls `wait_agent` once with `timeout_ms=60000`",
             normalized,
         )
-        self.assertIn("every call counts even when a mailbox update wakes it early", normalized)
+        self.assertIn(
+            "every wait call counts even when a mailbox update wakes it early",
+            normalized,
+        )
+        self.assertIn(completed_wake, normalized)
+        self.assertIn(status_check, normalized)
         self.assertIn(polling, normalized)
         self.assertIn(
             "If the canonical path is absent from `list_agents`, treat it as "
@@ -144,7 +156,7 @@ class MarketerRouterTests(unittest.TestCase):
         )
         self.assertIn(completed, normalized)
         self.assertIn(terminal, normalized)
-        self.assertIn("After the fifteenth cycle", normalized)
+        self.assertIn("If the fifteenth non-completing cycle", normalized)
         self.assertIn("call `interrupt_agent` exactly once", normalized)
         self.assertIn(
             "Never claim that this budget fallback completed the delegation; "
@@ -169,6 +181,9 @@ class MarketerRouterTests(unittest.TestCase):
         )
         self.assertLess(normalized.index(running), normalized.index(completed))
         self.assertLess(normalized.index(completed), normalized.index(terminal))
+        self.assertLess(
+            normalized.index(completed_wake), normalized.index(status_check)
+        )
 
     def test_versioned_eval_fixture_has_twelve_boundary_cases(self) -> None:
         fixture = json.loads(EVAL_FIXTURE.read_text(encoding="utf-8"))

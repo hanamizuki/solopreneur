@@ -4,8 +4,10 @@
 longer defines the current platform limit. Codex 0.147.0 can create real custom-
 agent children. A first rebuilt local-path matrix passed on 2026-08-09, but the
 first git-ref matrix exposed a coordinator lifecycle failure. The corrected
-final-byte local matrix has now passed; the final git-ref matrix remains
-pending. PR 5a has not merged or shipped.
+local-path and fresh git-ref matrices then passed at `954fc64` and proved the
+terminal-completion shortcut. A later blocker ruling changed the router wording
+that defines that contract, so both matrices are pending on the new final bytes.
+PR 5a has not merged or shipped.
 
 **Original pilot:** 2026-07-15, Codex CLI 0.144.3, Claude Code 2.1.210
 **Current calibration:** 2026-08-09, Codex CLI 0.147.0, `gpt-5.6-sol`
@@ -21,9 +23,11 @@ enabled; Sol uses V2, and calibration proved that the platform can create real
 custom-agent children. The pre-redesign natural headless calibration did not
 prove the redesigned router: its router-body sentinel was not observed, the
 first named call used full-history inheritance and was rejected, generic
-retries followed, and the run was stopped incomplete. The corrected final-byte
-local matrix has now replaced that calibration for the local consumer path;
-final git-ref acceptance still has to start from a fresh installed snapshot.
+retries followed, and the run was stopped incomplete. The local-path and fresh
+git-ref matrices at `954fc64` then replaced that initial calibration and
+demonstrated the terminal-completion shortcut. A subsequent router wording
+change means those runs are calibration rather than final-byte merge acceptance.
+They do not establish skill parity or complete content quality.
 
 ## Original 0.144.3 evidence
 
@@ -157,20 +161,20 @@ harness exited after the child completed but before the root parent recorded
 its own final and task completion. The corrected TUI control pins the unique root
 rollout and exits only after that root records both events.
 
-The corrected router treats polling timeouts and interim mailbox messages as
-non-terminal, checks the canonical child status, treats a missing path as not
-found, and forbids send, follow-up, interrupt, duplicate work, or a parent final
-while the child is pending or running. Only a completed result is integrated.
-A rejected spawn, missing path, or tool-reported errored or shutdown child may
-enter the zero-additional-agent inline fallback. A separate 15-minute outer
-budget is implemented as fifteen counted `wait_agent` cycles with 60-second
-timeouts; early mailbox wake-ups still count. Exhausting it may interrupt a
-still-running child once, but that is a delegation failure and cannot pass the
-live gate. An unexpected interrupted state surfaces failure without inline
-completion. At that checkpoint, both installation matrices needed to rerun on
-the corrected bytes.
+The current router gives the accepted child fifteen counted `wait_agent`
+cycles with 60-second timeouts; early mailbox wake-ups still count. An exact
+canonical terminal completion delivered by a wake is integrated immediately
+and stops polling without `list_agents`. Only a timeout, progress-only message,
+or unknown non-terminal wake requires a canonical status check. A missing path
+is treated as not found. The parent forbids send, follow-up, interrupt,
+duplicate work, or a final answer while the child is pending or running and
+cycles remain. Exhausting the budget may interrupt a still-running child once,
+but that is a delegation failure and cannot pass the live gate. A rejected
+spawn, missing path, or tool-reported errored or shutdown child may enter the
+zero-additional-agent inline fallback. An unexpected interrupted state surfaces
+failure without inline completion.
 
-### Corrected final-byte local acceptance
+### `954fc64` local calibration
 
 The complete corrected local consumer-path matrix passed on 2026-08-09. R02
 and R07 passed through `codex exec`; R08 and R09 passed through the interactive
@@ -185,11 +189,42 @@ before either child completed. The local marketplace install also reproduced
 the source router and agent bytes in the installed snapshot and managed agent,
 and the bootstrap reported `Installed` followed by `Unchanged`.
 
-This result accepts the corrected final bytes only for the local leg. The fresh
-final git-ref R02/R07/R08/R09 matrix is still pending, so PR 5a has not met its
-merge gate and has not shipped. The result proves agent distribution and
-delegation on the tested local surfaces; it does not certify marketer skill
-parity.
+This result remains calibration for agent distribution and delegation on the
+tested local surfaces; it does not certify marketer skill parity or complete
+content quality. The router wording changed afterward, so the complete local
+matrix must rerun on the new final bytes.
+
+### `954fc64` git-ref calibration
+
+The fresh published-ref matrix passed at SHA `954fc64`. Every case used
+a separate clean install that resolved that exact SHA, reproduced the source
+router and agent bytes in the installed snapshot and managed agent, and
+reported bootstrap `Installed` followed by `Unchanged`. R02 and R07 passed
+through `codex exec`; R08 and R09 passed through the interactive TUI.
+
+Each case made exactly one `spawn_agent` call with
+`agent_type="marketer"` and `fork_turns="none"`, created exactly one direct
+marketer child, and created no nested child, generic replacement, or extra root.
+The complete child final was delivered, followed by the unique root parent's
+final answer and task completion. Parent `send_message`, `followup_task`, and
+`interrupt_agent` counts were all zero before the recorded completion.
+
+R02 used one wait/list cycle, R07 used three, and R09 used eight. R08 used six
+waits and five list checks: its sixth wait delivered the exact terminal
+completion, so the coordinator correctly accepted it without another list
+check. A list check is required after a timeout, progress-only, or unknown wake,
+not after an exact terminal completion. The required non-sensitive result
+anchors were present on the covered cases. These checks demonstrate the
+distribution, routing, lifecycle, final-delivery, and recorded-anchor behavior
+of `954fc64` only; they do not certify marketer skill parity or complete content
+quality.
+
+The subsequent blocker ruling changed the router wording to make the observed
+shortcut normative: terminal completion integrates and stops directly, while
+only timeout, progress-only, or unknown non-terminal wakes proceed to
+`list_agents`. The new router bytes therefore require fresh local-path and
+git-ref R02/R07/R08/R09 matrices before merge acceptance. Those matrices, CI,
+review, and merge remain pending; PR 5a has not merged or shipped.
 
 ## Rebuilt PR 5a contract
 
@@ -226,10 +261,14 @@ named `Agent` call for `marketer`. The router never substitutes generic agents,
 splits the request across agents, or retries with another type. It sends only
 the self-contained brief. A rejected call, missing canonical child path, or
 tool-reported errored or shutdown child permits no further delegation and uses
-the minimal inline fallback. A child still pending or running after all fifteen
-polling cycles is interrupted once before the same fallback, but that path
-fails live delegation acceptance. An unexpected interrupted state surfaces
-failure without inline completion or a success claim.
+the minimal inline fallback. After an accepted spawn, the child owns the work
+for at most fifteen `wait_agent` cycles. An exact terminal-completion wake is
+integrated immediately and ends polling without a list check. Only a timeout,
+progress-only message, or unknown non-terminal wake requires `list_agents` to
+check the canonical child. A child still pending or running after all fifteen
+cycles is interrupted once before the same fallback, but that path fails live
+delegation acceptance. An unexpected interrupted state surfaces failure without
+inline completion or a success claim.
 
 ### Bootstrap
 
@@ -264,8 +303,8 @@ plus explicit user approval.
 | Router contract | versioned 12-case expectation fixture and static action-language checks | required CI; not live evidence |
 | Bootstrap fixtures | Bash 3.2/modern Bash install, update, no-op, collision, symlink, failure, orphan cases | required CI on macOS and Linux |
 | Install integration | all seven plugins install; cached bootstrap produces byte-identical agent; second run unchanged | required CI |
-| Local live delegation | full R02 explicit plus R07/R08/R09 natural matrix creates linked marketer children | corrected final-byte matrix passed |
-| Git-ref live delegation | fresh published-ref install repeats the full R02/R07/R08/R09 matrix | first attempt failed R08 lifecycle; final-byte rerun pending |
+| Local live delegation | full R02 explicit plus R07/R08/R09 natural matrix creates linked marketer children | `954fc64` calibration passed; new-final-byte rerun pending |
+| Git-ref live delegation | fresh published-ref install repeats the full R02/R07/R08/R09 matrix | first attempt failed; `954fc64` calibration passed; new-final-byte rerun pending |
 | Claude compatibility | same-basename TOML remains inert | maintainer fixture |
 
 Authenticated live acceptance is intentionally outside public CI. It requires a
