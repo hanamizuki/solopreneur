@@ -10,9 +10,10 @@ architecture baseline contains 104 and the PR 5a/v2 feature tree contains 106
 **Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md), [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)
 
 The related specs remain authoritative for agent-distribution status. PR 5a/v2
-has passed its local-path matrix on the feature tree; its git-ref and remaining
-merge gates are pending. This changes no skill support status and does not
-certify marketer skill portability.
+has passed its corrected final-byte local matrix after fixing the child-
+lifecycle gap found by its first git-ref matrix. The final git-ref matrix and
+remaining merge gates are pending; PR 5a/v2 has not merged or shipped. This
+changes no skill support status and does not certify marketer skill portability.
 
 ## Problem
 
@@ -378,11 +379,11 @@ interruption. Those same scenarios become the cross-engine conformance suite.
 ## Relationship to agent distribution
 
 The marketer agent pilot and skill portability are independent tracks. The v2
-redo is active: its local-path matrix passed, while its git-ref and remaining
-merge gates are pending. It answers whether Codex can install, discover, and
-dispatch a custom marketer agent. This spec answers whether a skill executed by
-that agent or by the parent satisfies the same cross-platform behavioral
-contract.
+redo is active: the corrected final-byte local matrix passed after the first
+git-ref attempt exposed a lifecycle failure, and the fresh final git-ref matrix
+remains pending. It answers whether Codex can install, discover, and dispatch a
+custom marketer agent. This spec answers whether a skill executed by that agent
+or by the parent satisfies the same cross-platform behavioral contract.
 
 Evidence does not transfer between the tracks: a linked child thread does not
 prove its skills are portable, and a loadable skill does not prove agent TOML,

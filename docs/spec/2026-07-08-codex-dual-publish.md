@@ -2,9 +2,9 @@
 
 **Status:** Approved architecture. Rollout PRs 1–4 are on `main`; the PR 5a
 marketer vertical slice resumed after a Codex 0.147.0 retest removed the old
-headless-delegation blocker. Its rebuilt local-path acceptance matrix passed on
-2026-08-09. The slice is not shipped until the git-ref matrix and remaining
-merge gates pass.
+headless-delegation blocker. The corrected final-byte local matrix has passed;
+the final git-ref matrix and remaining merge gates are still pending. The slice
+has not merged or shipped.
 **Date:** 2026-07-08
 **Current review:** 2026-08-09
 **Affected plugins:** all seven (`solopreneur`, `designer`, `marketer`,
@@ -233,8 +233,26 @@ named agent makes exactly one call: on V2, `spawn_agent` with
 agent, splits the brief across agents, or retries with another type. The
 self-contained brief contains only the objective, deliverables, language,
 constraints, evidence paths, and bounded assumptions. The child does not
-delegate again. If this exact call is rejected or fails, the router makes no
-further delegation calls and falls back inline.
+delegate again.
+
+After an accepted Codex spawn, the child is the selected execution path. The
+outer budget is fifteen polling cycles. Each cycle calls `wait_agent` once with
+a 60-second timeout and then checks the canonical child status; early mailbox
+wake-ups still consume a cycle. A timeout or progress message before the cycle
+budget is not a child failure. A missing canonical path is treated as not found.
+While the child remains pending or running and cycles remain, the parent does
+not send or follow up, interrupt it, retry, start the delegated work inline, or
+answer. Only a completed child result is integrated. A rejected call, missing
+path, or tool-reported errored or shutdown state enters the
+zero-additional-agent inline fallback.
+
+After the fifteenth cycle, a still-pending or running child is interrupted once;
+the parent marks delegation failed, makes no further agent calls, and uses the
+minimal inline fallback. That path cannot satisfy live delegation acceptance.
+Explicit user cancellation or replacement may interrupt sooner but does not
+authorize completing the original delegated work inline or reporting it as
+successful delegation. An unexpected interrupted state instead surfaces
+delegation failure without inline completion or a success claim.
 
 ## Known compatibility scope
 
@@ -286,14 +304,27 @@ Validation is layered so deterministic failures do not consume model calls:
    the local-path install and the git-ref install run that same surface mapping.
    Parse persisted parent/child rollout linkage and reject narrated-only
    delegation, a full-history fork error, a wrong agent identity, nested
-   delegation, or a missing child result. This is a maintainer gate, not public
-   CI, because it uses authentication and model quota.
+   delegation, a missing child result, or any parent send, follow-up, or
+   interruption before the child terminal result. Polling timeouts and progress
+   messages remain non-terminal. Exhausting fifteen 60-second polling cycles is
+   a defined product fallback but still fails this live delegation gate. This
+   is a maintainer gate, not public CI, because it uses authentication and model
+   quota.
 
-Current local-path evidence from 2026-08-09 satisfies the local leg: all four
-cases passed with the router-body sentinel before the first spawn, one exact
-marketer fresh-context call, one direct marketer child, no generic or nested
-child, and a delivered child final. The git-ref leg has not yet run, so the
-merge criterion remains unsatisfied.
+The first local-path matrix passed on 2026-08-09, but it covered the router
+revision before the lifecycle rule above. The first git-ref attempt then showed
+R08 interrupting a still-running child after repeated polling timeouts. That
+attempt failed, and the earlier local result cannot satisfy the merge criterion.
+
+The corrected final-byte local matrix has now passed. R02 and R07 passed on
+`codex exec`; R08 and R09 passed in the interactive TUI. Every case made one
+exact `agent_type="marketer"`, `fork_turns="none"` call, produced one direct
+marketer child and no nested or generic replacement, delivered the child's
+complete final result, and reached one root-parent final answer and task
+completion. The TUI cases allowed the running child to complete after seven
+R08 polling cycles and eight R09 polling cycles, with no parent send,
+follow-up, or interrupt before acceptance. The fresh final git-ref matrix is
+still pending, so PR 5a has neither satisfied its merge gate nor shipped.
 
 The versioned router eval fixture freezes twelve non-sensitive decision-boundary
 inputs and their expected route, spawn count, agent identity, history fork, and
@@ -322,7 +353,7 @@ contract drift without replacing the pinned gate.
 | 2 | Vendored `$N` escape prerequisite | complete |
 | 3 | Move non-skill directories to `vendor/` and `shared/` | complete |
 | 4 | Generate seven manifests and marketplace; add drift/install CI | complete |
-| 5a | Marketer TOML, router, secure bootstrap, and live delegation gate | active; local accepted, git-ref pending |
+| 5a | Marketer TOML, router, secure bootstrap, and live delegation gate | active; corrected local accepted, final git-ref pending |
 | 5b | Five remaining TOMLs and six remaining routers | blocked on 5a acceptance |
 | 6 | Native vocabulary and workflow compatibility audit | pending |
 | 7 | Complete public install and release documentation | pending |

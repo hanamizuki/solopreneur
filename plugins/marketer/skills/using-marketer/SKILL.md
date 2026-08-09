@@ -45,9 +45,32 @@ branches:
 
 Never spawn a generic agent, split the brief across agents, or retry with
 another agent type. Send only a self-contained objective, deliverables,
-language, constraints, and relevant evidence or paths. Wait for that child and
-integrate its result without repeating the work.
+language, constraints, and relevant evidence or paths.
 
-If the exact named-agent call in branch 3 is rejected or fails, make no further
-spawn or delegation calls. Continue inline with the smallest applicable skill
-set.
+In Codex, after an accepted spawn, treat that child as the selected execution
+path and wait for its result before answering. The outer liveness budget is 15
+polling cycles. Each cycle calls `wait_agent` once with `timeout_ms=60000`, then
+inspects the spawned canonical path with `list_agents`; every call counts even
+when a mailbox update wakes it early. The maximum wait is therefore 15 minutes,
+and may be shorter after progress updates. A polling timeout or progress message
+before the cycle budget is exhausted is not a child failure. If the canonical
+path is absent from `list_agents`, treat it as `not_found`. While the child is
+`pending_init` or `running` and cycles remain, wait again: do not call
+`send_message`, `followup_task`, or `interrupt_agent`; do not spawn, retry,
+begin the delegated work inline, or deliver a final answer.
+
+After the fifteenth cycle, inspect the canonical path once more. If the child is
+still `pending_init` or `running`, call `interrupt_agent` exactly once, mark the
+delegation failed, make no further agent calls, and continue inline with the
+smallest applicable skill set. Never claim that this budget fallback completed
+the delegation; it cannot satisfy live delegation acceptance.
+
+Integrate only a `completed` child result. If the exact named-agent call is
+rejected, the canonical path is absent, or the tool reports the child as
+`errored` or `shutdown`, make no further agent calls and continue inline with
+the smallest applicable skill set. Explicit user cancellation or replacement
+may interrupt a running child before the budget; then follow the new user intent
+without continuing the original delegated work inline or claiming that
+delegation completed. If the child becomes `interrupted` without either of
+those parent-initiated reasons, make no further agent calls, surface delegation
+failure, and do not continue the original work inline or claim success.

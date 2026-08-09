@@ -70,9 +70,7 @@ class MarketerRouterTests(unittest.TestCase):
             "If the route is delegation and `marketer` is available, make exactly "
             "one named-agent call"
         )
-        failed_call = (
-            "If the exact named-agent call in branch 3 is rejected or fails"
-        )
+        failed_call = "If the exact named-agent call is rejected"
 
         self.assertIn("mutually exclusive branches", normalized)
         self.assertIn(inline, normalized)
@@ -92,7 +90,7 @@ class MarketerRouterTests(unittest.TestCase):
             normalized,
         )
         self.assertIn(failed_call, normalized)
-        self.assertIn("make no further spawn or delegation calls", normalized)
+        self.assertIn("make no further agent calls", normalized)
         self.assertLess(normalized.index(inline), normalized.index(unavailable))
         self.assertLess(normalized.index(unavailable), normalized.index(available))
         self.assertLess(normalized.index(available), normalized.index(failed_call))
@@ -109,6 +107,68 @@ class MarketerRouterTests(unittest.TestCase):
             "never omit or change either field.",
             description,
         )
+
+    def test_router_waits_for_running_child_without_interruption(self) -> None:
+        source = ROUTER.read_text(encoding="utf-8")
+        normalized = " ".join(source.split())
+        polling = (
+            "A polling timeout or progress message before the cycle budget is "
+            "exhausted is not a child failure."
+        )
+        running = (
+            "While the child is `pending_init` or `running` and cycles remain, "
+            "wait again: do not call `send_message`, `followup_task`, or "
+            "`interrupt_agent`"
+        )
+        completed = "Integrate only a `completed` child result."
+        terminal = "the tool reports the child as `errored` or `shutdown`"
+
+        self.assertIn("The outer liveness budget is 15 polling cycles.", normalized)
+        self.assertIn(
+            "Each cycle calls `wait_agent` once with `timeout_ms=60000`, then "
+            "inspects the spawned canonical path with `list_agents`",
+            normalized,
+        )
+        self.assertIn("every call counts even when a mailbox update wakes it early", normalized)
+        self.assertIn(polling, normalized)
+        self.assertIn(
+            "If the canonical path is absent from `list_agents`, treat it as "
+            "`not_found`.",
+            normalized,
+        )
+        self.assertIn(running, normalized)
+        self.assertIn(
+            "do not spawn, retry, begin the delegated work inline, or deliver "
+            "a final answer",
+            normalized,
+        )
+        self.assertIn(completed, normalized)
+        self.assertIn(terminal, normalized)
+        self.assertIn("After the fifteenth cycle", normalized)
+        self.assertIn("call `interrupt_agent` exactly once", normalized)
+        self.assertIn(
+            "Never claim that this budget fallback completed the delegation; "
+            "it cannot satisfy live delegation acceptance.",
+            normalized,
+        )
+        self.assertIn("Explicit user cancellation or replacement", normalized)
+        self.assertIn(
+            "If the child becomes `interrupted` without either of those "
+            "parent-initiated reasons",
+            normalized,
+        )
+        self.assertIn(
+            "surface delegation failure, and do not continue the original work "
+            "inline or claim success",
+            normalized,
+        )
+        self.assertNotIn(
+            "the tool reports the child as `errored`, `shutdown`, `not_found`, "
+            "or `interrupted`",
+            normalized,
+        )
+        self.assertLess(normalized.index(running), normalized.index(completed))
+        self.assertLess(normalized.index(completed), normalized.index(terminal))
 
     def test_versioned_eval_fixture_has_twelve_boundary_cases(self) -> None:
         fixture = json.loads(EVAL_FIXTURE.read_text(encoding="utf-8"))
