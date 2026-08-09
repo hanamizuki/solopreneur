@@ -430,9 +430,14 @@ evidence requirements, or acceptance criteria.
   Each host also requires the paired live bundled-specialist evidence in L03;
   an unproven specialist adapter blocks that host's conformance claim, while a
   later transient failure of an already promoted adapter remains a visible
-  `incomplete-review` outcome.
+  `incomplete-review` outcome. Claude additionally requires the L04 direct-
+  native binding, and Codex requires the full L05 native-provenance and wrong-
+  context branches. A verified remote finding cannot enter disposition or the
+  fixer until its current-generation blocking windows settle.
   A conditional GitHub candidate requires P11 or L14 only before that candidate
-  is enabled or advertised; an unsafe or failed candidate probe leaves it
+  is enabled or advertised, using the real vendor App and an actually supported
+  parent-only permission-authority profile. An unsafe or failed candidate probe
+  leaves it
   ineligible without blocking CLI-default engine conformance. This does not
   withdraw the existing Claude-oriented runtime.
 - Interrupted, partial, and failed reviewer runs produce the same classified

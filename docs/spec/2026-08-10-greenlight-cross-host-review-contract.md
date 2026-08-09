@@ -202,10 +202,14 @@ provider provenance, and the host-specific invocation token returned by
 current-session discovery. It must not assume that a plugin-qualified catalog
 identity, an unqualified skill name, and an interactive slash or at-sign token
 are interchangeable. The adapter resolves the actual token for the pinned host
-version, then proves that it belongs to the expected Superpowers, Ponytail, or
-gstack provider. A same-named standalone skill cannot silently impersonate a
+version, then proves that it belongs to the expected native, bundled,
+Superpowers, Ponytail, or gstack provider. Native recipes additionally bind the
+runner-observed capability identity and active host profile to the registered
+host-native provenance; a peer CLI or same-named standalone capability cannot
+impersonate them. A same-named standalone skill cannot silently impersonate any
 registered provider. Disabled providers and stale caches are absent, not
-available. L03 freezes the real discovery artifacts for both hosts.
+available. L03 freezes the real discovery artifacts for both hosts, while L04
+and L05 prove the required host-native bindings.
 
 Once availability is resolved, Greenlight must invoke every frozen-roster entry
 whose status is `available`. A required unavailable entry remains visible as
@@ -302,6 +306,8 @@ policy. A synchronous `local_cli` recipe defines a zero closing window
 and marks remote cursor, watermark, and final-query-timeout fields not
 applicable. An unverified advisory channel uses best-effort closing evidence,
 marks those fields not applicable, and cannot gate or extend a closing sweep.
+The recipe also declares the versioned permission-authority profiles its parent-
+owned probe accepts and the explicit credential-profile mapping for each one.
 These recipe and channel values are the single timing source used by both
 engines. Gate independence is implementation-level: a Codex-host reviewer in the OpenAI group
 cannot gate Codex, and a Claude-host reviewer in the Anthropic group cannot gate
@@ -371,6 +377,31 @@ canonical permission digest, and permission-policy ID and version. An App's
 claim that it requests a smaller installation token is not authority evidence;
 the installation grant is the capability ceiling visible to Greenlight.
 
+The active `gh` profile is not implicitly a permission authority. V1 accepts
+only these versioned, explicitly configured authority profiles:
+
+- `app_jwt_exact_repo`: a JWT for the registered reviewer App queries that
+  App's exact-repository installation endpoint.
+- `app_user_inventory`: a user access token issued by the registered reviewer
+  App queries its installation plus complete repository inventory, including
+  pagination and exact target membership.
+- `org_owner_inventory`: an organization-owner credential with the documented
+  installation-inventory permission queries the complete organization App
+  inventory. On its own, it proves target membership only when
+  `repository_selection=all`; a selected installation still requires the
+  matching App-specific repository inventory above.
+
+The parent credential broker owns these credentials and never exposes them to
+the reviewer process. Evidence records only the authority-profile ID and
+version, credential class, authenticated subject/App/account identity, endpoint
+set and API version, query status and time, pagination completeness, membership-
+proof kind, and response digest—never a token, JWT, or private key. A normal
+`gh` OAuth token, a narrowed installation token, provider self-report, public
+App metadata, the wrong App's credential, or organization inventory for a
+selected installation without supplemental membership proof is not authority.
+If no supported profile can prove the exact App/install/repository tuple, the
+boundary is unavailable rather than guessed.
+
 The versioned policy derives two overlapping sets: required or observed
 `review_output_capabilities` and `target_mutation_capabilities`. Output authority
 does not cancel mutation authority. In V1, a GitHub App is gateable only when all
@@ -408,6 +439,21 @@ change, or unverifiable boundary after publication or dispatch is a runner-owned
 safety violation: accepted gate evidence becomes null and the run terminally
 halts without a same-target fallback. This applies even when the App's review
 channel is best-effort advisory. Provider output cannot repair or override it.
+
+Authority failure follows activation, not optimism. An explicit-only recipe
+with no supported authority profile is `explicit_unavailable`, creates zero
+trigger, attempt, or window, and may select an eligible CLI fallback. Unknown
+activation cannot be downgraded to explicit-only. A known repository-active
+automatic or hybrid App with missing authority, incomplete pagination,
+insufficient scope, or unproved selected-repository membership is
+`preflight_failed`: even for an already published unchanged PR, the run creates
+zero publication and dispatches zero reviewers before halting. After any
+publication or dispatch, a 401/403 response, timeout, incomplete inventory,
+credential expiry, authority-profile mismatch, or boundary drift becomes
+`post_start_failed`, clears accepted gate evidence, and halts without fallback.
+A point-in-time permission query never proves an `automatic_disabled` interval;
+that branch remains unavailable without the separate lifecycle-complete control
+evidence required below.
 
 An unsafe explicit-only App is never triggered and may remain best-effort
 advisory. An unsafe or unknown-permission automatic or hybrid App is different:
@@ -449,7 +495,7 @@ clean and seeded-finding live fixtures.
 
 Every dispatched external attempt has one state from `observing`,
 `observation_closed`, `observation_failed`, `advisory_closed`,
-`completed_valid`, `completed_invalid`, or `timed_out`.
+`completed_valid`, `completed_invalid`, `timed_out`, or `cancelled`.
 A `publication_collector` remains `observing` when its finite observation
 deadline captures the cutoff and schedules closing. It alone moves to
 `observation_closed`, and only after every verified-blocking channel's bounded
@@ -544,8 +590,54 @@ finding path. A later-position finding is retained as advisory for this run. No
 engine may invent an extra retry, extend a deadline, or begin fallback before
 the applicable terminal and termination rules are satisfied.
 
-Once the primary returns a finding, the run is sticky to that primary. The
-finding must be resolved or adjudicated. A target-changing fix requires the
+A reviewer terminal boundary is not a settled remote decision. Once any
+current-generation `verified_blocking` window exists, one exhaustive generation
+settlement record owns the exact frozen set of all such current-generation
+windows. While any member remains `observing` or `closing_scheduled` and none
+has failed, the generation has `settlement_state=pending_closing`.
+Findings may be preserved and displayed with
+`actionability=pending_closing`, but Greenlight must not disposition or
+adjudicate them, dispatch a fixer, change the worktree, commit, publish, advance
+the generation, accept fallback authority, or emit a terminal result. After all
+required windows reach `closing_complete`, the parent atomically folds the
+accepted occurrence union through each cutoff: at-or-before-cutoff findings
+become actionable and sticky together, while later findings remain advisory.
+It records `settlement_state=settled`, settlement time, required-window
+references, accepted-union digest, and settled normalized-findings digest before
+any action begins. The first required `closing_failed` window takes precedence
+over pending state: the parent records failed settlement at `failed_at`, leaves
+accepted authority null, and atomically marks every other nonterminal required
+window `closing_cancelled` with the failed-settlement and originating-window
+references. Already complete windows and all raw evidence remain immutable;
+cancelled siblings have no acceptance authority. A collector that owns a
+cancelled sibling becomes `observation_failed`. An already-terminal remote gate
+retains its reviewer attempt state but cannot gate, while an active remote gate
+enters `cancelled` after collection stops. The parent also cancels every other
+same-generation authority-bearing collector, gate, publication gate, or
+fallback attempt that is still active, including a synchronous local fallback
+with no remote window: a local process must confirm full process-tree
+termination, while a GitHub attempt must record that parent collection stopped
+and treat later provider events as advisory. Best-effort advisory attempts are
+excluded from this hard cancellation barrier; they synchronously record
+`advisory_closed` and stop collection under their existing nonblocking cleanup
+contract. Only after authority-bearing attempt cancellations are durable may
+the generation record `failed_at`. If the target
+is unchanged, the parent
+retains the original generation and halts with zero engine-authorized fixer
+dispatch or mutation. If an external or reviewer-originated mutation already
+occurred, the parent records the actual changed fingerprint and generation as an
+invariant violation, halts, and never treats it as a normal continuation. A
+synchronous local CLI attempt reaches its own zero-window terminal immediately,
+but the generation settles immediately only when its exhaustive verified-
+blocking remote-window set is empty. If a same-generation publication collector
+or other verified remote window remains open, the local result joins the
+generation evidence while settlement stays pending. Best-effort advisory
+windows do not extend this barrier.
+
+Once a remote primary's finding settlement completes—or the generation
+settlement completes after a synchronous local primary returns a finding—the
+run is sticky to that primary. The settled
+finding set must be resolved or adjudicated. A target-changing fix requires the
 same primary to review the new target. Greenlight must never switch to a
 fallback merely to obtain an easier clean verdict. Only after that mandatory
 same-primary re-review attempt may an availability-class failure use the
@@ -1047,15 +1139,18 @@ The shared result records these facts independent of engine implementation:
 | Target | Target mode, canonical target selector, base object, head object, working-tree diff digest, recursive submodule identity manifest (canonical ancestry/path, selector-common containing gitlink object, equal checked-out commit object, clean-state marker), and mutation generation. Existing-PR mode additionally requires repository/PR identity, authoritative lifecycle state, and published base/head. Pre-create mode instead requires planned repository/base/head identity with PR identity and lifecycle explicitly not applicable until the parent records the postpublication `OPEN` tuple |
 | Publication transaction | Transaction ID, `publication_kind=create_pr|update_pr|historical_pr`, exact target fingerprint, frozen remote candidate, channel-roster, and run-level App-permission-barrier references, floor evidence, status, and failure reason. `create_pr|update_pr` additionally require conditional planned/old tuples, `publication_started_at`, finite operation deadline, acknowledgement or explicit timeout, finite confirmation timeout and deadline when acknowledged, authoritative tuple query and completion when confirmed, and final confirmed tuple. A failed permission barrier creates no publication transaction. A failed or unacknowledged publication transaction remains valid failure evidence but cannot have a collector. `historical_pr` instead requires the current `OPEN` tuple, verified publication event identity/time, lifecycle-proven historical floors and validation status, while every parent-operation, acknowledgement, and confirmation field is not applicable |
 | Internal roster | Recipe, required flag, availability and provenance, transport, mutation policy, discriminated execution or `not_started` context, reviewed target fingerprint, deadline, invocation and cancellation status, completion/finding parser identity and version, recipe-validated completion schema/status or explicit not-applicable value, explicit normalized findings collection, explicit candidate-change collection where applicable, incomplete flag, disposition, and evidence reference. Parser fields are required for a completed branch and explicitly not applicable for `not_started`. Silence, process success, and a missing collection are not zero findings; a completed empty collection is. Every invoked `local_cli` entry additionally requires frozen-source identity, recursive submodule materialization proof when applicable, inode and Git-state isolation, default-deny protection, provider-only credentials and egress, and credential-scrub evidence. `report_only` marks candidate-workspace fields not applicable. Every `isolated_candidate` entry regardless of transport requires frozen-source identity, recursive submodule materialization proof when applicable, candidate-workspace identity, independent inode and Git-state evidence, the declared allowed-write boundary, normalized candidate diff against the frozen source, and destruction evidence. A `host_tool` entry may not fabricate CLI-specific process-sandbox or credential fields; `host_tool + report_only` may mark snapshot fields not applicable, while `host_tool + isolated_candidate` must supply the shared frozen-source, materialization, and candidate-boundary evidence |
-| External event common | Recipe, implementation group, transport, target mode and invocation adapter, discriminated execution context, attempt kind, reviewed target, `attempt_state=observing|observation_closed|observation_failed|advisory_closed|completed_valid|completed_invalid|timed_out`, attempt deadline and retry index, terminal-boundary kind and time, invalid reason or explicit `null`, timeout and termination status, closing-evidence kind, fallback reason, and normalized findings. A `github_app` event also references its frozen installation-permission boundary. Per finding, record parser/version, normalized claim, rule identity, severity, canonical location, canonical affected scope, affected-scope digest, derived canonical key, linked remote-occurrence identities, recurrence and adjudication references, and queue disposition; every discriminator is present with explicit `null` when inapplicable. Reviewer start, completion, terminal-signal, rejected-payload, and verdict fields are kind-specific rather than common |
-| GitHub App permission barrier | Run-level boundary ID; `boundary_state=eligible|explicit_unavailable|automatic_disabled|preflight_failed|post_start_failed`; `failure_phase=prepublication|pretrigger|postpublication|postdispatch|terminal|closing|null`; App ID and slug; target account and repository IDs; activation mode; `installation_presence=installed|suspended|excluded|uninstalled|unknown`; permission-policy ID and version; eligibility decision and reason; attempt and window references or explicit not-applicable values. `eligible|explicit_unavailable` with an installed App require installation ID, repository selection and target-membership proof, suspension state, installation revision or `updated_at`, complete normalized permission map, canonical digest, required and observed output capabilities, derived target-mutation and unknown write/admin capabilities, query time, API source, and parent-authentication provenance. `automatic_disabled` additionally requires disablement kind, control ID and version, target scope, state and digest, durable monotonic revision, `effective_from`, protected-through boundary, lifecycle-completeness proof, start and run-terminal observations, and cleanup status; installed, suspended, and excluded states retain every installation field that exists, while an uninstalled state marks nonexistent grant fields not applicable and requires lifecycle-complete install-history evidence. `explicit_unavailable|automatic_disabled|preflight_failed` require attempt and window references to be not applicable; the preflight-failed branch records every fact known before zero publication and zero dispatch. `post_start_failed` adds `failure_kind=boundary_mismatch|omitted_app_discovery`. A boundary mismatch requires the last valid boundary and every attempt or window actually owned before failure, with nonexistent references explicitly not applicable according to failure phase. Omitted-App discovery requires discovery source and time plus App, installation, repository, and activation evidence, while last-boundary, attempt, and window references are not applicable. Checkpoints are branch-specific: a collector uses prepublication, cutoff, and closing; an explicit remote gate uses pretrigger, terminal, and closing; an invoked best-effort advisory uses prepublication or pretrigger according to activation, then its terminal or `advisory_closed` boundary and run terminal; an automatic-disabled App uses prepublication and run-terminal; explicit-unavailable and preflight-failed branches use one unavailable or failed barrier observation. Provider self-report and claimed token narrowing are never substitutes |
-| Remote channel windows | Frozen channel roster and, per channel, identifier, activation mode, `authority_kind`, App/installation/repository/channel provenance, installation-permission-boundary reference, lifecycle-completeness mode and update/retraction/resolution/deletion matchers, authenticated lifecycle-actor/authority and relation extractors, event-identity namespace and extractors, start-boundary origin (`parent_prepublication|verified_historical_publication|pretrigger`), kind, position, capture time and scope, and `window_state=closing_scheduled|closing_complete|closing_failed`. A scheduled verified-blocking window records its terminal boundary and every field available so far while pending fields remain explicit `null`. The complete branch requires `authority_cutoff_position`, `cutoff_observed_at`, positive closing window, `closing_deadline_at`, positive `final_query_timeout`, `final_query_deadline_at`, `final_watermark_captured_at`, final server watermark, `closing_query_started_at`, `closing_query_completed_at`, complete-query and pagination evidence, accepted-occurrence-union digest, and successful permission-boundary revalidation. It proves `floor <= cutoff <= final watermark` and the required timestamp order. The failed branch requires `failure_stage=cutoff_capture|watermark_capture|query|pagination|target_revalidation|permission_boundary`, `failed_at`, reason, the last durable boundary and query evidence available before failure, and explicit not-applicable values for every later field that could not exist; it may not fabricate a successful cutoff, watermark, query, permission revalidation, or union digest. Only an attempt that owns a window can use this failure branch; preflight and omitted-App failures remain in the run-level permission barrier. Any failed required window makes its collector `observation_failed` and terminally halts; a failed remote-gate window preserves that gate's reviewer attempt state but still terminally halts the run. A `publication_collector` window for automatic or hybrid verified-blocking channels requires a parent-owned or verified-historical prepublication start. A `remote_gate` window for explicit or hybrid channels uses a separate pretrigger start; the hybrid gate window must link to, and cannot replace, its collector window. Best-effort advisory values may be present or explicitly not applicable or failed, but cannot gate, block, or extend closing |
+| Internal capability binding | Every invoked internal entry records expected and runner-observed capability identity, provider provenance, match result, and active host profile. `host_tool + host_native` requires the registered native capability and marks peer-profile fields not applicable; a peer or same-named standalone capability cannot satisfy it. `host_tool` bundled or optional entries retain their registered provider provenance. Preflight mismatch dispatches zero times; a post-start actual-versus-expected mismatch is runner-owned invariant failure |
+| External event common | Recipe, implementation group, transport, target mode and invocation adapter, discriminated execution context, attempt kind, reviewed target, `attempt_state=observing|observation_closed|observation_failed|advisory_closed|completed_valid|completed_invalid|timed_out|cancelled`, attempt deadline and retry index, terminal-boundary kind and time, invalid reason or explicit `null`, timeout and termination status, cancellation reason, request time, confirmation time and evidence or explicit not-applicable values, closing-evidence kind, fallback reason, `fallback_dispatched_at`, `fallback_accepted_at`, generation-settlement reference, and normalized findings. A non-fallback event marks all fallback fields not applicable. A dispatched provisional fallback records its dispatch time but keeps acceptance time and settlement reference null. Only `completed_valid` with a recipe-valid clean or findings verdict may accept fallback authority, and it must prove `fallback_dispatched_at <= reviewer_started_at <= authenticated_completion_or_terminal_at <= fallback_accepted_at` plus `settled_at <= fallback_accepted_at` on the exhaustive generation record. `observing|completed_invalid|timed_out|cancelled` and every missing or invalid verdict keep acceptance time and settlement reference null. A `github_app` event also references its frozen installation-permission boundary. Per finding, record parser/version, normalized claim, rule identity, severity, canonical location, canonical affected scope, affected-scope digest, derived canonical key, linked remote-occurrence identities, recurrence and adjudication references, and queue disposition; every discriminator is present with explicit `null` when inapplicable. Reviewer start, completion, terminal-signal, rejected-payload, and verdict fields are kind-specific rather than common |
+| GitHub App permission authority | Authority-profile ID and version; profile kind `app_jwt_exact_repo|app_user_inventory|org_owner_inventory`; credential class; authenticated subject, App, account, and organization identity as applicable; registered reviewer-App match; endpoint set and API version; query status and times; pagination-completeness evidence; repository-selection value; membership-proof kind and status; response digest; and parent-only credential-broker provenance. Secrets are never recorded. `org_owner_inventory` with selected repository access requires a linked App-specific membership proof; ordinary `gh`, installation-token narrowing, provider echo, wrong-App authority, incomplete pagination, and unsupported profiles are explicit failed evidence rather than eligible authority |
+| GitHub App permission barrier | Run-level boundary ID; `boundary_state=eligible|explicit_unavailable|automatic_disabled|preflight_failed|post_start_failed`; `failure_phase=prepublication|pretrigger|postpublication|postdispatch|terminal|closing|null`; App ID and slug; target account and repository IDs; activation mode; `installation_presence=installed|suspended|excluded|uninstalled|unknown`; permission-policy ID and version; eligibility decision and reason; attempt and window references or explicit not-applicable values. `eligible|explicit_unavailable` with an installed App require installation ID, repository selection and target-membership proof, suspension state, installation revision or `updated_at`, complete normalized permission map, canonical digest, required and observed output capabilities, derived target-mutation and unknown write/admin capabilities, query time, API source and parent-authentication provenance, plus the permission-authority evidence above. `automatic_disabled` additionally requires disablement kind, control ID and version, target scope, state and digest, durable monotonic revision, `effective_from`, protected-through boundary, lifecycle-completeness proof, start and run-terminal observations, and cleanup status; installed, suspended, and excluded states retain every installation field that exists, while an uninstalled state marks nonexistent grant fields not applicable and requires lifecycle-complete install-history evidence. `explicit_unavailable|automatic_disabled|preflight_failed` require attempt and window references to be not applicable; the preflight-failed branch records every fact known before zero publication and zero dispatch. `post_start_failed` adds `failure_kind=boundary_mismatch|omitted_app_discovery|authority_failure`. A boundary mismatch or authority failure requires the last valid boundary and every attempt or window actually owned before failure, with nonexistent references explicitly not applicable according to failure phase. Omitted-App discovery requires discovery source and time plus App, installation, repository, and activation evidence, while last-boundary, attempt, and window references are not applicable. Checkpoints are branch-specific: a collector uses prepublication, cutoff, and closing; an explicit remote gate uses pretrigger, terminal, and closing; an invoked best-effort advisory uses prepublication or pretrigger according to activation, then its terminal or `advisory_closed` boundary and run terminal; an automatic-disabled App uses prepublication and run-terminal; explicit-unavailable and preflight-failed branches use one unavailable or failed barrier observation. Provider self-report and claimed token narrowing are never substitutes |
+| Remote channel windows | Frozen channel roster and, per channel, identifier, activation mode, `authority_kind`, App/installation/repository/channel provenance, installation-permission-boundary reference, lifecycle-completeness mode and update/retraction/resolution/deletion matchers, authenticated lifecycle-actor/authority and relation extractors, event-identity namespace and extractors, start-boundary origin (`parent_prepublication|verified_historical_publication|pretrigger`), kind, position, capture time and scope, and `window_state=observing|closing_scheduled|closing_complete|closing_failed|closing_cancelled`. The observing branch records its floor/start and currently known evidence while terminal, cutoff, and closing fields remain null. A scheduled verified-blocking window records its terminal boundary and every field available so far while later fields remain explicit `null`. The complete branch requires `authority_cutoff_position`, `cutoff_observed_at`, positive closing window, `closing_deadline_at`, positive `final_query_timeout`, `final_query_deadline_at`, `final_watermark_captured_at`, final server watermark, `closing_query_started_at`, `closing_query_completed_at`, complete-query and pagination evidence, accepted-occurrence-union digest, successful permission-boundary revalidation, and `permission_revalidated_at`. It proves `floor <= cutoff <= final watermark` and the required timestamp order. The failed branch requires `failure_stage=cutoff_capture|watermark_capture|query|pagination|target_revalidation|permission_boundary`, `failed_at`, reason, the last durable boundary and query evidence available before failure, and explicit not-applicable values for every later field that could not exist; it may not fabricate a successful cutoff, watermark, query, permission revalidation, or union digest. The cancelled branch is allowed only after a different required window fails; it requires `cancelled_at`, the failed-generation-settlement reference, originating failed-window reference, last durable evidence, and explicit not-applicable values for unfinished success fields. Its time must be no earlier than the originating window's `failed_at`, and it never grants authority. Only an attempt that owns a window can use the failure branch; preflight and omitted-App failures remain in the run-level permission barrier. Any failed required window makes its collector `observation_failed` and terminally halts; every other observing or scheduled required window is cancelled atomically. A collector owning a cancelled sibling records `observation_failed` with the originating failure reference. An already-terminal remote gate retains its attempt state while the sibling window loses authority; only an `observing` remote gate becomes `cancelled` after parent collection stops. A `publication_collector` window for automatic or hybrid verified-blocking channels requires a parent-owned or verified-historical prepublication start. A `remote_gate` window for explicit or hybrid channels uses a separate pretrigger start; the hybrid gate window must link to, and cannot replace, its collector window. Best-effort advisory values may be present or explicitly not applicable or failed, but cannot gate, block, or extend closing |
+| Generation external-decision settlement | One exhaustive record per target generation when a synchronous local gate completes or any verified-blocking remote window exists. It records `settlement_state=pending_closing|settled|failed`, `settled_at`, `failed_at`, required-window references whose set must equal every current-generation verified-blocking window owned by a started collector or attempt, and cancelled-authority-attempt references when failure interrupts a same-generation authority-bearing attempt without a remote window. Pending records make both times null, settled records require only `settled_at`, and failed records require only `failed_at`. One settled attempt cannot mask another open collector or attempt. `settled_at` must be no earlier than the synchronous-local authenticated completion when present and the maximum `closing_query_completed_at` plus permission revalidation completion of every required `closing_complete` window. `failed_at` must be no earlier than the originating required window's `failed_at`, every sibling `closing_cancelled.cancelled_at`, every cancelled authority-bearing remote collection-stop time, every cancelled authority-bearing local process-termination confirmation, and the synchronous-local terminal when it completed before failure. It also records the accepted-occurrence-union digest and settled normalized-findings digest, or explicit `null` before success. A synchronous local attempt has an immediate zero-window terminal, but the generation records immediate settlement with an empty remote-window set only when no current-generation verified-blocking remote window exists. If one exists, the generation record must contain the exhaustive nonempty set and stay pending until all members close. Best-effort advisory attempts mark settlement authority and cancelled-authority-attempt references not applicable; at run terminalization they use `advisory_closed`, whose cleanup status does not delay settlement failure or terminal emission. Every normalized remote finding records `actionability=pending_closing|actionable|advisory` plus `actionable_at` or explicit `null`. Every disposition or target-transition record declares `transition_cause=initial_publication|internal_phase|settled_external_decision|invariant_violation`. Initial parent-owned create/update or historical registration and pre-external internal-phase actions require a not-applicable settlement reference. A disposition, adjudication, fixer dispatch, mutation, republication, or generation transition derived from either a synchronous local or verified remote external decision requires the settled generation record and a time not earlier than `settled_at`. If that authority came from an accepted fallback, the action additionally requires the fallback-event reference and a time not earlier than `fallback_accepted_at`; a later backfilled acceptance cannot authorize an earlier action. An invariant-violation transition references failed settlement and records the actual unauthorized mutation without granting continuation authority |
 | Remote event occurrences | Zero or more stable records globally deduplicated within the run. Each record requires origin channel identifier, event-identity namespace, provider event ID, explicit revision/version or `null`, revision-aware source position, authenticated actor and authority, provider-asserted target reference or explicit `null`, optional superseded/retracted/resolved occurrence identity, raw payload or evidence reference, and derived occurrence identity. Different provider IDs or revisions remain distinct even when their text is identical; each observation link separately validates the provider reference against its attempt target |
 | Occurrence observation links | One or more links for every observed occurrence. Each link requires attempt ID, channel-window ID, query and watermark evidence, parent-observed time, exact-target binding result, and late-event disposition. The engine validates that the attempt owns the window, occurrence origin channel and namespace match that window, source position belongs to the window's ordered query interval, and binding and disposition are recomputed for that attempt rather than copied from another link. The same provider event and revision discovered through publication and gate attempts has one occurrence with two links; findings link the occurrence identity rather than duplicating it |
-| External attempt union | `publication_collector` requires a confirmed `publication_transaction_id`, matching `publication_kind=create_pr|update_pr|historical_pr`, publication identifier, exact target fingerprint, authoritative postpublication or current tuple, `publication_observed_at` with parent-owned or verified-historical provenance, finite `observation_deadline_at`, required parent-owned or verified-historical prepublication windows for verified-blocking channels, and best-effort or explicitly not-applicable advisory windows. It cannot reference a failed, unacknowledged, or unconfirmed transaction. It is `observing` through cutoff capture, `observation_closed` only after its bounded closing succeeds, or `observation_failed` with channel, boundary, and failure evidence when cutoff or closing fails; trigger, reviewer completion, and verdict are not applicable. `remote_gate` always requires trigger and handshake/start. Its `completed_valid` state additionally requires recipe-valid reviewer completion and an explicit zero-finding or findings verdict; `completed_invalid` instead requires an authenticated recipe-valid completion or calibrated terminal-failure signal, invalid reason, rejected payload reference, terminal boundary, and state-discriminated remote cutoff/closing evidence, with verdict not applicable; `timed_out` requires the original deadline boundary and the same state-discriminated evidence. Persisted cutoff plus `closing_scheduled` makes fallback dispatch eligible and every fallback result provisional. Only `closing_complete` makes that result fallback-acceptance-eligible. A `closing_failed` window preserves failure evidence, discards any provisional fallback authority, and terminally halts. A malformed event without a terminal signal remains `observing` and cannot authorize fallback. A hybrid gate also requires `parent_publication_attempt_id`, while unrelated publication fields are not applicable. `synchronous_local_gate` requires process start and a confirmed process boundary: `completed_valid` carries a structured verdict, while `completed_invalid` or `timed_out` carries its reason and rejected payload or timeout evidence with verdict not applicable; every remote channel/publication field is not applicable and its closing window is zero. `best_effort_advisory` cannot block or gate and marks unavailable authoritative fields not applicable. A separately calibrated `publication_gate` requires both publication evidence and its recipe-valid completion and verdict contract. Wrong-state or wrong-kind fields are rejected rather than ignored |
+| External attempt union | `publication_collector` requires a confirmed `publication_transaction_id`, matching `publication_kind=create_pr|update_pr|historical_pr`, publication identifier, exact target fingerprint, authoritative postpublication or current tuple, `publication_observed_at` with parent-owned or verified-historical provenance, finite `observation_deadline_at`, required parent-owned or verified-historical prepublication windows for verified-blocking channels, and best-effort or explicitly not-applicable advisory windows. It cannot reference a failed, unacknowledged, or unconfirmed transaction. It is `observing` through cutoff capture, `observation_closed` only after its bounded closing succeeds, or `observation_failed` with channel, boundary, and failure evidence when cutoff or closing fails or a sibling closing is cancelled; trigger, reviewer completion, and verdict are not applicable. `remote_gate` always requires trigger and handshake/start. Its `completed_valid` state additionally requires recipe-valid reviewer completion and an explicit zero-finding or findings verdict; `completed_invalid` instead requires an authenticated recipe-valid completion or calibrated terminal-failure signal, invalid reason, rejected payload reference, terminal boundary, and state-discriminated remote cutoff/closing evidence, with verdict not applicable; `timed_out` requires the original deadline boundary and the same state-discriminated evidence. Persisted cutoff plus `closing_scheduled` makes fallback dispatch eligible and every fallback result provisional: it records `fallback_dispatched_at` while acceptance time and generation-settlement reference remain null. Only exhaustive generation settlement after every required window reaches `closing_complete` makes a `completed_valid` fallback result acceptance-eligible; acceptance proves the full dispatch/start/completion/acceptance order, records `fallback_accepted_at` and the settled-generation reference, and occurs no earlier than `settled_at`. `observing|completed_invalid|timed_out|cancelled` fallback attempts keep both acceptance fields null. A `closing_failed` window preserves failure evidence, cancels sibling windows and every active same-generation authority-bearing collector, gate, publication gate, or fallback attempt, discards any provisional fallback authority, and terminally halts. The `cancelled` attempt branch requires the failed-settlement and originating-window references, reason, request and confirmation times, and no verdict or acceptance. A `local_cli` cancellation requires full process-tree termination evidence; a `github_app` cancellation requires parent collection-stop evidence and makes every later provider event advisory. The failed generation cannot terminalize before these confirmations. A malformed event without a terminal signal remains `observing` and cannot authorize fallback. A hybrid gate also requires `parent_publication_attempt_id`, while unrelated publication fields are not applicable. `synchronous_local_gate` requires process start and a confirmed process boundary: `completed_valid` carries a structured verdict, while `completed_invalid` or `timed_out` carries its reason and rejected payload or timeout evidence with verdict not applicable; every remote channel/publication field is not applicable and its closing window is zero. If it is still observing when sibling settlement fails, it instead enters the cancellation branch and must prove process-tree termination. `best_effort_advisory` cannot block or gate, marks unavailable authoritative fields not applicable, never enters `cancelled`, and follows the existing `advisory_closed` terminalization path without delaying pass or non-pass cleanup. A separately calibrated `publication_gate` requires both publication evidence and its recipe-valid completion and verdict contract. Wrong-state or wrong-kind fields are rejected rather than ignored |
 | External transport protection | Every `local_cli` event requires `report_only` mutation policy plus immutable-snapshot identity, recursive submodule materialization proof when applicable, inode and Git-state isolation, write-protection evidence, provider-only credentials and egress evidence, and credential-scrub results; optional denied-write diagnostics are separate. A PR-mode event requires parent-observed dispatch, completion, and closing-sweep tuples containing repository/PR identity, `OPEN` lifecycle, base, and head. A `github_app` event retains the target's submodule identity manifest and installation-permission-boundary evidence, marks local mutation-policy, local snapshot, submodule materialization, and CLI-isolation fields not applicable, and must not fabricate them. V1 marks continuous-target-mutation-journal fields unsupported rather than using endpoint equality as a replacement |
 | Objective verification | Commands or required checks, exact target, completion and outcome |
-| Terminal result | Pass, halt, failure, degraded/manual outcome, reason class, accepted gate evidence |
+| Terminal result | Pass, halt, failure, degraded/manual outcome, reason class, accepted gate evidence, `emitted_at`, and a generation-settlement reference or explicit not-applicable discriminator. When the generation owns external-decision settlement evidence, every terminal kind requires that record to be `settled|failed` and may emit only at or after its `settled_at|failed_at`; a pending record cannot emit even a halt or manual result. Pass requires `settled`, while `failed` permits only a non-pass terminal. When accepted gate evidence comes from a fallback, the terminal record additionally requires the fallback-event reference and `fallback_accepted_at <= emitted_at`; evidence accepted after emission cannot authorize that result. A run that ends before any external-decision settlement exists records the settlement reference as not applicable rather than fabricating one |
 
 Parsers and test oracles consume this normalized artifact, not conversational
 wording. Raw reviewer content remains available for human inspection, but no
@@ -1069,7 +1164,7 @@ engine infers clean by searching prose for the absence of findings.
 | D02 | Deterministic | None, one, two, and all optional integrations available; matching, missing, unknown, and mismatched peer profiles; same token with wrong provenance, same-named standalone skill, disabled provider, stale cache; injected mixed-generation internal evidence | Exact available set enters the frozen roster and every entry is scheduled once against the same captured `internal_target`, independent of S, M, or L. Every in-harness specialist or optional capability records `host_tool`, its provider provenance, execution context, and mutation policy; any separately launched reviewer records `local_cli` and its required isolation. Wrong or missing transport rejects the event. Provenance mismatch, disabled provider, and stale-cache-only inputs have stable unavailable reasons, never resolve to the registered recipe, and dispatch zero times. A mismatched fingerprint or mutation before collection completes rejects the phase; cross-host recipes appear only for an explicitly matched peer profile, and no invocation falls back to a default home or unrelated credentials |
 | L03 | Authenticated live | Run bundled `specialist-review` against paired clean and seeded-stack-finding targets on Claude and Codex; install and invoke Superpowers, gstack, and Ponytail on each supported host | Each specialist branch uses the real host adapter and the same registered parser, then returns a positive recipe-valid internal completion bound to the exact `internal_target`. The clean fixture carries an explicit empty findings collection; the seeded fixture carries the expected normalized stack finding. Both record `host_tool` transport, `host_native` context, active profile, bundled solopreneur provenance, parser identity/version, `report_only`, an unchanged target, and not-applicable candidate-workspace fields; neither can gate. Silence, process success, `execution_failed`, timeout, or `incomplete-review` cannot satisfy this promotion branch. The optional-integration branches retain current-session discovery and invocation proof for available-to-must-run; each event records the actual `host_tool` or `local_cli` transport, provider provenance, execution context, and mutation policy, and a local CLI path supplies its full isolation evidence. A failed invocation remains failed, not absent, while missing or wrong-kind transport rejects the event |
 | L04 | Authenticated live | Claude Simplify against paired clean and seeded-simplification targets, directly on Claude and through an explicitly matched Codex peer profile | Both fixtures on both paths return a positive recipe-valid completion bound to the exact target. The clean fixture contains explicit empty findings and candidate-change collections, produces an empty normalized candidate diff, and is not inferred from silence or process success. Every seeded candidate change is normalized into an evidenced finding with a disposition; neither result can gate. Both paths declare `isolated_candidate`, bind the frozen source and any recursively materialized submodule trees to the exact target manifest, create and destroy an independent candidate worktree, and leave the frozen source and real target unchanged locally and remotely. Only the seeded fixture writes its simplification inside that worktree and produces a normalized diff against the frozen source. Direct execution records `host_tool` transport, valid `host_native` context, active profile plus capability/provider provenance, frozen-source identity, applicable recursive submodule materialization, equivalent candidate-boundary enforcement, and no remote-control side effect. The peer invocation records `local_cli` transport, valid `peer_cli` context, execution host, selected profile and mapping provenance, plus frozen-source identity, applicable recursive submodule materialization, candidate identity and destruction, process-tree default-deny outside the candidate worktree, provider-only credential and egress, credential-scrub, local-path/Git-state, and fake-control-plane probes. Candidate-worktree writes are accepted; source, real-target, path-escape, Git-control, and remote writes are denied. Unknown or mismatched preflight context dispatches zero times; missing or contradictory runner-observed context, host-tool frozen-source identity, or required materialization evidence after start terminally halts. Other malformed reviewer payload follows its phase policy, and a no-peer control makes no Claude call or review event |
-| L05 | Authenticated live | Codex native review against paired clean and seeded-correctness-bug targets | Both fixtures return a positive recipe-valid completion bound to the exact target through the same parser. The clean fixture carries an explicit empty findings collection rather than silence or process success; the seeded fixture carries the normalized correctness finding. Neither path mutates the target or can gate |
+| L05 | Authenticated live | Codex native review against paired clean and seeded-correctness-bug targets, plus wrong-capability and wrong-context controls | Both fixtures run through the real Codex native adapter and return a positive recipe-valid completion bound to the exact `internal_target` through the same registered parser. They record `host_tool` transport, `host_native` context, active Codex profile, expected and runner-observed native capability identity, provider provenance and match result, parser identity/version, `report_only`, unchanged target, and not-applicable peer-profile and candidate-workspace fields. The clean fixture carries an explicit empty findings collection rather than silence or process success; the seeded fixture carries the expected normalized correctness finding. A peer or `local_cli` route, same-named standalone capability, wrong profile/provider/capability/parser, or missing provenance cannot satisfy L05. Preflight mismatch dispatches zero times; a post-start observed mismatch follows the invariant-halt policy. Neither valid path mutates the target or can gate |
 | D06 | Deterministic | Host-aware external defaults before and after a GitHub candidate becomes eligible; requested mode is supported or unsupported by an otherwise eligible recipe; PR target is parent-created, parent-updated, or already published without mutation | Claude defaults to Codex CLI and Codex defaults to Claude CLI. Codex bot and Bugbot remain excluded while their permission or review-protocol evidence is unverified or unsafe; later promotion makes them eligible only for explicit selection or a user-configured ladder and does not silently reorder either V1 default. Antigravity appears only by explicit selection. Resolution filters by declared target mode and the presence of that recipe's invocation adapter before gate eligibility, so a PR-only recipe cannot receive post-commit or uncommitted work. Before any create or update, the engine freezes the complete eligible remote primary, fallback, collected, and repository-active automatic/hybrid set. An already-published head uses a `historical_pr` collector only with a lifecycle-complete verified publication event and historical boundary; without them, that automatic/hybrid candidate is unavailable for this generation and resolution continues only through an eligible candidate already frozen for the same target |
 | D07 | Deterministic | Primary is absent, quota-limited, timed out, terminal-invalid, nonterminal-malformed, recipe-authentication-failed, repeatedly stale after bounded retry, or unavailable because its remote publication boundary was not frozen; a local CLI separately completes invalid; control-plane auth failure is injected independently | Recipe-scoped availability outcomes select the next eligible configured candidate with the same current target and record the exact fallback reason without credential shopping. For parent-created or updated targets, a remote automatic/hybrid fallback is eligible only when it was frozen before publication with its parent-owned channel floors. For an existing unchanged target, it must instead be in the run-start roster with lifecycle-complete verified-historical floors. Postpublication or post-trigger discovery cannot bootstrap authority in either branch. Attempt deadline, termination rule, retry ceiling, channel cursor rules, and closing window come from the recipe. A remote terminal-invalid result requires an authenticated terminal signal, persisted cutoff, and scheduled finite closing before fallback; a malformed message without that signal stays observing until valid completion or timeout. A local invalid result requires confirmed process completion and zero-window closing. Fallback may start only after that boundary and remains provisional until every earlier remote closing completes; a cutoff-position finding blocks and restores sticky-primary handling, while a later-position finding remains advisory. The engine never exceeds those limits or starts fallback before required termination confirmation. One stale result retries the primary first; all candidates unavailable, a missing cutoff, or failed closing produces halt. Control-plane auth failure halts immediately; neither path can become clean |
 | D08 | Deterministic | Primary returns findings while fallback is available; a false positive or accepted risk is adjudicated with unchanged target and is optionally repeated; after unrelated fixes create a new target, re-review returns only an exact false-positive recurrence, only an exact accepted-risk recurrence, either recurrence plus a new finding, a finding with one changed discriminator, explicit clean, or an availability failure; gate returns clean while another selected or collected reviewer returns a finding before or after its channel authority cutoff position; separately, an unverified bot emits an advisory finding | No fallback occurs before the finding is resolved and the same primary is retried after a target-changing fix. Unchanged-target adjudication and exact-only recurrence end immediately as `manual_non_pass`, `clean=false`, and null accepted-gate evidence. False positive uses `acknowledged_duplicate` plus `adjudicated_gate_disagreement` and is suppressed only from the action queue; accepted risk uses `accepted_risk_recurrence` plus `accepted_risk_gate_disagreement`, remains visibly accepted risk, and cannot masquerade as false positive or clean. Matching requires byte equality across recipe, parser/version, normalized claim, rule identity, severity, canonical location, canonical affected scope, affected-scope digest, and adjudication reference; every field is present or explicit `null`. A missing or changed discriminator, changed relevant bytes, or any additional finding is new and sticky, while an exact recurrence beside it does not re-enter the action queue unless the user elects to fix the accepted risk. Explicit same-primary clean alone restores the normal-pass path. Timeout, quota, unavailable, recipe-scoped authentication failure, invalid, or repeatedly stale evidence after a target-changing resolution may use fallback with a recorded reason against the exact new target. A verified blocking finding at or before its channel cutoff position outranks gate clean even when observed during the finite sweep; a post-cutoff or advisory-channel finding remains visible but cannot block or satisfy pass |
@@ -1081,6 +1176,14 @@ engine infers clean by searching prose for the absence of findings.
 | L14 | Authenticated GitHub live | Codex bot reviews one clean PR and one seeded-bug PR, including a seeded finding after publication and before any explicit trigger whenever the installed activation is automatic or hybrid | The review branch begins only after a target-safe installation-permission boundary is frozen. Before activation the worktree is clean and the parent-observed PR lifecycle is `OPEN` with captured head equal to the published PR head. Verified bot identity, `github_app` transport and execution context, parent-authoritative App/installation/repository permission boundary, actual activation and lifecycle-completeness modes, per-channel pretrigger or prepublication floors as required, and start handshake lead to recipe-specific completion, complete findings, positive zero-finding evidence, full target-mode, canonical-selector, lifecycle/base/head, recursive submodule identity manifest (explicitly empty when absent), event-level invocation adapter, finite per-channel cutoff/closing/final-watermark ordering, and bounded complete final query. For safe automatic or hybrid activation, the pretrigger exact-target seeded finding is collected and blocks with null accepted-gate evidence; an explicit-only calibration cannot claim either automatic mode, and a mutable-snapshot-only channel remains advisory. The permission revision, digest, engine-captured target digest, manifest, and generation remain unchanged through closing, while silence or any stale fingerprint or permission field fails. A target-write-capable or unknown explicit-only App produces zero trigger and leaves L14 unsatisfied. The automatic/hybrid unsafe branch produces zero publication and halt unless its complete disabled-interval proof succeeds; a disabled App is not invoked and cannot promote the gate. Only the safe review branch satisfies L14 |
 | D15 | Deterministic | Equivalent normalized transcript on both engines, plus wrong-kind, wrong-link, publication-kind, lifecycle, and closing-evidence transcripts | Host default recipes and transport syntax may differ; normalized logical recipe identifiers and discriminated result schema do not drift, action sequence, invalidation, terminal state, and reason schema remain conformant. Both engines accept collectors with finite observation deadlines and reviewer completion and verdict not applicable. `update_pr` requires an old authoritative tuple; `create_pr` requires planned repository/base/head identity and rejects a fabricated old PR tuple; both require ordered start, operation deadline, acknowledgement, and authoritative tuple confirmation within the finite parent deadlines. A failed, unacknowledged, or unconfirmed publication transaction remains valid failure evidence but its transaction and target generation produce zero collector attempts and zero gate invocations or attempts, with no later dispatch after failure; a transcript that creates either is rejected, while earlier-generation attempts and findings remain present. `historical_pr` requires the current `OPEN` tuple, exact target, verified publication event identity/time, and lifecycle-proven historical floors while rejecting fabricated create/update, operation, acknowledgement, or confirmation fields or a floor not immediately before that event. A parent-owned create/update fallback must belong to the prepublication roster; a historical fallback must belong to the run-start roster. A missing or late operation acknowledgement, missing/late/mismatched tuple confirmation, `completed_valid` gate without trigger/completion/verdict, hybrid gate without `parent_publication_attempt_id`, collector carrying a gate verdict, unfrozen remote fallback, cross-channel cursor reuse, invalid historical floor, collector window for an automatic/hybrid blocking channel with only a pretrigger floor, explicit-only channel with fabricated publication fields, mutable-snapshot-only blocking channel, or local CLI event with remote fields is rejected. A hybrid remote-gate window may use its own pretrigger floor only while retaining its linked prepublication collector. Query evidence must prove `closing_deadline <= watermark capture <= query start <= query completion <= final-query deadline` and `floor <= cutoff <= watermark`; wrong order, timeout, lagging watermark, or treating an at-or-before-cutoff union finding as advisory is rejected. Historical cutoff position is reconstructed at the historical observation deadline, while current `cutoff_observed_at`, closing deadline, and final-query deadline remain finite future controls; deriving an already-expired query deadline from the historical timestamp is rejected. One provider event and revision fetched by auto and manual attempts yields one occurrence with two validated observation links. A link whose attempt does not own its window, whose origin channel or namespace mismatches, whose position is outside that query/watermark interval, or whose binding or late disposition was copied from another link is rejected; the same occurrence may be blocking through its publication link and pre-floor/non-blocking through its later gate link. Text-identical different IDs and distinct revisions remain separate. Previously observed findings survive final-snapshot deletion. A withdrawal resolves only when actor/authority, exact occurrence relation, target binding, and at-or-before-cutoff position all match the registered reviewer/provider; human or unrelated resolution is adjudication evidence, a later withdrawal is advisory, and discovering an omitted at-or-before-cutoff occurrence after a purported complete query invalidates the result |
 
+Within D02, “every in-harness specialist or optional capability” extends to
+every in-harness internal capability, including each required host-native
+minimum. The fixtures inject matching, missing, wrong-profile, wrong-kind,
+wrong-provider, same-named standalone, and peer-substitution records for
+`codex-native-review`. Only the registered Codex `host_tool + host_native`
+binding may dispatch; preflight mismatch dispatches zero times and post-start
+actual-context mismatch terminally halts.
+
 Within D06, the resolver evaluates a parent-authoritative installation permission
 map before remote gate eligibility. A safe control with read access plus only
 policy-verified evidence-output capabilities may gate. `contents:write`,
@@ -1090,6 +1193,21 @@ repository boundary cannot gate. An unsafe explicit-only primary dispatches zero
 times and may select its CLI fallback. An unsafe or unknown automatic/hybrid App
 must have authoritative prepublication disablement evidence; without it, D06
 expects zero publication, zero reviewer dispatch, and halt.
+
+The permission-authority branches of D06, P11, and L14 use the actual vendor App
+and an actually supported authority profile. Every checkpoint records the
+credential class and authenticated subject, authority-profile ID/version,
+endpoint/API version, query status, pagination completeness, membership proof,
+and permission digest without recording secrets. Deterministic and live
+negative controls cover a normal `gh` profile, wrong-App credentials,
+organization inventory with `repository_selection=selected` but no App-specific
+membership proof, mid-run authority loss, 401/403, timeout, and incomplete
+pagination. Explicit-only failure produces zero trigger and no promotion;
+automatic or hybrid failure produces zero publication and zero reviewer
+dispatch before halt. A controlled substitute App cannot satisfy P11 or L14 for
+Bugbot or Codex bot. If the real vendor credential cannot be obtained, or its
+grant is target-mutating, only the no-promotion negative branch may pass and the
+CLI-default engine remains independently conformant.
 
 Within D09, a post-start permission revision or digest change, wrong App,
 installation or repository binding, or privilege expansion is runner-owned
@@ -1149,11 +1267,61 @@ collector, remote gate, attempt, or channel window attached to an
 `automatic_disabled` boundary, while an enabled eligible automatic/hybrid
 control must create the recipe-appropriate collector.
 
+Within D08, a remote primary first reports finding F1 and enters
+`pending_closing`. A pre-settlement disposition, adjudication, or fixer request
+must produce zero action and zero mutation. A mixed-window control closes the
+primary attempt while its same-generation publication collector remains open;
+the exhaustive generation settlement stays pending and still dispatches zero
+fixers. The final query then reveals F2 at or before the cutoff and F3 after it.
+Only after every required current-generation window is `closing_complete` may
+one atomic settlement make F1 and F2 actionable and sticky while retaining F3
+as advisory; only then may a fixer create G1 and the same primary re-review it.
+The unchanged-target adjudication and recurrence branches likewise begin only
+from settled evidence.
+
 Within D10, marking a collector `observation_closed` at its observation
 deadline or before every required final query succeeds is rejected and cannot
 authorize fallback acceptance or mutation. A cutoff or closing failure must
 produce `observation_failed` with channel, boundary, and reason evidence and
-terminally halt; it cannot remain ambiguously observing or become closed.
+terminally halt; it cannot remain ambiguously observing or become closed. In a
+multi-window control, the first required failure wins over pending state,
+records `failed_at`, and atomically changes every other nonterminal required
+window to `closing_cancelled` with the originating failure reference before the
+non-pass terminal result may emit. It may not wait forever for siblings, leave
+them authoritative, or relabel them complete. Paired controls leave a remote
+fallback pre-terminal and a synchronous local fallback process running when the
+sibling failure occurs. The parent must stop remote collection and confirm the
+local process tree terminated, mark both attempts `cancelled` with null verdict
+and acceptance, then record generation failure no earlier than those
+confirmations. A final artifact with either attempt still observing is invalid.
+The paired best-effort control instead leaves a local advisory process running:
+the parent synchronously records `advisory_closed` and stops accepting advisory
+evidence, but pending or failed cleanup remains visible and does not delay the
+failed settlement or non-pass terminal.
+An
+engine-controlled pre-settlement fixer request is rejected with zero mutation.
+A failed final query or target revalidation on an unchanged target records
+failed settlement, preserves the old generation, and yields zero fixer dispatch
+and zero mutation. A forced external or reviewer-originated mid-closing mutation
+records the actual changed fingerprint and generation plus
+`closing_failed(target_revalidation)`, then halts with null authority; it cannot
+be relabeled as a normal G1 continuation. The successful control closes every
+required window, settles the union, and only then permits the fixer. A mixed-
+window control whose primary is closed but collector remains open is still
+pending. Missing or non-exhaustive settlement fields, a wrong transition cause,
+or any remote-derived disposition, fixer, republication, or generation
+transition before settlement is rejected. Initial parent-owned publication and
+pre-external internal transitions instead require the explicit not-applicable
+settlement branch. When no verified remote window exists, a synchronous local
+finding uses immediate zero-window generation settlement before its fixer or
+republication may begin; an attempted local-finding action before that
+settlement is rejected, while the settled control may fix and republish with
+`transition_cause=settled_external_decision`. A
+mixed control completes the local gate while a same-generation publication
+collector remains open: the generation must retain the collector's nonempty
+window reference set, remain pending, and authorize zero disposition, fixer,
+mutation, or pass. Claiming empty immediate settlement in that transcript is
+rejected.
 
 Within D15, a collector transcript is rejected if it enters
 `observation_closed` before every required final query succeeds, or if failed
@@ -1166,10 +1334,60 @@ provisional fallback dispatch; the complete branch is required for fallback
 acceptance, while the failed branch discards provisional authority and halts. A
 nonterminal malformed payload cannot be relabeled terminal. A local invalid attempt is rejected without
 confirmed process completion or when padded with remote cursor evidence.
-Accepting fallback clean, mutating the target, or emitting normal pass before
-every earlier remote closing completes is invalid. A cutoff-position finding
+Accepting fallback authority or mutating the target before the exhaustive
+generation settlement reaches `settled` is invalid. Emitting any terminal
+result while that settlement remains pending is also invalid; the first
+required closing failure may instead terminalize it as `failed` only after all
+other nonterminal required windows are atomically recorded
+`closing_cancelled`. The artifact must prove this ordering with
+`fallback_accepted_at` and `Terminal result.emitted_at` plus the exhaustive
+generation-settlement reference; filling those references after the fact does
+not repair an earlier timestamp. A cutoff-position finding
 invalidates fallback clean; the post-cutoff advisory control remains visible and
 may still permit fallback after every other pass condition is satisfied.
+The same transcript validator accepts initial parent-owned create/update or
+historical registration and pre-external internal transitions only with their
+declared causes and not-applicable settlement reference. It rejects a
+non-exhaustive generation window set and any pre-settlement remote-derived
+disposition, adjudication, fixer dispatch, mutation, republication, or generation
+transition. It also rejects an early synchronous-local-finding action, while
+accepting a local zero-window settlement followed by a fixer and republication
+that reference `settled_external_decision`. Every accepted external-decision-
+derived transition references the settled generation decision and occurs no
+earlier than `settled_at`; an unauthorized
+mutation uses the invariant-violation branch and can never authorize normal
+continuation.
+The validator also rejects a local clean or finding result that claims empty,
+immediate generation settlement while a same-generation verified publication
+collector remains open; that transcript must carry the exhaustive nonempty
+window set and remain pending with zero disposition, fixer, mutation, or pass.
+It rejects every terminal kind emitted against `pending_closing`, a terminal
+record missing its time or settlement discriminator, a pass referencing failed
+settlement, a non-pass emitted before `failed_at`, and fallback acceptance with
+null, pending, non-exhaustive, or later-than-acceptance settlement evidence. A
+pre-external halt control may use the explicit not-applicable settlement branch.
+The multi-window failure control requires one `closing_failed`, every remaining
+nonterminal sibling `closing_cancelled`, a failed exhaustive generation record,
+and only then a non-pass terminal; missing, late, fabricated-complete, or still-
+authoritative siblings are rejected. When either a remote or local fallback was
+still observing, it also requires a `cancelled` attempt with the proper stop-
+collection or process-tree-termination evidence and rejects any surviving active
+attempt, verdict, or acceptance. The generation `failed_at` and terminal
+`emitted_at` must follow every such confirmation. A fallback acceptance is also rejected
+unless the fallback attempt is `completed_valid` with a recipe-valid verdict and
+proves `dispatch <= reviewer start <= authenticated completion/terminal <=
+acceptance` plus `settled_at <= acceptance`; `observing`, `completed_invalid`,
+and `timed_out` attempts must keep acceptance time and settlement reference
+null, and every reversed or backfilled timestamp is rejected. The validator
+also rejects `settled_at` earlier than any required final-query or permission-
+revalidation completion, and `failed_at` earlier than the causative window
+failure, a sibling cancellation, or an applicable synchronous-local terminal.
+It rejects `cancelled_at` earlier than the originating failure and any non-pass
+terminal emitted before the maximum sibling cancellation and generation
+`failed_at`. When fallback evidence authorizes a terminal, disposition, fixer,
+mutation, republication, or generation transition, D15 requires the exact
+fallback-event reference and rejects `fallback_accepted_at` later than that
+result or action, as well as any acceptance reference backfilled after the fact.
 An invoked `best_effort_advisory` that is still `observing` in the final result,
 or that carries fabricated authoritative cutoff, closing, gate-verdict, or
 fallback fields, is rejected. An `advisory_closed` control records the pass-
@@ -1180,6 +1398,12 @@ and authorizes neither. D15 covers both pass and a required-gate or closing
 failure occurring while the advisory is observing: each emits the underlying
 result only after synchronously recording `advisory_closed`, while omitting that
 record is rejected. None of the advisory terminal states can satisfy pass.
+In the sibling-closing-failure control, a still-running local advisory must take
+this `advisory_closed` path rather than `cancelled`; its cleanup may remain
+pending without entering cancelled-authority-attempt references or delaying
+generation `failed_at` and the non-pass terminal. Treating that advisory as an
+authority-bearing cancellation, leaving it observing, or using it to delay the
+result is rejected.
 
 L12 runs with Codex as the coordinating host and Claude CLI through the matched
 Anthropic peer profile. L13 runs with Claude Code as the coordinating host and
@@ -1204,7 +1428,9 @@ content.
 1. Add host, phase, provenance, implementation-group, target-mode and invocation-
    adapter, timing, evidence, GitHub App permission-boundary policy, and gate-
    eligibility metadata to the reviewer registry without changing runtime
-   defaults. Keep continuous target-mutation journal authority unsupported in
+   defaults. Add the parent-only permission-authority credential broker and its
+   three supported profile adapters; ordinary `gh` authentication is not a
+   substitute. Keep continuous target-mutation journal authority unsupported in
    V1.
 2. Add internal capability discovery, frozen rosters, mutation-policy metadata,
    host-native report-only and isolated-candidate adapters, and deterministic
@@ -1218,15 +1444,17 @@ content.
    parent-owned PR tuple validation, and structured Claude CLI and Codex CLI
    gate adapters; then pass L04, L12, and L13 before the corresponding peer or
    gate adapter becomes available under the new contract.
-5. Probe Bugbot through P11 and the Codex bot through L14. A target-safe positive
-   branch may promote the candidate for explicit or user-configured use; an
-   unsafe installation records the zero-trigger negative branch and remains
-   ineligible. Neither probe blocks the CLI-default engines nor silently changes
-   their order.
+5. Probe Bugbot through P11 and the Codex bot through L14 using the actual vendor
+   App and an actually supported permission-authority profile. A target-safe
+   positive branch may promote the candidate for explicit or user-configured
+   use; missing authority or an unsafe installation records the no-promotion
+   negative branch and remains ineligible. Neither probe blocks the CLI-default
+   engines nor silently changes their order.
 6. Split the Claude and Codex Greenlight engines under the shared state and
    evidence contract. Before either host is advertised as conforming, pass D15,
    that host's L03 bundled-specialist branch, L04 direct Claude for the Claude
-   engine, and L05 for the Codex engine. L03 optional-integration branches and
+   engine, and the full L05 native-provenance positive and wrong-context branches
+   for the Codex engine. L03 optional-integration branches and
    the L04 peer branch promote only their corresponding additional recipes. A
    promoted specialist's later transient failure remains visible under the
    per-run `incomplete-review` policy.
@@ -1250,6 +1478,9 @@ content.
 - [Claude Code headless mode](https://code.claude.com/docs/en/headless)
 - [Cursor Bugbot](https://docs.cursor.com/bugbot)
 - [GitHub App installation permissions](https://docs.github.com/en/rest/apps/installations)
+- [Repository installation for an authenticated App](https://docs.github.com/en/rest/apps/apps#get-a-repository-installation-for-the-authenticated-app)
+- [Installations accessible to an App user token](https://docs.github.com/en/rest/apps/installations#list-app-installations-accessible-to-the-user-access-token)
+- [Organization App installation inventory](https://docs.github.com/en/rest/orgs/orgs#list-app-installations-for-an-organization)
 - [GitHub App permission selection](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
 - [GitHub App installation access tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
 - [Git reference update permissions](https://docs.github.com/en/rest/git/refs#update-a-reference)
