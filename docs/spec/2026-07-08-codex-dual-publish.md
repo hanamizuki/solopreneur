@@ -1,13 +1,11 @@
 # Codex Dual-Publish
 
-**Status:** Approved architecture. Rollout PRs 1–4 are on `main`; the PR 5a
-marketer vertical slice resumed after a Codex 0.147.0 retest removed the old
-headless-delegation blocker. Local-path and fresh git-ref matrices passed at
-`954fc64` and proved the terminal-completion shortcut, but a later blocker
-ruling changed the router wording that defines that lifecycle contract. The new
-final SHA, `c8bae2710051da659afad879c226e202ad3368d4`, has now passed both
-complete matrices. CI, review, and merge remain pending; the slice has not
-merged or shipped.
+**Status:** Approved architecture. Rollout PRs 1–4 and the rebuilt PR 5a
+marketer distribution slice are on `main`. Final-byte acceptance SHA
+`c8bae2710051da659afad879c226e202ad3368d4` passed complete local-path and
+fresh git-ref matrices; PR #155 was squash-merged as `fc943a9` on 2026-08-09
+without changing the accepted runtime bytes. The slice is not yet included in
+a tagged plugin release and does not certify marketer domain-skill parity.
 **Date:** 2026-07-08
 **Current review:** 2026-08-09
 **Affected plugins:** all seven (`solopreneur`, `designer`, `marketer`,
@@ -263,8 +261,9 @@ delegation failure without inline completion or a success claim.
 ## Known compatibility scope
 
 PR 5a proves the adapter, distribution, and routing architecture with marketer;
-it does not certify every marketer skill. The later vocabulary gate must resolve
-at least these verified couplings before full marketer parity is claimed:
+it does not certify every marketer skill. When the deferred marketer-parity
+track resumes, it must resolve at least these verified couplings before full
+parity is claimed:
 
 - `naming` assumes Claude is always the execution harness in its ensemble.
 - `slide-design` contains Claude-specific interaction, multimodal-read, and
@@ -272,7 +271,8 @@ at least these verified couplings before full marketer parity is claimed:
 - `linkedin-growth` uses a Claude configuration path to infer project context.
 
 The same inventory must be repeated for each remaining plugin before its agent
-adapter ships.
+adapter ships. Those adapters are deferred until the core workflow V1 is
+complete.
 
 ## Dependency audit
 
@@ -350,8 +350,9 @@ terminal completion integrates and stops immediately, while only timeout,
 progress-only, or unknown non-terminal wakes proceed to `list_agents`. Because
 the router bytes changed, `954fc64` is no longer final-byte merge acceptance.
 
-The new final SHA, `c8bae2710051da659afad879c226e202ad3368d4`, passed the
-complete local-path and fresh per-case git-ref matrices. R02 and R07 passed on
+The final-byte acceptance SHA,
+`c8bae2710051da659afad879c226e202ad3368d4`, passed the complete local-path and
+fresh per-case git-ref matrices. R02 and R07 passed on
 `codex exec`; R08 and R09 passed in the interactive TUI. In every case the
 hardened verifier recorded the exact `agent_type="marketer"`,
 `fork_turns="none"` call, one direct marketer child, no nested or generic child
@@ -366,8 +367,8 @@ git-ref counts were R02 1/0, R07 2/1, R08 12/11, and R09 6/5. Every final wait
 delivered terminal completion; every preceding non-terminal wake was followed
 by a list check, and every case stayed within the fifteen-cycle budget. This
 satisfies the authenticated agent-distribution and routing gate. It does not
-certify marketer skill parity or complete content quality. CI, review, and
-merge remain pending, so PR 5a has not merged or shipped.
+certify marketer skill parity or complete content quality. PR #155 was
+squash-merged to `main` as `fc943a9`; a tagged plugin release remains pending.
 
 The versioned router eval fixture freezes twelve non-sensitive decision-boundary
 inputs and their expected route, spawn count, agent identity, history fork, and
@@ -396,22 +397,30 @@ contract drift without replacing the pinned gate.
 | 2 | Vendored `$N` escape prerequisite | complete |
 | 3 | Move non-skill directories to `vendor/` and `shared/` | complete |
 | 4 | Generate seven manifests and marketplace; add drift/install CI | complete |
-| 5a | Marketer TOML, router, secure bootstrap, and live delegation gate | active; final-byte authenticated distribution accepted at `c8bae27`, CI/review/merge pending |
-| 5b | Five remaining TOMLs and six remaining routers | blocked on 5a acceptance |
-| 6 | Native vocabulary and workflow compatibility audit | pending |
-| 7 | Complete public install and release documentation | pending |
+| 5a | Marketer TOML, router, secure bootstrap, and live delegation gate | complete; PR #155 merged as `fc943a9`, tagged release and marketer parity pending |
+| 5b | Five remaining TOMLs and six remaining routers | deferred until the core workflow V1 is complete |
+| 6 | Core-first skill portability: publication safety, Greenlight, core seams, and Autopilot | active; governed by the skill-portability spec |
+| 7 | Complete truthful public install and release documentation | pending until the filtered Codex surface is release-ready |
 
-PR 5a may merge only after local-path and git-ref installation both produce a
-byte-identical bootstrapped marketer agent, deterministic gates pass on macOS
-and Linux, and authenticated acceptance records a real marketer child for the
-complete R02/R07/R08/R09 matrix from both the local-path and git-ref installs.
-The generated project copy must remain byte-identical to its source, and Claude
-must continue to load only the Markdown sibling.
+The PR 5a merge gate required local-path and git-ref installation to produce a
+byte-identical bootstrapped marketer agent, deterministic gates to pass on
+macOS and Linux, and authenticated acceptance to record a real marketer child
+for the complete R02/R07/R08/R09 matrix from both install sources. The accepted
+slice met those conditions while keeping the generated project copy
+byte-identical to its source and preserving Claude's Markdown-agent behavior.
+
+The next product priority is the `solopreneur` core. Registry and filtered
+publication work may land first only as minimum release-safety prerequisites;
+they are not a 106-skill parity project. The core execution order is Greenlight
+pull-request mode, `plan-review` and `merge-pr` dependency closure, then a
+run-now single-pull-request Autopilot V1. Greenlight's other modes, Autopilot
+multi-PR and scheduling, remaining core engines, marketer domain-skill parity,
+and other specialist adapters follow in that order.
 
 The `954fc64` runs remain valid lifecycle calibration. The final-byte
 authenticated local-path and git-ref distribution criterion is satisfied at
-`c8bae2710051da659afad879c226e202ad3368d4`; CI, review, and merge remain
-pending.
+`c8bae2710051da659afad879c226e202ad3368d4`, and PR #155 is merged but
+unreleased.
 
 ## Remaining questions
 

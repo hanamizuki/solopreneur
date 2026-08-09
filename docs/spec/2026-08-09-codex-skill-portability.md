@@ -1,23 +1,22 @@
 # Codex Skill Portability Architecture
 
-**Status:** Approved design; implementation pending
+**Status:** Approved design; agent-distribution prerequisite merged; core-first
+implementation pending
 
 **Date:** 2026-08-09
 
 **Scope:** every skill published by the seven solopreneur plugins; the
-architecture baseline contains 104 and the PR 5a/v2 feature tree contains 106
+architecture baseline contains 104 and current `main` contains 106
 
 **Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md), [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)
 
-The related specs remain authoritative for agent-distribution status. PR 5a/v2
-passed local-path and fresh git-ref matrices at `954fc64`, demonstrating the
-terminal-completion shortcut after the first git-ref attempt exposed a lifecycle
-failure. A later blocker ruling changed the router wording that defines that
-contract. The new final SHA, `c8bae2710051da659afad879c226e202ad3368d4`,
-has now passed complete local-path and fresh per-case git-ref matrices, satisfying
-the authenticated agent-distribution gate. CI, review, and merge remain pending;
-PR 5a/v2 has not merged or shipped. This changes no skill support status and
-does not certify marketer skill portability or complete content quality.
+The related specs remain authoritative for agent-distribution status.
+Final-byte acceptance SHA `c8bae2710051da659afad879c226e202ad3368d4`
+passed complete local-path and fresh per-case git-ref matrices. PR #155 was
+squash-merged as `fc943a9` on 2026-08-09 without changing the accepted runtime
+bytes. The slice is not yet included in a tagged plugin release. This changes
+no skill support status and does not certify marketer skill portability or
+complete content quality.
 
 ## Problem
 
@@ -59,6 +58,40 @@ The design therefore separates two questions that must not be conflated:
 - Do not reproduce Claude Workflow, Cron, or per-agent worktree APIs one for
   one when Codex has a different control model.
 - Do not publish a high-level workflow merely because it loads.
+
+## Product priority and enabling order
+
+The P0 product outcome is a usable Codex Greenlight and Autopilot V1 for the
+`solopreneur` core. They share the same product priority, but Greenlight comes
+first in dependency order because Autopilot consumes its unattended pull-
+request result.
+
+The compatibility registry and filtered Codex publication view are minimum
+release-safety prerequisites, not user-facing product priorities. They may land
+before or in parallel with Greenlight baseline work, but they must stay bounded
+to classifying the current tree and preventing unsupported skills from being
+exposed. They must not turn into a 106-skill parity project or displace the core
+workflow path.
+
+The core critical path is:
+
+1. Add the registry, filtered publication view, and shared config/plugin-root
+   resolver required to publish an honest Codex surface.
+2. Establish all-mode Claude Greenlight baselines, then extract the shared
+   contract, deterministic artifacts, scenarios, and Claude engine.
+3. Deliver Greenlight Codex pull-request mode with unattended review,
+   independent final-diff coverage, objective verification, and structured
+   halt and result outputs.
+4. Close only the Autopilot-critical `plan-review internal` and safe
+   `merge-pr` seams.
+5. Deliver Autopilot Codex V1 as run-now, single-pull-request orchestration with
+   explicit worktree ownership. An unavailable specialist uses a generic Codex
+   worker under the same brief and contract; it does not block core V1.
+
+Greenlight's uncommitted and post-commit Codex modes, Autopilot multi-PR waves
+and scheduling, other core engines, marketer domain-skill parity, remaining
+specialist agents and routers, and broad portable-skill promotion are later
+increments. No deferred capability is advertised before its own evidence lands.
 
 ## Architecture decisions
 
@@ -297,8 +330,8 @@ update the registry and its behavioral scenarios in the same change.
 
 ## Source-shape research hypothesis
 
-The architecture baseline contained 104 skills. The PR 5a/v2 feature tree now
-contains 106 after adding `using-marketer` and `codex-agents-bootstrap`. The
+The architecture baseline contained 104 skills. Current `main` contains 106
+after adding `using-marketer` and `codex-agents-bootstrap`. The
 counts below remain a planning hypothesis for the 104-skill baseline, not a
 registry seed or a Codex support claim. The registry PR must enumerate its own
 tree and re-audit every discovered skill against the semantic decision rule
@@ -382,52 +415,61 @@ interruption. Those same scenarios become the cross-engine conformance suite.
 
 ## Relationship to agent distribution
 
-The marketer agent pilot and skill portability are independent tracks. The v2
-redo is active: local-path and fresh git-ref matrices passed at `954fc64` after
-the first git-ref attempt exposed a lifecycle failure. Those runs demonstrated
-the terminal-completion shortcut, but a subsequent router wording change makes
-them calibration rather than final-byte merge acceptance. The new final SHA,
-`c8bae2710051da659afad879c226e202ad3368d4`, subsequently passed the complete
-R02/R07/R08/R09 matrices on both installation paths. That accepts distribution,
-routing, and final delivery on the tested exec and TUI surfaces only. This spec
-separately answers whether a skill executed by that agent or by the parent
-satisfies the same cross-platform behavioral contract.
+The marketer agent pilot and skill portability are independent tracks. The
+distribution slice is complete: final-byte acceptance SHA
+`c8bae2710051da659afad879c226e202ad3368d4` passed the complete R02/R07/R08/R09
+matrices on both installation paths, and PR #155 was squash-merged as
+`fc943a9`. That accepts distribution, routing, and final delivery on the tested
+exec and TUI surfaces only. The slice remains unreleased. This spec separately
+answers whether a skill executed by that agent or by the parent satisfies the
+same cross-platform behavioral contract.
 
 Evidence does not transfer between the tracks: a linked child thread does not
 prove its skills are portable, and a loadable skill does not prove agent TOML,
-bootstrap, or delegation behavior. A merged PR 5a/v2 vertical slice is the
-agent-distribution prerequisite and does not certify marketer skill parity.
+bootstrap, or delegation behavior. The merged PR 5a/v2 vertical slice satisfies
+the agent-distribution prerequisite and does not certify marketer skill parity.
 
 ## Rollout
 
 | PR | Scope | Gate |
 | --- | --- | --- |
 | 1. Architecture | This independent spec and backlog update | No runtime, pilot-document, or packaging change |
-| 2. Marketer PR 5a/v2 | Resolve the paused agent-distribution vertical slice and update its authoritative pilot documents | Final-byte authenticated local and git-ref distribution accepted at `c8bae27`; CI/review/merge pending; no marketer domain-skill parity claim |
-| 3. Registry | Add the complete compatibility registry, conditional schema validation, and generated inventory report | Every skill discovered at that commit is re-audited; expected count is 106 if PR 2 lands first; existing Claude skills may enter as `legacy` |
-| 4. Publication fixture | Prove and implement the Codex publication view | Local and git-ref installs expose only registry-included skills through the declared root; inert snapshot bytes do not count as exposure |
-| 5. Shared foundations | Add one executable config/plugin-root resolver and platform-resource validation | No bulk vocabulary rewrite; existing Claude behavior remains unchanged |
-| 6. Greenlight contract | Establish baseline scenarios, then extract shared protocol, schemas, scripts, and the Claude engine | Claude conformance passes before Codex engine work |
-| 7. Greenlight Codex pilot | Add the Codex engine and run scenarios per claimed surface | Every Codex surface remains `unsupported`, or earns its own `full` or explicit `degraded` status |
-| 8. Seam skills | Port `shared_with_seams` skills in bounded batches | Each skill earns its own support status |
-| 9. Remaining engines | Port `autopilot`, `mvp`, `plan-review`, and `todos-babysit` one at a time | Required dependency closure is supported on the target surface; no bundled control-plane rewrite |
-| 10. Portable skills | Promote shared skills by plugin-sized behavioral batches | Loadability alone is insufficient |
+| 2. Marketer distribution prerequisite | Resolve the paused agent-distribution vertical slice and update its authoritative pilot documents | complete; accepted at `c8bae27`, merged through PR #155 as `fc943a9`, unreleased, and no marketer domain-skill parity claim |
+| 3. Registry safety | Add the compatibility registry, conditional schema validation, and generated inventory report | Re-enumerate every skill at that commit; current `main` contains 106, but discovery is authoritative |
+| 4. Publication safety | Prove and implement the filtered Codex publication view | Local and git-ref installs expose only registry-included skills through the declared root; inert snapshot bytes do not count as exposure |
+| 5. Shared core foundations | Add one executable config/plugin-root resolver and platform-resource validation | Greenlight scripts and prompts resolve the same platform-aware config; existing Claude behavior remains unchanged |
+| 6. Greenlight baseline and contract | Establish all-mode Claude baselines, then extract shared protocol, schemas, scripts, scenarios, and the Claude engine | Claude conformance, reviewer independence, and final-diff invariants pass before Codex publication |
+| 7. Greenlight Codex PR mode | Add unattended pull-request review on Codex and test every claimed surface | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
+| 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Neither dependency may mutate the reviewed head after final Greenlight approval |
+| 9. Autopilot Codex V1 | Add run-now, single-pull-request orchestration with explicit worktree ownership | Greenlight and CI re-run after every mutation; unavailable specialists fall back to a generic Codex worker |
+| 10. Core workflow expansion | Add Greenlight's remaining modes, then Autopilot multi-PR waves | Each mode earns its own support status and preserves the shared contract |
+| 11. Scheduling | Add Codex App scheduling as a separate capability | No CLI or run-now path claims Claude Cron parity |
+| 12. Remaining core | Port `mvp`, `todos-babysit`, and other core seams in dependency-sized changes | No bundled control-plane rewrite |
+| 13. Deferred plugin breadth | Resume marketer domain-skill parity, remaining specialist agents and routers, and portable-skill batches | Per-skill registry evidence; loadability alone is insufficient |
 
 Autopilot must not begin its Codex engine merely because Greenlight's contract
 exists. On each target surface, Greenlight must be `full`, or its `degraded`
 contract must retain unattended pull-request review, structured halt and reason
-results, and the final result summary that Autopilot consumes. `plan-review`
-and `merge-pr` must also have a supported dependency closure on that surface.
+results, independent final-diff coverage, objective verification, and the final
+result summary that Autopilot consumes. `plan-review internal` and `merge-pr`
+must also have a supported dependency closure on that surface. A CI repair or
+any other head mutation invalidates the prior Greenlight result: Greenlight and
+CI must run again before merge. The V1 `merge-pr` seam must not perform a new
+post-Greenlight consolidation mutation.
 
-App scheduling is a later capability. The initial Autopilot Codex scope may be
-run-now only if that degradation is explicit, tested, and accepted; a mapping
-must not pretend to reproduce Claude Cron behavior.
+App scheduling is a later capability. The initial Autopilot Codex scope is
+run-now and single-PR only; a mapping must not pretend to reproduce Claude Cron,
+Workflow, or automatic per-child worktree behavior. Specialist agents are
+optional enhancements in V1. If the requested specialist is unavailable, the
+orchestrator uses a generic Codex worker with the same self-contained brief and
+acceptance contract.
 
-If PR 5a/v2 satisfies step 2, marketer's known portability seams and the
-Greenlight contract extraction may proceed independently. Remaining agent
-adapters roll out one plugin at a time only after that plugin's skills have
-complete registry entries; they do not have to wait for every skill to reach
-`full` support.
+The agent-distribution prerequisite is complete. Registry and publication
+safety may proceed in parallel with Greenlight baseline and contract work, but
+Greenlight cannot be published on Codex before both safety gates pass. Marketer
+portability seams and remaining agent adapters are not on the core critical
+path; when resumed, they still roll out one plugin at a time after that plugin's
+skills have complete registry entries.
 
 ## Release policy
 
