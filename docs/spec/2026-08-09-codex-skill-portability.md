@@ -423,8 +423,9 @@ evidence requirements, or acceptance criteria.
 - The deterministic and authenticated cases in the cross-host reviewer
   contract prove internal availability-to-invocation, host-aware defaults,
   anti-shopping fallback, stale-target invalidation, and live clean plus seeded-
-  bug evidence for both host-default gate ladders before either Greenlight
-  engine can be advertised.
+  bug evidence for both host-default gate ladders before Codex Greenlight, or
+  either host, can be advertised as conforming to the new cross-host contract.
+  This does not withdraw the existing Claude-oriented runtime.
 - Interrupted, partial, and failed reviewer runs produce the same classified
   terminal result on both platforms.
 - No complete Greenlight skill body is copied into a second tree.
