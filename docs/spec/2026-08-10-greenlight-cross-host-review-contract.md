@@ -125,11 +125,13 @@ reviewer halts; a missing bundled specialist is recorded as `unavailable` and
 follows the non-host-native incomplete-review policy. Neither case may be
 silently omitted or rewritten as a smaller successful roster.
 
-Claude's bundled `/simplify` may apply changes. The `claude-simplify` adapter
-must therefore run against an isolated disposable target and return findings or
-candidate changes without mutating the Greenlight target. Codex native review
-is likewise report-only. Every internal adapter must prove that the target
-fingerprint is unchanged before its result is accepted.
+Every internal recipe declares a mutation policy. `claude-simplify` uses
+`isolated_candidate` because Claude's bundled `/simplify` may apply changes; it
+runs against a frozen source plus an independent disposable candidate workspace
+and returns findings or candidate changes without mutating the Greenlight
+target. All other initial internal recipes use `report_only`. Every internal
+adapter must prove that the target fingerprint is unchanged before its result
+is accepted.
 
 Every candidate change returned by Simplify is normalized into an evidenced
 finding with the same fix, explicit-rejection, and adjudication requirements as
@@ -173,7 +175,11 @@ confirmed cancellation, does not by itself prevent a normal pass. The terminal
 artifact retains an `incomplete-review` flag and identifies every incomplete
 advisor; all partial findings still require disposition. This is distinct from
 a degraded or manual result, which applies when the final-gate guarantee itself
-is missing or manually overridden.
+is missing or manually overridden. This incomplete-review path covers a trusted
+adapter that fails after valid preflight. It never covers a local CLI process
+that started without valid isolation or whose completed event lacks consistent
+mutation-policy and protection evidence; that is an invariant violation and
+terminally halts.
 
 Every internal recipe declares a finite positive deadline measured from one
 shared dispatch epoch, so the whole phase is bounded. At the deadline the
@@ -189,6 +195,11 @@ equivalent target profile is configured. It must not guess a default home,
 silently use unrelated credentials, or fall through to a different user's
 session. If no matched peer exists, the adapter records availability without
 starting a review process, so no review event can claim a selected profile.
+The runner also fixes the intended execution-context kind, execution host,
+selected profile identity, and mapping provenance before dispatch. An unknown
+or contradictory value dispatches zero times. If the process starts and the
+runner-observed actual context differs from that preflight record, the run has
+crossed a credential boundary and terminally halts.
 
 Every review event uses a discriminated execution context. `peer_cli` records
 the execution host, selected peer-profile identity, and mapping provenance;
@@ -201,10 +212,18 @@ identity fields. A roster entry that was never invoked uses `not_started` with
 its unavailable reason and discovery provenance and null execution fields; that
 context is never valid for a completed review event.
 
-Execution context and transport are separate axes. Every external event also
-declares `local_cli` or `github_app`. All `local_cli` events require the
-immutable-snapshot protections below whether their execution context is
-`peer_cli` or `host_native`; only `github_app` has no local filesystem surface.
+Execution context and transport are separate axes. Every invoked review event
+declares `host_tool`, `local_cli`, or `github_app`; a `not_started` roster entry
+marks transport not applicable. All `local_cli` events require the same
+immutable-snapshot, default-deny, policy-scoped write, credential-scrub, and
+egress protections below whether the recipe is internal or external and whether
+its execution context is `peer_cli` or `host_native`. `host_tool` covers any in-
+harness internal capability—native, bundled, or optional—whose complete
+lifecycle and tool policy the parent controls, whose provider provenance remains
+separately recorded, and whose parent can enforce the declared mutation policy
+and exclude remote-control side effects. A capability that launches an
+uncontrolled subprocess must use the isolated `local_cli` transport or remain
+unavailable. Only `github_app` has no local filesystem surface.
 
 ## External reviewers and final gates
 
@@ -366,22 +385,38 @@ currently configured for this repository. It may gate Codex only after repo-
 specific availability and evidence validation; it remains same-host advisory
 coverage on Claude Code.
 
-### CLI evidence
+## Local CLI isolation and evidence
 
-A CLI process exit code of zero means the invocation completed; it does not
-mean the diff is clean. Every CLI gate must return a recipe-specific structured
-verdict, bind it to the complete requested target fingerprint, and survive
-clean and seeded-bug acceptance fixtures.
+This section applies to every `local_cli` subprocess, including peer internal
+reviewers such as `claude-simplify`, not only external final gates. A CLI process
+exit code of zero means the invocation completed; it does not mean its review
+succeeded. Every local CLI review must return recipe-specific structured
+evidence bound to the complete requested target fingerprint. An external CLI
+gate additionally returns a structured verdict and survives paired clean and
+seeded-bug acceptance fixtures.
 
-The adapter materializes an isolated review snapshot that is byte-identical to
+Every local CLI recipe declares `report_only` or `isolated_candidate` mutation
+policy. `report_only` is mandatory for external gates and is the default for
+internal reviewers. `isolated_candidate` is allowed only for an internal recipe
+whose contract returns candidate changes, initially `claude-simplify`; it never
+authorizes a write to the Greenlight target.
+
+Both policies materialize a frozen source snapshot that is byte-identical to
 the complete target fingerprint and preserves the Git topology needed by the
-selected mode without sharing a writable inode with the source checkout. The
-reviewer process tree runs in a write-deny-by-default sandbox. Its only writable
-paths are fresh, adapter-owned cache and temporary directories whose resolved
-locations cannot reach a repository, credential source, or one another through
-links. Required credentials and peer-profile inputs are exposed read-only; any
-provider state that must be mutable is copied into the bounded adapter-owned
-area.
+selected mode without sharing a writable inode with the source checkout. Under
+`report_only`, the reviewer process tree runs with that snapshot read-only. Its
+only writable paths are fresh adapter-owned cache and temporary directories
+whose resolved locations cannot reach a repository, credential source, or one
+another through links.
+
+Under `isolated_candidate`, the engine additionally creates a fully independent
+writable candidate workspace from the frozen source. The candidate workspace
+may not share an inode, mutable Git control state, or writable object store with
+the source snapshot or real checkout; its Git metadata is independent and read-
+only while its candidate worktree files are writable. The only added write
+scope is that candidate worktree. Required credentials and peer-profile inputs
+remain read-only, and any provider state that must be mutable is copied into the
+bounded adapter-owned cache area.
 
 The subprocess also receives a clean control-plane environment. It gets only
 the selected model provider's authentication and required egress; GitHub and
@@ -390,18 +425,27 @@ access, cloud control-plane credentials, and write-capable hooks, plugins, MCP
 servers, or connectors are absent. Child-process network egress is denied by
 default and allowlisted only for the model provider endpoints required by the
 recipe. The parent engine keeps its GitHub credentials and performs all
-authoritative PR queries outside the reviewer sandbox. A recipe is not gateable
-when credential scrubbing or egress isolation cannot be proved.
+authoritative PR queries outside the reviewer sandbox. If credential scrubbing
+or egress isolation cannot be proved at preflight, no process starts: an
+external recipe is unavailable for gating and an internal recipe records its
+unavailable roster outcome. Once a process has started, missing or contradictory
+completion evidence for those protections is an invariant violation and
+terminally halts; it cannot become fallback or incomplete-review.
 
-The snapshot target root and original checkout are mechanically read-only, and
-the original is otherwise unreachable when the host can omit it from the
-sandbox. The snapshot may not share a mutable Git worktree control directory,
-index, refs, or writable object store with the source; copied control state is
-read-only, and a shared object store is allowed only through an enforced read-
-only mount. Absolute paths, parent traversal, symbolic-link escapes, hard-link
-aliases, shared Git metadata, and child processes remain subject to the same
-deny policy. A recipe is not gateable when inode and Git-state isolation or this
-sandbox policy is unavailable. The adapter verifies snapshot identity and
+The frozen source snapshot and original checkout are mechanically read-only,
+and the original is otherwise unreachable when the host can omit it from the
+sandbox. The source snapshot may not share a mutable Git worktree control
+directory, index, refs, or writable object store with the real checkout; copied
+control state is read-only, and a shared object store is allowed only through an
+enforced read-only mount. Absolute paths, parent traversal, symbolic-link
+escapes, hard-link aliases, shared Git metadata, and child processes remain
+subject to the same deny policy. Under `isolated_candidate`, writes inside the
+declared candidate worktree are allowed, while every path escape or Git-control
+write remains denied. When mutation-policy, inode, Git-state, or sandbox
+isolation is unavailable at preflight, the adapter dispatches zero times under
+the same phase-specific unavailable policy. If a launched process cannot return
+consistent evidence for that isolation, the run terminally halts. The adapter
+verifies source and candidate identity and
 captures the real target fingerprint before and after the call, but equal
 endpoint fingerprints alone are not proof of immutability. Free-form output,
 malformed schema, stale evidence, authentication failure, timeout, or any
@@ -409,27 +453,45 @@ successful target mutation is not clean. Denied-write telemetry may be retained
 when a host exposes it, but observability of every rejected system call is not
 the safety boundary.
 
-For PR mode, the parent engine verifies before dispatch that the snapshot and
-local target match the selector's published repository, PR, `OPEN` lifecycle,
-base, and head tuple. It independently queries the same tuple again at CLI
-completion and at the final closing sweep. A normal concurrent advance, close,
-merge, or base change makes the verdict stale and follows the same-primary
-current-target retry or halt policy. A remote side effect attributable to the
-reviewer is a reviewer mutation and terminally halts even if the local
-fingerprint is unchanged.
+Runner-owned safety evidence and reviewer-owned result evidence have different
+failure semantics. The runner envelope includes transport, execution-context
+kind, execution host, selected profile identity and mapping provenance for a
+peer CLI, active profile plus capability/provider provenance for a host tool,
+declared mutation policy, isolation, credential, egress, allowed-write boundary,
+workspace destruction, and applicable engine-owned closing evidence. Missing or
+contradictory runner evidence after dispatch is an invariant violation and
+terminally halts. A timeout or missing, malformed, or stale reviewer payload—
+including verdict, findings, or a reviewer-echoed target—does not erase an
+intact runner envelope. After required termination, it follows the internal
+incomplete or external invalid-result fallback policy and can never be treated
+as clean.
 
-External CLI reviewers are report-only. A reviewer-originated write, or a write
+For any PR-mode local CLI review, the parent engine verifies before dispatch
+that the frozen source and local target match the selector's published
+repository, PR, `OPEN` lifecycle, base, and head tuple, then queries that tuple
+again at this review's completion. An external gate event verifies it a third
+time at the final closing sweep; an internal event does not participate in that
+external sweep. An internal result remains advisory evidence bound to its frozen
+generation, so a later legitimate fix and published tuple do not retroactively
+invalidate it. A concurrent advance, close, merge, or base change during the
+review itself makes that event stale under its phase policy. A remote side
+effect attributable to the reviewer is a reviewer mutation and terminally halts
+even if the local fingerprint is unchanged.
+
+Every local CLI reviewer is report-only with respect to the real Greenlight
+target. A write inside a declared `isolated_candidate` worktree is normalized
+into a candidate diff against the frozen source, then that workspace is
+destroyed; it is not a target mutation. Any write outside that scope, or a write
 whose origin cannot be distinguished from the reviewer, is an invariant
 violation rather than an ordinary new generation: cancel the reviewer, preserve
-evidence, and halt without retry or fallback. A write that restores the original
-bytes before exit is still a violation; mechanical isolation must prevent it
-rather than relying on a matching after-call digest. Rollback is permitted only
-when the engine can
+evidence, and halt without retry or fallback. A forbidden write that restores
+the original bytes before exit is still a violation; mechanical isolation must
+prevent it rather than relying on a matching after-call digest. Rollback is
+permitted only when the engine can
 restore the exact pre-review fingerprint without overwriting an unrelated
 concurrent change; even a successful rollback still requires a new human-
-initiated run. Candidate changes made by `claude-simplify` inside its disposable
-target are not target mutations; only the normal fixer may apply an adjudicated
-candidate to create the next legitimate generation.
+initiated run. Only the normal fixer may apply an adjudicated candidate diff to
+the real target and create the next legitimate generation.
 
 Claude Code has no top-level `claude review` command. Its local review surface
 is the bundled `/code-review` command, with `/review` as an alias, and a non-
@@ -501,8 +563,8 @@ The shared result records these facts independent of engine implementation:
 | --- | --- |
 | Host | Harness, surface, version, active profile identity, implementation group |
 | Target | Target mode, canonical target selector, base object, head object, working-tree diff digest, mutation generation, and repository/PR identity plus authoritative lifecycle state and published base/head for PR mode |
-| Internal roster | Recipe, required flag, availability and provenance, discriminated execution or `not_started` context, reviewed target fingerprint, deadline, invocation and cancellation status, incomplete flag, normalized findings and candidate changes, disposition, evidence reference |
-| External events | Common fields: recipe, implementation group, transport, target mode and recipe invocation adapter, blocking authority and provenance, discriminated execution context, trigger, attempt deadline and retry index, timeout and termination status, closing-evidence kind, late-event disposition, start and completion evidence, reviewed target, verdict, findings, fallback reason. A verified remote kind requires trigger cursor, authority cutoff, positive closing window and deadline, and final server cursor or watermark. A synchronous-local kind requires zero closing window, completion equal to cutoff and deadline, and not-applicable remote cursor and watermark fields. A best-effort-advisory kind marks remote cursor, cutoff, deadline, and watermark not applicable and can neither gate nor extend closing. Every `local_cli` transport additionally requires immutable-snapshot identity, inode and Git-state isolation, write-protection evidence, provider-only credentials and egress evidence, and credential-scrub results regardless of execution context; optional denied-write diagnostics are separate. A PR-mode event requires parent-observed dispatch, completion, and closing-sweep published tuples containing repository/PR identity, `OPEN` lifecycle, base, and head. A `github_app` transport marks local-snapshot and CLI-isolation fields not applicable and must not fabricate them |
+| Internal roster | Recipe, required flag, availability and provenance, transport, mutation policy, discriminated execution or `not_started` context, reviewed target fingerprint, deadline, invocation and cancellation status, incomplete flag, normalized findings and candidate changes, disposition, evidence reference. Every invoked `local_cli` entry additionally requires frozen-source identity, inode and Git-state isolation, default-deny protection, provider-only credentials and egress, and credential-scrub evidence. `report_only` marks candidate-workspace fields not applicable; `isolated_candidate` requires candidate-workspace identity, independent inode and Git-state evidence, the declared allowed-write boundary, normalized candidate diff against the frozen source, and destruction evidence. A `host_tool` entry may not fabricate CLI-specific fields but must record equivalent mutation-policy enforcement |
+| External events | Common fields: recipe, implementation group, transport, target mode and recipe invocation adapter, blocking authority and provenance, discriminated execution context, trigger, attempt deadline and retry index, timeout and termination status, closing-evidence kind, late-event disposition, start and completion evidence, reviewed target, verdict, findings, fallback reason. A verified remote kind requires trigger cursor, authority cutoff, positive closing window and deadline, and final server cursor or watermark. A synchronous-local kind requires zero closing window, completion equal to cutoff and deadline, and not-applicable remote cursor and watermark fields. A best-effort-advisory kind marks remote cursor, cutoff, deadline, and watermark not applicable and can neither gate nor extend closing. Every `local_cli` transport requires `report_only` mutation policy plus immutable-snapshot identity, inode and Git-state isolation, write-protection evidence, provider-only credentials and egress evidence, and credential-scrub results regardless of execution context; optional denied-write diagnostics are separate. A PR-mode event requires parent-observed dispatch, completion, and closing-sweep published tuples containing repository/PR identity, `OPEN` lifecycle, base, and head. A `github_app` transport marks mutation-policy, local-snapshot, and CLI-isolation fields not applicable and must not fabricate them |
 | Objective verification | Commands or required checks, exact target, completion and outcome |
 | Terminal result | Pass, halt, failure, degraded/manual outcome, reason class, accepted gate evidence |
 
@@ -515,18 +577,18 @@ engine infers clean by searching prose for the absence of findings.
 | ID | Tier | Scenario | Required oracle |
 | --- | --- | --- | --- |
 | D01 | Deterministic | Empty optional catalog on each host; missing, execution-failed, and fake-clock stalled internal recipes | Claude and Codex include their host-native recipe plus bundled specialist even when discovery fails; neither internal recipe can gate. Missing, failed, or timed-out host-native review halts before external dispatch unless explicit `external` mode is active. A missing specialist, non-host-native failure, or confirmed-cancelled timeout remains in the roster and may continue only with `incomplete-review`; unconfirmed cancellation halts; every partial finding and candidate change remains actionable |
-| D02 | Deterministic | None, one, two, and all optional integrations available; matching, missing, unknown, and mismatched peer profiles; same token with wrong provenance, same-named standalone skill, disabled provider, stale cache; injected mixed-generation internal evidence | Exact available set enters the frozen roster and every entry is scheduled once against the same captured `internal_target`, independent of S, M, or L. Provenance mismatch, disabled provider, and stale-cache-only inputs have stable unavailable reasons, never resolve to the registered recipe, and dispatch zero times. A mismatched fingerprint or mutation before collection completes rejects the phase; cross-host recipes appear only for an explicitly matched peer profile, and no invocation falls back to a default home or unrelated credentials |
-| L03 | Authenticated live | Install and invoke Superpowers, gstack, and Ponytail on each supported host | Current-session discovery and invocation artifacts prove available-to-must-run; a failed invocation remains failed, not absent |
-| L04 | Authenticated live | Claude Simplify against a seeded simplification target, directly on Claude and through an explicitly matched Codex peer profile | Every candidate change is normalized into an evidenced finding with a disposition; the real target fingerprint is unchanged; recipe cannot gate. Direct execution records a valid `host_native` context, while the peer invocation records a valid `peer_cli` context and matched profile provenance. Missing, mismatched, or wrong-kind context rejects the evidence, and a no-peer control makes no Claude call or review event |
+| D02 | Deterministic | None, one, two, and all optional integrations available; matching, missing, unknown, and mismatched peer profiles; same token with wrong provenance, same-named standalone skill, disabled provider, stale cache; injected mixed-generation internal evidence | Exact available set enters the frozen roster and every entry is scheduled once against the same captured `internal_target`, independent of S, M, or L. Every in-harness specialist or optional capability records `host_tool`, its provider provenance, execution context, and mutation policy; any separately launched reviewer records `local_cli` and its required isolation. Wrong or missing transport rejects the event. Provenance mismatch, disabled provider, and stale-cache-only inputs have stable unavailable reasons, never resolve to the registered recipe, and dispatch zero times. A mismatched fingerprint or mutation before collection completes rejects the phase; cross-host recipes appear only for an explicitly matched peer profile, and no invocation falls back to a default home or unrelated credentials |
+| L03 | Authenticated live | Install and invoke Superpowers, gstack, and Ponytail on each supported host | Current-session discovery and invocation artifacts prove available-to-must-run; each event records the actual `host_tool` or `local_cli` transport, provider provenance, execution context, and mutation policy, and a local CLI path supplies its full isolation evidence. A failed invocation remains failed, not absent, while missing or wrong-kind transport rejects the event |
+| L04 | Authenticated live | Claude Simplify against a seeded simplification target, directly on Claude and through an explicitly matched Codex peer profile | Every candidate change is normalized into an evidenced finding with a disposition; recipe cannot gate. Both paths declare `isolated_candidate`, successfully write a seeded simplification only inside an independent candidate worktree, normalize its final diff against the frozen source, destroy the workspace, and leave the frozen source and real target unchanged locally and remotely. Direct execution records `host_tool` transport, valid `host_native` context, active profile plus capability/provider provenance, equivalent candidate-boundary enforcement, and no remote-control side effect. The peer invocation records `local_cli` transport, valid `peer_cli` context, execution host, selected profile and mapping provenance, plus frozen-source identity, candidate identity and destruction, process-tree default-deny outside the candidate worktree, provider-only credential and egress, credential-scrub, local-path/Git-state, and fake-control-plane probes. Candidate-worktree writes are accepted; source, real-target, path-escape, Git-control, and remote writes are denied. Unknown or mismatched preflight context dispatches zero times; missing or contradictory runner-observed context after start terminally halts. Other malformed reviewer payload follows its phase policy, and a no-peer control makes no Claude call or review event |
 | L05 | Authenticated live | Codex native review against a seeded correctness bug | Structured findings cover the exact target; no mutation occurs; recipe cannot gate |
 | D06 | Deterministic | Host-aware external defaults before and after Bugbot calibration; requested mode is supported or unsupported by an otherwise eligible recipe | Claude resolves Codex bot then Codex CLI; Codex resolves directly to Claude CLI while Bugbot is unverified, then resolves calibrated Bugbot followed by Claude CLI after P11 passes; Antigravity appears only by explicit selection. Resolution filters by declared target mode and the presence of that recipe's invocation adapter before gate eligibility, so a PR-only recipe cannot receive post-commit or uncommitted work |
 | D07 | Deterministic | Primary absent, quota-limited, timed out, malformed, recipe-authentication-failed, invalid, or repeatedly stale after bounded retry; separately, control-plane auth failure | Recipe-scoped availability outcomes select the next eligible configured candidate with the same current target and record the exact fallback reason without credential shopping. Attempt deadline, termination rule, retry ceiling, authority cutoff, and closing window come from the recipe; the engine never exceeds them or starts fallback before required termination confirmation. One stale result retries the primary first; all candidates unavailable produces halt. Control-plane auth failure halts immediately; neither path can become clean |
 | D08 | Deterministic | Primary returns findings while fallback is available; post-fix mandatory primary re-review returns a valid finding or an availability failure; gate returns clean while another selected or collected reviewer returns a finding before or after its authority cutoff; separately, an unverified bot emits an advisory finding | No fallback occurs before the finding is resolved and the same primary is retried; another valid blocking finding remains sticky, while timeout, quota, unavailable, recipe-scoped authentication failure, invalid, or repeatedly stale evidence may use the fallback with a recorded reason against the exact new target. A verified blocking finding at or before its cutoff outranks gate clean even when observed during the finite sweep; a post-cutoff or unverified advisory remains visible but cannot block or satisfy pass |
-| D09 | Deterministic | Internal advisors review generation G0 and a legitimate fixer creates G1; a bot or committed CLI target starts with an unclean worktree, or a bot head is unpublished; bot and CLI evidence each omit or mismatch one target-fingerprint field; an event omits its closing-evidence discriminator, supplies the wrong kind, or omits or fabricates a kind-specific field; a peer or host-native `local_cli` event omits protection evidence, or a `github_app` event fabricates it; a local CLI inherits fake GitHub, Git-helper, askpass, SSH-agent, keychain, connector, or cloud credentials and probes `git push`, PR mutation, direct API, and SSH paths; separately, PR published base/head advances or its lifecycle becomes `CLOSED` or `MERGED` with unchanged base/head before completion or closing; separately, sandbox probes target local paths and Git state | Internal evidence remains advisory and bound to G0 while the final gate must review G1. An ineligible bot, `--base`, or `--commit` target dispatches zero times, leaves accepted gate evidence null, and cannot pass. Any missing or mismatched transport, closing-evidence kind or kind-specific field, mode, canonical selector, base, head, digest, generation, published lifecycle or tuple, or transport-specific protection field likewise leaves accepted gate evidence null. The CLI receives none of the injected control-plane authority and produces zero remote calls or side effects. A normal published-tuple or lifecycle transition is stale and follows retry or halt; a reviewer-attributed remote side effect terminally halts. Every filesystem conformance probe is mechanically denied and leaves snapshot and real target unchanged; any successful write makes that adapter unavailable for gating |
+| D09 | Deterministic | Internal advisors review generation G0 and a legitimate fixer creates and publishes G1 before the external gate; a bot or committed CLI target starts with an unclean worktree, or a bot head is unpublished; preflight reports unavailable isolation or unknown/mismatched execution context; separately, an already-invoked event omits or contradicts runner-owned transport, actual execution context, profile/provenance, applicable external closing, mutation-policy, protection, candidate-boundary, or destruction evidence; separately, a safely isolated reviewer times out or omits or malforms reviewer-owned verdict, findings, target echo, or context echo; a local CLI inherits fake GitHub, Git-helper, askpass, SSH-agent, keychain, connector, or cloud credentials and probes `git push`, PR mutation, direct API, and SSH paths; separately, PR published base/head advances or its lifecycle becomes `CLOSED` or `MERGED` with unchanged base/head during a review or external closing sweep; separately, report-only and isolated-candidate sandboxes probe frozen source, real target, candidate worktree, path escapes, and Git state | Internal evidence remains advisory and bound to G0 while the final gate and its closing sweep validate G1; the legitimate G0-to-G1 transition after internal completion does not stale or halt on the older internal tuple. An ineligible bot, `--base`, or `--commit` target dispatches zero times, leaves accepted gate evidence null, and cannot pass. Static isolation or execution-context mismatch at preflight also dispatches zero times: an internal recipe records `not_started` and unavailable under its roster policy, while an external recipe may use availability fallback. Once a process starts, missing or contradictory runner-owned safety or actual-context evidence terminally halts with no retry, fallback, or incomplete-review path. With that envelope intact, a timeout or invalid reviewer-owned result or echo follows the existing internal incomplete or external fallback policy after confirmed termination and remains non-clean. A write wholly inside a declared isolated-candidate worktree succeeds and appears only in its normalized candidate diff; the workspace is then destroyed without changing generation. The CLI receives none of the injected control-plane authority and produces zero remote calls or side effects. A published-tuple or lifecycle transition during the event's own authority window is stale and follows its phase policy. Every report-only write and every isolated-candidate write outside the candidate worktree is mechanically denied and leaves frozen source and real target unchanged; any successful out-of-scope reviewer write or remote side effect terminally halts |
 | D10 | Deterministic | Bot or CLI produces no completion evidence before its recipe deadline; a timed-out remote primary emits a finding on each side of its authority cutoff | Stubbed silence becomes timeout at the same configured boundary on both engines. Required cancellation or observation termination is recorded, retry count never exceeds the recipe ceiling, and only then may the allowed fallback or halt path run. The engine waits no longer than the maximum finite remote closing deadline, obtains the final cursor for verified remote evidence, closes synchronous local evidence at confirmed process completion with remote cursor fields not applicable, blocks on a valid pre-cutoff remote finding, retains a post-cutoff event as non-blocking advisory, and halts when required final polling or cursor acquisition fails; silence never becomes clean |
 | P11 | Paid opt-in live | Bugbot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and the parent-observed PR lifecycle is `OPEN` with captured head equal to the published PR head. Verified identity, `github_app` transport and execution context, completion channel, target-mode and canonical-selector binding, event-level invocation adapter, trigger-time lifecycle/base/head binding, positive zero-finding signal, finding parser, and finite cursor/cutoff/closing-window mechanics all work through the same recipe; engine-captured digest and generation remain unchanged through closing |
-| L12 | Authenticated live | For every target mode declared by the Claude CLI recipe, review a paired clean and seeded-bug target through an explicitly matched peer profile | Each declared invocation path independently records `local_cli` transport, its recipe invocation adapter, valid `peer_cli` context, synchronous-local closing evidence with zero window and not-applicable remote cursors, then produces a schema-valid verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. The real adapter proves byte-identical snapshot materialization, process-tree write-deny, provider-only credentials and egress, and absence of GitHub/Git/SSH/cloud authority. Sandbox and fake-control-plane probes produce no local or remote mutation. PR mode records matching parent-observed `OPEN` lifecycle and published base/head tuples at dispatch, completion, and closing, while a concurrent-advance fixture rejects stale evidence; deterministic D09 separately covers unchanged-object close and merge transitions. Missing, mismatched, or wrong-kind transport, context, or closing evidence rejects the event; clean and findings parse through the same recipe; process success alone is insufficient; and a no-peer control makes no Claude call or review event. Initial Codex Greenlight V1 may declare PR mode only; post-commit or uncommitted support requires its own paired live evidence. Deterministic transport failures remain in D07–D10 |
-| L13 | Authenticated live | Codex CLI final gate reviews paired clean and seeded-bug targets through four distinct existing Greenlight invocation paths: PR against a base branch or ref with `--base`, a post-commit range against a base object with `--base`, one post-commit object with `--commit`, and the working tree with `--uncommitted`, all through an explicitly matched peer profile | Every call site independently records `local_cli` transport, its recipe invocation adapter, `peer_cli` execution context, selected profile identity, matching provenance, and synchronous-local closing evidence with zero window and not-applicable remote cursors, then emits a normalized verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. The real adapter proves byte-identical snapshot materialization, process-tree write-deny, provider-only credentials and egress, and absence of GitHub/Git/SSH/cloud authority. Sandbox and fake-control-plane probes produce no local or remote mutation. The PR path records matching parent-observed `OPEN` lifecycle and published base/head tuples at dispatch, completion, and closing, while a concurrent-advance fixture rejects stale evidence; deterministic D09 separately covers unchanged-object close and merge transitions. PR, range, and single-commit fixtures prove dirty-worktree no-dispatch, and each path has separate clean and seeded-bug evidence. A PR fixture cannot certify the post-commit-range path; if the installed CLI does not accept a base object, that mode remains unsupported. Missing or mismatched transport, context, or closing evidence rejects the event; a no-peer control makes no Codex call or review event, L05 cannot substitute, and deterministic transport failures remain in D07–D10 |
+| L12 | Authenticated live | For every target mode declared by the Claude CLI recipe, review a paired clean and seeded-bug target through an explicitly matched peer profile | Each declared invocation path independently records `local_cli` transport, its recipe invocation adapter, valid `peer_cli` context, execution host, selected profile and mapping provenance, synchronous-local closing evidence with zero window and not-applicable remote cursors, then produces a schema-valid verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. The real adapter proves byte-identical snapshot materialization, process-tree write-deny, provider-only credentials and egress, and absence of GitHub/Git/SSH/cloud authority. Sandbox and fake-control-plane probes produce no local or remote mutation. PR mode records matching parent-observed `OPEN` lifecycle and published base/head tuples at dispatch, completion, and closing, while a concurrent-advance fixture rejects stale evidence; deterministic D09 separately covers unchanged-object close and merge transitions. Unknown or mismatched context at preflight makes no call; missing or contradictory runner-observed context after start terminally halts. Other malformed reviewer output follows D07–D10; clean and findings parse through the same recipe; process success alone is insufficient; and a no-peer control makes no Claude call or review event. Initial Codex Greenlight V1 may declare PR mode only; post-commit or uncommitted support requires its own paired live evidence |
+| L13 | Authenticated live | Codex CLI final gate reviews paired clean and seeded-bug targets through four distinct existing Greenlight invocation paths: PR against a base branch or ref with `--base`, a post-commit range against a base object with `--base`, one post-commit object with `--commit`, and the working tree with `--uncommitted`, all through an explicitly matched peer profile | Every call site independently records `local_cli` transport, its recipe invocation adapter, `peer_cli` execution context, execution host, selected profile identity and mapping provenance, and synchronous-local closing evidence with zero window and not-applicable remote cursors, then emits a normalized verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. The real adapter proves byte-identical snapshot materialization, process-tree write-deny, provider-only credentials and egress, and absence of GitHub/Git/SSH/cloud authority. Sandbox and fake-control-plane probes produce no local or remote mutation. The PR path records matching parent-observed `OPEN` lifecycle and published base/head tuples at dispatch, completion, and closing, while a concurrent-advance fixture rejects stale evidence; deterministic D09 separately covers unchanged-object close and merge transitions. PR, range, and single-commit fixtures prove dirty-worktree no-dispatch, and each path has separate clean and seeded-bug evidence. A PR fixture cannot certify the post-commit-range path; if the installed CLI does not accept a base object, that mode remains unsupported. Unknown or mismatched context at preflight makes no call; missing or contradictory runner-observed context after start terminally halts. Other malformed reviewer output follows D07–D10; a no-peer control makes no Codex call or review event, L05 cannot substitute |
 | L14 | Authenticated GitHub live | Codex bot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and the parent-observed PR lifecycle is `OPEN` with captured head equal to the published PR head. Verified bot identity, `github_app` transport and execution context, and start handshake lead to recipe-specific completion, complete findings, positive zero-finding evidence, full target-mode, canonical-selector, lifecycle/base/head binding, event-level invocation adapter, and finite cursor/cutoff/closing-window mechanics; the engine-captured digest and generation remain unchanged through closing, while silence or any stale fingerprint field fails |
 | D15 | Deterministic | Equivalent normalized transcript on both engines, plus wrong-kind and missing-field closing-evidence transcripts | Host default recipes and transport syntax may differ; normalized logical recipe identifiers and discriminated result schema do not drift, action sequence, invalidation, terminal state, and reason schema remain conformant, and both engines reject the same invalid closing-evidence combinations |
 
@@ -543,15 +605,18 @@ content.
 1. Add host, phase, provenance, implementation-group, target-mode and invocation-
    adapter, timing, evidence, and gate-eligibility metadata to the reviewer
    registry without changing runtime defaults.
-2. Add internal capability discovery, frozen rosters, report-only adapters, and
-   deterministic cases D01 and D02.
+2. Add internal capability discovery, frozen rosters, mutation-policy metadata,
+   host-native report-only and isolated-candidate adapters, and deterministic
+   cases D01 and D02. Peer local-CLI internal adapters remain unavailable until
+   the shared isolation runner in step 4 is complete.
 3. Introduce host-specific, mode-aware external defaults and migrate legacy
    configuration; land deterministic fallback, anti-shopping, unsupported-mode,
    stale-target, and silence cases.
-4. Add immutable review-snapshot enforcement, provider-only credential and
-   egress isolation, parent-owned PR tuple validation, and structured Claude CLI
-   and Codex CLI gate adapters; then pass L12 and L13 before either can gate
-   under the new contract.
+4. Add the shared report-only and isolated-candidate local-CLI runner, immutable
+   frozen-source enforcement, provider-only credential and egress isolation,
+   parent-owned PR tuple validation, and structured Claude CLI and Codex CLI
+   gate adapters; then pass L04, L12, and L13 before the corresponding peer or
+   gate adapter becomes available under the new contract.
 5. Calibrate Bugbot through P11 and the Codex bot through L14. Until Bugbot
    passes, Codex resolves directly to Claude CLI.
 6. Split the Claude and Codex Greenlight engines under the shared state and
