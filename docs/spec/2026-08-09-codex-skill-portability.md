@@ -427,6 +427,10 @@ evidence requirements, or acceptance criteria.
   anti-shopping fallback, stale-target invalidation, and live clean plus seeded-
   bug evidence for each claimed default CLI gate before Codex Greenlight, or
   either host, can be advertised as conforming to the new cross-host contract.
+  Each host also requires the paired live bundled-specialist evidence in L03;
+  an unproven specialist adapter blocks that host's conformance claim, while a
+  later transient failure of an already promoted adapter remains a visible
+  `incomplete-review` outcome.
   A conditional GitHub candidate requires P11 or L14 only before that candidate
   is enabled or advertised; an unsafe or failed candidate probe leaves it
   ineligible without blocking CLI-default engine conformance. This does not
