@@ -70,6 +70,13 @@ syntax and is recorded on the review event, not in the fingerprint. Fallback
 may change the invocation adapter but must preserve the canonical selector and
 every fingerprint field.
 
+A PR selector additionally binds repository identity, PR number, authoritative
+lifecycle state, and published base and head objects. The lifecycle state must
+remain `OPEN`; `CLOSED` or `MERGED` is stale even when both objects are
+unchanged. Draft status and mergeability are separate merge-readiness concerns,
+not review-byte identity. The parent engine resolves this tuple through its own
+GitHub control-plane connection; reviewer output cannot supply or override it.
+
 Internal and external describe authority and timing, not the model vendor. The
 same vendor may appear twice under different recipes. For example, a Codex-host
 run may use a narrow Claude Simplify internal pass and later start a fresh,
@@ -216,12 +223,19 @@ A recipe records its vendor or implementation group, transport, supported hosts,
 supported target modes, each mode's invocation adapter and byte scope, trigger,
 availability probe, response channels, completion handshake, finding parser,
 clean rule, target-binding rule, blocking authority, a finite positive deadline,
-timeout and termination rule, finite positive maximum retry count, and
-whether it is eligible to gate a given host. These recipe values are the single
-timing source used by both engines. Gate independence is implementation-level:
-a Codex-host reviewer in the OpenAI group cannot gate Codex, and a Claude-host
-reviewer in the Anthropic group cannot gate Claude. This contract does not claim
-that a vendor's undisclosed foundation-model mix is independently verifiable.
+timeout and termination rule, finite positive maximum retry count, a closing-
+evidence kind, and whether it is eligible to gate a given host. A registered
+remote `github_app` recipe with verified blocking authority additionally defines
+a finite positive closing window plus event-cursor, authority-cutoff, and final-
+watermark rules. A synchronous `local_cli` recipe defines a zero closing window
+and marks remote cursor and watermark fields not applicable. An unverified
+advisory channel uses best-effort closing evidence, marks those fields not
+applicable, and cannot gate or extend a closing sweep. These recipe values are
+the single timing source used by both engines. Gate
+independence is implementation-level: a Codex-host reviewer in the OpenAI group
+cannot gate Codex, and a Claude-host reviewer in the Anthropic group cannot gate
+Claude. This contract does not claim that a vendor's undisclosed foundation-
+model mix is independently verifiable.
 
 Gate support is promoted per recipe and target mode. A clean live result for a
 PR range does not certify a single commit or an uncommitted working tree, even
@@ -260,9 +274,11 @@ reviewer under an untrusted state.
 An external attempt times out only at its recipe deadline. A local process must
 then be cancelled and its termination confirmed before retry or fallback; if it
 cannot be stopped, the run halts as an invariant violation. A remote bot recipe
-defines its own bounded observation and retry handshake, and any later event
-remains attached to that timed-out attempt for the closing sweep. No engine may
-invent an extra retry, extend a deadline, or begin fallback before the recipe's
+defines its own bounded observation and retry handshake. Timeout fixes that
+attempt's authority cutoff at the deadline; a later-observed event whose source
+cursor falls on or before that cutoff remains eligible for the finite closing
+sweep, while a post-cutoff event is advisory for this run. No engine may invent
+an extra retry, extend a deadline, or begin fallback before the recipe's
 termination rule is satisfied.
 
 Once the primary returns a finding, the run is sticky to that primary. The
@@ -274,6 +290,35 @@ records its reason, and the fallback must review the exact post-fix target from
 scratch. A valid finding from the re-review keeps the primary sticky; it cannot
 fall back. If every eligible gate is unavailable, the run halts with a
 dependency reason and never promotes a host-native self-review to final pass.
+
+### Finite closing sweep
+
+After a candidate final gate returns clean, the parent engine starts one closing
+sweep over every registered selected or collected remote attempt with verified
+blocking authority. Unverified advisory channels receive only a best-effort
+final sample and never extend the sweep. A normally completed remote attempt
+sets its authority cutoff and closing deadline to completion plus its recipe
+closing window. A timed-out remote attempt keeps the timeout cutoff and uses
+timeout plus that same window as its closing deadline.
+
+Closing evidence is discriminated rather than padded with invented fields. A
+verified remote attempt records its trigger cursor, authority cutoff, positive
+closing window and deadline, and final server cursor or watermark. The engine
+waits only until every such attempt reaches its finite closing deadline, then
+performs one final query through the parent control plane. A synchronous local
+CLI attempt records a zero window, sets completion equal to its cutoff and
+closing deadline, marks remote cursor and watermark fields not applicable, and
+closes when the process completes. An unverified advisory attempt records
+`best_effort` with remote cutoff, deadline, and final-watermark fields not
+applicable; a sample failure cannot block pass or extend the sweep.
+
+A verified blocking finding whose source cursor is at or before its remote
+attempt's authority cutoff prevents pass even if it was observed after fallback
+began. An event after the cutoff, or first observable only after the recorded
+closing deadline, remains visible as post-run advisory evidence but cannot
+retroactively change this run's result. For a verified remote attempt, failure
+to obtain the final cursor, complete the query, or revalidate the target halts;
+it never extends the window indefinitely or treats silence as clean.
 
 Users may select a registered gate or a host-specific fallback order. A
 selected recipe must still have a verified completion contract, cover the
@@ -338,6 +383,16 @@ links. Required credentials and peer-profile inputs are exposed read-only; any
 provider state that must be mutable is copied into the bounded adapter-owned
 area.
 
+The subprocess also receives a clean control-plane environment. It gets only
+the selected model provider's authentication and required egress; GitHub and
+Git tokens, credential helpers, askpass programs, SSH agents and keys, keychain
+access, cloud control-plane credentials, and write-capable hooks, plugins, MCP
+servers, or connectors are absent. Child-process network egress is denied by
+default and allowlisted only for the model provider endpoints required by the
+recipe. The parent engine keeps its GitHub credentials and performs all
+authoritative PR queries outside the reviewer sandbox. A recipe is not gateable
+when credential scrubbing or egress isolation cannot be proved.
+
 The snapshot target root and original checkout are mechanically read-only, and
 the original is otherwise unreachable when the host can omit it from the
 sandbox. The snapshot may not share a mutable Git worktree control directory,
@@ -353,6 +408,15 @@ malformed schema, stale evidence, authentication failure, timeout, or any
 successful target mutation is not clean. Denied-write telemetry may be retained
 when a host exposes it, but observability of every rejected system call is not
 the safety boundary.
+
+For PR mode, the parent engine verifies before dispatch that the snapshot and
+local target match the selector's published repository, PR, `OPEN` lifecycle,
+base, and head tuple. It independently queries the same tuple again at CLI
+completion and at the final closing sweep. A normal concurrent advance, close,
+merge, or base change makes the verdict stale and follows the same-primary
+current-target retry or halt policy. A remote side effect attributable to the
+reviewer is a reviewer mutation and terminally halts even if the local
+fingerprint is unchanged.
 
 External CLI reviewers are report-only. A reviewer-originated write, or a write
 whose origin cannot be distinguished from the reviewer, is an invariant
@@ -396,11 +460,14 @@ Greenlight returns a normal pass only when all of the following are true:
    but does not by itself block normal pass.
 3. The selected final gate returned an explicit, schema-valid clean verdict for
    the current target fingerprint.
-4. No selected or collected reviewer with verified blocking authority has an
-   unresolved new finding, including a late finding discovered by the closing
-   sweep. Unverified advisory findings remain visible but non-blocking.
-5. No commit, working-tree mutation, consolidation step, or CI repair occurred
-   after the accepted final-gate result.
+4. The finite closing sweep completed every kind-specific requirement, including
+   every required remote deadline and final cursor, and no selected or collected
+   reviewer with verified blocking authority has an unresolved finding at or
+   before its authority cutoff. Unverified and post-cutoff advisory findings
+   remain visible but non-blocking.
+5. No commit, working-tree mutation, consolidation step, CI repair, or PR
+   published-tuple or lifecycle change occurred after the accepted final-gate
+   result and before the closing sweep completed.
 6. The result preserves objective-verifier state separately from reviewer
    state. Autopilot may call the result merge-ready only when required checks or
    CI are also green for the exact final head.
@@ -433,9 +500,9 @@ The shared result records these facts independent of engine implementation:
 | Evidence group | Required fields |
 | --- | --- |
 | Host | Harness, surface, version, active profile identity, implementation group |
-| Target | Target mode, canonical target selector, base object, head object, working-tree diff digest, mutation generation |
+| Target | Target mode, canonical target selector, base object, head object, working-tree diff digest, mutation generation, and repository/PR identity plus authoritative lifecycle state and published base/head for PR mode |
 | Internal roster | Recipe, required flag, availability and provenance, discriminated execution or `not_started` context, reviewed target fingerprint, deadline, invocation and cancellation status, incomplete flag, normalized findings and candidate changes, disposition, evidence reference |
-| External events | Common fields: recipe, implementation group, transport, target mode and recipe invocation adapter, blocking authority and provenance, discriminated execution context, trigger, deadline, attempt and retry index, timeout and termination status, start and completion evidence, reviewed target, verdict, findings, fallback reason. Every `local_cli` transport additionally requires immutable-snapshot identity, inode and Git-state isolation, and write-protection evidence regardless of execution context; optional denied-write diagnostics are separate. A `github_app` transport marks those local-snapshot fields not applicable and must not fabricate them |
+| External events | Common fields: recipe, implementation group, transport, target mode and recipe invocation adapter, blocking authority and provenance, discriminated execution context, trigger, attempt deadline and retry index, timeout and termination status, closing-evidence kind, late-event disposition, start and completion evidence, reviewed target, verdict, findings, fallback reason. A verified remote kind requires trigger cursor, authority cutoff, positive closing window and deadline, and final server cursor or watermark. A synchronous-local kind requires zero closing window, completion equal to cutoff and deadline, and not-applicable remote cursor and watermark fields. A best-effort-advisory kind marks remote cursor, cutoff, deadline, and watermark not applicable and can neither gate nor extend closing. Every `local_cli` transport additionally requires immutable-snapshot identity, inode and Git-state isolation, write-protection evidence, provider-only credentials and egress evidence, and credential-scrub results regardless of execution context; optional denied-write diagnostics are separate. A PR-mode event requires parent-observed dispatch, completion, and closing-sweep published tuples containing repository/PR identity, `OPEN` lifecycle, base, and head. A `github_app` transport marks local-snapshot and CLI-isolation fields not applicable and must not fabricate them |
 | Objective verification | Commands or required checks, exact target, completion and outcome |
 | Terminal result | Pass, halt, failure, degraded/manual outcome, reason class, accepted gate evidence |
 
@@ -453,15 +520,15 @@ engine infers clean by searching prose for the absence of findings.
 | L04 | Authenticated live | Claude Simplify against a seeded simplification target, directly on Claude and through an explicitly matched Codex peer profile | Every candidate change is normalized into an evidenced finding with a disposition; the real target fingerprint is unchanged; recipe cannot gate. Direct execution records a valid `host_native` context, while the peer invocation records a valid `peer_cli` context and matched profile provenance. Missing, mismatched, or wrong-kind context rejects the evidence, and a no-peer control makes no Claude call or review event |
 | L05 | Authenticated live | Codex native review against a seeded correctness bug | Structured findings cover the exact target; no mutation occurs; recipe cannot gate |
 | D06 | Deterministic | Host-aware external defaults before and after Bugbot calibration; requested mode is supported or unsupported by an otherwise eligible recipe | Claude resolves Codex bot then Codex CLI; Codex resolves directly to Claude CLI while Bugbot is unverified, then resolves calibrated Bugbot followed by Claude CLI after P11 passes; Antigravity appears only by explicit selection. Resolution filters by declared target mode and the presence of that recipe's invocation adapter before gate eligibility, so a PR-only recipe cannot receive post-commit or uncommitted work |
-| D07 | Deterministic | Primary absent, quota-limited, timed out, malformed, recipe-authentication-failed, invalid, or repeatedly stale after bounded retry; separately, control-plane auth failure | Recipe-scoped availability outcomes select the next eligible configured candidate with the same current target and record the exact fallback reason without credential shopping. Deadline, termination rule, and retry ceiling come from the recipe; the engine never exceeds that ceiling or starts fallback before required termination confirmation. One stale result retries the primary first; all candidates unavailable produces halt. Control-plane auth failure halts immediately; neither path can become clean |
-| D08 | Deterministic | Primary returns findings while fallback is available; post-fix mandatory primary re-review returns a valid finding or an availability failure; separately, gate returns clean while another selected, collected, or late reviewer returns a finding; separately, an unverified bot emits an advisory finding | No fallback occurs before the finding is resolved and the same primary is retried; another valid blocking finding remains sticky, while timeout, quota, unavailable, recipe-scoped authentication failure, invalid, or repeatedly stale evidence may use the fallback with a recorded reason against the exact new target. Any verified blocking finding outranks gate clean; an unverified advisory remains visible but cannot block or satisfy pass |
-| D09 | Deterministic | Internal advisors review generation G0 and a legitimate fixer creates G1; a bot or committed CLI target starts with an unclean worktree, or a bot head is unpublished; bot and CLI evidence each omit or mismatch one target-fingerprint field; a peer or host-native `local_cli` event omits protection evidence, or a `github_app` event fabricates it; separately, clean evidence is followed by head, base, staged, unstaged, untracked-file, or generation mutation; separately, sandbox conformance probes attempt direct writes and write-restores against the snapshot, original checkout, shared Git state, hard-link alias, and absolute or symbolic-link escapes | Internal evidence remains advisory and bound to G0 while the final gate must review G1. An ineligible bot, `--base`, or `--commit` target dispatches zero times, leaves accepted gate evidence null, and cannot pass. Any missing or mismatched transport, mode, canonical selector, base, head, digest, generation, or transport-specific protection field likewise leaves accepted gate evidence null. Creating, editing, renaming, or deleting a non-ignored untracked entry changes the digest. Every conformance probe is mechanically denied and leaves snapshot and real target unchanged; any successful write makes that adapter unavailable for gating. A successful reviewer mutation or unattributable mutation cancels the reviewer and terminally halts and can never be legitimized by a later clean result |
-| D10 | Deterministic | Bot or CLI produces no completion evidence before its recipe deadline | Stubbed silence becomes timeout at the same configured boundary on both engines. Required cancellation or observation termination is recorded, retry count never exceeds the recipe ceiling, and only then may the allowed fallback or halt path run; silence never becomes clean |
-| P11 | Paid opt-in live | Bugbot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and captured head equals the published PR head. Verified identity, `github_app` transport and execution context, completion channel, target-mode and canonical-selector binding, event-level invocation adapter, trigger-time base-and-head binding, positive zero-finding signal, and finding parser all work through the same recipe; engine-captured digest and generation remain unchanged through completion |
-| L12 | Authenticated live | For every target mode declared by the Claude CLI recipe, review a paired clean and seeded-bug target through an explicitly matched peer profile | Each declared invocation path independently records `local_cli` transport, its recipe invocation adapter, and valid `peer_cli` context, then produces a schema-valid verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. The real adapter proves byte-identical snapshot materialization without shared writable inodes or mutable Git state, process-tree write-deny, bounded fresh writable paths, and read-only credential inputs. Separate sandbox conformance probes target the snapshot, original checkout, shared Git state, and path escapes; each write and write-restore is mechanically denied and leaves snapshot and target unchanged, while any successful write fails support promotion. Missing, mismatched, or wrong-kind transport or context rejects the evidence; clean and findings parse through the same recipe; process success alone is insufficient; and a no-peer control makes no Claude call or review event. Initial Codex Greenlight V1 may declare PR mode only; post-commit or uncommitted support requires its own paired live evidence. Deterministic transport failures remain in D07–D10 |
-| L13 | Authenticated live | Codex CLI final gate reviews paired clean and seeded-bug targets through four distinct existing Greenlight invocation paths: PR against a base branch or ref with `--base`, a post-commit range against a base object with `--base`, one post-commit object with `--commit`, and the working tree with `--uncommitted`, all through an explicitly matched peer profile | Every call site independently records `local_cli` transport, its recipe invocation adapter, `peer_cli` execution context, selected profile identity, and matching provenance, then emits a normalized verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. The real adapter proves byte-identical snapshot materialization without shared writable inodes or mutable Git state, process-tree write-deny, bounded fresh writable paths, and read-only credential inputs. Separate sandbox conformance probes target the snapshot, original checkout, shared Git state, and path escapes; each write and write-restore is mechanically denied and leaves snapshot and target unchanged, while any successful write fails support promotion. PR, range, and single-commit fixtures also prove dirty-worktree no-dispatch. A PR fixture cannot certify the separate post-commit-range path; if the installed CLI does not accept a base object, that mode remains unsupported rather than inheriting PR evidence. Missing or mismatched transport or context rejects the evidence; each path distinguishes clean from process success, captures seeded findings, and never mutates the target. A no-peer control makes no Codex call or review event, L05 internal evidence cannot substitute, and deterministic transport failures remain in D07–D10 |
-| L14 | Authenticated GitHub live | Codex bot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and captured head equals the published PR head. Verified bot identity, `github_app` transport and execution context, and start handshake lead to recipe-specific completion, complete findings, positive zero-finding evidence, full target-mode, canonical-selector, and base-and-head binding, and an event-level invocation adapter; the engine-captured digest and generation remain unchanged through completion, while silence or any stale fingerprint field fails |
-| D15 | Deterministic | Equivalent normalized transcript on both engines | Host default recipes and transport syntax may differ; normalized logical recipe identifiers and result schema do not drift, and action sequence, invalidation, terminal state, and reason schema remain conformant |
+| D07 | Deterministic | Primary absent, quota-limited, timed out, malformed, recipe-authentication-failed, invalid, or repeatedly stale after bounded retry; separately, control-plane auth failure | Recipe-scoped availability outcomes select the next eligible configured candidate with the same current target and record the exact fallback reason without credential shopping. Attempt deadline, termination rule, retry ceiling, authority cutoff, and closing window come from the recipe; the engine never exceeds them or starts fallback before required termination confirmation. One stale result retries the primary first; all candidates unavailable produces halt. Control-plane auth failure halts immediately; neither path can become clean |
+| D08 | Deterministic | Primary returns findings while fallback is available; post-fix mandatory primary re-review returns a valid finding or an availability failure; gate returns clean while another selected or collected reviewer returns a finding before or after its authority cutoff; separately, an unverified bot emits an advisory finding | No fallback occurs before the finding is resolved and the same primary is retried; another valid blocking finding remains sticky, while timeout, quota, unavailable, recipe-scoped authentication failure, invalid, or repeatedly stale evidence may use the fallback with a recorded reason against the exact new target. A verified blocking finding at or before its cutoff outranks gate clean even when observed during the finite sweep; a post-cutoff or unverified advisory remains visible but cannot block or satisfy pass |
+| D09 | Deterministic | Internal advisors review generation G0 and a legitimate fixer creates G1; a bot or committed CLI target starts with an unclean worktree, or a bot head is unpublished; bot and CLI evidence each omit or mismatch one target-fingerprint field; an event omits its closing-evidence discriminator, supplies the wrong kind, or omits or fabricates a kind-specific field; a peer or host-native `local_cli` event omits protection evidence, or a `github_app` event fabricates it; a local CLI inherits fake GitHub, Git-helper, askpass, SSH-agent, keychain, connector, or cloud credentials and probes `git push`, PR mutation, direct API, and SSH paths; separately, PR published base/head advances or its lifecycle becomes `CLOSED` or `MERGED` with unchanged base/head before completion or closing; separately, sandbox probes target local paths and Git state | Internal evidence remains advisory and bound to G0 while the final gate must review G1. An ineligible bot, `--base`, or `--commit` target dispatches zero times, leaves accepted gate evidence null, and cannot pass. Any missing or mismatched transport, closing-evidence kind or kind-specific field, mode, canonical selector, base, head, digest, generation, published lifecycle or tuple, or transport-specific protection field likewise leaves accepted gate evidence null. The CLI receives none of the injected control-plane authority and produces zero remote calls or side effects. A normal published-tuple or lifecycle transition is stale and follows retry or halt; a reviewer-attributed remote side effect terminally halts. Every filesystem conformance probe is mechanically denied and leaves snapshot and real target unchanged; any successful write makes that adapter unavailable for gating |
+| D10 | Deterministic | Bot or CLI produces no completion evidence before its recipe deadline; a timed-out remote primary emits a finding on each side of its authority cutoff | Stubbed silence becomes timeout at the same configured boundary on both engines. Required cancellation or observation termination is recorded, retry count never exceeds the recipe ceiling, and only then may the allowed fallback or halt path run. The engine waits no longer than the maximum finite remote closing deadline, obtains the final cursor for verified remote evidence, closes synchronous local evidence at confirmed process completion with remote cursor fields not applicable, blocks on a valid pre-cutoff remote finding, retains a post-cutoff event as non-blocking advisory, and halts when required final polling or cursor acquisition fails; silence never becomes clean |
+| P11 | Paid opt-in live | Bugbot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and the parent-observed PR lifecycle is `OPEN` with captured head equal to the published PR head. Verified identity, `github_app` transport and execution context, completion channel, target-mode and canonical-selector binding, event-level invocation adapter, trigger-time lifecycle/base/head binding, positive zero-finding signal, finding parser, and finite cursor/cutoff/closing-window mechanics all work through the same recipe; engine-captured digest and generation remain unchanged through closing |
+| L12 | Authenticated live | For every target mode declared by the Claude CLI recipe, review a paired clean and seeded-bug target through an explicitly matched peer profile | Each declared invocation path independently records `local_cli` transport, its recipe invocation adapter, valid `peer_cli` context, synchronous-local closing evidence with zero window and not-applicable remote cursors, then produces a schema-valid verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. The real adapter proves byte-identical snapshot materialization, process-tree write-deny, provider-only credentials and egress, and absence of GitHub/Git/SSH/cloud authority. Sandbox and fake-control-plane probes produce no local or remote mutation. PR mode records matching parent-observed `OPEN` lifecycle and published base/head tuples at dispatch, completion, and closing, while a concurrent-advance fixture rejects stale evidence; deterministic D09 separately covers unchanged-object close and merge transitions. Missing, mismatched, or wrong-kind transport, context, or closing evidence rejects the event; clean and findings parse through the same recipe; process success alone is insufficient; and a no-peer control makes no Claude call or review event. Initial Codex Greenlight V1 may declare PR mode only; post-commit or uncommitted support requires its own paired live evidence. Deterministic transport failures remain in D07–D10 |
+| L13 | Authenticated live | Codex CLI final gate reviews paired clean and seeded-bug targets through four distinct existing Greenlight invocation paths: PR against a base branch or ref with `--base`, a post-commit range against a base object with `--base`, one post-commit object with `--commit`, and the working tree with `--uncommitted`, all through an explicitly matched peer profile | Every call site independently records `local_cli` transport, its recipe invocation adapter, `peer_cli` execution context, selected profile identity, matching provenance, and synchronous-local closing evidence with zero window and not-applicable remote cursors, then emits a normalized verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. The real adapter proves byte-identical snapshot materialization, process-tree write-deny, provider-only credentials and egress, and absence of GitHub/Git/SSH/cloud authority. Sandbox and fake-control-plane probes produce no local or remote mutation. The PR path records matching parent-observed `OPEN` lifecycle and published base/head tuples at dispatch, completion, and closing, while a concurrent-advance fixture rejects stale evidence; deterministic D09 separately covers unchanged-object close and merge transitions. PR, range, and single-commit fixtures prove dirty-worktree no-dispatch, and each path has separate clean and seeded-bug evidence. A PR fixture cannot certify the post-commit-range path; if the installed CLI does not accept a base object, that mode remains unsupported. Missing or mismatched transport, context, or closing evidence rejects the event; a no-peer control makes no Codex call or review event, L05 cannot substitute, and deterministic transport failures remain in D07–D10 |
+| L14 | Authenticated GitHub live | Codex bot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and the parent-observed PR lifecycle is `OPEN` with captured head equal to the published PR head. Verified bot identity, `github_app` transport and execution context, and start handshake lead to recipe-specific completion, complete findings, positive zero-finding evidence, full target-mode, canonical-selector, lifecycle/base/head binding, event-level invocation adapter, and finite cursor/cutoff/closing-window mechanics; the engine-captured digest and generation remain unchanged through closing, while silence or any stale fingerprint field fails |
+| D15 | Deterministic | Equivalent normalized transcript on both engines, plus wrong-kind and missing-field closing-evidence transcripts | Host default recipes and transport syntax may differ; normalized logical recipe identifiers and discriminated result schema do not drift, action sequence, invalidation, terminal state, and reason schema remain conformant, and both engines reject the same invalid closing-evidence combinations |
 
 Deterministic cases run on every contract or engine change without network
 access. Authenticated live cases run before support promotion and on a periodic
@@ -481,9 +548,10 @@ content.
 3. Introduce host-specific, mode-aware external defaults and migrate legacy
    configuration; land deterministic fallback, anti-shopping, unsupported-mode,
    stale-target, and silence cases.
-4. Add immutable review-snapshot enforcement and structured Claude CLI and Codex
-   CLI gate adapters, then pass L12 and L13 before either can gate under the new
-   contract.
+4. Add immutable review-snapshot enforcement, provider-only credential and
+   egress isolation, parent-owned PR tuple validation, and structured Claude CLI
+   and Codex CLI gate adapters; then pass L12 and L13 before either can gate
+   under the new contract.
 5. Calibrate Bugbot through P11 and the Codex bot through L14. Until Bugbot
    passes, Codex resolves directly to Claude CLI.
 6. Split the Claude and Codex Greenlight engines under the shared state and
