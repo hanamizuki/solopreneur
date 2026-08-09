@@ -8,7 +8,9 @@ implementation pending
 **Scope:** every skill published by the seven solopreneur plugins; the
 architecture baseline contains 104 and current `main` contains 106
 
-**Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md), [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)
+**Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md),
+[pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md),
+[Greenlight cross-host reviewer contract](./2026-08-10-greenlight-cross-host-review-contract.md)
 
 The related specs remain authoritative for agent-distribution status.
 Final-byte acceptance SHA `c8bae2710051da659afad879c226e202ad3368d4`
@@ -46,7 +48,9 @@ The design therefore separates two questions that must not be conflated:
 - Publish only capabilities whose support level is explicit.
 - Define parity by shared outcomes and safety invariants, not identical tool
   calls.
-- Keep Claude Code behavior unchanged while Codex support is added.
+- Preserve Claude Code behavior unless an approved shared contract deliberately
+  changes both engines, with Claude baselines and conformance evidence guarding
+  that migration.
 - Make drift, accidental exposure, and unsupported platform vocabulary fail in
   CI.
 
@@ -360,6 +364,14 @@ generation in one large file.
 
 ### Shared Greenlight contract
 
+The [cross-host reviewer contract](./2026-08-10-greenlight-cross-host-review-contract.md)
+is authoritative for internal rosters, host-specific external defaults,
+fallback, normalized reviewer evidence, and final pass semantics. Its approved
+target requires a host-native internal review on normal runs, invokes every
+available registered internal capability, and selects different default final-
+gate ladders for Claude Code and Codex. Those rules are not current runtime
+claims; implementation and acceptance evidence remain part of this pilot.
+
 The following remain platform-independent:
 
 - Target selection and unattended versus interactive mode.
@@ -368,6 +380,10 @@ The following remain platform-independent:
 - Halt, flag, pass, and failure taxonomy and terminal-state priority.
 - Reviewer independence groups for the host and every reviewer. A reviewer in
   the host's equivalence group cannot satisfy the independent-review gate.
+- Internal review is advisory and cannot grant final pass. The selected
+  external gate is the only reviewer that can end the loop clean, and a primary
+  reviewer that returned findings cannot be replaced merely to obtain a clean
+  result from its fallback.
 - The independent reviewer must inspect the final diff after the last mutation,
   not only an earlier revision.
 - Deterministic GitHub parsing, state persistence, report generation, and
@@ -404,6 +420,11 @@ evidence requirements, or acceptance criteria.
   than relying on narrated delegation on every supported Codex surface.
 - Reviewer independence and final-diff coverage are verified for every
   supported host surface.
+- The deterministic and authenticated cases in the cross-host reviewer
+  contract prove internal availability-to-invocation, host-aware defaults,
+  anti-shopping fallback, stale-target invalidation, and live clean plus seeded-
+  bug evidence for both host-default gate ladders before either Greenlight
+  engine can be advertised.
 - Interrupted, partial, and failed reviewer runs produce the same classified
   terminal result on both platforms.
 - No complete Greenlight skill body is copied into a second tree.
@@ -438,7 +459,7 @@ the agent-distribution prerequisite and does not certify marketer skill parity.
 | 3. Registry safety | Add the compatibility registry, conditional schema validation, and generated inventory report | Re-enumerate every skill at that commit; current `main` contains 106, but discovery is authoritative |
 | 4. Publication safety | Prove and implement the filtered Codex publication view | Local and git-ref installs expose only registry-included skills through the declared root; inert snapshot bytes do not count as exposure |
 | 5. Shared core foundations | Add one executable config/plugin-root resolver and platform-resource validation | Greenlight scripts and prompts resolve the same platform-aware config; existing Claude behavior remains unchanged |
-| 6. Greenlight baseline and contract | Establish all-mode Claude baselines, then extract shared protocol, schemas, scripts, scenarios, and the Claude engine | Claude conformance, reviewer independence, and final-diff invariants pass before Codex publication |
+| 6. Greenlight baseline and contract | Establish all-mode Claude baselines, implement the approved cross-host reviewer contract, then extract shared protocol, schemas, scripts, scenarios, and the Claude engine | Host-native internal review, available-to-must-run discovery, host-specific gate defaults, anti-shopping fallback, Claude conformance, reviewer independence, and final-diff invariants pass before Codex publication |
 | 7. Greenlight Codex PR mode | Add unattended pull-request review on Codex and test every claimed surface | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
 | 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Neither dependency may mutate the reviewed head after final Greenlight approval |
 | 9. Autopilot Codex V1 | Add run-now, single-pull-request orchestration with explicit worktree ownership | Greenlight and CI re-run after every mutation; unavailable specialists fall back to a generic Codex worker |

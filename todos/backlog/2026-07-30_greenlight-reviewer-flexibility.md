@@ -1,10 +1,10 @@
 # greenlight external reviewer 改成偵測驅動 + 可選 gate
 
-> **進度（2026-07-31）**：實作已由 autopilot 全數合併——PR #150（detection-driven
-> reviewers：腳本 + 測試 + CI + detection 接上）、PR #151（selectable gate and
-> multi-reviewer collection：gate 互動 + 四狀態 loop + autopilot 交接）。
-> 尚餘兩步：(1) `/release` 出 solopreneur patch 版；(2) release 後做
-> 〈驗證方式〉7–9 的 attended 實跑驗證（PR #151 body 有 post-release checklist）。
+> **進度（2026-08-10）**：實作已由 PR #150、#151 合併並隨 solopreneur
+> v0.5.37 發布。尚餘 release 後的 attended 實跑驗證。這份文件保留為目前
+> detection／registry runtime 的歷史設計；internal roster、host-specific default
+> gate、fallback 與 pass 語意若有衝突，以
+> `docs/spec/2026-08-10-greenlight-cross-host-review-contract.md` 為準。
 
 把 external reviewer 從「硬編碼 login 白名單 + 序列 fallback」改成「通用偵測 +
 registry 已驗證 login + per-repo 觀測快取 + 使用者選定 gate」。留下 review 形狀
