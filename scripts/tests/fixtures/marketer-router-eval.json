@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "fixture_kind": "routing_expectations",
+  "records_live_results": false,
+  "description": "Frozen, non-sensitive router inputs and expected traces. This fixture is not live execution evidence.",
+  "cases": [
+    {
+      "id": "R01",
+      "boundary": "current_marketer_explicit_request",
+      "current_agent": "marketer",
+      "harness_state": "available",
+      "prompt": "請明確使用 marketer 處理虛構產品 LedgerLeaf 的一句上市定位；不要上網或捏造證據。",
+      "expected": {
+        "route": "inline",
+        "spawn_count": 0,
+        "agent_type": null,
+        "fork_turns": null,
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R02",
+      "boundary": "coordinator_explicit_marketer_request",
+      "current_agent": "coordinator",
+      "harness_state": "available",
+      "prompt": "請明確使用 marketer agent 處理虛構產品 LedgerLeaf 的一句定位與首要獲客渠道；不要上網或捏造證據。",
+      "expected": {
+        "route": "delegate",
+        "spawn_count": 1,
+        "agent_type": "marketer",
+        "fork_turns": "none",
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R03",
+      "boundary": "single_skill_rewrite",
+      "current_agent": "coordinator",
+      "harness_state": "available",
+      "prompt": "Rewrite this fictional launch sentence to remove AI-writing patterns while preserving its facts: 'LedgerLeaf is an innovative solution that revolutionizes invoicing.'",
+      "expected": {
+        "route": "inline",
+        "spawn_count": 0,
+        "agent_type": null,
+        "fork_turns": null,
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R04",
+      "boundary": "single_skill_multistep_workflow",
+      "current_agent": "coordinator",
+      "harness_state": "available",
+      "prompt": "替虛構產品 LedgerLeaf 的 X 首發文提出三個 hook、選出一個並完成貼文，最後簡短說明選擇理由；不要捏造成效。",
+      "expected": {
+        "route": "inline",
+        "spawn_count": 0,
+        "agent_type": null,
+        "fork_turns": null,
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R05",
+      "boundary": "single_skill_multiple_outputs",
+      "current_agent": "coordinator",
+      "harness_state": "available",
+      "prompt": "Write three distinct X launch-post variants for fictional local-first invoicing app LedgerLeaf. Do not browse or invent traction.",
+      "expected": {
+        "route": "inline",
+        "spawn_count": 0,
+        "agent_type": null,
+        "fork_turns": null,
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R06",
+      "boundary": "natural_cross_concern_synthesis",
+      "current_agent": "coordinator",
+      "harness_state": "available",
+      "prompt": "虛構產品 LedgerLeaf 是台灣自由工作者用的本機優先發票 app，月費 NT$300，尚無用戶或成效數據。請提出一句定位與首要獲客渠道，不要上網或捏造證據。",
+      "expected": {
+        "route": "delegate",
+        "spawn_count": 1,
+        "agent_type": "marketer",
+        "fork_turns": "none",
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R07",
+      "boundary": "natural_naming_positioning_and_x",
+      "current_agent": "coordinator",
+      "harness_state": "available",
+      "prompt": "虛構產品 LedgerLeaf 是台灣自由工作者用的本機優先發票 app，月費 NT$300，尚無用戶或成效數據。請提出 3 個可替代產品名、選出一個，寫一句定位，並寫一則繁中 X 首發文。不要上網或捏造證據。",
+      "expected": {
+        "route": "delegate",
+        "spawn_count": 1,
+        "agent_type": "marketer",
+        "fork_turns": "none",
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R08",
+      "boundary": "natural_gtm_and_deck",
+      "current_agent": "coordinator",
+      "harness_state": "available",
+      "prompt": "虛構產品 LedgerLeaf 是台灣自由工作者用的本機優先發票 app，月費 NT$300，尚無用戶或成效數據。請設計 30 天 GTM 測試並給一份 5 張銷售簡報大綱。不要上網或捏造證據。",
+      "expected": {
+        "route": "delegate",
+        "spawn_count": 1,
+        "agent_type": "marketer",
+        "fork_turns": "none",
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R09",
+      "boundary": "natural_cross_channel_experiment",
+      "current_agent": "coordinator",
+      "harness_state": "available",
+      "prompt": "虛構產品 LedgerLeaf 是台灣自由工作者用的本機優先發票 app，月費 NT$300，尚無用戶或成效數據。請建立一致品牌語氣，分別寫 X 與 LinkedIn 首發文，並列出兩週內容實驗與判停條件。不要上網或捏造證據。",
+      "expected": {
+        "route": "delegate",
+        "spawn_count": 1,
+        "agent_type": "marketer",
+        "fork_turns": "none",
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R10",
+      "boundary": "explicit_inline_override",
+      "current_agent": "coordinator",
+      "harness_state": "available",
+      "prompt": "請保持 inline，不要委派 agent。替虛構產品 LedgerLeaf 提出兩個名字、選一個、寫一句定位與一則 X 首發文；不要捏造證據。",
+      "expected": {
+        "route": "inline",
+        "spawn_count": 0,
+        "agent_type": null,
+        "fork_turns": null,
+        "failure": "none",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R11",
+      "boundary": "known_marketer_unavailable",
+      "current_agent": "coordinator",
+      "harness_state": "known_unavailable",
+      "prompt": "虛構產品 LedgerLeaf 需要一句定位與一個首要渠道。marketer 在此 harness 已知不可用；請不要改用 generic agent，也不要捏造證據。",
+      "expected": {
+        "route": "fallback_inline",
+        "spawn_count": 0,
+        "agent_type": null,
+        "fork_turns": null,
+        "failure": "unavailable",
+        "generic_spawn_count": 0
+      }
+    },
+    {
+      "id": "R12",
+      "boundary": "exact_marketer_spawn_failure",
+      "current_agent": "coordinator",
+      "harness_state": "spawn_error",
+      "prompt": "虛構產品 LedgerLeaf 需要命名、定位與 X 首發文。若精確的 marketer 委派失敗，請直接 inline 完成，不得改派其他 agent；不要捏造證據。",
+      "expected": {
+        "route": "fallback_inline",
+        "spawn_count": 1,
+        "agent_type": "marketer",
+        "fork_turns": "none",
+        "failure": "spawn_error",
+        "generic_spawn_count": 0
+      }
+    }
+  ]
+}

@@ -4,15 +4,15 @@
 
 **Date:** 2026-08-09
 
-**Scope:** every skill published by the seven solopreneur plugins; 104 exist at
-this commit
+**Scope:** every skill published by the seven solopreneur plugins; the
+architecture baseline contains 104 and the PR 5a/v2 feature tree contains 106
 
 **Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md), [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)
 
-The related specs remain authoritative for agent-distribution status on
-`main`: PR 5a is paused there. A separate v2 effort must update those documents
-with accepted current evidence before it can satisfy this plan's distribution
-gate. This architecture does not itself unpause or certify that pilot.
+The related specs remain authoritative for agent-distribution status. PR 5a/v2
+has passed its local-path matrix on the feature tree; its git-ref and remaining
+merge gates are pending. This changes no skill support status and does not
+certify marketer skill portability.
 
 ## Problem
 
@@ -48,7 +48,7 @@ The design therefore separates two questions that must not be conflated:
 
 ## Non-goals
 
-- Do not create 104 hand-maintained Codex copies.
+- Do not create one hand-maintained Codex copy per skill.
 - Do not promise that Agent Skills format compliance implies runtime parity.
 - Do not require every skill to reach full Codex support in one rollout.
 - Do not reproduce Claude Workflow, Cron, or per-agent worktree APIs one for
@@ -292,12 +292,12 @@ update the registry and its behavioral scenarios in the same change.
 
 ## Source-shape research hypothesis
 
-The current tree contains 104 skills. The counts below are a planning
-hypothesis for this commit, not a registry seed or a Codex support claim. The
-marketer v2 slice is expected to add `using-marketer` and
-`codex-agents-bootstrap`, so the registry PR must enumerate the tree at its own
-commit instead of assuming 104. It must re-audit every discovered skill against
-the semantic decision rule rather than copying these values.
+The architecture baseline contained 104 skills. The PR 5a/v2 feature tree now
+contains 106 after adding `using-marketer` and `codex-agents-bootstrap`. The
+counts below remain a planning hypothesis for the 104-skill baseline, not a
+registry seed or a Codex support claim. The registry PR must enumerate its own
+tree and re-audit every discovered skill against the semantic decision rule
+rather than copying these values.
 
 | Source shape | Count | Initial scope |
 | --- | ---: | --- |
@@ -377,11 +377,12 @@ interruption. Those same scenarios become the cross-engine conformance suite.
 
 ## Relationship to agent distribution
 
-The marketer agent pilot and skill portability are independent tracks. On
-`main`, the former remains paused under the related pilot documents. Its v2
-redo answers whether Codex can install, discover, and dispatch a custom
-marketer agent. This spec answers whether a skill executed by that agent or by
-the parent satisfies the same cross-platform behavioral contract.
+The marketer agent pilot and skill portability are independent tracks. The v2
+redo is active: its local-path matrix passed, while its git-ref and remaining
+merge gates are pending. It answers whether Codex can install, discover, and
+dispatch a custom marketer agent. This spec answers whether a skill executed by
+that agent or by the parent satisfies the same cross-platform behavioral
+contract.
 
 Evidence does not transfer between the tracks: a linked child thread does not
 prove its skills are portable, and a loadable skill does not prove agent TOML,

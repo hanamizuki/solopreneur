@@ -20,8 +20,8 @@ for details and role-based recommendations.
 
 | Plugin | What you get |
 |---|---|
-| [`solopreneur`](#solopreneur-core) | 15 in-house skills (review, pipelines, thinking partners, automation) |
-| [`marketer`](#marketer) | `marketer` agent + 7 in-house skills (GTM, naming, writing, X/LinkedIn growth, slide design) |
+| [`solopreneur`](#solopreneur-core) | 17 in-house skills (15 product workflows + merge and Codex-agent plumbing) |
+| [`marketer`](#marketer) | `marketer` agent + 8 in-house skills (7 marketing workflows + agent router) |
 | [`designer`](#designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
 | [`ios-dev`](#ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 24 vendored skills (`apple-design` + `asc-*` + `iphone-apps`) |
 | [`android-dev`](#android-dev) | `android-dev` agent + `android-patterns` + 37 vendored skills (Compose + `gplay-*` + Android official) |
@@ -43,8 +43,8 @@ explicitly; everything else is recommended and degrades gracefully if absent.
 
 ### `solopreneur` (core)
 
-The foundation. Every other plugin depends on this one. No agent, just 15
-skills that wrap the lifecycle around your work.
+The foundation. Every other plugin depends on this one. No agent, just 17
+skills: 15 product workflows plus merge and Codex-agent plumbing.
 
 #### Your Virtual Product Team
 
@@ -79,17 +79,20 @@ Start them and walk away. They loop until the job is done.
 | [`/autopilot`](./plugins/solopreneur/skills/autopilot/SKILL.md) | **Auto Build.** Splits a large feature into multiple PRs and orchestrates unattended implementation, review, and merge. Supports scheduling for off-hours execution |
 | [`/greenlight`](./plugins/solopreneur/skills/greenlight/SKILL.md) | **Code Review Loop.** Triggers external reviewers (Codex bot + CLI, the Gemini bot when active on the repo, CodeRabbit), fixes issues, re-triggers. Review depth scales with PR risk (S/M/L sizing). Loops until the PR is clean |
 | [`/todos-babysit`](./plugins/solopreneur/skills/todos-babysit/SKILL.md) | **Backlog Monitor.** Scans backlog and in-progress todos, cross-references PR status, reviews new items, and maintains worktrees. **Interactive mode**: presents a confirmation checkpoint before acting. **Loop mode** (`/loop 24h /todos-babysit`): auto-executes safe operations and auto-implements bug fixes that pass the readiness gate. Notifies only for items that need human judgment |
+| [`/merge-pr`](./plugins/solopreneur/skills/merge-pr/SKILL.md) | **Merge Gate.** Verifies reviews, checks, branch state, and mergeability before merging the current pull request and cleaning up its worktree |
 
-#### Skill-index plumbing
+#### Discovery and platform plumbing
 
 | Skill | What it does |
 |---|---|
 | [`/rebuild-skill-index`](./plugins/solopreneur/skills/rebuild-skill-index/SKILL.md) | Generates per-platform extended indexes of every relevant skill installed on this machine. Feeds the `ios-dev`, `android-dev`, `designer`, `marketer`, and `neo4j-dev` agents' extended discovery. Run after installing/removing platform skills. |
+| [`codex-agents-bootstrap`](./plugins/solopreneur/skills/codex-agents-bootstrap/SKILL.md) | Installs or refreshes managed solopreneur-family custom agents for Codex, while preserving hand-authored agents and reporting inactive or orphaned managed copies without deleting them. |
 
 #### Requirements
 
-- **`git`**, **`gh`** (GitHub CLI), **`jq`**: required CLIs. Used across `/greenlight`, `/autopilot`, `/post-mortem`, `/todos-babysit`, and `scripts/sync-vendored.sh`.
-- **[Codex CLI](https://github.com/openai/codex)**: **required** for `/greenlight` uncommitted mode (the only path on `main` with uncommitted changes). Also used by `/plan-review` (stage 3, the external reviewer), `/greenlight` PR mode (one reviewer option), and `/naming` (multi-model candidate generation).
+- **`git`**, **`gh`** (GitHub CLI), **`jq`**: required CLIs. Used across `/greenlight`, `/autopilot`, `/post-mortem`, `/todos-babysit`, and `scripts/sync-vendored.sh`; `jq` is also required by `codex-agents-bootstrap`.
+- **[Codex CLI](https://github.com/openai/codex)**: **required** for `codex-agents-bootstrap` and `/greenlight` uncommitted mode (the only path on `main` with uncommitted changes). Also used by `/plan-review` (stage 3, the external reviewer), `/greenlight` PR mode (one reviewer option), and `/naming` (multi-model candidate generation). The custom-agent bootstrap and delegation pilot is validated against Codex CLI 0.147.0.
+- **Python 3.9+**: **required by** `codex-agents-bootstrap` to validate agent TOML before installation. Its fixed Tomli 2.4.1 parser is bundled, so no `pip` install or network access is required. Other workflows may also invoke `python3`, but do not establish this bootstrap-specific minimum version.
 - **[superpowers](https://github.com/obra/superpowers)** plugin: strongly recommended. `/greenlight` and `/specialist-review` use `superpowers:requesting-code-review` and `receiving-code-review` for the review framework. Graceful fallback if absent.
 - **[context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7)** MCP: strongly recommended. Used by `/plan-review`, `/specialist-review`, and every stack agent (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) for current official docs. Graceful skip if absent.
 - **[`gstack /review`](https://github.com/garrytan/gstack/tree/main/review)**: recommended. Powers the `/greenlight` internal review phase (SQL safety, trust boundaries, structural issues).
@@ -102,8 +105,8 @@ Start them and walk away. They loop until the job is done.
 
 ### `marketer`
 
-Brand, GTM, content, and writing work. Ships the `marketer` agent plus 7
-in-house skills.
+Brand, GTM, content, and writing work. Ships the `marketer` agent plus 8
+in-house skills: 7 domain workflows and one agent router.
 
 | Skill | What it does |
 |---|---|
@@ -114,6 +117,7 @@ in-house skills.
 | [`/x-growth`](./plugins/marketer/skills/x-growth/SKILL.md) | **X Growth Consultant.** Diagnoses X/Twitter profiles, co-creates personalized 12-week growth plans. Covers algorithm mechanics, content strategy, engagement tactics, monetization, and Dream 100 outreach. Integrates with GTM docs |
 | [`/linkedin-growth`](./plugins/marketer/skills/linkedin-growth/SKILL.md) | **LinkedIn Growth Consultant.** Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans. Covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
 | [`/slide-design`](./plugins/marketer/skills/slide-design/SKILL.md) | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase. Bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, fade-in/out background music, 13 reusable layout components, and AI-slop review via `/humanly` (English + Chinese) |
+| [`using-marketer`](./plugins/marketer/skills/using-marketer/SKILL.md) | Routes explicit marketer requests and cross-concern marketing work to the `marketer` agent when available, with a bounded inline fallback. |
 
 #### Requirements
 

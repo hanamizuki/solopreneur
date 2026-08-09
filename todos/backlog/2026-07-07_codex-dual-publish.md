@@ -68,14 +68,14 @@
 6. **Local dev：`.agents/plugins/marketplace.json` local marketplace 直裝**，不做 package artifact（Codex 安裝模型即 marketplace snapshot，無 package 格式）；發佈驗證於 pilot 時用 git `@ref` 實裝一次。
 7. **Release：同號同 commit**。`.codex-plugin/plugin.json` 由 generator 從 `.claude-plugin/plugin.json` 生成（含 `interface` overlay），`/release` 加跑 generator、CI 加 drift check（仿 validate-vendored 模式）；tag 沿用 `<plugin>--v<version>` double-dash（Codex 使用者可 `@tag` pin）；CHANGELOG 維持單一份。
 8. **Skills 檔案結構：不搬**。skills 留在 `plugins/<name>/skills/`——雙平台共用同一份內容已由「兩平台 manifest 同住 plugin 目錄」達成；安裝單位即 plugin 目錄（外部路徑裝不進去）；跨 plugin 零重名、無去重收益。「好找」問題以生成式總覽解決：script 產 `docs/skills-catalog.md` + CI 防過期。
-9. **Router skill 形態：router + 使用指引、建議式委派**。實作／多步驟 → 派 agent；快查 → 直接用該 plugin 的 skill；不內嵌 skill 清單（清單同步交給 skill-index 機制）。
+9. **Router skill 形態：router + 使用指引、建議式委派**。先判斷是否有單一已安裝 skill 能完整涵蓋：若有就 inline，即使流程含多步驟或多個輸出；只有明確指定 specialist、跨 concern synthesis，或沒有單一 skill 能完整涵蓋時才委派一次。已知 agent 不可用或精確委派失敗時 inline，不改派 generic agent、不拆成多次重試；不內嵌 skill 清單（清單同步交給 skill-index 機制）。
 10. **Router skill 命名：`using-<plugin>`**（如 `ios-dev:using-ios-dev`），沿 superpowers `using-superpowers` 先例，7 個 plugin 一致。
 
 ## Skill portability refinement（2026-08-09）
 
 權威規格：[`docs/spec/2026-08-09-codex-skill-portability.md`](../../docs/spec/2026-08-09-codex-skill-portability.md)
 
-- 此 commit 實際盤點為 104 個 `SKILL.md`；研究假設為 88 個 `shared`、11 個 `shared_with_seams`、5 個 `native_engines`。marketer v2 預計新增 `using-marketer` 與 `codex-agents-bootstrap`，所以 registry PR 必須依自己的 tree 逐項重審（若 v2 先合入，預期為 106），不能直接複製這組數字。
+- 架構 baseline 實際盤點為 104 個 `SKILL.md`；研究假設為 88 個 `shared`、11 個 `shared_with_seams`、5 個 `native_engines`。marketer v2 feature tree 已新增 `using-marketer` 與 `codex-agents-bootstrap`，目前為 106；registry PR 仍必須依自己的 tree 逐項重審，不能直接複製這組數字。
 - 舊決策 5 的全域 vocabulary rewrite 不足以處理平台控制流程；shared instructions 才使用 action language，native engine 保留真實平台語彙。
 - 舊決策 8 的「不維護第二份完整 skill」仍成立，但同一 skill 可以有共同 contract 與 Claude／Codex 原生 engine。
 - `source_shape` 與各執行入口的 `support` 分開記錄；Codex exec、TUI、App 不互相繼承證據，載入成功也不等於行為相容。只有本規格記錄的 104-skill baseline 可先標成 migration-only `legacy`；之後新增的 router/bootstrap 不可 grandfather，不能假裝未建 baseline 的 workflow 已是 `full`。
@@ -98,12 +98,12 @@
 - [x] Move `skills/_vendored` → `plugins/<n>/vendor/` and `skills/_shared` → `plugins/solopreneur/shared/` — update `plugins/solopreneur/scripts/sync-vendored.sh`, `.github/workflows/{sync,validate}-vendored.yml`, 5 agent references, and 7 config.md references in the same change. Land AFTER the `$N escape` backlog todo (both touch sync-vendored.sh). ✅ PR 3
 - [x] Add Codex validation script for plugin manifests and skill directories. ✅ PR 4
 - [x] Add dependency matrix for plugin deps, skill deps, agents/subagents, MCP/apps, external CLIs, env vars, sandbox/network assumptions (filled into the spec's Dependency audit matrix section). ✅ PR 4
-- [ ] Resolve the paused marketer v2 vertical slice first: one marketer TOML, `codex-agents-bootstrap`, and `using-marketer`; update the authoritative pilot documents with accepted current evidence.
+- [ ] Resolve the paused marketer v2 vertical slice first: one marketer TOML, `codex-agents-bootstrap`, and `using-marketer`; update the authoritative pilot documents with accepted current evidence. Fresh local R02/R07/R08/R09 passed; git-ref and remaining merge gates are pending.
 - [ ] After the compatibility registry lands, convert the remaining 5 Claude agents and add the remaining 6 `using-<plugin>` routers one plugin at a time; each plugin needs complete registry entries before its adapter lands.
 - [ ] Add a generated `docs/skills-catalog.md` (script + CI staleness check) listing every skill across plugins — platform-independent, can land before any Codex work.
-- [ ] In the marketer v2 slice, install via local marketplace and git `@ref`; verify skill-triggered agent spawning on every claimed Codex surface without claiming skill parity.
+- [ ] In the marketer v2 slice, install via local marketplace and git `@ref`; verify skill-triggered agent spawning on every claimed Codex surface without claiming skill parity. Local-path install and matrix passed; published git-ref install is pending.
 - [ ] Apply vocabulary policy by source shape: action language in shared workflow, bounded profiles for seams, and native terminology inside platform engines; keep vendored sources unchanged.
-- [ ] Extend `/release`: run the manifest generator inside the bump commit; keep a single CHANGELOG; no new tag namespace.
+- [x] Extend `/release`: run the manifest generator inside the bump commit; keep a single CHANGELOG; no new tag namespace. ✅ Existing release wiring now stages generated Codex agents as well.
 - [x] Classify high-level workflow source shapes and define the portability architecture for `autopilot`, `greenlight`, `preview`, `mvp`, `plan-review`, and `todos-*`.
 - [ ] Add root-level `skills-compatibility.json` and conditional CI completeness/shape validation; only the architecture's 104-skill Claude baseline may use migration-only `legacy`, unsupported future engines need no placeholder files, and the PR must not change runtime behavior.
 - [ ] Prove a generated Codex publication view through local marketplace and git-ref installs. Because exec, TUI, and App share one view, include a skill only if every unsupported reachable surface has a tested fail-closed guard; otherwise exclude it. Inert source may remain in the snapshot but must not be exposed through the declared skills root.
