@@ -4,8 +4,10 @@
 marketer vertical slice resumed after a Codex 0.147.0 retest removed the old
 headless-delegation blocker. Local-path and fresh git-ref matrices passed at
 `954fc64` and proved the terminal-completion shortcut, but a later blocker
-ruling changed the router wording that defines that lifecycle contract. Both
-matrices must rerun on the new final bytes. The slice has not merged or shipped.
+ruling changed the router wording that defines that lifecycle contract. The new
+final SHA, `c8bae2710051da659afad879c226e202ad3368d4`, has now passed both
+complete matrices. CI, review, and merge remain pending; the slice has not
+merged or shipped.
 **Date:** 2026-07-08
 **Current review:** 2026-08-09
 **Affected plugins:** all seven (`solopreneur`, `designer`, `marketer`,
@@ -347,8 +349,25 @@ A subsequent blocker ruling made that shortcut explicit in the router wording:
 terminal completion integrates and stops immediately, while only timeout,
 progress-only, or unknown non-terminal wakes proceed to `list_agents`. Because
 the router bytes changed, `954fc64` is no longer final-byte merge acceptance.
-The complete local-path and fresh git-ref R02/R07/R08/R09 matrices are pending
-on the new final SHA. PR 5a has not merged or shipped.
+
+The new final SHA, `c8bae2710051da659afad879c226e202ad3368d4`, passed the
+complete local-path and fresh per-case git-ref matrices. R02 and R07 passed on
+`codex exec`; R08 and R09 passed in the interactive TUI. In every case the
+hardened verifier recorded the exact `agent_type="marketer"`,
+`fork_turns="none"` call, one direct marketer child, no nested or generic child
+and no extra root, the complete child final, the unique root final answer and
+task completion, the required non-sensitive result anchors, and zero parent
+`send_message`, `followup_task`, or `interrupt_agent` calls before completion.
+Both installation paths produced byte-identical source, installed, and managed
+agent files, with bootstrap `Installed` followed by `Unchanged`.
+
+The local wait/list counts were R02 1/0, R07 4/3, R08 9/8, and R09 11/10. The
+git-ref counts were R02 1/0, R07 2/1, R08 12/11, and R09 6/5. Every final wait
+delivered terminal completion; every preceding non-terminal wake was followed
+by a list check, and every case stayed within the fifteen-cycle budget. This
+satisfies the authenticated agent-distribution and routing gate. It does not
+certify marketer skill parity or complete content quality. CI, review, and
+merge remain pending, so PR 5a has not merged or shipped.
 
 The versioned router eval fixture freezes twelve non-sensitive decision-boundary
 inputs and their expected route, spawn count, agent identity, history fork, and
@@ -377,7 +396,7 @@ contract drift without replacing the pinned gate.
 | 2 | Vendored `$N` escape prerequisite | complete |
 | 3 | Move non-skill directories to `vendor/` and `shared/` | complete |
 | 4 | Generate seven manifests and marketplace; add drift/install CI | complete |
-| 5a | Marketer TOML, router, secure bootstrap, and live delegation gate | active; `954fc64` calibration passed, new-final-byte local and git-ref matrices pending |
+| 5a | Marketer TOML, router, secure bootstrap, and live delegation gate | active; final-byte authenticated distribution accepted at `c8bae27`, CI/review/merge pending |
 | 5b | Five remaining TOMLs and six remaining routers | blocked on 5a acceptance |
 | 6 | Native vocabulary and workflow compatibility audit | pending |
 | 7 | Complete public install and release documentation | pending |
@@ -389,9 +408,10 @@ complete R02/R07/R08/R09 matrix from both the local-path and git-ref installs.
 The generated project copy must remain byte-identical to its source, and Claude
 must continue to load only the Markdown sibling.
 
-The `954fc64` runs remain valid lifecycle calibration, but the authenticated
-local-path and git-ref distribution criterion must be repeated on the new final
-router bytes. CI, review, and merge remain pending.
+The `954fc64` runs remain valid lifecycle calibration. The final-byte
+authenticated local-path and git-ref distribution criterion is satisfied at
+`c8bae2710051da659afad879c226e202ad3368d4`; CI, review, and merge remain
+pending.
 
 ## Remaining questions
 

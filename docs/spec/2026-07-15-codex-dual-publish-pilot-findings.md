@@ -6,8 +6,9 @@ agent children. A first rebuilt local-path matrix passed on 2026-08-09, but the
 first git-ref matrix exposed a coordinator lifecycle failure. The corrected
 local-path and fresh git-ref matrices then passed at `954fc64` and proved the
 terminal-completion shortcut. A later blocker ruling changed the router wording
-that defines that contract, so both matrices are pending on the new final bytes.
-PR 5a has not merged or shipped.
+that defines that contract. The new final SHA,
+`c8bae2710051da659afad879c226e202ad3368d4`, has now passed both complete
+matrices. CI, review, and merge remain pending; PR 5a has not merged or shipped.
 
 **Original pilot:** 2026-07-15, Codex CLI 0.144.3, Claude Code 2.1.210
 **Current calibration:** 2026-08-09, Codex CLI 0.147.0, `gpt-5.6-sol`
@@ -27,7 +28,9 @@ retries followed, and the run was stopped incomplete. The local-path and fresh
 git-ref matrices at `954fc64` then replaced that initial calibration and
 demonstrated the terminal-completion shortcut. A subsequent router wording
 change means those runs are calibration rather than final-byte merge acceptance.
-They do not establish skill parity or complete content quality.
+The new final bytes subsequently passed complete local-path and fresh per-case
+git-ref acceptance. This accepts agent distribution and routing only; it does
+not establish skill parity or complete content quality.
 
 ## Original 0.144.3 evidence
 
@@ -192,7 +195,8 @@ and the bootstrap reported `Installed` followed by `Unchanged`.
 This result remains calibration for agent distribution and delegation on the
 tested local surfaces; it does not certify marketer skill parity or complete
 content quality. The router wording changed afterward, so the complete local
-matrix must rerun on the new final bytes.
+matrix was required to rerun on the new final bytes; that result is recorded
+below.
 
 ### `954fc64` git-ref calibration
 
@@ -222,9 +226,33 @@ quality.
 The subsequent blocker ruling changed the router wording to make the observed
 shortcut normative: terminal completion integrates and stops directly, while
 only timeout, progress-only, or unknown non-terminal wakes proceed to
-`list_agents`. The new router bytes therefore require fresh local-path and
-git-ref R02/R07/R08/R09 matrices before merge acceptance. Those matrices, CI,
-review, and merge remain pending; PR 5a has not merged or shipped.
+`list_agents`. The router-byte change therefore required fresh local-path and
+git-ref R02/R07/R08/R09 matrices before merge acceptance.
+
+### Final-byte authenticated acceptance
+
+The final SHA, `c8bae2710051da659afad879c226e202ad3368d4`, passed the
+complete local-path and fresh per-case git-ref matrices. R02 and R07 passed
+through `codex exec`; R08 and R09 passed through the interactive TUI. Each
+isolated case installed the final bytes, and both installation paths reproduced
+byte-identical source, installed, and managed agent files. Bootstrap reported
+`Installed` followed by `Unchanged`.
+
+For every case, the hardened verifier recorded exactly one `spawn_agent` call
+with `agent_type="marketer"` and `fork_turns="none"`, exactly one direct
+marketer child, no nested or generic child and no extra root, the complete child
+final, the unique root parent's final answer and task completion, the required
+non-sensitive result anchors, and zero parent `send_message`, `followup_task`,
+or `interrupt_agent` calls before completion.
+
+The local wait/list counts were R02 1/0, R07 4/3, R08 9/8, and R09 11/10. The
+git-ref counts were R02 1/0, R07 2/1, R08 12/11, and R09 6/5. Each last wait
+delivered terminal completion directly; every earlier non-terminal wake was
+followed by a list check, and all cases completed within the fifteen-cycle
+budget. This satisfies the authenticated agent-distribution, routing,
+lifecycle, final-delivery, and recorded-anchor gate. It does not certify
+marketer skill parity or complete content quality. CI, review, and merge remain
+pending, so PR 5a has not merged or shipped.
 
 ## Rebuilt PR 5a contract
 
@@ -303,8 +331,8 @@ plus explicit user approval.
 | Router contract | versioned 12-case expectation fixture and static action-language checks | required CI; not live evidence |
 | Bootstrap fixtures | Bash 3.2/modern Bash install, update, no-op, collision, symlink, failure, orphan cases | required CI on macOS and Linux |
 | Install integration | all seven plugins install; cached bootstrap produces byte-identical agent; second run unchanged | required CI |
-| Local live delegation | full R02 explicit plus R07/R08/R09 natural matrix creates linked marketer children | `954fc64` calibration passed; new-final-byte rerun pending |
-| Git-ref live delegation | fresh published-ref install repeats the full R02/R07/R08/R09 matrix | first attempt failed; `954fc64` calibration passed; new-final-byte rerun pending |
+| Local live delegation | full R02 explicit plus R07/R08/R09 natural matrix creates linked marketer children | final-byte authenticated matrix passed at `c8bae27` |
+| Git-ref live delegation | fresh published-ref install repeats the full R02/R07/R08/R09 matrix | first attempt failed; `954fc64` calibration passed; final-byte authenticated matrix passed at `c8bae27` |
 | Claude compatibility | same-basename TOML remains inert | maintainer fixture |
 
 Authenticated live acceptance is intentionally outside public CI. It requires a
