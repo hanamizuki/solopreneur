@@ -367,10 +367,12 @@ generation in one large file.
 The [cross-host reviewer contract](./2026-08-10-greenlight-cross-host-review-contract.md)
 is authoritative for internal rosters, host-specific external defaults,
 fallback, normalized reviewer evidence, and final pass semantics. Its approved
-target requires a host-native internal review on normal runs, invokes every
-available registered internal capability, and selects different default final-
-gate ladders for Claude Code and Codex. Those rules are not current runtime
-claims; implementation and acceptance evidence remain part of this pilot.
+target requires a host-native internal review on normal runs and invokes every
+available registered internal capability. Claude Code defaults to Codex CLI and
+Codex defaults to Claude CLI for its final gate. A promoted GitHub reviewer is
+available only through explicit selection or a user-configured ladder and never
+silently reorders either CLI default. Those rules are not current runtime claims;
+implementation and acceptance evidence remain part of this pilot.
 
 The following remain platform-independent:
 
@@ -423,9 +425,12 @@ evidence requirements, or acceptance criteria.
 - The deterministic and authenticated cases in the cross-host reviewer
   contract prove internal availability-to-invocation, host-aware defaults,
   anti-shopping fallback, stale-target invalidation, and live clean plus seeded-
-  bug evidence for both host-default gate ladders before Codex Greenlight, or
+  bug evidence for each claimed default CLI gate before Codex Greenlight, or
   either host, can be advertised as conforming to the new cross-host contract.
-  This does not withdraw the existing Claude-oriented runtime.
+  A conditional GitHub candidate requires P11 or L14 only before that candidate
+  is enabled or advertised; an unsafe or failed candidate probe leaves it
+  ineligible without blocking CLI-default engine conformance. This does not
+  withdraw the existing Claude-oriented runtime.
 - Interrupted, partial, and failed reviewer runs produce the same classified
   terminal result on both platforms.
 - No complete Greenlight skill body is copied into a second tree.
