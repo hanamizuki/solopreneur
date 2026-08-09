@@ -44,8 +44,31 @@ and live acceptance cases pass on the exact implementation bytes.
 | External reviewer | A GitHub bot or separate CLI reviewer collected after internal findings and mutations have settled |
 | Final gate | The one selected external reviewer outside the active host's implementation group whose explicit clean result may authorize a Greenlight pass |
 | Objective verifier | Tests, lint, type checks, or required CI. It proves executable checks are green but cannot substitute for reviewer clean |
-| Target fingerprint | The base object, head object, working-tree diff digest, and mutation generation reviewed by a result |
+| Target fingerprint | The target mode, canonical target selector, base object, head object, working-tree diff digest, and mutation generation reviewed by a result |
 | Clean | An explicit, recipe-validated zero-finding verdict for the exact current target; silence and process success are not clean |
+
+The working-tree digest is not merely a hash of ordinary `git diff` output. It
+deterministically covers the index delta, unstaged tracked-file delta, and every
+non-ignored untracked entry's relative path, entry type, executable-mode
+semantics, and bytes. A symbolic link contributes its link target rather than
+the target file's contents. An unreadable entry or unsupported special-file
+type fails fingerprint creation instead of being omitted. This makes an
+untracked source file part of the reviewed target while keeping ignored build
+artifacts outside the contract.
+
+Each target mode also declares the bytes its invocation can observe. GitHub bot,
+`--base`, and `--commit` modes accept only a clean working tree, so their
+captured working-tree digest must represent no staged, unstaged, or non-ignored
+untracked change. The `--uncommitted` mode reviews exactly those three working-
+tree classes. A dirty committed-mode target is ineligible and dispatches no
+reviewer; a recipe may not bind a verdict to bytes its invocation did not see.
+
+The canonical target selector is reviewer-neutral: it identifies a PR range,
+post-commit range, single commit, or working tree without naming a provider
+command. A recipe's invocation adapter translates that selector into bot or CLI
+syntax and is recorded on the review event, not in the fingerprint. Fallback
+may change the invocation adapter but must preserve the canonical selector and
+every fingerprint field.
 
 Internal and external describe authority and timing, not the model vendor. The
 same vendor may appear twice under different recipes. For example, a Codex-host
@@ -84,16 +107,27 @@ capability instead of relying on the unqualified token.
 Every normal Greenlight run includes its required roster. S, M, and L control
 effort, skeptic adjudication, and round ceilings; they do not silently remove a
 reviewer that entered the roster. The host-native recipe is required to
-complete. The bundled specialist is required to be dispatched, while its
-execution failure follows the visible incomplete-advisor policy below. The
-explicit `external` mode remains the only user-requested bypass of internal
-review.
+complete. The bundled specialist is required to be dispatched when available;
+its unavailable or execution-failed outcome follows the visible incomplete-
+advisor policy below. The explicit `external` mode remains the only user-
+requested bypass of internal review.
+
+Required entries are created before availability discovery and remain in the
+frozen roster even when their capability is missing. A missing host-native
+reviewer halts; a missing bundled specialist is recorded as `unavailable` and
+follows the non-host-native incomplete-review policy. Neither case may be
+silently omitted or rewritten as a smaller successful roster.
 
 Claude's bundled `/simplify` may apply changes. The `claude-simplify` adapter
 must therefore run against an isolated disposable target and return findings or
 candidate changes without mutating the Greenlight target. Codex native review
 is likewise report-only. Every internal adapter must prove that the target
 fingerprint is unchanged before its result is accepted.
+
+Every candidate change returned by Simplify is normalized into an evidenced
+finding with the same fix, explicit-rejection, and adjudication requirements as
+any other internal finding. A raw candidate patch cannot remain outside the
+disposition ledger while the run proceeds to normal pass.
 
 ### Availability and provenance
 
@@ -117,13 +151,15 @@ gstack provider. A same-named standalone skill cannot silently impersonate a
 registered provider. Disabled providers and stale caches are absent, not
 available. L03 freezes the real discovery artifacts for both hosts.
 
-Once a reviewer is in the frozen roster, Greenlight must invoke it. An
-invocation error remains an explicit `execution_failed` outcome; it cannot be
-rewritten as not installed or silently skipped. Failure of the required host-
-native reviewer halts the run because the minimum internal guarantee was not
-met. Failure of another internal advisor is surfaced as an incomplete-review
-flag and does not, by itself, replace the final gate's authority. Any finding
-already produced remains actionable even if that reviewer later fails.
+Once availability is resolved, Greenlight must invoke every frozen-roster entry
+whose status is `available`. A required unavailable entry remains visible as
+`not_started` under the policy above; it is not a dispatch failure. An invocation
+error remains an explicit `execution_failed` outcome; it cannot be rewritten as
+not installed or silently skipped. Failure of the required host-native reviewer
+halts the run because the minimum internal guarantee was not met. Failure of
+another internal advisor is surfaced as an incomplete-review flag and does not,
+by itself, replace the final gate's authority. Any finding already produced
+remains actionable even if that reviewer later fails.
 
 A non-host-native advisor ending in `execution_failed`, or in `timed_out` after
 confirmed cancellation, does not by itself prevent a normal pass. The terminal
@@ -144,7 +180,19 @@ When one host calls the other host's CLI, profile selection must be explicit.
 The adapter maps the active profile only when its identity is known and an
 equivalent target profile is configured. It must not guess a default home,
 silently use unrelated credentials, or fall through to a different user's
-session.
+session. If no matched peer exists, the adapter records availability without
+starting a review process, so no review event can claim a selected profile.
+
+Every review event uses a discriminated execution context. `peer_cli` records
+the execution host, selected peer-profile identity, and mapping provenance;
+the coordinating host's own active-profile field is not a substitute.
+`host_native` records the active host profile and host-capability provenance.
+`github_app` records the App or bot identity, installation and repository
+provenance, and an explicit not-applicable profile field. Missing, contradictory,
+or wrong-kind context rejects the event rather than borrowing another kind's
+identity fields. A roster entry that was never invoked uses `not_started` with
+its unavailable reason and discovery provenance and null execution fields; that
+context is never valid for a completed review event.
 
 ## External reviewers and final gates
 
@@ -154,16 +202,27 @@ GitHub reviewers and local CLIs share one registry and normalized evidence
 schema, while retaining recipe-specific triggers and parsers. Initial named
 candidates include Codex bot, Claude Code Review, Cursor Bugbot, Gemini Code
 Assist, CodeRabbit, Greptile, Codex CLI, Claude CLI, and Antigravity CLI.
-Unknown GitHub bots may contribute advisory findings after identity detection,
-but cannot become a final gate without a verified recipe.
+Unknown GitHub bots may contribute non-blocking advisory findings after identity
+detection, but cannot become a final gate or block normal pass. Blocking
+evidence additionally requires a verified GitHub App identity and repository
+provenance under a registered recipe.
 
-A recipe records its vendor or implementation group, supported hosts, trigger,
+A recipe records its vendor or implementation group, supported hosts, supported
+target modes, each mode's invocation adapter and byte scope, trigger,
 availability probe, response channels, completion handshake, finding parser,
-clean rule, target-binding rule, and whether it is eligible to gate a given
-host. Gate independence is implementation-level: a Codex-host reviewer in the
-OpenAI group cannot gate Codex, and a Claude-host reviewer in the Anthropic
-group cannot gate Claude. This contract does not claim that a vendor's
-undisclosed foundation-model mix is independently verifiable.
+clean rule, target-binding rule, blocking authority, a finite positive deadline,
+timeout and termination rule, finite positive maximum retry count, and
+whether it is eligible to gate a given host. These recipe values are the single
+timing source used by both engines. Gate independence is implementation-level:
+a Codex-host reviewer in the OpenAI group cannot gate Codex, and a Claude-host
+reviewer in the Anthropic group cannot gate Claude. This contract does not claim
+that a vendor's undisclosed foundation-model mix is independently verifiable.
+
+Gate support is promoted per recipe and target mode. A clean live result for a
+PR range does not certify a single commit or an uncommitted working tree, even
+when those modes share a transport and parser. Adding a mode expands the
+recipe's declared support only after that exact invocation path passes paired
+clean and seeded-finding live fixtures.
 
 ### Host defaults
 
@@ -192,6 +251,14 @@ never cause fallback to a default home, unrelated profile, or different user's
 credentials. Authentication failure in the GitHub or control plane that makes
 the target or evidence unverifiable halts the run instead of trying another
 reviewer under an untrusted state.
+
+An external attempt times out only at its recipe deadline. A local process must
+then be cancelled and its termination confirmed before retry or fallback; if it
+cannot be stopped, the run halts as an invariant violation. A remote bot recipe
+defines its own bounded observation and retry handshake, and any later event
+remains attached to that timed-out attempt for the closing sweep. No engine may
+invent an extra retry, extend a deadline, or begin fallback before the recipe's
+termination rule is satisfied.
 
 Once the primary returns a finding, the run is sticky to that primary. The
 finding must be resolved or adjudicated, and the same primary reviews the new
@@ -223,10 +290,10 @@ zero-finding signal, complete finding collection, and proof that the result
 covers the exact trigger-time base and head. Bot recipes may gate only a clean-
 working-tree, committed PR target. At trigger time the engine captures the full
 target fingerprint. At completion the bot proves its base and head while the
-engine independently rechecks the base, head, working-tree digest, and mutation
-generation. The normalized envelope records all four; a missing or mismatched
-field is stale. The engine must settle and publish the new target before asking
-the recipe to review again.
+engine independently rechecks the mode, canonical selector, base, head,
+working-tree digest, and mutation generation. The normalized envelope records
+all six; a missing or mismatched field is stale. The engine must settle and
+publish the new target before asking the recipe to review again.
 
 Bugbot is the target Codex-host primary, but it is not gateable yet. Cursor's
 public documentation describes automatic PR review and manual triggers but
@@ -290,14 +357,17 @@ Greenlight returns a normal pass only when all of the following are true:
 1. The required host-native internal reviewer completed against the frozen
    internal-review target without mutating it, unless the user explicitly
    selected `external` mode.
-2. Every reviewer in the frozen internal roster was attempted, and every
-   actionable internal finding was fixed or explicitly adjudicated with
-   evidence. A non-host-native failure or confirmed-cancelled timeout remains in
-   the result as `incomplete-review` but does not by itself block normal pass.
+2. Every reviewer in the frozen internal roster was attempted or retained with
+   an explicit unavailable outcome, and every actionable internal finding,
+   including every normalized candidate change, was fixed, explicitly rejected,
+   or adjudicated with evidence. A non-host-native unavailable outcome, failure,
+   or confirmed-cancelled timeout remains in the result as `incomplete-review`
+   but does not by itself block normal pass.
 3. The selected final gate returned an explicit, schema-valid clean verdict for
    the current target fingerprint.
-4. No selected or collected reviewer has an unresolved new finding, including
-   a late finding discovered by the closing sweep.
+4. No selected or collected reviewer with verified blocking authority has an
+   unresolved new finding, including a late finding discovered by the closing
+   sweep. Unverified advisory findings remain visible but non-blocking.
 5. No commit, working-tree mutation, consolidation step, or CI repair occurred
    after the accepted final-gate result.
 6. The result preserves objective-verifier state separately from reviewer
@@ -332,9 +402,9 @@ The shared result records these facts independent of engine implementation:
 | Evidence group | Required fields |
 | --- | --- |
 | Host | Harness, surface, version, active profile identity, implementation group |
-| Target | Base object, head object, working-tree diff digest, mutation generation |
-| Internal roster | Recipe, required flag, availability and provenance, reviewed target fingerprint, deadline, invocation and cancellation status, incomplete flag, findings, disposition, evidence reference |
-| External events | Recipe, implementation group, trigger, start and completion evidence, reviewed target, verdict, findings, fallback reason |
+| Target | Target mode, canonical target selector, base object, head object, working-tree diff digest, mutation generation |
+| Internal roster | Recipe, required flag, availability and provenance, discriminated execution or `not_started` context, reviewed target fingerprint, deadline, invocation and cancellation status, incomplete flag, normalized findings and candidate changes, disposition, evidence reference |
+| External events | Recipe, implementation group, target mode and recipe invocation adapter, blocking authority and provenance, discriminated execution context, trigger, deadline, attempt and retry index, timeout and termination status, start and completion evidence, reviewed target, verdict, findings, fallback reason |
 | Objective verification | Commands or required checks, exact target, completion and outcome |
 | Terminal result | Pass, halt, failure, degraded/manual outcome, reason class, accepted gate evidence |
 
@@ -346,20 +416,20 @@ engine infers clean by searching prose for the absence of findings.
 
 | ID | Tier | Scenario | Required oracle |
 | --- | --- | --- | --- |
-| D01 | Deterministic | Empty optional catalog on each host; missing, execution-failed, and fake-clock stalled internal recipes | Claude and Codex include their host-native recipe plus bundled specialist; neither internal recipe can gate; missing, failed, or timed-out host-native review halts before external dispatch unless explicit `external` mode is active. A non-host-native failure or confirmed-cancelled timeout may continue with `incomplete-review`; unconfirmed cancellation halts; every partial finding remains actionable |
+| D01 | Deterministic | Empty optional catalog on each host; missing, execution-failed, and fake-clock stalled internal recipes | Claude and Codex include their host-native recipe plus bundled specialist even when discovery fails; neither internal recipe can gate. Missing, failed, or timed-out host-native review halts before external dispatch unless explicit `external` mode is active. A missing specialist, non-host-native failure, or confirmed-cancelled timeout remains in the roster and may continue only with `incomplete-review`; unconfirmed cancellation halts; every partial finding and candidate change remains actionable |
 | D02 | Deterministic | None, one, two, and all optional integrations available; matching, missing, unknown, and mismatched peer profiles; same token with wrong provenance, same-named standalone skill, disabled provider, stale cache; injected mixed-generation internal evidence | Exact available set enters the frozen roster and every entry is scheduled once against the same captured `internal_target`, independent of S, M, or L. Provenance mismatch, disabled provider, and stale-cache-only inputs have stable unavailable reasons, never resolve to the registered recipe, and dispatch zero times. A mismatched fingerprint or mutation before collection completes rejects the phase; cross-host recipes appear only for an explicitly matched peer profile, and no invocation falls back to a default home or unrelated credentials |
 | L03 | Authenticated live | Install and invoke Superpowers, gstack, and Ponytail on each supported host | Current-session discovery and invocation artifacts prove available-to-must-run; a failed invocation remains failed, not absent |
-| L04 | Authenticated live | Claude Simplify against a seeded simplification target, directly on Claude and through an explicitly matched Codex peer profile | Findings or candidate changes are captured from an isolated target; the real target fingerprint is unchanged; recipe cannot gate; the peer invocation records the selected profile and a no-peer control makes no Claude call |
+| L04 | Authenticated live | Claude Simplify against a seeded simplification target, directly on Claude and through an explicitly matched Codex peer profile | Every candidate change is normalized into an evidenced finding with a disposition; the real target fingerprint is unchanged; recipe cannot gate. Direct execution records a valid `host_native` context, while the peer invocation records a valid `peer_cli` context and matched profile provenance. Missing, mismatched, or wrong-kind context rejects the evidence, and a no-peer control makes no Claude call or review event |
 | L05 | Authenticated live | Codex native review against a seeded correctness bug | Structured findings cover the exact target; no mutation occurs; recipe cannot gate |
-| D06 | Deterministic | Host-aware external defaults before and after Bugbot calibration | Claude resolves Codex bot then Codex CLI; Codex resolves directly to Claude CLI while Bugbot is unverified, then resolves calibrated Bugbot followed by Claude CLI after P11 passes; Antigravity appears only by explicit selection |
-| D07 | Deterministic | Primary absent, quota-limited, timed out, malformed, recipe-authentication-failed, invalid, or repeatedly stale after bounded retry; separately, control-plane auth failure | Recipe-scoped availability outcomes select the next eligible configured candidate with the same current target and record the exact fallback reason without credential shopping; one stale result retries the primary first; all candidates unavailable produces halt. Control-plane auth failure halts immediately; neither path can become clean |
-| D08 | Deterministic | Primary returns findings while fallback is available; post-fix mandatory primary re-review returns a valid finding or an availability failure; separately, gate returns clean while another selected, collected, or late reviewer returns a finding | No fallback occurs before the finding is resolved and the same primary is retried; another valid finding remains sticky, while timeout, quota, unavailable, recipe-scoped authentication failure, invalid, or repeatedly stale evidence may use the fallback with a recorded reason against the exact new target; any collected finding outranks gate clean |
-| D09 | Deterministic | Internal advisors review generation G0 and a legitimate fixer creates G1; a bot target starts with an unclean worktree or unpublished head; bot and CLI evidence each omit or mismatch one target-fingerprint field; separately, clean evidence is followed by head, base, worktree, or generation mutation; separately, a reviewer writes the target | Internal evidence remains advisory and bound to G0 while the final gate must review G1. An ineligible bot target dispatches zero times, leaves accepted gate evidence null, and cannot pass. Any missing or mismatched base, head, digest, or generation likewise leaves accepted gate evidence null. Ordinary mutation invalidates old clean evidence; reviewer-originated or unattributable mutation cancels the reviewer and terminally halts, and that generation can never be legitimized by a later clean result |
-| D10 | Deterministic | Bot or CLI produces no completion evidence before its deadline | Stubbed silence becomes timeout and follows the allowed fallback or halt path; silence never becomes clean |
-| P11 | Paid opt-in live | Bugbot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and captured head equals the published PR head. Verified identity, completion channel, trigger-time base-and-head binding, positive zero-finding signal, and finding parser all work through the same recipe; engine-captured digest and generation remain unchanged through completion |
-| L12 | Authenticated live | Claude CLI reviews one clean target and one seeded-bug target through an explicitly matched peer profile | The real CLI emits a schema-valid verdict containing the matching base, head, worktree digest, and generation; clean and findings parse through the same recipe, process success alone is insufficient, and a no-peer control makes no Claude call; deterministic transport failures remain in D07–D10 |
-| L13 | Authenticated live | Codex CLI final gate reviews one clean target and one seeded-bug target through an explicitly matched peer profile | The real external recipe records the selected profile and emits a normalized verdict containing the matching base, head, worktree digest, and generation; it distinguishes clean from process success, captures seeded findings, and never mutates the target; a no-peer control makes no Codex call, L05 internal evidence cannot substitute, and deterministic transport failures remain in D07–D10 |
-| L14 | Authenticated GitHub live | Codex bot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and captured head equals the published PR head. Verified bot identity and start handshake lead to recipe-specific completion, complete findings, positive zero-finding evidence, and trigger-time base-and-head binding; the engine-captured digest and generation remain unchanged through completion, while silence or any stale fingerprint field fails |
+| D06 | Deterministic | Host-aware external defaults before and after Bugbot calibration; requested mode is supported or unsupported by an otherwise eligible recipe | Claude resolves Codex bot then Codex CLI; Codex resolves directly to Claude CLI while Bugbot is unverified, then resolves calibrated Bugbot followed by Claude CLI after P11 passes; Antigravity appears only by explicit selection. Resolution filters by declared target mode and the presence of that recipe's invocation adapter before gate eligibility, so a PR-only recipe cannot receive post-commit or uncommitted work |
+| D07 | Deterministic | Primary absent, quota-limited, timed out, malformed, recipe-authentication-failed, invalid, or repeatedly stale after bounded retry; separately, control-plane auth failure | Recipe-scoped availability outcomes select the next eligible configured candidate with the same current target and record the exact fallback reason without credential shopping. Deadline, termination rule, and retry ceiling come from the recipe; the engine never exceeds that ceiling or starts fallback before required termination confirmation. One stale result retries the primary first; all candidates unavailable produces halt. Control-plane auth failure halts immediately; neither path can become clean |
+| D08 | Deterministic | Primary returns findings while fallback is available; post-fix mandatory primary re-review returns a valid finding or an availability failure; separately, gate returns clean while another selected, collected, or late reviewer returns a finding; separately, an unverified bot emits an advisory finding | No fallback occurs before the finding is resolved and the same primary is retried; another valid blocking finding remains sticky, while timeout, quota, unavailable, recipe-scoped authentication failure, invalid, or repeatedly stale evidence may use the fallback with a recorded reason against the exact new target. Any verified blocking finding outranks gate clean; an unverified advisory remains visible but cannot block or satisfy pass |
+| D09 | Deterministic | Internal advisors review generation G0 and a legitimate fixer creates G1; a bot or committed CLI target starts with an unclean worktree, or a bot head is unpublished; bot and CLI evidence each omit or mismatch one target-fingerprint field; separately, clean evidence is followed by head, base, staged, unstaged, untracked-file, or generation mutation; separately, a reviewer writes the target | Internal evidence remains advisory and bound to G0 while the final gate must review G1. An ineligible bot, `--base`, or `--commit` target dispatches zero times, leaves accepted gate evidence null, and cannot pass. Any missing or mismatched mode, canonical selector, base, head, digest, or generation likewise leaves accepted gate evidence null. Creating, editing, renaming, or deleting a non-ignored untracked entry changes the digest. Ordinary mutation invalidates old clean evidence; reviewer-originated or unattributable mutation cancels the reviewer and terminally halts, and that generation can never be legitimized by a later clean result |
+| D10 | Deterministic | Bot or CLI produces no completion evidence before its recipe deadline | Stubbed silence becomes timeout at the same configured boundary on both engines. Required cancellation or observation termination is recorded, retry count never exceeds the recipe ceiling, and only then may the allowed fallback or halt path run; silence never becomes clean |
+| P11 | Paid opt-in live | Bugbot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and captured head equals the published PR head. Verified identity, `github_app` execution context, completion channel, target-mode and canonical-selector binding, event-level invocation adapter, trigger-time base-and-head binding, positive zero-finding signal, and finding parser all work through the same recipe; engine-captured digest and generation remain unchanged through completion |
+| L12 | Authenticated live | For every target mode declared by the Claude CLI recipe, review a paired clean and seeded-bug target through an explicitly matched peer profile | Each declared invocation path independently records its recipe invocation adapter and valid `peer_cli` context, then produces a schema-valid verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. Missing, mismatched, or wrong-kind context rejects the evidence; clean and findings parse through the same recipe; process success alone is insufficient; and a no-peer control makes no Claude call or review event. Initial Codex Greenlight V1 may declare PR mode only; post-commit or uncommitted support requires its own paired live evidence. Deterministic transport failures remain in D07–D10 |
+| L13 | Authenticated live | Codex CLI final gate reviews paired clean and seeded-bug targets through four distinct existing Greenlight invocation paths: PR against a base branch or ref with `--base`, a post-commit range against a base object with `--base`, one post-commit object with `--commit`, and the working tree with `--uncommitted`, all through an explicitly matched peer profile | Every call site independently records its recipe invocation adapter, `peer_cli` execution context, selected profile identity, and matching provenance, then emits a normalized verdict containing the matching mode, canonical selector, base, head, worktree digest, and generation. PR, range, and single-commit fixtures also prove dirty-worktree no-dispatch. A PR fixture cannot certify the separate post-commit-range path; if the installed CLI does not accept a base object, that mode remains unsupported rather than inheriting PR evidence. Missing or mismatched context rejects the evidence; each path distinguishes clean from process success, captures seeded findings, and never mutates the target. A no-peer control makes no Codex call or review event, L05 internal evidence cannot substitute, and deterministic transport failures remain in D07–D10 |
+| L14 | Authenticated GitHub live | Codex bot reviews one clean PR and one seeded-bug PR | Before trigger the worktree is clean and captured head equals the published PR head. Verified bot identity, `github_app` execution context, and start handshake lead to recipe-specific completion, complete findings, positive zero-finding evidence, full target-mode, canonical-selector, and base-and-head binding, and an event-level invocation adapter; the engine-captured digest and generation remain unchanged through completion, while silence or any stale fingerprint field fails |
 | D15 | Deterministic | Equivalent normalized transcript on both engines | Host default recipes and transport syntax may differ; normalized logical recipe identifiers and result schema do not drift, and action sequence, invalidation, terminal state, and reason schema remain conformant |
 
 Deterministic cases run on every contract or engine change without network
@@ -372,13 +442,14 @@ content.
 
 ## Rollout
 
-1. Add host, phase, provenance, implementation-group, evidence, and gate-
-   eligibility metadata to the reviewer registry without changing runtime
-   defaults.
+1. Add host, phase, provenance, implementation-group, target-mode and invocation-
+   adapter, timing, evidence, and gate-eligibility metadata to the reviewer
+   registry without changing runtime defaults.
 2. Add internal capability discovery, frozen rosters, report-only adapters, and
    deterministic cases D01 and D02.
-3. Introduce host-specific external defaults and migrate legacy configuration;
-   land deterministic fallback, anti-shopping, stale-target, and silence cases.
+3. Introduce host-specific, mode-aware external defaults and migrate legacy
+   configuration; land deterministic fallback, anti-shopping, unsupported-mode,
+   stale-target, and silence cases.
 4. Add structured Claude CLI and Codex CLI gate adapters and pass L12 and L13
    before either can gate under the new contract.
 5. Calibrate Bugbot through P11 and the Codex bot through L14. Until Bugbot
