@@ -10,6 +10,7 @@
 #      `license` copy verbatim from plugins/<n>/.claude-plugin/plugin.json
 #      (version lockstep across platforms is structural, not procedural);
 #      `"hooks": {}` guards against Codex loading Claude-format hook files;
+#      `"skills": "./skills/"` explicitly declares the shared skill root;
 #      Codex-only fields (`interface`, and anything else Codex may grow)
 #      come from the plugin's entry in scripts/codex-manifest-overlays.json.
 #   2. .agents/plugins/marketplace.json — mirrors .claude-plugin/
@@ -21,10 +22,10 @@
 #      uniform policy, and category taken from the plugin's overlay
 #      interface — the CLI installs entries without them, but directory-
 #      style consumers may enforce the documented contract.
-#   3. .codex/agents/*.toml — copies of plugins/*/agents/*.toml so Codex
-#      picks the agents up natively for in-repo development. No TOMLs exist
-#      until rollout PR 5a, so this step is a no-op that produces no
-#      directory today.
+#   3. .codex/agents/*.toml — copies of published
+#      plugins/<name>/agents/*.toml so Codex picks the agents up natively for
+#      in-repo development. If no published plugin has an agent source, the
+#      generator leaves no empty output directory behind.
 #
 # Everything here is deterministic: same inputs, same bytes out. CI re-runs
 # this script and fails on any diff (validate-codex.yml), mirroring the
@@ -35,7 +36,7 @@
 # Usage (from anywhere):
 #   ./scripts/generate-codex-manifests.sh
 #
-# Requires: jq
+# Requires: jq, python3 >= 3.9 (TOML parsing uses the bundled Tomli 2.4.1)
 
 set -euo pipefail
 
@@ -46,6 +47,11 @@ CODEX_MARKETPLACE="$REPO_ROOT/.agents/plugins/marketplace.json"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "error: jq is required (brew install jq)" >&2
+  exit 1
+fi
+if ! command -v python3 >/dev/null 2>&1 \
+   || ! python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 9))'; then
+  echo "error: python3 >= 3.9 is required" >&2
   exit 1
 fi
 
@@ -68,7 +74,7 @@ while IFS= read -r name; do plugins+=("$name"); done \
 dupes=$(jq -r '[.plugins[].name] | group_by(.) | map(select(length > 1) | .[0]) | .[]' "$CLAUDE_MARKETPLACE")
 if [[ -n "$dupes" ]]; then
   echo "error: duplicate plugin names in .claude-plugin/marketplace.json:" >&2
-  echo "$dupes" | sed 's/^/       /' >&2
+  printf '%s\n' "$dupes" | sed 's/^/       /' >&2
   exit 1
 fi
 
@@ -82,7 +88,7 @@ overlay_mismatch=$(jq -r --argjson names "$(jq '[.plugins[].name]' "$CLAUDE_MARK
   | .[]' "$OVERLAYS")
 if [[ -n "$overlay_mismatch" ]]; then
   echo "error: scripts/codex-manifest-overlays.json out of sync with .claude-plugin/marketplace.json:" >&2
-  echo "$overlay_mismatch" | sed 's/^/       /' >&2
+  printf '%s\n' "$overlay_mismatch" | sed 's/^/       /' >&2
   exit 1
 fi
 
@@ -96,11 +102,11 @@ reserved=$(jq -r '
   | .key as $plugin
   | .value
   | keys[]
-  | select(. as $k | ["name", "version", "description", "license", "hooks"] | index($k))
+  | select(. as $k | ["name", "version", "description", "license", "hooks", "skills"] | index($k))
   | "\($plugin): \(.)"' "$OVERLAYS")
 if [[ -n "$reserved" ]]; then
   echo "error: scripts/codex-manifest-overlays.json sets fields owned by the Claude manifest:" >&2
-  echo "$reserved" | sed 's/^/       /' >&2
+  printf '%s\n' "$reserved" | sed 's/^/       /' >&2
   exit 1
 fi
 
@@ -110,7 +116,7 @@ fi
 no_category=$(jq -r 'to_entries[] | select(.value.interface.category == null) | .key' "$OVERLAYS")
 if [[ -n "$no_category" ]]; then
   echo "error: overlay entries missing interface.category:" >&2
-  echo "$no_category" | sed 's/^/       /' >&2
+  printf '%s\n' "$no_category" | sed 's/^/       /' >&2
   exit 1
 fi
 
@@ -132,17 +138,11 @@ for name in "${plugins[@]}"; do
   fi
 done
 
-# Same pre-flight for surface 3: two plugins shipping the same agent TOML
-# basename would collide in .codex/agents/.
-toml_dupes=$(for toml in "$REPO_ROOT"/plugins/*/agents/*.toml; do
-  [[ -e "$toml" ]] || continue # glob matched nothing
-  basename "$toml"
-done | sort | uniq -d)
-if [[ -n "$toml_dupes" ]]; then
-  echo "error: two plugins ship an agent TOML with the same name — rename one:" >&2
-  echo "$toml_dupes" | sed 's/^/       /' >&2
-  exit 1
-fi
+# Same pre-flight for surface 3. Plugin installation does not parse custom
+# agents, so validate their TOML schema, managed identity, vocabulary, sibling
+# Claude agent, and cross-plugin uniqueness before rebuilding any output.
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "$REPO_ROOT/scripts/validate-codex-agents.py" "$REPO_ROOT"
 
 # --- Surface 1: per-plugin .codex-plugin/plugin.json ------------------------
 # Removed first, then rebuilt from the current marketplace list, so a plugin
@@ -154,7 +154,7 @@ for name in "${plugins[@]}"; do
   claude_manifest="$REPO_ROOT/plugins/$name/.claude-plugin/plugin.json"
   mkdir -p "$REPO_ROOT/plugins/$name/.codex-plugin"
   jq --argjson overlay "$(jq --arg n "$name" '.[$n]' "$OVERLAYS")" \
-    '{name, version, description, license, hooks: {}} + $overlay' \
+    '{name, version, description, license, hooks: {}, skills: "./skills/"} + $overlay' \
     "$claude_manifest" > "$REPO_ROOT/plugins/$name/.codex-plugin/plugin.json"
   echo "generated: plugins/$name/.codex-plugin/plugin.json"
 done
@@ -180,16 +180,18 @@ echo "generated: .agents/plugins/marketplace.json"
 # ownership map) — do not hand-edit it.
 rm -rf "$REPO_ROOT/.codex/agents"
 copied=0
-for toml in "$REPO_ROOT"/plugins/*/agents/*.toml; do
-  [[ -e "$toml" ]] || continue # glob matched nothing (collisions pre-checked above)
-  mkdir -p "$REPO_ROOT/.codex/agents"
-  cp "$toml" "$REPO_ROOT/.codex/agents/$(basename "$toml")"
-  copied=$((copied + 1))
-  echo "generated: .codex/agents/$(basename "$toml")"
+for name in "${plugins[@]}"; do
+  for toml in "$REPO_ROOT/plugins/$name"/agents/*.toml; do
+    [[ -e "$toml" ]] || continue # published plugin has no Codex agent
+    mkdir -p "$REPO_ROOT/.codex/agents"
+    cp "$toml" "$REPO_ROOT/.codex/agents/$(basename "$toml")"
+    copied=$((copied + 1))
+    echo "generated: .codex/agents/$(basename "$toml")"
+  done
 done
 if [[ "$copied" -eq 0 ]]; then
-  # No agent TOMLs in the repo yet (they arrive in rollout PR 5a); leave no
-  # empty directory behind.
+  # Preserve absence deterministically instead of committing an empty
+  # generator-owned directory.
   rmdir "$REPO_ROOT/.codex" 2>/dev/null || true
   echo "no agent TOMLs found — .codex/agents/ not generated"
 fi

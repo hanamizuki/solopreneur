@@ -1,0 +1,17 @@
+{
+  "name": "tomli",
+  "version": "2.4.1",
+  "upstream_repository": "https://github.com/hukkin/tomli",
+  "upstream_tag": "2.4.1",
+  "tag_object": "ccaa8bc3c7bcff65a174824b0268288f9be52d94",
+  "peeled_commit": "c5f44690c68c5ed29534faa8f9df18882113728c",
+  "license": "MIT",
+  "files": {
+    "LICENSE": "b80816b0d530b8accb4c2211783790984a6e3b61922c2b5ee92f3372ab2742fe",
+    "tomli/__init__.py": "9eb042d7c0db5d14c2168ec4946e410de5a91c9cce86892f5e4db5e4633c6762",
+    "tomli/_parser.py": "a412234c86bf710b361e0943276961f0e25fa6d7c36ba7a0e7eec87a3e018c7b",
+    "tomli/_re.py": "a12359fe294523a72112e434d58452a14c9d050affa2417f9927474e4166bfdd",
+    "tomli/_types.py": "f864c6d9552a929c7032ace654ee05ef26ca75d21b027b801d77e65907138b74",
+    "tomli/py.typed": "f0f8f2675695a10a5156fb7bd66bafbaae6a13e8d315990af862c792175e6e67"
+  }
+}

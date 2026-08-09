@@ -11,6 +11,7 @@ on:
       - '.agents/**'
       - '.codex/**'
       - 'scripts/**'
+      - '.claude/skills/release/SKILL.md'
       - '.github/workflows/validate-codex.yml'
   push:
     branches: [main]
@@ -23,6 +24,7 @@ on:
       - '.agents/**'
       - '.codex/**'
       - 'scripts/**'
+      - '.claude/skills/release/SKILL.md'
       - '.github/workflows/validate-codex.yml'
 
 permissions:
@@ -33,6 +35,47 @@ defaults:
     shell: bash
 
 jobs:
+  bootstrap-tests:
+    name: Agent fixtures (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.9'
+          - os: ubuntu-latest
+            python: '3.14'
+          - os: macos-latest
+            python: '3.14'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: '20'
+
+      - name: Show pinned Python, system Bash, and jq versions
+        run: |
+          python3 --version
+          /bin/bash --version | head -1
+          jq --version
+
+      - name: Run agent-validator fixture suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+
+      - name: Run bootstrap fixture suite with the system Bash
+        run: node --test plugins/solopreneur/skills/codex-agents-bootstrap/tests/*.test.mjs
+
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -41,6 +84,14 @@ jobs:
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: '3.9'
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: '20'
 
       - name: Regenerate Codex surfaces
         run: ./scripts/generate-codex-manifests.sh
@@ -65,8 +116,8 @@ jobs:
             exit 1
           fi
 
-      - name: Install Codex CLI
-        run: npm install -g @openai/codex
+      - name: Install pinned Codex CLI
+        run: npm install -g @openai/codex@0.147.0
 
       - name: Validate structure and install smoke
         run: ./scripts/validate-codex.sh
