@@ -75,11 +75,12 @@
 
 權威規格：[`docs/spec/2026-08-09-codex-skill-portability.md`](../../docs/spec/2026-08-09-codex-skill-portability.md)
 
-- 架構 baseline 實際盤點為 104 個 `SKILL.md`；研究假設為 88 個 `shared`、11 個 `shared_with_seams`、5 個 `native_engines`。marketer v2 feature tree 已新增 `using-marketer` 與 `codex-agents-bootstrap`，目前為 106；registry PR 仍必須依自己的 tree 逐項重審，不能直接複製這組數字。
+- 架構 baseline 實際盤點為 104 個 `SKILL.md`；研究假設為 88 個 `shared`、11 個 `shared_with_seams`、5 個 `native_engines`。`main` 已新增 `using-marketer` 與 `codex-agents-bootstrap`，目前為 106；registry PR 仍必須依自己的 tree 逐項重審，不能直接複製這組數字。
 - 舊決策 5 的全域 vocabulary rewrite 不足以處理平台控制流程；shared instructions 才使用 action language，native engine 保留真實平台語彙。
 - 舊決策 8 的「不維護第二份完整 skill」仍成立，但同一 skill 可以有共同 contract 與 Claude／Codex 原生 engine。
 - `source_shape` 與各執行入口的 `support` 分開記錄；Codex exec、TUI、App 不互相繼承證據，載入成功也不等於行為相容。只有本規格記錄的 104-skill baseline 可先標成 migration-only `legacy`；之後新增的 router/bootstrap 不可 grandfather，不能假裝未建 baseline 的 workflow 已是 `full`。
 - Agent TOML、bootstrap、`using-*` router 繼續作為獨立 distribution track；它們的成功不能替 skill portability 背書。
+- Marketer distribution pilot 已完成；後續 agent fan-out 不再緊接 pilot。當前產品 P0 是 `solopreneur` core 的 Greenlight 與 Autopilot V1，remaining agents／routers 與 marketer domain parity 延後。
 
 ## 建議第一個 PR
 
@@ -91,27 +92,43 @@
 - [x] 定義 dependency audit matrix（欄位定義 + 已驗證 seed rows；完整盤點仍在 migration tasks）
 - [x] 定義 validation commands（三道 gate；確切指令實作時釘死）
 
-## 後續 migration tasks（依拍板決策更新）
+## 後續 migration tasks（core-first priority）
+
+### 已完成基礎
 
 - [x] Write the `.codex-plugin/plugin.json` generator (from `.claude-plugin/plugin.json` + `interface` overlay), generate all 7 manifests, and wire a CI drift check (mirror the validate-vendored pattern). ✅ PR 4
 - [x] Add `.agents/plugins/marketplace.json` for Codex local/dev marketplace installation. ✅ PR 4
-- [x] Move `skills/_vendored` → `plugins/<n>/vendor/` and `skills/_shared` → `plugins/solopreneur/shared/` — update `plugins/solopreneur/scripts/sync-vendored.sh`, `.github/workflows/{sync,validate}-vendored.yml`, 5 agent references, and 7 config.md references in the same change. Land AFTER the `$N escape` backlog todo (both touch sync-vendored.sh). ✅ PR 3
+- [x] Move `skills/_vendored` → `plugins/<n>/vendor/` and `skills/_shared` → `plugins/solopreneur/shared/` — update `plugins/solopreneur/scripts/sync-vendored.sh`, `.github/workflows/{sync,validate}-vendored.yml`, 5 agent references, and 7 config.md references in the same change. ✅ PR 3
 - [x] Add Codex validation script for plugin manifests and skill directories. ✅ PR 4
-- [x] Add dependency matrix for plugin deps, skill deps, agents/subagents, MCP/apps, external CLIs, env vars, sandbox/network assumptions (filled into the spec's Dependency audit matrix section). ✅ PR 4
-- [ ] Resolve the marketer v2 vertical slice first: one marketer TOML, `codex-agents-bootstrap`, and `using-marketer`; update the authoritative pilot documents with accepted current evidence. The earlier `954fc64` matrices remain lifecycle calibration; the final-byte local-path and fresh git-ref R02/R07/R08/R09 matrices passed at `c8bae2710051da659afad879c226e202ad3368d4`. CI, review, and merge remain pending.
-- [ ] After the compatibility registry lands, convert the remaining 5 Claude agents and add the remaining 6 `using-<plugin>` routers one plugin at a time; each plugin needs complete registry entries before its adapter lands.
-- [ ] Add a generated `docs/skills-catalog.md` (script + CI staleness check) listing every skill across plugins — platform-independent, can land before any Codex work.
-- [x] In the marketer v2 slice, install via local marketplace and git `@ref`; verify skill-triggered agent spawning on every claimed Codex surface without claiming skill parity. At final SHA `c8bae2710051da659afad879c226e202ad3368d4`, the local-path and fresh per-case git-ref R02/R07/R08/R09 matrices passed; source, installed, and managed agent bytes matched, bootstrap reported `Installed` followed by `Unchanged`, every terminal-completion shortcut and preceding non-terminal list check followed the fifteen-cycle contract, and the hardened verifier accepted each case. ✅ Authenticated agent-distribution gate complete; this is not skill-parity or complete-content-quality evidence.
-- [ ] Apply vocabulary policy by source shape: action language in shared workflow, bounded profiles for seams, and native terminology inside platform engines; keep vendored sources unchanged.
-- [x] Extend `/release`: run the manifest generator inside the bump commit; keep a single CHANGELOG; no new tag namespace. ✅ Existing release wiring now stages generated Codex agents as well.
+- [x] Add dependency matrix for plugin deps, skill deps, agents/subagents, MCP/apps, external CLIs, env vars, sandbox/network assumptions. ✅ PR 4
+- [x] Extend `/release`: run the manifest generator inside the bump commit; keep a single CHANGELOG; no new tag namespace. ✅ Existing release wiring stages generated Codex agents as well.
 - [x] Classify high-level workflow source shapes and define the portability architecture for `autopilot`, `greenlight`, `preview`, `mvp`, `plan-review`, and `todos-*`.
-- [ ] Add root-level `skills-compatibility.json` and conditional CI completeness/shape validation; only the architecture's 104-skill Claude baseline may use migration-only `legacy`, unsupported future engines need no placeholder files, and the PR must not change runtime behavior.
-- [ ] Prove a generated Codex publication view through local marketplace and git-ref installs. Because exec, TUI, and App share one view, include a skill only if every unsupported reachable surface has a tested fail-closed guard; otherwise exclude it. Inert source may remain in the snapshot but must not be exposed through the declared skills root.
-- [ ] Establish Greenlight lifecycle baselines, then extract its shared contract, schemas, deterministic scripts, scenarios, and Claude engine while preserving behavior.
-- [ ] Add and behaviorally validate the Greenlight Codex engine; accept `full`, explicit `degraded`, or `unsupported` based on evidence.
-- [ ] Make reviewer independence executable: map host/reviewer equivalence groups, require final-diff coverage, and halt when no independent reviewer exists.
-- [ ] Port Autopilot only when Greenlight, plan-review, and merge-pr provide its required supported dependency closure; start with run-now single-PR mode before multi-PR or scheduling.
-- [ ] Add README install instructions for both Claude Code and Codex (document `@tag` pinning for Codex).
+- [x] Complete the marketer distribution slice: marketer TOML, `codex-agents-bootstrap`, `using-marketer`, and authenticated local-path/git-ref R02/R07/R08/R09 matrices at final-byte acceptance SHA `c8bae2710051da659afad879c226e202ad3368d4`. PR #155 merged as `fc943a9`; tagged release and marketer domain-skill parity remain pending.
+
+### Core-first critical path（依序）
+
+- [ ] Add the minimum root-level `skills-compatibility.json`, conditional CI completeness/shape validation, and generated inventory report. Re-enumerate the current tree; do not turn this safety gate into a 106-skill parity project.
+- [ ] Prove and implement the filtered Codex publication view through local marketplace and git-ref installs. Expose only registry-included skills; unsupported reachable surfaces remain excluded or fail closed before side effects.
+- [ ] Add one executable platform-aware config/plugin-root resolver and move Greenlight's executable config/cache paths onto it without changing Claude behavior.
+- [ ] Establish Greenlight baselines for all existing Claude modes, then extract the shared contract, schemas, deterministic scripts, scenarios, and Claude engine.
+- [ ] Make Greenlight reviewer independence executable: define host/reviewer equivalence groups, require an independent reviewer of the final diff, and return a structured halt instead of clean when none is available.
+- [ ] Add and behaviorally validate Greenlight Codex pull-request mode first: unattended review, objective verification, final-diff coverage, and structured pass/halt/failure results on every claimed surface.
+- [ ] Close the Autopilot-critical dependencies only: support `plan-review internal` and a safe `merge-pr` seam that cannot mutate the reviewed head after final Greenlight approval.
+- [ ] Add Autopilot Codex V1 as run-now, single-PR orchestration with explicit worktree ownership. Re-run Greenlight and CI after every mutation; use a generic Codex worker when a specialist is unavailable.
+
+### Core expansion after V1
+
+- [ ] Add Greenlight uncommitted and post-commit Codex modes one at a time.
+- [ ] Add Autopilot multi-PR waves, then Codex App scheduling as separate capabilities; do not claim Claude Workflow or Cron parity.
+- [ ] Port `mvp`, `todos-babysit`, and remaining core seams in dependency-sized changes.
+
+### Deferred until core V1
+
+- [ ] Audit and port marketer domain-skill seams, including `naming`, `slide-design`, and `linkedin-growth`.
+- [ ] Convert the remaining 5 Claude agents and add the remaining 6 `using-<plugin>` routers one plugin at a time after that plugin's registry entries and skill audit exist.
+- [ ] Promote shared and seam skills in bounded behavioral batches; apply action language or native platform engines only where each selected skill requires it.
+- [ ] Add a generated `docs/skills-catalog.md` with a CI staleness check; this is independent and off the core critical path.
+- [ ] Add truthful README install and release instructions for both Claude Code and Codex, including `@tag` pinning, after the filtered publication surface is release-ready.
 
 ## 下次優先讀的檔案
 

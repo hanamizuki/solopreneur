@@ -2,13 +2,11 @@
 
 **Status:** The Codex 0.144.3 result is retained as historical evidence but no
 longer defines the current platform limit. Codex 0.147.0 can create real custom-
-agent children. A first rebuilt local-path matrix passed on 2026-08-09, but the
-first git-ref matrix exposed a coordinator lifecycle failure. The corrected
-local-path and fresh git-ref matrices then passed at `954fc64` and proved the
-terminal-completion shortcut. A later blocker ruling changed the router wording
-that defines that contract. The new final SHA,
-`c8bae2710051da659afad879c226e202ad3368d4`, has now passed both complete
-matrices. CI, review, and merge remain pending; PR 5a has not merged or shipped.
+agent children. Final-byte acceptance SHA
+`c8bae2710051da659afad879c226e202ad3368d4` passed complete local-path and fresh
+git-ref matrices. PR #155 was squash-merged as `fc943a9` on 2026-08-09 without
+changing the accepted runtime bytes. The slice is not yet included in a tagged
+plugin release and does not certify marketer domain-skill parity.
 
 **Original pilot:** 2026-07-15, Codex CLI 0.144.3, Claude Code 2.1.210
 **Current calibration:** 2026-08-09, Codex CLI 0.147.0, `gpt-5.6-sol`
@@ -231,9 +229,10 @@ git-ref R02/R07/R08/R09 matrices before merge acceptance.
 
 ### Final-byte authenticated acceptance
 
-The final SHA, `c8bae2710051da659afad879c226e202ad3368d4`, passed the
-complete local-path and fresh per-case git-ref matrices. R02 and R07 passed
-through `codex exec`; R08 and R09 passed through the interactive TUI. Each
+The final-byte acceptance SHA,
+`c8bae2710051da659afad879c226e202ad3368d4`, passed the complete local-path and
+fresh per-case git-ref matrices. R02 and R07 passed through `codex exec`; R08
+and R09 passed through the interactive TUI. Each
 isolated case installed the final bytes, and both installation paths reproduced
 byte-identical source, installed, and managed agent files. Bootstrap reported
 `Installed` followed by `Unchanged`.
@@ -251,8 +250,8 @@ delivered terminal completion directly; every earlier non-terminal wake was
 followed by a list check, and all cases completed within the fifteen-cycle
 budget. This satisfies the authenticated agent-distribution, routing,
 lifecycle, final-delivery, and recorded-anchor gate. It does not certify
-marketer skill parity or complete content quality. CI, review, and merge remain
-pending, so PR 5a has not merged or shipped.
+marketer skill parity or complete content quality. PR #155 was squash-merged to
+`main` as `fc943a9`; a tagged plugin release remains pending.
 
 ## Rebuilt PR 5a contract
 
@@ -364,7 +363,9 @@ current inventory still includes Claude-specific execution assumptions in
 configuration path in `linkedin-growth`. These belong to the later vocabulary
 and workflow gate.
 
-Before the remaining five agent adapters ship, each plugin needs the same
-platform-language audit and live routing sample. The large-plugin skill-context
-budget also remains a measurement question; it is not answered by the isolated
-marketer slice.
+The current product priority is Greenlight and Autopilot in the `solopreneur`
+core. Marketer domain-skill seams and the remaining five agent adapters and six
+routers are deferred until the core workflow V1 is complete. When that track
+resumes, each plugin still needs the same platform-language audit and live
+routing sample. The large-plugin skill-context budget also remains a
+measurement question; it is not answered by the isolated marketer slice.
