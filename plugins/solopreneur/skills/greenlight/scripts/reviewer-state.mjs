@@ -731,9 +731,16 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate, hos
   //   independent recipe — so it is KEPT, and keeps `every` false on purpose.
   //
   // Collapsing the two is how one of them always ends up misrouted.
+  // Read the selection the caller ACTUALLY asked for, not `wanted` — the
+  // total-miss branch above sets `wanted` to null so the round can still run
+  // something, and that erases the very fact this classification needs.
+  // `--select claude-cli` on a host where the CLI is momentarily unauthenticated
+  // still authorizes an independent reviewer: restoring it recovers the run, so
+  // that is `unavailable` (retryable), never an authority boundary.
   const known = (ids) => ids.filter((id) => recipeFor(id));
-  const authorized = wanted
-    ? known(wanted)
+  const requestedSel = known(csv(select));
+  const authorized = requestedSel.length > 0
+    ? requestedSel
     : (fallbackOrder.length > 0
       ? known(fallbackOrder)
       : [...selected.map((r) => r.recipe), ...marked.map((m) => m.recipe), 'codex-bot']);

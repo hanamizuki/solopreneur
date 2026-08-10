@@ -1013,6 +1013,18 @@ test('a marked independent reviewer keeps the halt retryable', () => {
   assert.equal(out.gateBlock, 'unavailable', 'the marked reviewer can still be retried');
 });
 
+test('an explicitly selected independent reviewer keeps the halt retryable', () => {
+  // `--select claude-cli` on a Codex host where the CLI is momentarily
+  // unavailable: the caller DID authorize an independent reviewer, so restoring
+  // it recovers the run. Classifying on the degraded selection instead would
+  // report host-family and emit a non-retryable halt.
+  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', '',
+    '--select', 'claude-cli'], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.gateBlock, 'unavailable');
+});
+
 test('a stale id in the ladder does not veto the host-family verdict', () => {
   // `codex-bot,typo` on a Codex host authorizes no independent gate — the typo
   // names nothing and can never become a reviewer. Reporting `unavailable` here
