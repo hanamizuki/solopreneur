@@ -65,10 +65,13 @@ The design therefore separates two questions that must not be conflated:
 
 ## Product priority and enabling order
 
-The P0 product outcome is a usable Codex Greenlight and Autopilot V1 for the
-`solopreneur` core. They share the same product priority, but Greenlight comes
-first in dependency order because Autopilot consumes its unattended pull-
-request result.
+The P0 product outcome is a usable Codex Greenlight for the `solopreneur`
+core. Autopilot Codex V1 was originally co-P0 but was cancelled on 2026-08-10:
+the platform bounds it to run-now / single-PR / attended, which forfeits
+unattended operation, multi-PR waves, and scheduling — Autopilot's entire
+value. Its fail-closed host guard (see the
+[publication-safety todo](../../todos/backlog/2026-08-10_codex-publication-safety.md))
+is the end state unless Codex ships subagent or scheduling primitives.
 
 The compatibility registry and filtered Codex publication view are minimum
 release-safety prerequisites, not user-facing product priorities. They may land
@@ -471,7 +474,7 @@ the agent-distribution prerequisite and does not certify marketer skill parity.
 | 6. Greenlight baseline | Establish Claude baselines for the modes Codex will run, then measure whether Codex can drive the shipped Phase 3 loop end to end | The `external` subset runs from the same skill body on both hosts; every divergence is recorded before Codex publication |
 | 7. Greenlight Codex PR mode | Add unattended pull-request review on Codex and test every claimed surface | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
 | 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Any merge-preparation mutation invalidates the old clean and reruns Greenlight plus CI for the new head |
-| 9. Autopilot Codex V1 | Add run-now, single-pull-request orchestration with explicit worktree ownership | Greenlight and CI re-run after every mutation; unavailable specialists fall back to a generic Codex worker |
+| 9. Autopilot Codex V1 | **Cancelled 2026-08-10** — run-now/single-PR/attended forfeits Autopilot's value; ship the fail-closed `autopilot` host guard instead | Guard stops before any side effect and names the supported surface |
 | 10. Core workflow expansion | Add Greenlight's remaining modes, then Autopilot multi-PR waves | Each mode earns its own support status and preserves the shared contract |
 | 11. Scheduling | Add Codex App scheduling as a separate capability | No CLI or run-now path claims Claude Cron parity |
 | 12. Remaining core | Port `mvp`, `todos-babysit`, and other core seams in dependency-sized changes | No bundled control-plane rewrite |

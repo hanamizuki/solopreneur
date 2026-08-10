@@ -46,10 +46,10 @@ re-authoring shell instead of executing it. The fix is to stop interpolating
 positional-parameter shell through skill bodies at all (see W1); `preview`
 already made this move (`skills/preview/scripts/config-resolve.mjs`, PR #147).
 
-Escaped-`$N` counts in native bodies today: `merge-pr` 8, `worktree-handoff` 6,
-`todos-cleanup` 5, `todos-babysit` 5, `greenlight` 5 (all five in the inlined
-config-helper block). Vendored plugins' `\$` content is upstream's and is out
-of scope here.
+Escaped-`$N` occurrences in native bodies today: `merge-pr` 10,
+`worktree-handoff` 6, `todos-cleanup` 5, `todos-babysit` 5, `greenlight` 5
+(greenlight's are all in the inlined config-helper block). Vendored plugins'
+`\$` content is upstream's and is out of scope here.
 
 ### M2. Invocation semantics on codex-exec
 
