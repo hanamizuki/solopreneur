@@ -1,0 +1,44 @@
+# Orchestration plan: Codex Greenlight port, work items W1-W5.
+# Split settled with the user before dispatch (2 PRs, sequential — both touch
+# greenlight/SKILL.md and reviewer-state.mjs, so they cannot run in parallel).
+name: "Codex Greenlight port W1-W5"
+source_todo: "todos/backlog/2026-08-10_codex-greenlight-w1-w5-implementation.md"
+created_at: "2026-08-10"
+
+prs:
+  - id: pr1
+    branch: feature/codex-greenlight-w1-config-sh
+    title: "refactor(shared): source the config helpers from shared/config.sh"
+    type: code
+    size: m
+    subagent: general-purpose
+    depends_on: []
+    spec: pr1-config-sh.md
+    files:
+      - plugins/solopreneur/shared/config.sh
+      - plugins/solopreneur/shared/config.md
+      - plugins/solopreneur/shared/tests/config-helpers.test.mjs
+      - plugins/solopreneur/skills/greenlight/SKILL.md
+      - plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs
+      - plugins/solopreneur/skills/greenlight/tests/reviewer-state.test.mjs
+      - plugins/solopreneur/skills/merge-pr/SKILL.md
+      - plugins/solopreneur/skills/worktree-handoff/SKILL.md
+      - plugins/solopreneur/skills/todos-babysit/SKILL.md
+      - plugins/solopreneur/skills/todos-cleanup/SKILL.md
+
+  - id: pr2
+    branch: feature/codex-greenlight-w2-w5-host-aware
+    title: "feat(greenlight): host-aware gate independence and the claude-cli recipe"
+    type: code
+    size: m
+    subagent: general-purpose
+    depends_on: [pr1]
+    spec: pr2-host-aware-gate.md
+    files:
+      - plugins/solopreneur/skills/greenlight/SKILL.md
+      - plugins/solopreneur/skills/greenlight/scripts/reviewer-registry.mjs
+      - plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs
+      - plugins/solopreneur/skills/greenlight/tests/reviewer-registry.test.mjs
+      - plugins/solopreneur/skills/greenlight/tests/reviewer-state.test.mjs
+      - plugins/solopreneur/skills/greenlight/tests/skill-sync.test.mjs
+      - todos/backlog/2026-08-10_codex-publication-safety.md
