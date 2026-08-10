@@ -23,11 +23,18 @@ Outputs are consumed by the matching subagents (`ios-dev`, `android-dev`,
 
 ## Step 0: Resolve base directory
 
-Claude Code may be invoked with `CLAUDE_CONFIG_DIR` pointing at a non-default
-config. Resolve the current config's base directory first via Bash:
+Either harness may be invoked with a non-default config home — `CLAUDE_CONFIG_DIR`
+on Claude Code, `CODEX_HOME` on Codex. Resolve the running session's base
+directory first via Bash:
 
 ```bash
-BASE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+# Codex exports CODEX_THREAD_ID on every session, while CODEX_HOME exists only
+# when the user sets one; anything that is not Codex keeps the Claude path.
+if [ -n "${CODEX_THREAD_ID:-}" ]; then
+  BASE="${CODEX_HOME:-$HOME/.codex}"
+else
+  BASE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+fi
 echo "$BASE"
 ```
 

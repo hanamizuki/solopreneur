@@ -1,0 +1,90 @@
+name: Validate shared config tests
+
+# The suite has two halves and they need different triggers: the behaviour tests
+# follow shared/config.md, while the drift tests compare that file against the
+# five SKILL.md bodies that inline its helper block. Editing only a consumer is
+# exactly the drift this gate exists to catch, so every consumer is listed.
+#
+# The two path lists are duplicated rather than shared through a YAML anchor:
+# every other workflow here duplicates them, and Actions does not document
+# anchor support.
+on:
+  pull_request:
+    paths:
+      - 'plugins/solopreneur/shared/**'
+      - 'plugins/solopreneur/skills/greenlight/SKILL.md'
+      - 'plugins/solopreneur/skills/merge-pr/SKILL.md'
+      - 'plugins/solopreneur/skills/worktree-handoff/SKILL.md'
+      - 'plugins/solopreneur/skills/todos-babysit/SKILL.md'
+      - 'plugins/solopreneur/skills/todos-cleanup/SKILL.md'
+      - '.github/workflows/validate-shared-config-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/solopreneur/shared/**'
+      - 'plugins/solopreneur/skills/greenlight/SKILL.md'
+      - 'plugins/solopreneur/skills/merge-pr/SKILL.md'
+      - 'plugins/solopreneur/skills/worktree-handoff/SKILL.md'
+      - 'plugins/solopreneur/skills/todos-babysit/SKILL.md'
+      - 'plugins/solopreneur/skills/todos-cleanup/SKILL.md'
+      - '.github/workflows/validate-shared-config-tests.yml'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      # The matrix leg has to be part of the group, as in the greenlight and
+      # preview suites: without it the Node jobs share one group and cancel each
+      # other, leaving one version silently untested.
+      group: validate-shared-config-tests-${{ github.ref }}-${{ matrix.node }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        # Same pair, same reasoning, as the other suites: '20' is the declared
+        # floor and '24' is the current Active LTS.
+        node: ['20', '24']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          # This job only runs Node's built-in test runner and bash — it never
+          # fetches, pushes, or talks to the API. Leaving the default on would
+          # persist GITHUB_TOKEN into .git/config, readable by every later step
+          # including the test processes themselves (zizmor: artipacked).
+          persist-credentials: false
+
+      - name: Install Node ${{ matrix.node }}
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: ${{ matrix.node }}
+          # Deliberately no `cache:` — it keys on a lockfile and hard errors when
+          # there is none. This repo ships no package.json anywhere and the suite
+          # uses Node built-ins only.
+
+      - name: Run the shared config test suite
+        working-directory: plugins/solopreneur/shared
+        run: |
+          # jq is what the helper block shells out to; the ubuntu runner ships
+          # it, but assert rather than discover that through a confusing failure.
+          command -v jq >/dev/null || { echo "::error::jq is required"; exit 1; }
+          # failglob, or this gate can pass having run zero tests: with no match
+          # bash passes the pattern through literally, Node >= 22.6 treats it as
+          # its own glob, matches nothing, and exits 0 on "tests 0".
+          shopt -s failglob
+          # NOT `node --test tests/`: since Node 22.6 the positional arguments are
+          # glob patterns rather than paths, so a bare directory matches itself
+          # and Node tries to execute the directory as a test file.
+          if ! node --test tests/*.test.mjs; then
+            echo
+            echo "::error::The shared config test suite failed on Node ${{ matrix.node }}."
+            echo "::error::Reproduce with: cd plugins/solopreneur/shared && node --test tests/*.test.mjs"
+            exit 1
+          fi
