@@ -995,6 +995,24 @@ test('an absent-but-authorized independent reviewer stays retryable, not authori
   assert.ok(!out.warnings.some((w) => w.includes('no independent gate')));
 });
 
+test('a marked independent reviewer keeps the halt retryable', () => {
+  // Unconfigured ladder, Codex host, and the one independent reviewer here is
+  // marked unresponsive. Retrying it is an answer the selection prompt offers,
+  // so an independent gate IS reachable — classifying this `host-family` would
+  // emit a non-retryable halt and skip the prompt that fixes it.
+  // On a Codex host the config home IS $CODEX_HOME (harness detection), so the
+  // fixture has to live there — handing it to CLAUDE_CONFIG_DIR would leave the
+  // script reading an empty config and quietly test nothing.
+  const dir = tmpConfigDir(CFG({ observed: { [RABBIT]: { triggerable: false } } }));
+  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', ''],
+    { stdin: BOTS([CODEX]), env: { ...CODEX_HOST, CODEX_HOME: dir } });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.needsPrompt, true);
+  assert.deepEqual(out.marked.map((m) => m.recipe), ['coderabbit']);
+  assert.equal(out.gateBlock, 'unavailable', 'the marked reviewer can still be retried');
+});
+
 test('--host-family is honoured without the env var', () => {
   const { stdout } = run([
     'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot', '--host-family', 'openai',

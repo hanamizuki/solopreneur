@@ -519,6 +519,7 @@ echo "HOST_FAMILY=$HOST_FAMILY"
 # running anyway would degrade silently, mid-loop, after paying for reviews.
 if [ "$EFFECTIVE_SIZE" = L ] && [ "$HOST_FAMILY" != anthropic ]; then
   echo "HALT: L-size runs need a Claude Code host (reason_class: authority-boundary)"
+  exit 1   # a guard that only prints is not a guard — stop before any reviewer runs
 fi
 ```
 
@@ -631,6 +632,7 @@ is decided, before Step 2 and before any side effect:
 HOST_FAMILY=$([ -n "${CODEX_THREAD_ID:-}" ] && echo openai || echo anthropic)
 if [ "$HOST_FAMILY" != anthropic ] && [ "$MODE" != pr ]; then
   echo "HALT: $MODE mode needs a Claude Code host (reason_class: authority-boundary)"
+  exit 1   # stop here, before Step 2 and before any side effect
 fi
 ```
 
@@ -1517,9 +1519,10 @@ GitHub Copilot posts as `Copilot` with no `[bot]` suffix). A `—` tool still
 works: detection collects it by `type == "Bot"`, and an attended identify binds
 its login per repo (see Reviewer selection).
 
-**Family** is the tool's upstream model family. A tool with no upstream family
-of its own (`coderabbit`, `bugbot`, `greptile`) is its own family — it can never
-be the host, so it is never filtered. See
+**Family** is the tool's upstream model family. A tool with no upstream model
+family of its own is keyed to its vendor instead — `coderabbit` and `greptile`
+to their own name, `bugbot` to `cursor`, the vendor that ships it. None of those
+is ever a host family, so none is ever filtered. See
 [Host-family independence](#host-family-independence) for what the column is for.
 
 `scripts/reviewer-registry.mjs` is the executable copy of this table and the one

@@ -693,9 +693,17 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate, hos
   // authorized candidate is the host's own family is waiting futile — no amount
   // of retrying adds a reviewer of another family, and that is the difference
   // between a retryable halt and one that needs a human.
+  // `marked` counts as authorized on the unconfigured branch. A reviewer marked
+  // `triggerable: false` is one prompt away from coming back (that retry is an
+  // answer the selection prompt offers), so an independent one sitting in
+  // `marked` means an independent gate IS reachable here — reporting
+  // `host-family` would send a recoverable round to a non-retryable halt and
+  // skip the very prompt that fixes it. A configured ladder needs no equivalent:
+  // it lists ids outright, available or not.
   const authorized = wanted ?? (fallbackOrder.length > 0
     ? fallbackOrder
-    : [...selected.map((r) => r.recipe).filter(Boolean), 'codex-bot']);
+    : [...selected.map((r) => r.recipe), ...marked.map((m) => m.recipe), 'codex-bot']
+      .filter(Boolean));
   const gateBlock = gateEntry !== null ? null
     : (authorized.length > 0 && authorized.every((id) => recipeFor(id) && !independent(id))
       ? 'host-family' : 'unavailable');

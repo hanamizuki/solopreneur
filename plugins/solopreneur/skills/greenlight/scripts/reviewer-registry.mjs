@@ -24,10 +24,12 @@
  *
  * `family` is the tool's upstream model family, and it is what makes gate
  * independence decidable: the gate must never be the host's own family, or the
- * loop is a model reviewing its own work. A tool with no upstream family of its
- * own (`coderabbit`, `bugbot`, `greptile`) is its own family — it can never be
- * the host, so it is never filtered. This is vendor knowledge by the registry's
- * own admission rule: identical for every user of the tool.
+ * loop is a model reviewing its own work. A tool with no upstream model family
+ * of its own is keyed to its vendor instead — `coderabbit` and `greptile` to
+ * their own name, `bugbot` to `cursor`, the vendor that ships it. None of those
+ * is ever a host family, so they are never filtered; the distinction only
+ * matters for tools whose vendor also ships a harness. This is vendor knowledge
+ * by the registry's own admission rule: identical for every user of the tool.
  *
  * Adding a tool is one row whose required thoughts are the trigger string and the
  * `family` — `family` has no safe fallback, because an absent one compares
