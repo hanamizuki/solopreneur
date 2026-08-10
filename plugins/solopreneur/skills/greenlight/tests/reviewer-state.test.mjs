@@ -1025,6 +1025,17 @@ test('an explicitly selected independent reviewer keeps the halt retryable', () 
   assert.equal(out.gateBlock, 'unavailable');
 });
 
+test('an explicitly requested independent gate keeps the halt retryable', () => {
+  // The --gate twin of the --select case above: an explicit gate is an
+  // authorization too, so an unavailable-but-authorized independent CLI is a
+  // retryable dependency failure, not an authority boundary.
+  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot',
+    '--gate', 'claude-cli'], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.gateBlock, 'unavailable');
+});
+
 test('a stale id in the ladder does not veto the host-family verdict', () => {
   // `codex-bot,typo` on a Codex host authorizes no independent gate — the typo
   // names nothing and can never become a reviewer. Reporting `unavailable` here
