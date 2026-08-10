@@ -71,6 +71,38 @@ Verified independently after each merge, not taken from the subagents' reports:
   codex-family reviewers still run as non-gate reviewers — the V1 shape works
   end to end at the resolver level.
 
+### PR #162 did NOT end on a clean pass — read this before trusting its review trail
+
+The `success` the dispatched subagent reported is not a converged review. Round
+10 is the L-profile cap, and the loop spent it:
+
+```
+16:31:06Z  push 8b2aeb1c        round 9's fix
+16:31:22Z  @codex review        round 10 — the last one the budget allows
+16:34:59Z  Codex returns 1 P2   on reviewer-state.mjs (a clean Codex pass is a 👍 reaction, not a comment)
+16:37:03Z  push fed9e07         the fix for that P2
+16:40:11Z  MERGED at fed9e07    no reviewer ever saw this commit
+```
+
+`unresolved=0` across all 14 threads is misleading: the last thread closed
+because the finding was *fixed*, not because a round came back clean. Per
+greenlight's own escalation taxonomy the budget-exhausted state is
+`invariant-violation` and the orchestrator should have marked this blocked
+rather than recording a merge.
+
+This run also demonstrates, live and on the very PR that ports the skill, both
+defects the spec parks in "Not in V1": review evidence bound to a stale SHA
+([head-binding](./2026-08-10_greenlight-head-binding.md) — the verdict covers
+`8b2aeb1c`, the merge is `fed9e07`) and the missing atomic merge precondition
+([merge-pr](./2026-08-10_merge-pr-atomic-merge.md)).
+
+`fed9e07` itself is small — 20 lines in `resolve()` plus 11 lines of test,
+widening `authorized` so an explicit `--gate` counts as authorization when
+classifying a halt. CI was green and the 112-test suite passes, and the A4
+invariant still holds under direct behavioural probing (an explicit
+`--gate codex-cli` on a Codex host is still refused). It is unreviewed, not
+known-bad — but it is unreviewed.
+
 **Still open — `A2` is deliberately NOT done here.** The end-to-end
 seeded-finding run on a real Codex host (claude-cli gate triggered → findings
 parsed → fix pushed → re-review → clean terminal report) is post-merge manual
