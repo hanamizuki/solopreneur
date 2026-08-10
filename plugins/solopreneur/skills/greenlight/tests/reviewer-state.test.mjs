@@ -47,14 +47,23 @@ function tmpConfigDir(config) {
   return dir;
 }
 
-function run(args, { stdin = '', configDir } = {}) {
+function run(args, { stdin = '', configDir, env = {} } = {}) {
   const home = tmpDir();
   const res = spawnSync(process.execPath, [SCRIPT, ...args], {
     input: stdin,
     encoding: 'utf8',
     // Allowlist, not { ...process.env }: an inherited NODE_OPTIONS or a real
-    // CLAUDE_CONFIG_DIR would silently change what these assertions mean.
-    env: { PATH: process.env.PATH, HOME: home, CLAUDE_CONFIG_DIR: configDir ?? tmpDir() },
+    // CLAUDE_CONFIG_DIR would silently change what these assertions mean. The
+    // Codex variables are cleared for the same reason — a developer running the
+    // suite from a Codex session must not flip which home branch is taken.
+    env: {
+      PATH: process.env.PATH,
+      HOME: home,
+      CLAUDE_CONFIG_DIR: configDir ?? tmpDir(),
+      CODEX_HOME: '',
+      CODEX_THREAD_ID: '',
+      ...env,
+    },
   });
   return { code: res.status, signal: res.signal, stdout: res.stdout, stderr: res.stderr };
 }
@@ -201,6 +210,45 @@ test('record creates greenlight_reviewers on a fresh config', () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(reviewersOf(dir).observed['coderabbitai[bot]'], { auto: true });
+});
+
+test('record follows the running harness home, not CLAUDE_CONFIG_DIR', () => {
+  // Same detection as solopreneur_config_home in shared/config.sh: CODEX_THREAD_ID
+  // identifies the harness, CODEX_HOME only relocates its home. Without this, a
+  // Codex run writes reviewer state into the Claude home unless every caller
+  // remembers to export CLAUDE_CONFIG_DIR=$CODEX_HOME by hand — which is exactly
+  // the improvisation this replaces.
+  const claudeDir = tmpConfigDir();
+  const codexDir = tmpDir();
+  const { code } = run(['record', '--repo-key', KEY], {
+    stdin: JSON.stringify({ observations: [{ login: 'coderabbitai[bot]', auto: true }] }),
+    configDir: claudeDir,
+    env: { CODEX_THREAD_ID: 't_1', CODEX_HOME: codexDir },
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(reviewersOf(codexDir).observed['coderabbitai[bot]'], { auto: true });
+  assert.equal(
+    fs.existsSync(path.join(claudeDir, 'solopreneur.json')), false,
+    'a Codex run must not create or touch the Claude home');
+});
+
+test('record falls back to ~/.codex when CODEX_HOME is unset', () => {
+  const home = tmpDir();
+  const res = spawnSync(process.execPath, [SCRIPT, 'record', '--repo-key', KEY], {
+    input: JSON.stringify({ observations: [{ login: 'cursor[bot]', auto: true }] }),
+    encoding: 'utf8',
+    // CLAUDE_CONFIG_DIR is deliberately still set: the Codex branch must win
+    // over it, not merely fill in for its absence.
+    env: {
+      PATH: process.env.PATH,
+      HOME: home,
+      CLAUDE_CONFIG_DIR: tmpConfigDir(),
+      CODEX_THREAD_ID: 't_1',
+    },
+  });
+  assert.equal(res.status, 0, res.stderr);
+  assert.deepEqual(
+    reviewersOf(path.join(home, '.codex')).observed['cursor[bot]'], { auto: true });
 });
 
 test('record merges into an existing entry without dropping fields', () => {

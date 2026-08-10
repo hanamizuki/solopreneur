@@ -36,9 +36,10 @@ non-null wins:
 `write_solopreneur_repo_config` lands at `repos[<repo-key>].<key>`.
 
 Existing configs on the old flat schema (`{ "todos": {...} }` at the
-top level) keep working via layer 5; migration is optional. See
-`plugins/solopreneur/shared/config.md` for the full helper
-definitions and a sample migrated config.
+top level) keep working via layer 5; migration is optional. The helpers
+are implemented once in `plugins/solopreneur/shared/config.sh`, which
+skills `source`; see `plugins/solopreneur/shared/config.md` for the
+cascade documentation and a sample migrated config.
 
 There is a **second, separate config file**: `.solopreneur.json` (leading
 dot), used by the preview Library. It is keyed by **filesystem path**
