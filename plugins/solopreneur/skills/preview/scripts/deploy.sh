@@ -113,6 +113,12 @@ REPO_KEY="$(_preview_repo_key)"
 # spliced into the jq program — a key with special characters cannot alter the
 # query.
 # Returns empty when unset, file missing, or jq unavailable.
+# NOTE: this reader falls back per dotted key, so `projects.default` and
+# `autoProtect` can come from different homes — the shared
+# `read_solopreneur_config` returns one whole feature subtree instead. That
+# difference predates the Codex home being added here; widening the search from
+# two homes to three does not change its character. Converting this to the
+# shared reader is tracked in todos/backlog/2026-08-10_deploy-sh-shared-reader.md.
 read_preview_config() {
   local key="$1"
   local out f h session seen=""

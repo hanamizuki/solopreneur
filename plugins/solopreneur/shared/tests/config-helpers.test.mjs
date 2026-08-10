@@ -195,6 +195,30 @@ test('repo scope outranks default, and default outranks the legacy flat key', ()
   assert.equal(run('read_solopreneur_config todos | jq -r .backlog', box), 'repo');
 });
 
+test('home order outranks scope: a nearer default beats a farther repo entry', () => {
+  // The documented cascade is per home — repo scope, then default, then move on
+  // — and that stays true once there are three homes. A repo-scoped value in a
+  // farther home does NOT jump ahead of a default in a nearer one.
+  //
+  // The alternative (all repo layers across all homes first) was considered and
+  // rejected: cross-home reading exists so a value configured under either
+  // harness stays *reachable*, not so another harness's file can outrank the
+  // one belonging to the harness you are running. One rule, uniformly applied,
+  // also survives a fourth home without another precedence debate.
+  const box = sandbox({
+    'custom/solopreneur.json': { default: { other: 1 } },       // session home, no todos
+    '.claude/solopreneur.json': { default: { todos: 'near-default' } },
+    '.codex/solopreneur.json': { repos: { PLACEHOLDER: { todos: 'far-repo' } } },
+  });
+  const repoKey = run('solopreneur_repo_key', box);
+  const codexFile = path.join(box.home, '.codex/solopreneur.json');
+  fs.writeFileSync(codexFile, JSON.stringify({ repos: { [repoKey]: { todos: 'far-repo' } } }));
+
+  assert.equal(
+    run('read_solopreneur_config todos', { ...box, env: { CLAUDE_CONFIG_DIR: `${box.home}/custom` } }),
+    'near-default');
+});
+
 test('a missing key reads as empty with a zero status, not as a failure', () => {
   // "nothing configured" is the common case, so a non-zero status here would
   // abort every caller running under `set -e`. `run` throws on non-zero, so

@@ -142,6 +142,15 @@ single harness has a single real file, and a machine with both gets a
 deterministic order instead of a guess. **Writes cannot do that** — they must
 pick exactly one target, which is what `solopreneur_config_home` is for.
 
+**Home order outranks scope.** Repo scope beats `default` *within* a home, but a
+`default` in a nearer home still beats a repo entry in a farther one — layers
+1-2 finish before layer 3 begins. The alternative (every home's repo layer
+first, then every home's default) was considered and rejected: cross-home
+reading exists so a value configured under either harness stays *reachable*,
+not so another harness's file can outrank the home belonging to the harness
+actually running. One rule applied uniformly also survives a fourth home
+without reopening the question. A regression test pins this.
+
 Layer 5 keeps **pre-refactor configs working unchanged** — users do not need
 to migrate their JSON. New writes always use the new shape, but reads honor
 the old shape if that's all the file has.
