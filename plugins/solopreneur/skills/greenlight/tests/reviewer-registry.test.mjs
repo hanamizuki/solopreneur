@@ -70,11 +70,21 @@ test('the claude-cli trigger requests the [P*] tags the loop already parses', ()
   // existing `[P*]` scan reads, and for the exact clean sentence that separates
   // "reviewed, found nothing" from "never ran".
   const { trigger } = RECIPES['claude-cli'];
-  for (const needle of ['[P1]', '[P2]', '[P3]', 'No findings.', ' -p ', 'between main and HEAD']) {
+  for (const needle of ['[P1]', '[P2]', '[P3]', 'No findings.', ' -p ', 'UNTRUSTED']) {
     assert.ok(trigger.includes(needle), `claude-cli trigger is missing ${JSON.stringify(needle)}`);
   }
-  // The local base branch, like every other reviewer in this loop. `origin/main`
-  // is absent on a repo whose remote is named differently or unfetched.
+});
+
+test('the claude-cli gate never bypasses tool permissions', () => {
+  // The diff under review is untrusted and can carry prompt injection; the
+  // reviewer is handed it as inert input on stdin and needs no tools, so
+  // auto-approving them buys nothing and costs command execution under the
+  // operator's own credentials. Same rule the agy recipe already follows.
+  // Measured: default permissions answer fine.
+  const { trigger } = RECIPES['claude-cli'];
+  assert.ok(!trigger.includes('dangerously'), 'claude-cli must not bypass tool permissions');
+  // Never a remote ref either: `origin/main` is absent on a repo whose remote is
+  // named differently or unfetched, and the rest of the loop uses local `main`.
   assert.ok(!trigger.includes('origin/'), 'claude-cli must review against the LOCAL base branch');
 });
 
