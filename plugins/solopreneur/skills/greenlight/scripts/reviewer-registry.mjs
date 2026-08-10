@@ -113,7 +113,14 @@ export const RECIPES = {
     aliases: ['claude cli'],
     kind: 'local-cli',
     family: 'anthropic',
-    trigger: 'claude --dangerously-skip-permissions -p "Review the diff between origin/main and HEAD as an independent code reviewer. Tag each finding [P1] (must fix) / [P2] (should fix) / [P3] (nit) with file:line and a concrete fix. If there are no findings, output exactly: No findings."',
+    // `main`, not `origin/main`: every other base ref in this loop is the LOCAL
+    // base branch (`codex review --base main`, agy's `git diff main...HEAD`, the
+    // size cascade's `main...HEAD`). `origin/main` is also the more fragile of
+    // the two — absent on a repo whose remote is named something else or has not
+    // been fetched, where the nested reviewer would error out, emit no `[P*]` and
+    // no clean sentence, and be read as an invocation failure that cannot close
+    // the round.
+    trigger: 'claude --dangerously-skip-permissions -p "Review the diff between main and HEAD as an independent code reviewer. Tag each finding [P1] (must fix) / [P2] (should fix) / [P3] (nit) with file:line and a concrete fix. If there are no findings, output exactly: No findings."',
     handshake: 'stdout',
     knownLogins: [],
   },

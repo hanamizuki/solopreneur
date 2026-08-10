@@ -46,7 +46,7 @@ surface:
 
 | | On Codex |
 |---|---|
-| Modes | PR mode via `external` only (Phase 1 and Phase 2 need subagents Codex does not have) |
+| Modes | PR mode via `external` only (Phase 1 and Phase 2 need subagents Codex does not have). Uncommitted and post-commit modes **halt at pre-flight** — they have no gate and never call `resolve`, so their clean signal would be `codex review` approving its own host's work |
 | Gate | `claude-cli` — the gate must be independent of the host's model family (see [Host-family independence](#host-family-independence)) |
 | Sizes | **S and M only**; an L-size run halts at pre-flight |
 | Invocation | the explicit `$greenlight` mention, plus the `unattended` token for any unattended caller — a one-shot exec session has nobody to answer a prompt |
@@ -318,7 +318,7 @@ retry-vs-blocked without re-deriving intent:
 |---|---|---|---|
 | `transient-dependency` | A dependency is down but may recover. | **Retryable** — orchestrator waits and retries. | External reviewers all exhausted (unattended fallback). |
 | `invariant-violation` | A hard stop the loop cannot resolve itself — a broken correctness / state invariant, or the round budget spent without convergence. | **Do not retry** — orchestrator marks blocked. | Inner verify fails 3×; a post-commit invariant violation (TIP ≠ HEAD, origin/main unreachable, BASE unreachable, push-verification mismatch, branch changed mid-loop); the round budget spent (max `SIZE_MAX_ROUNDS` reached with findings still unresolved). |
-| `authority-boundary` | The next step needs authority the run does not have — refuse. | **Do not retry — a human must intervene.** | A fix would touch a dangerous path outside the size authorization (contradiction ③); the anti-gaming guard's **unattended** halt (a refusal to commit a suspected gaming edit); **no independent gate** (`RESOLVED.gateBlock == "host-family"` — every authorized reviewer shares the host's model family); an **L-size run on a non-anthropic host**. |
+| `authority-boundary` | The next step needs authority the run does not have — refuse. | **Do not retry — a human must intervene.** | A fix would touch a dangerous path outside the size authorization (contradiction ③); the anti-gaming guard's **unattended** halt (a refusal to commit a suspected gaming edit); **no independent gate** (`RESOLVED.gateBlock == "host-family"` — every authorized reviewer shares the host's model family); an **L-size run**, or an **uncommitted / post-commit run**, **on a non-anthropic host**. |
 
 `reason_class` governs only the **unattended** halt's retry routing; it does **not**
 dictate the attended projection (that is set by the level — see
@@ -623,6 +623,32 @@ echo "BRANCH=$CURRENT_BRANCH UNCOMMITTED=$HAS_UNCOMMITTED PR=$PR_EXISTS/$PR_STAT
 | feature / worktree | no | no | **stop** | No PR + no changes; tell user to commit or create PR first |
 
 The post-commit row is more specific than the stop row — match it first; otherwise fall through to stop.
+
+**Mode guard — PR mode only on a non-anthropic host.** Run this the moment `MODE`
+is decided, before Step 2 and before any side effect:
+
+```bash
+HOST_FAMILY=$([ -n "${CODEX_THREAD_ID:-}" ] && echo openai || echo anthropic)
+if [ "$HOST_FAMILY" != anthropic ] && [ "$MODE" != pr ]; then
+  echo "HALT: $MODE mode needs a Claude Code host (reason_class: authority-boundary)"
+fi
+```
+
+Halt with `reason_class: authority-boundary` and stop. **Uncommitted and
+post-commit modes have no gate and never call `resolve`**, so the host-family
+independence below does not reach them at all: their terminal clean signal is
+`codex review`'s own stdout, which on a Codex host is the host's model family
+declaring its own work clean. That is the same-family self-approval the gate
+filter exists to prevent, arriving through a door the filter does not watch.
+[Host support](#host-support) already scopes Codex to PR mode; this is the check
+that makes the scope real rather than merely documented. Not retryable — the
+fixes are to run the mode on a Claude Code host, or to open a PR and use PR mode.
+
+In **PR mode** on such a host, Phase 1 and Phase 2 are skipped (they need
+subagents the host does not have) and the run goes straight to Phase 3 — the same
+place `external` lands. Passing `external` explicitly is still preferred, because
+it states the intent instead of relying on the all-reviewers-unavailable
+degradation.
 
 If `MODE=uncommitted`, skip Steps 2-5 below and Argument Parsing; jump directly to **[Uncommitted Mode](#uncommitted-mode)**.
 
@@ -1472,7 +1498,7 @@ downstream needs to change.**
 | `bugbot` | `bugbot`, `cursor` | github-bot | cursor | PR comment `bugbot run` (top-level only) | none | default | — |
 | `greptile` | `greptile` | github-bot | greptile | PR comment `@greptileai` | none | default | — |
 | `codex-cli` | `codex cli` | local-cli | openai | `codex review --base main` | stdout `[P*]` | n/a | n/a |
-| `claude-cli` | `claude cli` | local-cli | anthropic | `claude --dangerously-skip-permissions -p "Review the diff between origin/main and HEAD as an independent code reviewer. Tag each finding [P1] (must fix) / [P2] (should fix) / [P3] (nit) with file:line and a concrete fix. If there are no findings, output exactly: No findings."` | stdout `[P*]` | n/a | n/a |
+| `claude-cli` | `claude cli` | local-cli | anthropic | `claude --dangerously-skip-permissions -p "Review the diff between main and HEAD as an independent code reviewer. Tag each finding [P1] (must fix) / [P2] (should fix) / [P3] (nit) with file:line and a concrete fix. If there are no findings, output exactly: No findings."` | stdout `[P*]` | n/a | n/a |
 | `agy` | `agy` | local-cli | google | `agy --print` (model pinned with `--model`) | stdout + marker | n/a | n/a |
 
 **Reviewer kinds:**

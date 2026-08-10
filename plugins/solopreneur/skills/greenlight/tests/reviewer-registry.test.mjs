@@ -70,9 +70,12 @@ test('the claude-cli trigger requests the [P*] tags the loop already parses', ()
   // existing `[P*]` scan reads, and for the exact clean sentence that separates
   // "reviewed, found nothing" from "never ran".
   const { trigger } = RECIPES['claude-cli'];
-  for (const needle of ['[P1]', '[P2]', '[P3]', 'No findings.', ' -p ', 'origin/main']) {
+  for (const needle of ['[P1]', '[P2]', '[P3]', 'No findings.', ' -p ', 'between main and HEAD']) {
     assert.ok(trigger.includes(needle), `claude-cli trigger is missing ${JSON.stringify(needle)}`);
   }
+  // The local base branch, like every other reviewer in this loop. `origin/main`
+  // is absent on a repo whose remote is named differently or unfetched.
+  assert.ok(!trigger.includes('origin/'), 'claude-cli must review against the LOCAL base branch');
 });
 
 test('every recipe declares an aliases array', () => {
