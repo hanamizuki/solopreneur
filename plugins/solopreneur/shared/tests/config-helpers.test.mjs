@@ -1,23 +1,23 @@
 /**
- * Tests the shared config-helper block in shared/config.md, and the fact that
- * every skill inlining it is still inlining the same thing.
+ * Tests shared/config.sh — the one implementation of the config cascade — and
+ * the fact that every consuming skill still sources it rather than carrying a
+ * copy of its own.
  *
  * Requires Node.js >= 20. No dependencies.
  *
- * Why the block is executed rather than read: it is the only copy of the
+ * Why the script is executed rather than read: it is the only copy of the
  * cascade, it resolves paths that differ per harness, and nothing else in the
- * repo exercises it. Why the drift check exists: markdown cannot `source` a
- * shared file, so five SKILL.md bodies carry byte copies of this block
- * (config.md documents that constraint). Nothing enforced that they stay in
- * sync until now — the helper could be fixed in one place and left broken in
- * five.
+ * repo exercises it.
  *
- * The `\$1` in the canonical text is deliberate: Claude Code substitutes bare
- * `$N` in a SKILL.md body with the slash-command arguments before the model
- * ever sees it, so the escape is what survives that pass (commit 418dd5c).
- * These tests un-escape it exactly as that substitution would, which is also
- * why the escape must NOT be assumed portable — a harness that does not
- * substitute would hand the model a literal `$1`.
+ * Why the drift check inverted. The helpers used to be byte-copied into five
+ * SKILL.md bodies, escaped as `\$1` because Claude Code substitutes bare `$N`
+ * in a body on every load and eats the backslash. Codex substitutes nothing and
+ * passes the escape through, so the same text bound the literal string `$1`
+ * there and every jq path in the cascade missed — silently. No escaping
+ * convention satisfies both harnesses, so the shell moved into a real file that
+ * neither rewrites, and what these tests now enforce is that it stays there:
+ * each marker block sources the script, defines nothing, and carries no
+ * positional parameter in any form.
  */
 
 import { test } from 'node:test';
@@ -31,46 +31,64 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SHARED = path.join(HERE, '..');
 const SKILLS = path.join(SHARED, '..', 'skills');
+const CONFIG_SH = path.join(SHARED, 'config.sh');
 
-const START = '# --- solopreneur config helpers (inlined from shared/config.md) ---';
+const START_PREFIX = '# --- solopreneur config helpers';
 const END = '# --- end solopreneur config helpers ---';
 
 /** The marked block, dedented, with each line's trailing whitespace removed. */
 function extractBlock(file) {
   const lines = fs.readFileSync(file, 'utf8').split('\n');
-  const s = lines.findIndex((l) => l.trim() === START);
+  const s = lines.findIndex((l) => l.trim().startsWith(START_PREFIX));
   const e = lines.findIndex((l) => l.trim() === END);
   assert.ok(s !== -1 && e > s, `${file}: missing or inverted helper-block markers`);
   const indent = lines[s].length - lines[s].trimStart().length;
   return lines.slice(s, e + 1).map((l) => l.slice(indent).trimEnd());
 }
 
-const CANONICAL = extractBlock(path.join(SHARED, 'config.md'));
-
-/** Every skill that inlines the block. Adding one here is the point. */
+/** Every skill that uses the helpers. Adding one here is the point. */
 const CONSUMERS = ['greenlight', 'merge-pr', 'worktree-handoff', 'todos-babysit', 'todos-cleanup'];
 
 // --- drift ---------------------------------------------------------------
 
 for (const skill of CONSUMERS) {
-  test(`${skill} inlines the canonical helper block`, () => {
-    const copy = extractBlock(path.join(SKILLS, skill, 'SKILL.md'));
-    assert.deepEqual(copy, CANONICAL,
-      `${skill}/SKILL.md has drifted from shared/config.md — re-sync it`);
+  test(`${skill} sources config.sh instead of defining the helpers`, () => {
+    const block = extractBlock(path.join(SKILLS, skill, 'SKILL.md'));
+
+    // The relative path, not merely the word `source`: a block that sources a
+    // path which has rotted would otherwise pass every structural check.
+    assert.ok(
+      block.some((l) => l.startsWith('source ') && l.includes('/../../shared/config.sh')),
+      `${skill}/SKILL.md must source "…/../../shared/config.sh" inside the marker block`);
+
+    // A re-inlined helper is the regression this whole refactor exists to
+    // prevent — it would drag `$N` back into a skill body with it. All three
+    // bash declaration forms count: `name()`, `name ()`, and `function name`
+    // (with or without parens). Matching only the first would let a re-inline
+    // written either other way pass, and the "defines no functions" guarantee
+    // config.md documents would be false.
+    const defs = block.filter((l) =>
+      /^\s*(?:function\s+[A-Za-z_][\w-]*|[A-Za-z_][\w-]*\s*\(\s*\))/.test(l));
+    assert.deepEqual(defs, [],
+      `${skill}/SKILL.md re-inlines helper definitions; source shared/config.sh instead`);
+
+    // No positional parameter in any form — bare, escaped, or braced. This is
+    // the measurable bar: the two harnesses cannot agree on what it means.
+    const positional = block.filter((l) => /\\?\$\{?[0-9@*]/.test(l));
+    assert.deepEqual(positional, [],
+      `${skill}/SKILL.md carries a positional parameter in its config block`);
   });
 }
 
-test('the canonical block still escapes bare $N for SKILL.md substitution', () => {
-  // If this ever fails, the copies are being pasted into SKILL.md bodies where
-  // Claude Code will eat the positional parameter. See the header note.
-  assert.ok(CANONICAL.some((l) => l.includes('local key="\\$1"')),
-    'expected the escaped positional parameter to survive in the canonical block');
+test('config.md documents the source instruction, not a copyable helper block', () => {
+  const md = fs.readFileSync(path.join(SHARED, 'config.md'), 'utf8');
+  assert.ok(md.includes('/../../shared/config.sh'),
+    'config.md must show the source instruction consumers carry');
+  assert.ok(!/^solopreneur_repo_key\(\)/m.test(md),
+    'config.md must not carry a second copy of the helper definitions — config.sh is the implementation');
 });
 
 // --- behaviour -----------------------------------------------------------
-
-/** The block as a harness would actually run it: `\$` collapsed to `$`. */
-const RUNNABLE = CANONICAL.join('\n').replace(/\\\$/g, '$');
 
 let tmpRoot;
 
@@ -93,14 +111,12 @@ function sandbox(files) {
 }
 
 /**
- * Source the block and run `script`, with HOME pointed at a sandbox and the
+ * Source config.sh and run `script`, with HOME pointed at a sandbox and the
  * real session's harness variables cleared — otherwise the machine running the
  * tests decides which branch is taken.
  */
 function run(script, { home, cwd, env = {} }) {
-  const helpers = path.join(tmpRoot, 'helpers.sh');
-  fs.writeFileSync(helpers, RUNNABLE);
-  return execFileSync('bash', ['-c', `source ${JSON.stringify(helpers)}\n${script}`], {
+  return execFileSync('bash', ['-c', `source ${JSON.stringify(CONFIG_SH)}\n${script}`], {
     cwd,
     encoding: 'utf8',
     env: {
@@ -114,11 +130,8 @@ function run(script, { home, cwd, env = {} }) {
   }).trim();
 }
 
-test('the block is valid bash', () => {
-  tmpRoot ??= fs.mkdtempSync(path.join(os.tmpdir(), 'solo-cfg-'));
-  const f = path.join(tmpRoot, 'syntax.sh');
-  fs.writeFileSync(f, RUNNABLE);
-  execFileSync('bash', ['-n', f]);
+test('config.sh is valid bash', () => {
+  execFileSync('bash', ['-n', CONFIG_SH]);
 });
 
 test('a Claude session writes to the Claude home', () => {

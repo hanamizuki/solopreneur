@@ -2,24 +2,26 @@
 name: shared/config
 description: |
   Config reference for solopreneur skills, covering both config files.
-  1. `solopreneur.json` (legacy, keyed by git remote): the four shell helpers
-     — solopreneur_repo_key, read_solopreneur_config, write_solopreneur_config,
+  1. `solopreneur.json` (legacy, keyed by git remote): the five shell helpers
+     in `config.sh` — solopreneur_repo_key, solopreneur_config_home,
+     read_solopreneur_config, write_solopreneur_config,
      write_solopreneur_repo_config — and their per-repo override cascade.
   2. `.solopreneur.json` (v2, keyed by filesystem path): the schema, the
      resolution order, and the path rules used by the preview Library and its
      config-resolve.mjs resolver.
   The two files coexist; neither reader touches the other's file.
 
-  This file is NOT a skill — it is a reference document. Skills that need
-  config access must inline these function definitions verbatim at the top of
-  their bash blocks.
+  This file is NOT a skill — it is a reference document. The helpers it
+  documents are implemented in `config.sh` beside it; skills `source` that
+  file at the top of any bash block that touches config.
 ---
 
 # Solopreneur Config Cascade Helper
 
 All solopreneur skills that read or write `solopreneur.json` must use these
-helpers instead of hardcoding paths or recomputing repo identity. Inline the
-helper block verbatim at the top of each bash section that touches config.
+helpers instead of hardcoding paths or recomputing repo identity. `config.sh`
+beside this file is the implementation; `source` it at the top of each bash
+section that touches config.
 
 ## Schema
 
@@ -248,169 +250,83 @@ The `preview` skill's old `preview.paths.<repo-key>` subtree migrates to
 `repos[<repo-key>].preview.path` (note: singular `path`, plus the value is
 the path string directly, not wrapped in another object).
 
-## Helper block (copy verbatim into skills)
+## Helper implementation (`config.sh`)
+
+`config.sh`, beside this file, **is** the implementation — the five helpers and
+nothing else. It is sourced, never executed. Each consumer carries a
+marker-delimited block that resolves the path and sources it, and defines no
+functions of its own:
 
 ```bash
-# --- solopreneur config helpers (inlined from shared/config.md) ---
-# Compute the canonical repo identity used as the key under `.repos` in
-# solopreneur.json. Falls back to git toplevel path, then $PWD.
-solopreneur_repo_key() {
-  local url root
-  url=$(git remote get-url origin 2>/dev/null || true)
-  if [ -n "$url" ]; then
-    # Strip protocol schemes (https/http/ssh/git) and user prefixes (git@)
-    # in either order — origin URLs come in many shapes:
-    #   https://github.com/owner/repo.git
-    #   http://github.com/owner/repo.git
-    #   ssh://git@github.com/owner/repo.git
-    #   git://github.com/owner/repo.git
-    #   git@github.com:owner/repo.git
-    url="${url#https://}"; url="${url#http://}"
-    url="${url#ssh://}";   url="${url#git://}"
-    url="${url#git@}"
-    url="${url%.git}"
-    # Replace the first `:` with `/` — the scp-style `git@host:owner/repo`
-    # form. Bash `${var/pattern/replacement}` parses the second `/` as the
-    # delimiter; the chars after it (`/` here) are the replacement, so this
-    # produces a single slash, not double. (Tested.)
-    url="${url/://}"
-    printf '%s\n' "$url"
-    return
-  fi
-  root=$(git rev-parse --show-toplevel 2>/dev/null || true)
-  if [ -n "$root" ]; then
-    printf '%s\n' "$root"
-    return
-  fi
-  printf '%s\n' "$PWD"
-}
-
-# The config home this session WRITES to: the one owned by the harness that is
-# actually running. Codex exports CODEX_THREAD_ID on every session, while
-# CODEX_HOME exists only when the user sets one — so the thread ID identifies
-# the harness and CODEX_HOME merely relocates its home. Anything that is not
-# Codex expands to the historical Claude expression character for character,
-# so existing installs behave exactly as before.
-solopreneur_config_home() {
-  if [ -n "${CODEX_THREAD_ID:-}" ]; then
-    printf '%s\n' "${CODEX_HOME:-$HOME/.codex}"
-  else
-    printf '%s\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-  fi
-}
-
-# Read a feature subtree from solopreneur.json with the 5-layer cascade:
-# 1. this session's config home .repos[<repo-key>].<feature>
-# 2. this session's config home .default.<feature>
-# 3. the next config home       .repos[<repo-key>].<feature>
-# 4. the next config home       .default.<feature>
-# 5. legacy top-level .<feature>, visiting the homes in that same order
-# First non-null wins. Reads visit every harness's home rather than detecting
-# one: a machine with a single harness has a single real file, and a machine
-# with both gets a deterministic order instead of a guess. Duplicates are
-# dropped, so the common case still touches exactly one file.
-read_solopreneur_config() {
-  local key="\$1"
-  local repo_key; repo_key=$(solopreneur_repo_key)
-  local h f out seen=""
-  local files=()
-  for h in "$(solopreneur_config_home)" "$HOME/.claude" "${CODEX_HOME:-$HOME/.codex}"; do
-    f="$h/solopreneur.json"
-    case "$seen" in *"|$f|"*) continue ;; esac
-    seen="$seen|$f|"
-    [ -f "$f" ] && files+=("$f")
-  done
-  # Guard the expansions below: "${files[@]}" on an empty array is an error
-  # under `set -u` in the bash 3.2 that ships with macOS.
-  # `return 0`, never a bare `return`: "no value configured" is a normal answer,
-  # and a non-zero status here would abort any caller running under `set -e`.
-  [ ${#files[@]} -gt 0 ] || return 0
-
-  # Layers 1-4: current schema, each file in order.
-  for f in "${files[@]}"; do
-    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] | values' "$f" 2>/dev/null)
-    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-    out=$(jq -r --arg fk "$key" '.default[$fk] | values' "$f" 2>/dev/null)
-    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-  done
-
-  # Layer 5: legacy top-level, same file order.
-  for f in "${files[@]}"; do
-    out=$(jq -r --arg fk "$key" '.[$fk] | values' "$f" 2>/dev/null)
-    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-  done
-  return 0
-}
-
-# Write a feature subtree to .default.<key> in the primary file.
-# Sibling keys are preserved (atomic read-modify-write).
-# Usage: write_solopreneur_config greenlight '{fallback_order:["codex-bot","codex-cli"]}'
-write_solopreneur_config() {
-  local key="\$1"
-  local value_expr="\$2"
-  local primary="$(solopreneur_config_home)/solopreneur.json"
-  local tmp existing
-  mkdir -p "$(dirname "$primary")"
-  tmp=$(mktemp "${primary}.XXXXXX")
-  existing=$(cat "$primary" 2>/dev/null); [ -z "$existing" ] && existing='{}'
-  printf '%s\n' "$existing" \
-    | jq --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
-        '.default = ((.default // {}) | .[$fk] = $v)' \
-    > "$tmp" || { rm -f "$tmp"; return 1; }
-  mv "$tmp" "$primary"
-}
-
-# Write a feature subtree to .repos[<repo-key>].<key> in the primary file.
-# Sibling repos AND sibling features within the same repo are preserved.
-# Usage: write_solopreneur_repo_config preview '{path:"docs/preview"}'
-write_solopreneur_repo_config() {
-  local key="\$1"
-  local value_expr="\$2"
-  local primary="$(solopreneur_config_home)/solopreneur.json"
-  local repo_key; repo_key=$(solopreneur_repo_key)
-  local tmp existing
-  mkdir -p "$(dirname "$primary")"
-  tmp=$(mktemp "${primary}.XXXXXX")
-  existing=$(cat "$primary" 2>/dev/null); [ -z "$existing" ] && existing='{}'
-  printf '%s\n' "$existing" \
-    | jq --arg rk "$repo_key" --arg fk "$key" --argjson v "$(jq -n "$value_expr")" \
-        '.repos = ((.repos // {}) | .[$rk] = ((.[$rk] // {}) | .[$fk] = $v))' \
-    > "$tmp" || { rm -f "$tmp"; return 1; }
-  mv "$tmp" "$primary"
-}
+# --- solopreneur config helpers (sourced from shared/config.sh) ---
+# One real shell file, so no harness rewrites the helpers on the way to the
+# shell. Claude Code replaces the ${CLAUDE_SKILL_DIR} token below when it loads
+# this body; Codex does not. It is SINGLE-quoted on purpose — it is a load-time
+# token, not an environment variable, and letting the shell expand the name
+# would source whatever an inherited value happened to point at. Unreplaced, it
+# is not a directory, so substitute the absolute path of the directory holding
+# THIS SKILL.md — every harness states that path to the model.
+SOLO_SKILL_DIR='${CLAUDE_SKILL_DIR}'
+[ -d "$SOLO_SKILL_DIR" ] || SOLO_SKILL_DIR="<absolute path of the directory holding this SKILL.md>"
+source "$SOLO_SKILL_DIR/../../shared/config.sh"
 # --- end solopreneur config helpers ---
 ```
 
-Skills that only read may omit the two write helpers and `solopreneur_repo_key`
-is still required because `read_solopreneur_config` calls it. The cleanest
-rule is: inline the **whole block** verbatim. The helper is small and
-duplication keeps each skill self-contained at install time. The constraint is
-specific to SKILL.md *bodies*: markdown cannot `source` a shared file, so a
-bash block that needs the helpers has to carry them. A **script** shipped
-beside a skill has no such limit — the plugin installs as one directory, so
-`shared/` is readable at runtime (`preview/scripts/config-resolve.mjs` reads
-`shared/config.schema.json` that way). Prefer that for new code; leave the
-existing inlined copies alone.
+**`${CLAUDE_SKILL_DIR}` is a load-time token, not an environment variable.** Claude
+Code substitutes it into the body text before the model sees it (measured: a body
+carrying `"${CLAUDE_SKILL_DIR}/"scripts` arrives with an absolute path already in
+it, while `env` in a Bash call from that same session shows no such variable).
+Two consequences, and the three-line shape above is what satisfies both:
 
-When this file changes, all consuming skills must re-sync. Find the
-marker-tagged verbatim copies with:
+- **Single quotes, not double.** A harness that leaves the token alone must not
+  have the shell expand the *name* — on a machine that runs both harnesses,
+  an inherited `CLAUDE_SKILL_DIR` would otherwise pass the `[ -d ]` test and
+  source a different install's `config.sh`. Single-quoted, an unreplaced token is
+  an inert literal that fails the test and falls through to the stated path.
+- **An explicit `[ -d ]` test, not `${VAR:-default}`.** The `:-` form asks the
+  shell for a value the shell never had, so on Claude it would silently take the
+  fallback branch — sourcing a literal `<absolute path…>` — if the substituter
+  matched only the bare token. Testing the resolved value is correct whether the
+  token was replaced or not.
+
+The `SCRIPTS=` line in `greenlight/SKILL.md` uses the same pattern for the same
+reasons.
+
+**Why a file rather than a copy in each body.** The helpers take positional
+parameters, and the harnesses disagree about those: Claude Code substitutes
+bare `$N` in a skill body on every load and consumes the backslash of `\$N`,
+while Codex substitutes nothing and passes the escape through untouched. Text
+that binds `$1` correctly under one binds a literal string under the other, and
+a config read that silently returns empty is the quiet kind of failure — the
+model may even repair it by rewriting the shell it was told to run, which makes
+correctness depend on improvisation rather than on execution. A `.sh` file is
+rewritten by neither harness. The plugin installs as one directory, so
+`shared/` is readable at runtime; the precedent is
+`preview/scripts/config-resolve.mjs` reading `shared/config.schema.json` the
+same way. Prefer a shipped file over inlined shell for new code.
+
+Skills that only read still get all five helpers — sourcing is all-or-nothing,
+and `read_solopreneur_config` calls `solopreneur_repo_key` regardless.
+
+Find every consumer with:
 
 ```bash
 grep -rl "# --- solopreneur config helpers" plugins/solopreneur/skills/
 ```
 
-**`tests/config-helpers.test.mjs` fails when a copy drifts**, comparing each
-one against this file modulo its own indentation (greenlight's copy sits inside
-a numbered list item, so it is indented). That test is the reason a fix here
-can no longer be left half-applied; before it existed, nothing checked. It also
-executes the block, so the cascade itself is covered — including the rule that
+**`tests/config-helpers.test.mjs` fails when a consumer re-inlines the
+helpers.** For each of the five it asserts the marker block sources
+`../../shared/config.sh`, defines no functions — in any of bash's three
+declaration forms, `name()` / `name ()` / `function name` — and carries no
+positional parameter in any form, the thing that was broken. The behaviour half sources
+`config.sh` itself, so the cascade is covered directly, including the rule that
 "nothing configured" returns an empty string with a **zero** status, which is
 what keeps callers running under `set -e` alive.
 
 One consumer carries a bespoke derivative WITHOUT the marker —
 `preview/scripts/deploy.sh`'s `_preview_repo_key`, which re-copies only the
 repo-key URL normalization (it anchors at `$DIR` instead of cwd, so it cannot
-inline the block verbatim). The marker grep above misses it. List every
+source the shared helper as-is). The marker grep above misses it. List every
 normalization copy that lacks the marker (currently just deploy.sh) with
 `-F` fixed-string match — a BRE pattern silently matches nothing on BSD grep:
 
@@ -424,9 +340,13 @@ registered here by hand:
 - `preview/scripts/config-resolve.mjs` — `legacyPreviewValues()` and the
   layer 4/5 file locations restate this file's legacy layout in JavaScript. It
   only ever **reads and reports** that layout; it never writes a legacy file.
-- `greenlight/scripts/reviewer-state.mjs` — restates the primary file's location
-  (`$CLAUDE_CONFIG_DIR/solopreneur.json`, else `~/.claude/…`) in JavaScript, and
-  unlike every other entry in this list it **writes**: `record` merges into
+- `greenlight/scripts/reviewer-state.mjs` — restates `solopreneur_config_home`
+  in JavaScript: `CODEX_THREAD_ID` set → `${CODEX_HOME:-~/.codex}`, else
+  `${CLAUDE_CONFIG_DIR:-~/.claude}`, then `solopreneur.json` under it. Detecting
+  the harness there rather than making greenlight export `CLAUDE_CONFIG_DIR` on
+  each call is deliberate — a missed call would write reviewer state into the
+  wrong harness's home. Unlike every other entry in this list it **writes**:
+  `record` merges into
   `.repos[<repo-key>].greenlight_reviewers` and nothing else. It deliberately
   does **not** restate the five-layer cascade — `fallback_order` is read by the
   shell helper and passed in as a flag, so there is only ever one implementation
@@ -452,7 +372,7 @@ registered here by hand:
 # `.solopreneur.json` — the v2 path-scoped config
 
 Everything above describes `solopreneur.json`, the **legacy** per-user feature
-config read through the 4 shell helpers. This section describes
+config read through the shell helpers in `config.sh`. This section describes
 `.solopreneur.json` (note the leading dot), a **different file** introduced for
 the preview Library.
 

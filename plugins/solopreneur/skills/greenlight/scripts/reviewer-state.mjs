@@ -103,12 +103,23 @@ function detect(tsv) {
   return [...byLogin.values()].sort((a, b) => (a.login < b.login ? -1 : a.login > b.login ? 1 : 0));
 }
 
-/** The primary config file, matching the shell helpers in shared/config.md. */
+/**
+ * The primary config file, restating `solopreneur_config_home` from
+ * shared/config.sh in JavaScript.
+ *
+ * The harness is identified by CODEX_THREAD_ID, which Codex exports on every
+ * session; CODEX_HOME only relocates that home and may be unset. Anything that
+ * is not Codex takes the historical Claude branch unchanged, so existing
+ * installs behave exactly as before. Detecting here rather than making callers
+ * export CLAUDE_CONFIG_DIR=$CODEX_HOME is the point: an improvised env var is
+ * a per-call decision, and a missed call would silently write reviewer state
+ * into the wrong harness's home.
+ */
 function configPath() {
-  const base = process.env.CLAUDE_CONFIG_DIR
-    ? path.resolve(process.env.CLAUDE_CONFIG_DIR)
-    : path.join(os.homedir(), '.claude');
-  return path.join(base, 'solopreneur.json');
+  const base = process.env.CODEX_THREAD_ID
+    ? process.env.CODEX_HOME || path.join(os.homedir(), '.codex')
+    : process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  return path.join(path.resolve(base), 'solopreneur.json');
 }
 
 /** A JSON object — arrays and null excluded, as in preview/config-resolve.mjs. */
