@@ -43,6 +43,35 @@ still works.
 This is the cheapest of the three items and the one that actually prevents the
 damage. Consider doing it alone and leaving 2 and 3 permanently deferred.
 
+### Measured 2026-08-10: a fourth failure class — silent `\$N` corruption
+
+A minimal probe plugin (SKILL.md body containing `$1`, `\$1`, `$ARGUMENTS`)
+installed into Codex and driven via `codex exec` showed that **Codex performs
+no argument substitution on skill bodies and does not consume backslash
+escapes**: the model received every probe byte-for-byte, with the invocation
+arguments appended separately.
+
+Claude Code substitutes `$N` on every load, which is why commit `418dd5c`
+escaped bare `$N` as `\$N` in the native skill bodies. On Codex that escape
+arrives intact, so `local key="\$1"` in the inlined config helper binds `key`
+to the literal string `$1`, every jq path in the five-layer cascade misses,
+and `read_solopreneur_config` returns empty. The skill then runs with
+defaults as if no config existed — no error, no stop.
+
+That is a failure class the guard list above does not cover: not an abandoned
+side effect, not a missing tool, but **silent wrong behavior** — the workflow
+appears to work while ignoring the operator's configuration. Affected native
+bodies (escaped-`$N` counts): `merge-pr` (8), `worktree-handoff` (6),
+`todos-cleanup` (5), `todos-babysit` (5), `greenlight` (5).
+
+The escape requirements are mutually exclusive at the body level: Claude needs
+`\$N`, Codex needs bare `$N`. The exit is to stop interpolating shell that
+uses positional parameters in skill bodies at all — move it into script files,
+which neither harness rewrites. `preview` already made this move
+(`scripts/config-resolve.mjs`, PR #147), and the portability spec's rollout
+PR 5 (one executable config/plugin-root resolver) is the same fix for the
+remaining five bodies.
+
 ## 2. Compatibility registry (`skills-compatibility.json`)
 
 Rollout PR 3. A root-level registry classifying every discovered
