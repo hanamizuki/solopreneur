@@ -1013,6 +1013,19 @@ test('a marked independent reviewer keeps the halt retryable', () => {
   assert.equal(out.gateBlock, 'unavailable', 'the marked reviewer can still be retried');
 });
 
+test('an unidentified reviewer keeps the halt retryable', () => {
+  // Its family is UNKNOWN, not host: the attended identify prompt can still bind
+  // it to an independent recipe. Concluding `host-family` from the identified
+  // candidates alone would emit a non-retryable halt and skip that prompt.
+  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', ''],
+    { stdin: BOTS([{ login: 'brand-new[bot]' }]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.needsPrompt, true);
+  assert.equal(out.available[0].recipe, null, 'unidentified: family cannot be known');
+  assert.equal(out.gateBlock, 'unavailable');
+});
+
 test('--host-family is honoured without the env var', () => {
   const { stdout } = run([
     'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot', '--host-family', 'openai',

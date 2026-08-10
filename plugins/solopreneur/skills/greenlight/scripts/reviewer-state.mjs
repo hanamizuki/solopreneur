@@ -700,10 +700,16 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate, hos
   // `host-family` would send a recoverable round to a non-retryable halt and
   // skip the very prompt that fixes it. A configured ladder needs no equivalent:
   // it lists ids outright, available or not.
+  //
+  // Nulls are KEPT, never filtered out. A null recipe is an unidentified
+  // reviewer, and its family is unknown, not host — the attended prompt can bind
+  // it to an independent recipe. Dropping the unknowns would let `every` below
+  // conclude "all host-family" from the survivors alone, which is how an
+  // identifiable reviewer would get a non-retryable halt instead of the identify
+  // prompt. `recipeFor(null)` is null, so an unknown keeps `every` false.
   const authorized = wanted ?? (fallbackOrder.length > 0
     ? fallbackOrder
-    : [...selected.map((r) => r.recipe), ...marked.map((m) => m.recipe), 'codex-bot']
-      .filter(Boolean));
+    : [...selected.map((r) => r.recipe), ...marked.map((m) => m.recipe), 'codex-bot']);
   const gateBlock = gateEntry !== null ? null
     : (authorized.length > 0 && authorized.every((id) => recipeFor(id) && !independent(id))
       ? 'host-family' : 'unavailable');
