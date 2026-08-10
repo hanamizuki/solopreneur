@@ -260,12 +260,25 @@ functions of its own:
 ```bash
 # --- solopreneur config helpers (sourced from shared/config.sh) ---
 # One real shell file, so no harness rewrites the helpers on the way to the
-# shell. Substitute the absolute path of the directory holding THIS SKILL.md —
-# every harness states it to the model. $CLAUDE_SKILL_DIR is a Claude Code
-# shortcut only; Codex never sets it, and it can be unset on Claude too.
-source "${CLAUDE_SKILL_DIR:-<absolute path of the directory holding this SKILL.md>}/../../shared/config.sh"
+# shell. Claude Code fills in ${CLAUDE_SKILL_DIR} when it loads this body; it is
+# a load-time token, not an environment variable, and Codex does not fill it in.
+# When it did not resolve to a directory, substitute the absolute path of the
+# directory holding THIS SKILL.md — every harness states that path to the model.
+SOLO_SKILL_DIR="${CLAUDE_SKILL_DIR}"
+[ -d "$SOLO_SKILL_DIR" ] || SOLO_SKILL_DIR="<absolute path of the directory holding this SKILL.md>"
+source "$SOLO_SKILL_DIR/../../shared/config.sh"
 # --- end solopreneur config helpers ---
 ```
+
+**`${CLAUDE_SKILL_DIR}` is a load-time token, not an environment variable.** Claude
+Code substitutes it into the body text before the model sees it (measured: a body
+carrying `"${CLAUDE_SKILL_DIR}/"scripts` arrives with an absolute path already in
+it, while `env` in a Bash call from that same session shows no such variable).
+That is why the fallback is an explicit `[ -d ]` test rather than a shell
+`${VAR:-default}`: if a harness leaves the token alone, the shell expands it to
+the empty string, and `:-` would then silently take the fallback branch on Claude
+too. Testing the resolved value is the one form that is correct under both
+behaviors. The `SCRIPTS=` line in `greenlight/SKILL.md` uses the same pattern.
 
 **Why a file rather than a copy in each body.** The helpers take positional
 parameters, and the harnesses disagree about those: Claude Code substitutes
