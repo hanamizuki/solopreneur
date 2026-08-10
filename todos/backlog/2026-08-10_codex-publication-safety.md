@@ -43,6 +43,14 @@ still works.
 This is the cheapest of the three items and the one that actually prevents the
 damage. Consider doing it alone and leaving 2 and 3 permanently deferred.
 
+**Decided 2026-08-10 (Hana): Codex Autopilot V1 is not being built.** The
+platform bounds it to run-now / single-PR / attended — no Workflow or Agent
+tool, no cron — which forfeits all three of Autopilot's values (unattended
+operation, multi-PR waves, scheduling). The `autopilot` guard above is
+therefore the end state, not a stopgap. Revisit only if Codex ships subagent
+or scheduling primitives, or real demand appears once Greenlight's Codex mode
+is in use.
+
 ### Measured 2026-08-10: a fourth failure class — silent `\$N` corruption
 
 A minimal probe plugin (SKILL.md body containing `$1`, `\$1`, `$ARGUMENTS`)
@@ -61,7 +69,7 @@ defaults as if no config existed — no error, no stop.
 That is a failure class the guard list above does not cover: not an abandoned
 side effect, not a missing tool, but **silent wrong behavior** — the workflow
 appears to work while ignoring the operator's configuration. Affected native
-bodies (escaped-`$N` counts): `merge-pr` (8), `worktree-handoff` (6),
+bodies (escaped-`$N` occurrences): `merge-pr` (10), `worktree-handoff` (6),
 `todos-cleanup` (5), `todos-babysit` (5), `greenlight` (5).
 
 The escape requirements are mutually exclusive at the body level: Claude needs
