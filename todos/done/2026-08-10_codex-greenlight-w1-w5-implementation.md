@@ -43,3 +43,38 @@ PR CI.
 - Claude Code behavior must not change (A3): same gate selection, same
   reports, drift test replaced not deleted.
 - Do not touch vendored plugins.
+
+## Outcome — done 2026-08-10
+
+Both PRs landed via `/autopilot`
+(plan: `docs/loops/2026-08-10_codex-greenlight-w1-w5/`).
+
+| PR | Scope | Result |
+|---|---|---|
+| [#161](https://github.com/hanamizuki/solopreneur/pull/161) | W1 — `shared/config.sh` extraction | merged `a9b4dc8`; 2 review rounds, 2 fixed, 1 pushed back |
+| [#162](https://github.com/hanamizuki/solopreneur/pull/162) | W2-W5 — `claude-cli` recipe, `family` column, host-aware gate, S/M bound, degraded docs | merged `e7613a0`; 10 review rounds, 20 fixed, 2 pushed back |
+
+Verified independently after each merge, not taken from the subagents' reports:
+
+- `grep -rE '\\\$[0-9@*{]' plugins/solopreneur/skills/*/SKILL.md` returns
+  nothing — W1's measurable bar.
+- `shared` suite 17 pass; `greenlight` suite **112 pass** (89 before this work,
+  91 after W1), zero failures, no test deleted.
+- Every registry recipe declares a `family`; `claude-cli` is
+  `local-cli` / `anthropic`.
+- **A4 behaviorally**: on a Codex host (`CODEX_THREAD_ID` set) with only
+  openai-family candidates, `resolve` returns `gate: null` +
+  `needsPrompt: true` and a warning naming the host-family reason; an explicit
+  `--gate codex-cli` is refused the same way. On a Claude host the baseline is
+  unchanged (still gates `codex-bot`) — **A3 holds**.
+- With no `fallback_order` configured, a Codex host gates on `claude-cli`, and
+  codex-family reviewers still run as non-gate reviewers — the V1 shape works
+  end to end at the resolver level.
+
+**Still open — `A2` is deliberately NOT done here.** The end-to-end
+seeded-finding run on a real Codex host (claude-cli gate triggered → findings
+parsed → fix pushed → re-review → clean terminal report) is post-merge manual
+acceptance; it needs live reviewer loops and a throwaway PR. Publication of
+Greenlight on Codex additionally stays gated on
+[the publication-safety todo](./2026-08-10_codex-publication-safety.md), whose
+§2 now records the pre-decided `degraded` entry.

@@ -1,24 +1,32 @@
 {
-  "status": "pending",
+  "status": "done",
   "plan_dir": "docs/loops/2026-08-10_codex-greenlight-w1-w5",
-  "started_at": null,
-  "completed_at": null,
+  "started_at": "2026-08-10T14:07:28Z",
+  "completed_at": "2026-08-10T16:42:26Z",
   "prs": {
     "pr1": {
-      "number": null,
-      "status": "pending",
+      "number": 161,
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": {
+        "rounds": 2,
+        "fixed": 2,
+        "pushed_back": 1
+      }
     },
     "pr2": {
-      "number": null,
-      "status": "pending",
+      "number": 162,
+      "status": "merged",
       "worktree": null,
       "error": null,
       "retry_count": 0,
-      "review_summary": null
+      "review_summary": {
+        "rounds": 10,
+        "fixed": 20,
+        "pushed_back": 2
+      }
     }
   }
 }
