@@ -48,9 +48,9 @@ The design therefore separates two questions that must not be conflated:
 - Publish only capabilities whose support level is explicit.
 - Define parity by shared outcomes and safety invariants, not identical tool
   calls.
-- Preserve Claude Code behavior unless an approved shared contract deliberately
-  changes both engines, with Claude baselines and conformance evidence guarding
-  that migration.
+- Use current Claude Code behavior as the compatibility baseline while Codex
+  support is added. Shared safety fixes apply to both engines rather than making
+  the Codex port satisfy a stronger, unrelated contract.
 - Make drift, accidental exposure, and unsupported platform vocabulary fail in
   CI.
 
@@ -365,14 +365,11 @@ generation in one large file.
 ### Shared Greenlight contract
 
 The [cross-host reviewer contract](./2026-08-10-greenlight-cross-host-review-contract.md)
-is authoritative for internal rosters, host-specific external defaults,
-fallback, normalized reviewer evidence, and final pass semantics. Its approved
-target requires a host-native internal review on normal runs and invokes every
-available registered internal capability. Claude Code defaults to Codex CLI and
-Codex defaults to Claude CLI for its final gate. A promoted GitHub reviewer is
-available only through explicit selection or a user-configured ladder and never
-silently reorders either CLI default. Those rules are not current runtime claims;
-implementation and acceptance evidence remain part of this pilot.
+is authoritative for internal rosters, host-aware final gates, serialized review
+ordering, reviewed-head evidence, fallback, and normalized results. It preserves
+the current Claude product shape: GitHub bots and local CLIs remain valid final
+gates, while Codex adds the corresponding Bugbot and Claude CLI adapters. These
+rules are target behavior, not a claim that the Codex engine already exists.
 
 The following remain platform-independent:
 
@@ -386,8 +383,10 @@ The following remain platform-independent:
   external gate is the only reviewer that can end the loop clean, and a primary
   reviewer that returned findings cannot be replaced merely to obtain a clean
   result from its fallback.
-- The independent reviewer must inspect the final diff after the last mutation,
-  not only an earlier revision.
+- Greenlight freezes one PR head SHA before triggering the final gate, prohibits
+  mutation while that review is in flight, and accepts clean only for that head.
+- Any finding, CI repair, merge preparation, or other later mutation creates a
+  new head and invalidates the earlier clean result.
 - Deterministic GitHub parsing, state persistence, report generation, and
   artifact validation.
 - Scenarios that assert the same outcome and safety invariant on both
@@ -422,28 +421,16 @@ evidence requirements, or acceptance criteria.
   than relying on narrated delegation on every supported Codex surface.
 - Reviewer independence and final-diff coverage are verified for every
   supported host surface.
-- The deterministic and authenticated cases in the cross-host reviewer
-  contract prove internal availability-to-invocation, host-aware defaults,
-  anti-shopping fallback, stale-target invalidation, and live clean plus seeded-
-  bug evidence for each claimed default CLI gate before Codex Greenlight, or
-  either host, can be advertised as conforming to the new cross-host contract.
-  Each host also requires the paired live bundled-specialist evidence in L03;
-  an unproven specialist adapter blocks that host's conformance claim, while a
-  later transient failure of an already promoted adapter remains a visible
-  `incomplete-review` outcome. Each optional Superpowers, gstack, or Ponytail
-  recipe also requires its own paired parser-valid clean and seeded-finding L03
-  branch on every host where that recipe is promoted; an unavailable or
-  unpromoted optional recipe does not block host conformance, and a transient
-  post-promotion failure remains `incomplete-review`. Claude additionally requires the L04 direct-
-  native binding, and Codex requires the full L05 native-provenance and wrong-
-  context branches. A verified remote finding cannot enter disposition or the
-  fixer until its current-generation blocking windows settle.
-  A conditional GitHub candidate requires P11 or L14 only before that candidate
-  is enabled or advertised, using the real vendor App and an actually supported
-  parent-only permission-authority profile. An unsafe or failed candidate probe
-  leaves it
-  ineligible without blocking CLI-default engine conformance. This does not
-  withdraw the existing Claude-oriented runtime.
+- Cross-host acceptance proves the host-native minimum, installed-to-invoked
+  optional reviewers, host-aware gate selection, anti-shopping fallback,
+  reviewed-head binding, and a clean plus seeded-finding result for every
+  promoted external adapter. GitHub adapters are calibrated against their real
+  formal-review, comment, or reaction signals; CLI adapters must return an
+  explicit structured verdict. Missing optional integrations do not block host
+  conformance, while a failed invocation remains visible.
+- The engine serializes review and mutation instead of introducing a separate
+  remote settlement, App-permission, or crash-recovery protocol. Stronger
+  concurrency hardening is shared follow-up work, not a Codex parity gate.
 - Interrupted, partial, and failed reviewer runs produce the same classified
   terminal result on both platforms.
 - No complete Greenlight skill body is copied into a second tree.
@@ -478,9 +465,9 @@ the agent-distribution prerequisite and does not certify marketer skill parity.
 | 3. Registry safety | Add the compatibility registry, conditional schema validation, and generated inventory report | Re-enumerate every skill at that commit; current `main` contains 106, but discovery is authoritative |
 | 4. Publication safety | Prove and implement the filtered Codex publication view | Local and git-ref installs expose only registry-included skills through the declared root; inert snapshot bytes do not count as exposure |
 | 5. Shared core foundations | Add one executable config/plugin-root resolver and platform-resource validation | Greenlight scripts and prompts resolve the same platform-aware config; existing Claude behavior remains unchanged |
-| 6. Greenlight baseline and contract | Establish all-mode Claude baselines, implement the approved cross-host reviewer contract, then extract shared protocol, schemas, scripts, scenarios, and the Claude engine | Host-native internal review, available-to-must-run discovery, host-specific gate defaults, anti-shopping fallback, Claude conformance, reviewer independence, and final-diff invariants pass before Codex publication |
+| 6. Greenlight baseline and contract | Establish all-mode Claude baselines, implement the serialized cross-host reviewer contract, then extract shared schemas, scripts, scenarios, and the Claude engine | Host-native internal review, available-to-must-run discovery, host-aware gates, reviewed-head binding, anti-shopping fallback, and Claude conformance pass before Codex publication |
 | 7. Greenlight Codex PR mode | Add unattended pull-request review on Codex and test every claimed surface | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
-| 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Neither dependency may mutate the reviewed head after final Greenlight approval |
+| 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Any merge-preparation mutation invalidates the old clean and reruns Greenlight plus CI for the new head |
 | 9. Autopilot Codex V1 | Add run-now, single-pull-request orchestration with explicit worktree ownership | Greenlight and CI re-run after every mutation; unavailable specialists fall back to a generic Codex worker |
 | 10. Core workflow expansion | Add Greenlight's remaining modes, then Autopilot multi-PR waves | Each mode earns its own support status and preserves the shared contract |
 | 11. Scheduling | Add Codex App scheduling as a separate capability | No CLI or run-now path claims Claude Cron parity |
@@ -495,7 +482,8 @@ result summary that Autopilot consumes. `plan-review internal` and `merge-pr`
 must also have a supported dependency closure on that surface. A CI repair or
 any other head mutation invalidates the prior Greenlight result: Greenlight and
 CI must run again before merge. The V1 `merge-pr` seam must not perform a new
-post-Greenlight consolidation mutation.
+post-Greenlight consolidation mutation unless it reruns both gates afterward;
+prefer moving consolidation before final review.
 
 App scheduling is a later capability. The initial Autopilot Codex scope is
 run-now and single-PR only; a mapping must not pretend to reproduce Claude Cron,

@@ -1735,16 +1735,15 @@ Attended runs then ask **one** question, offering:
   documented successor to `codex-bot` in the same family, and `config.md`'s
   recommended `fallback_order` already pairs them.
 
-- **Try a tool with no history here.** The current runtime has no GitHub App
-  permission-authority adapter. Ordinary `gh` authentication cannot use the
-  App-specific installation endpoints; organization-owner inventory is a
-  limited exception and still cannot by itself prove membership for a selected-
-  repository installation. Therefore this remains a question, not a lookup.
-  The user picks a registry recipe and its trigger is posted this round — **a
-  trigger needs only the recipe string, never a login**. A responder matching
-  the registry's verified logins identifies itself; an unknown responder becomes
-  an unidentified bot to identify next time; a silent window **leaves no state
-  behind**, so retrying later costs one more answer and nothing else.
+- **Try a tool with no history here.** GitHub exposes no way to ask which Apps a
+  repo has installed (`/user/installations` needs an App token, the per-repo
+  endpoint needs an App JWT, and these reviewers create no check runs), so this
+  is a question, not a lookup. The user picks a registry recipe and its trigger
+  is posted this round — **a trigger needs only the recipe string, never a
+  login**. A responder matching the registry's verified logins identifies itself;
+  an unknown responder becomes an unidentified bot to identify next time; a
+  silent window **leaves no state behind**, so retrying later costs one more
+  answer and nothing else.
 
 - **Halt.**
 
