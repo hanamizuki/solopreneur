@@ -99,10 +99,9 @@ REPO_KEY="$(_preview_repo_key)"
 
 # --- read a preview config value: per-repo override -> user-global default ---
 # Cascade (first non-null wins), mirroring shared/config.md layers 1-4:
-#   1. primary  .repos[<rk>].preview.<key>
-#   2. primary  .default.preview.<key>
-#   3. fallback .repos[<rk>].preview.<key>
-#   4. fallback .default.preview.<key>
+#   1. session home .repos[<rk>].preview.<key>
+#   2. session home .default.preview.<key>
+#   3. each remaining config home, in the same two-step order
 # Uses `| values` (NOT `// empty`) so a literal `false` (autoProtect:false) is
 # preserved rather than dropped as if unset — keep this value-semantics in
 # sync with shared/config.md's reader. Reading per key (not the whole
@@ -114,21 +113,34 @@ REPO_KEY="$(_preview_repo_key)"
 # spliced into the jq program — a key with special characters cannot alter the
 # query.
 # Returns empty when unset, file missing, or jq unavailable.
+# NOTE: this reader falls back per dotted key, so `projects.default` and
+# `autoProtect` can come from different homes — the shared
+# `read_solopreneur_config` returns one whole feature subtree instead. That
+# difference predates the Codex home being added here; widening the search from
+# two homes to three does not change its character. Converting this to the
+# shared reader is tracked in todos/backlog/2026-08-10_deploy-sh-shared-reader.md.
 read_preview_config() {
   local key="$1"
-  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
-  local fallback="$HOME/.claude/solopreneur.json"
-  local out f
+  local out f h session seen=""
   command -v jq >/dev/null 2>&1 || return 0
-  for f in "$primary" "$fallback"; do
-    if [ -f "$f" ]; then
-      out=$(jq -r --arg rk "$REPO_KEY" --arg key "$key" '.repos[$rk].preview | getpath($key | split(".")) | values' "$f" 2>/dev/null || true)
-      if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
-      out=$(jq -r --arg key "$key" '.default.preview | getpath($key | split(".")) | values' "$f" 2>/dev/null || true)
-      if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
-    fi
-    # read once when primary and fallback resolve to the same file
-    if [ "$primary" = "$fallback" ]; then break; fi
+  # Same home order as shared/config.md's read cascade: the running harness's
+  # own home first, then each harness's user-global default. Codex exports
+  # CODEX_THREAD_ID on every session; CODEX_HOME only relocates its home.
+  if [ -n "${CODEX_THREAD_ID:-}" ]; then
+    session="${CODEX_HOME:-$HOME/.codex}"
+  else
+    session="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  fi
+  for h in "$session" "$HOME/.claude" "${CODEX_HOME:-$HOME/.codex}"; do
+    f="$h/solopreneur.json"
+    # Read each distinct file once, however the homes happen to resolve.
+    case "$seen" in *"|$f|"*) continue ;; esac
+    seen="$seen|$f|"
+    [ -f "$f" ] || continue
+    out=$(jq -r --arg rk "$REPO_KEY" --arg key "$key" '.repos[$rk].preview | getpath($key | split(".")) | values' "$f" 2>/dev/null || true)
+    if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
+    out=$(jq -r --arg key "$key" '.default.preview | getpath($key | split(".")) | values' "$f" 2>/dev/null || true)
+    if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
   done
   return 0
 }

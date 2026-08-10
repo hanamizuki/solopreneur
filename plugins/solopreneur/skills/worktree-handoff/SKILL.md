@@ -57,48 +57,61 @@ solopreneur_repo_key() {
   printf '%s\n' "$PWD"
 }
 
+# The config home this session WRITES to: the one owned by the harness that is
+# actually running. Codex exports CODEX_THREAD_ID on every session, while
+# CODEX_HOME exists only when the user sets one — so the thread ID identifies
+# the harness and CODEX_HOME merely relocates its home. Anything that is not
+# Codex expands to the historical Claude expression character for character,
+# so existing installs behave exactly as before.
+solopreneur_config_home() {
+  if [ -n "${CODEX_THREAD_ID:-}" ]; then
+    printf '%s\n' "${CODEX_HOME:-$HOME/.codex}"
+  else
+    printf '%s\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  fi
+}
+
 # Read a feature subtree from solopreneur.json with the 5-layer cascade:
-# 1. primary .repos[<repo-key>].<feature>
-# 2. primary .default.<feature>
-# 3. fallback .repos[<repo-key>].<feature>
-# 4. fallback .default.<feature>
-# 5. legacy top-level .<feature> (primary then fallback)
-# First non-null wins. Each layer is checked inline (no nested helper
-# function — bash function declarations are global, even nested ones, and
-# would pollute the user's shell namespace).
+# 1. this session's config home .repos[<repo-key>].<feature>
+# 2. this session's config home .default.<feature>
+# 3. the next config home       .repos[<repo-key>].<feature>
+# 4. the next config home       .default.<feature>
+# 5. legacy top-level .<feature>, visiting the homes in that same order
+# First non-null wins. Reads visit every harness's home rather than detecting
+# one: a machine with a single harness has a single real file, and a machine
+# with both gets a deterministic order instead of a guess. Duplicates are
+# dropped, so the common case still touches exactly one file.
 read_solopreneur_config() {
   local key="\$1"
-  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
-  local fallback="$HOME/.claude/solopreneur.json"
   local repo_key; repo_key=$(solopreneur_repo_key)
-  local out
+  local h f out seen=""
+  local files=()
+  for h in "$(solopreneur_config_home)" "$HOME/.claude" "${CODEX_HOME:-$HOME/.codex}"; do
+    f="$h/solopreneur.json"
+    case "$seen" in *"|$f|"*) continue ;; esac
+    seen="$seen|$f|"
+    [ -f "$f" ] && files+=("$f")
+  done
+  # Guard the expansions below: "${files[@]}" on an empty array is an error
+  # under `set -u` in the bash 3.2 that ships with macOS.
+  # `return 0`, never a bare `return`: "no value configured" is a normal answer,
+  # and a non-zero status here would abort any caller running under `set -e`.
+  [ ${#files[@]} -gt 0 ] || return 0
 
-  # Layer 1: primary .repos[<repo-key>].<feature>
-  if [ -f "$primary" ]; then
-    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] | values' "$primary" 2>/dev/null)
+  # Layers 1-4: current schema, each file in order.
+  for f in "${files[@]}"; do
+    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] | values' "$f" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-    # Layer 2: primary .default.<feature>
-    out=$(jq -r --arg fk "$key" '.default[$fk] | values' "$primary" 2>/dev/null)
+    out=$(jq -r --arg fk "$key" '.default[$fk] | values' "$f" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-  fi
+  done
 
-  # Layers 3 + 4: fallback file, only if different from primary
-  if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    out=$(jq -r --arg rk "$repo_key" --arg fk "$key" '.repos[$rk][$fk] | values' "$fallback" 2>/dev/null)
+  # Layer 5: legacy top-level, same file order.
+  for f in "${files[@]}"; do
+    out=$(jq -r --arg fk "$key" '.[$fk] | values' "$f" 2>/dev/null)
     if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-    out=$(jq -r --arg fk "$key" '.default[$fk] | values' "$fallback" 2>/dev/null)
-    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-  fi
-
-  # Layer 5: legacy top-level — primary then fallback
-  if [ -f "$primary" ]; then
-    out=$(jq -r --arg fk "$key" '.[$fk] | values' "$primary" 2>/dev/null)
-    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-  fi
-  if [ "$primary" != "$fallback" ] && [ -f "$fallback" ]; then
-    out=$(jq -r --arg fk "$key" '.[$fk] | values' "$fallback" 2>/dev/null)
-    if [ -n "$out" ]; then printf '%s\n' "$out"; return; fi
-  fi
+  done
+  return 0
 }
 
 # Write a feature subtree to .default.<key> in the primary file.
@@ -107,7 +120,7 @@ read_solopreneur_config() {
 write_solopreneur_config() {
   local key="\$1"
   local value_expr="\$2"
-  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local primary="$(solopreneur_config_home)/solopreneur.json"
   local tmp existing
   mkdir -p "$(dirname "$primary")"
   tmp=$(mktemp "${primary}.XXXXXX")
@@ -125,7 +138,7 @@ write_solopreneur_config() {
 write_solopreneur_repo_config() {
   local key="\$1"
   local value_expr="\$2"
-  local primary="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/solopreneur.json"
+  local primary="$(solopreneur_config_home)/solopreneur.json"
   local repo_key; repo_key=$(solopreneur_repo_key)
   local tmp existing
   mkdir -p "$(dirname "$primary")"
