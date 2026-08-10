@@ -717,15 +717,26 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate, hos
   // skip the very prompt that fixes it. A configured ladder needs no equivalent:
   // it lists ids outright, available or not.
   //
-  // Nulls are KEPT, never filtered out. A null recipe is an unidentified
-  // reviewer, and its family is unknown, not host — the attended prompt can bind
-  // it to an independent recipe. Dropping the unknowns would let `every` below
-  // conclude "all host-family" from the survivors alone, which is how an
-  // identifiable reviewer would get a non-retryable halt instead of the identify
-  // prompt. `recipeFor(null)` is null, so an unknown keeps `every` false.
-  const authorized = wanted ?? (fallbackOrder.length > 0
-    ? fallbackOrder
-    : [...selected.map((r) => r.recipe), ...marked.map((m) => m.recipe), 'codex-bot']);
+  // Two kinds of "unknown" live here and they must be treated OPPOSITELY:
+  //
+  //   a CONFIGURED id that resolves to nothing (`fallback_order: [..., "typo"]`,
+  //   a renamed recipe) names no reviewer and can never become one, so it is
+  //   dropped. Letting it stand would make `every` false forever, report
+  //   `unavailable`, and send an unattended run round-tripping through a
+  //   retryable halt that waiting can never fix — while the pre-flight's
+  //   `host-family` append, the one thing that WOULD fix it, never fires.
+  //
+  //   a DETECTED entry with a null recipe is an unidentified but real reviewer.
+  //   Its family is unknown, not host, and the attended prompt can bind it to an
+  //   independent recipe — so it is KEPT, and keeps `every` false on purpose.
+  //
+  // Collapsing the two is how one of them always ends up misrouted.
+  const known = (ids) => ids.filter((id) => recipeFor(id));
+  const authorized = wanted
+    ? known(wanted)
+    : (fallbackOrder.length > 0
+      ? known(fallbackOrder)
+      : [...selected.map((r) => r.recipe), ...marked.map((m) => m.recipe), 'codex-bot']);
   const gateBlock = gateEntry !== null ? null
     : (authorized.length > 0 && authorized.every((id) => recipeFor(id) && !independent(id))
       ? 'host-family' : 'unavailable');

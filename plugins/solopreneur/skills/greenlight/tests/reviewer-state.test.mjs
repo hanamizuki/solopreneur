@@ -1013,6 +1013,19 @@ test('a marked independent reviewer keeps the halt retryable', () => {
   assert.equal(out.gateBlock, 'unavailable', 'the marked reviewer can still be retried');
 });
 
+test('a stale id in the ladder does not veto the host-family verdict', () => {
+  // `codex-bot,typo` on a Codex host authorizes no independent gate — the typo
+  // names nothing and can never become a reviewer. Reporting `unavailable` here
+  // would route an unattended run to a retryable halt that waiting can never
+  // fix, while suppressing the one pre-flight branch (host-family) that would
+  // authorize an independent CLI.
+  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot,typo'],
+    { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.gateBlock, 'host-family');
+});
+
 test('an unidentified reviewer keeps the halt retryable', () => {
   // Its family is UNKNOWN, not host: the attended identify prompt can still bind
   // it to an independent recipe. Concluding `host-family` from the identified
