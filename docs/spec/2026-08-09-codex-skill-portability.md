@@ -8,7 +8,9 @@ implementation pending
 **Scope:** every skill published by the seven solopreneur plugins; the
 architecture baseline contains 104 and current `main` contains 106
 
-**Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md), [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)
+**Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md),
+[pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md),
+[Codex Greenlight port](./2026-08-10-codex-greenlight-port.md)
 
 The related specs remain authoritative for agent-distribution status.
 Final-byte acceptance SHA `c8bae2710051da659afad879c226e202ad3368d4`
@@ -46,7 +48,9 @@ The design therefore separates two questions that must not be conflated:
 - Publish only capabilities whose support level is explicit.
 - Define parity by shared outcomes and safety invariants, not identical tool
   calls.
-- Keep Claude Code behavior unchanged while Codex support is added.
+- Use current Claude Code behavior as the compatibility baseline while Codex
+  support is added. Shared safety fixes apply to both engines rather than making
+  the Codex port satisfy a stronger, unrelated contract.
 - Make drift, accidental exposure, and unsupported platform vocabulary fail in
   CI.
 
@@ -360,6 +364,15 @@ generation in one large file.
 
 ### Shared Greenlight contract
 
+The [Codex Greenlight port](./2026-08-10-codex-greenlight-port.md) scopes what
+actually differs between the two hosts. There is no separate cross-host
+contract: the shipped `greenlight/SKILL.md` is the specification, and its
+pre-flight, cursor, polling, classification, and fallback logic is already
+host-independent shell. V1 is `/greenlight external` with a Claude CLI gate —
+the subset that needs no subagent — running from the same skill body. Whether
+Codex can drive that loop end to end is settled by measurement against a real
+pull request, not by contract.
+
 The following remain platform-independent:
 
 - Target selection and unattended versus interactive mode.
@@ -368,8 +381,14 @@ The following remain platform-independent:
 - Halt, flag, pass, and failure taxonomy and terminal-state priority.
 - Reviewer independence groups for the host and every reviewer. A reviewer in
   the host's equivalence group cannot satisfy the independent-review gate.
-- The independent reviewer must inspect the final diff after the last mutation,
-  not only an earlier revision.
+- Internal review is advisory and cannot grant final pass. The selected
+  external gate is the only reviewer that can end the loop clean, and a primary
+  reviewer that returned findings cannot be replaced merely to obtain a clean
+  result from its fallback.
+- Greenlight freezes one PR head SHA before triggering the final gate, prohibits
+  mutation while that review is in flight, and accepts clean only for that head.
+- Any finding, CI repair, merge preparation, or other later mutation creates a
+  new head and invalidates the earlier clean result.
 - Deterministic GitHub parsing, state persistence, report generation, and
   artifact validation.
 - Scenarios that assert the same outcome and safety invariant on both
@@ -404,6 +423,17 @@ evidence requirements, or acceptance criteria.
   than relying on narrated delegation on every supported Codex surface.
 - Reviewer independence and final-diff coverage are verified for every
   supported host surface.
+- Cross-host acceptance proves that the `external` subset reaches the same
+  terminal outcome on both hosts: gate selection, anti-shopping fallback, and a
+  clean plus seeded-finding result for each host's default CLI gate. CLI
+  verdicts are prose-parsed — no CLI in use exposes a structured verdict — so
+  the oracle is the loop's terminal classification, not a JSON payload. Missing
+  optional integrations do not block host conformance, while a failed
+  invocation remains visible.
+- Greenlight remains the only writer while a review is in flight. Binding a
+  verdict to the reviewed head, and everything downstream of it, is tracked as
+  a Claude-side defect rather than a Codex parity gate; see
+  [the head-binding todo](../../todos/backlog/2026-08-10_greenlight-head-binding.md).
 - Interrupted, partial, and failed reviewer runs produce the same classified
   terminal result on both platforms.
 - No complete Greenlight skill body is copied into a second tree.
@@ -438,9 +468,9 @@ the agent-distribution prerequisite and does not certify marketer skill parity.
 | 3. Registry safety | Add the compatibility registry, conditional schema validation, and generated inventory report | Re-enumerate every skill at that commit; current `main` contains 106, but discovery is authoritative |
 | 4. Publication safety | Prove and implement the filtered Codex publication view | Local and git-ref installs expose only registry-included skills through the declared root; inert snapshot bytes do not count as exposure |
 | 5. Shared core foundations | Add one executable config/plugin-root resolver and platform-resource validation | Greenlight scripts and prompts resolve the same platform-aware config; existing Claude behavior remains unchanged |
-| 6. Greenlight baseline and contract | Establish all-mode Claude baselines, then extract shared protocol, schemas, scripts, scenarios, and the Claude engine | Claude conformance, reviewer independence, and final-diff invariants pass before Codex publication |
+| 6. Greenlight baseline | Establish Claude baselines for the modes Codex will run, then measure whether Codex can drive the shipped Phase 3 loop end to end | The `external` subset runs from the same skill body on both hosts; every divergence is recorded before Codex publication |
 | 7. Greenlight Codex PR mode | Add unattended pull-request review on Codex and test every claimed surface | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
-| 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Neither dependency may mutate the reviewed head after final Greenlight approval |
+| 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Any merge-preparation mutation invalidates the old clean and reruns Greenlight plus CI for the new head |
 | 9. Autopilot Codex V1 | Add run-now, single-pull-request orchestration with explicit worktree ownership | Greenlight and CI re-run after every mutation; unavailable specialists fall back to a generic Codex worker |
 | 10. Core workflow expansion | Add Greenlight's remaining modes, then Autopilot multi-PR waves | Each mode earns its own support status and preserves the shared contract |
 | 11. Scheduling | Add Codex App scheduling as a separate capability | No CLI or run-now path claims Claude Cron parity |
@@ -455,7 +485,8 @@ result summary that Autopilot consumes. `plan-review internal` and `merge-pr`
 must also have a supported dependency closure on that surface. A CI repair or
 any other head mutation invalidates the prior Greenlight result: Greenlight and
 CI must run again before merge. The V1 `merge-pr` seam must not perform a new
-post-Greenlight consolidation mutation.
+post-Greenlight consolidation mutation unless it reruns both gates afterward;
+prefer moving consolidation before final review.
 
 App scheduling is a later capability. The initial Autopilot Codex scope is
 run-now and single-PR only; a mapping must not pretend to reproduce Claude Cron,

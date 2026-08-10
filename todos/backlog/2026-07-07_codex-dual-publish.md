@@ -110,10 +110,12 @@
 - [ ] Add the minimum root-level `skills-compatibility.json`, conditional CI completeness/shape validation, and generated inventory report. Re-enumerate the current tree; do not turn this safety gate into a 106-skill parity project.
 - [ ] Prove and implement the filtered Codex publication view through local marketplace and git-ref installs. Expose only registry-included skills; unsupported reachable surfaces remain excluded or fail closed before side effects.
 - [ ] Add one executable platform-aware config/plugin-root resolver and move Greenlight's executable config/cache paths onto it without changing Claude behavior.
-- [ ] Establish Greenlight baselines for all existing Claude modes, then extract the shared contract, schemas, deterministic scripts, scenarios, and Claude engine.
-- [ ] Make Greenlight reviewer independence executable: define host/reviewer equivalence groups, require an independent reviewer of the final diff, and return a structured halt instead of clean when none is available.
-- [ ] Add and behaviorally validate Greenlight Codex pull-request mode first: unattended review, objective verification, final-diff coverage, and structured pass/halt/failure results on every claimed surface.
-- [ ] Close the Autopilot-critical dependencies only: support `plan-review internal` and a safe `merge-pr` seam that cannot mutate the reviewed head after final Greenlight approval.
+- [x] Review the proposed cross-host Greenlight contract and re-scope it. `/plan-review` found that it required behavior the shipped skill does not have, bound clean verdicts through channels that carry no commit, and folded two Claude-side defects into the port. Superseded by the [Codex Greenlight port](../../docs/spec/2026-08-10-codex-greenlight-port.md): V1 is `/greenlight external` with a Claude CLI gate, one skill body, no shared-engine extraction.
+- [ ] Measure whether Codex can read the shipped `greenlight/SKILL.md` and drive Phase 3 end to end against a real PR: trigger, round cursors, polling, terminal classification, fallback. Record where it diverges. Everything below depends on that result.
+- [ ] Add Claude CLI as a gate recipe. Resolve it through the Claude profile matching the active Codex profile, inheriting the ambient environment when that name is unset or unrecognized. The gate stays outside the coordinating host's provider family; same-family reviewers remain advisory.
+- [ ] Ship Codex `/greenlight external` V1: unattended pull-request mode, objective verification, and a structured pass/halt/failure report. No second skill body.
+- [ ] (blocked) Internal review on Codex — needs the plugin-subagent spawn question settled first. See [pilot findings](../../docs/spec/2026-07-15-codex-dual-publish-pilot-findings.md).
+- [ ] Close the Autopilot-critical dependencies only: support `plan-review internal`, and land the `merge-pr` seam tracked in [its own todo](2026-08-10_merge-pr-atomic-merge.md).
 - [ ] Add Autopilot Codex V1 as run-now, single-PR orchestration with explicit worktree ownership. Re-run Greenlight and CI after every mutation; use a generic Codex worker when a specialist is unavailable.
 
 ### Core expansion after V1
