@@ -598,11 +598,13 @@ If `MODE=post-commit`, skip PR-mode pre-flight Step 2 below; do Argument Parsing
    ```bash
    # --- solopreneur config helpers (sourced from shared/config.sh) ---
    # One real shell file, so no harness rewrites the helpers on the way to the
-   # shell. Claude Code fills in ${CLAUDE_SKILL_DIR} when it loads this body; it is
-   # a load-time token, not an environment variable, and Codex does not fill it in.
-   # When it did not resolve to a directory, substitute the absolute path of the
-   # directory holding THIS SKILL.md — every harness states that path to the model.
-   SOLO_SKILL_DIR="${CLAUDE_SKILL_DIR}"
+   # shell. Claude Code replaces the ${CLAUDE_SKILL_DIR} token below when it loads
+   # this body; Codex does not. It is SINGLE-quoted on purpose — it is a load-time
+   # token, not an environment variable, and letting the shell expand the name
+   # would source whatever an inherited value happened to point at. Unreplaced, it
+   # is not a directory, so substitute the absolute path of the directory holding
+   # THIS SKILL.md — every harness states that path to the model.
+   SOLO_SKILL_DIR='${CLAUDE_SKILL_DIR}'
    [ -d "$SOLO_SKILL_DIR" ] || SOLO_SKILL_DIR="<absolute path of the directory holding this SKILL.md>"
    source "$SOLO_SKILL_DIR/../../shared/config.sh"
    # --- end solopreneur config helpers ---
@@ -1506,13 +1508,13 @@ collect_reviewer_activity() {
   return $rc
 }
 
-# Same one documented resolution as the config-helper source line above.
-# Claude Code fills in ${CLAUDE_SKILL_DIR} when it loads this body; Codex does
-# not. When it did not resolve to a directory, substitute the absolute path of
-# the directory holding THIS SKILL.md, which every harness states to the model.
+# Same one documented resolution as the config-helper source line above, and
+# single-quoted for the same reason (a load-time token, never a shell variable).
+# Unreplaced, it is not a directory, so substitute the absolute path of the
+# directory holding THIS SKILL.md, which every harness states to the model.
 # Do NOT improvise a repo-relative path: it resolves only when the repo under
 # review happens to be this plugin's own source repo.
-SOLO_SKILL_DIR="${CLAUDE_SKILL_DIR}"
+SOLO_SKILL_DIR='${CLAUDE_SKILL_DIR}'
 [ -d "$SOLO_SKILL_DIR" ] || SOLO_SKILL_DIR="<absolute path of the directory holding this SKILL.md>"
 SCRIPTS="$SOLO_SKILL_DIR/scripts"
 REPO_KEY=$(solopreneur_repo_key)

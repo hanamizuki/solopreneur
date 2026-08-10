@@ -260,11 +260,13 @@ functions of its own:
 ```bash
 # --- solopreneur config helpers (sourced from shared/config.sh) ---
 # One real shell file, so no harness rewrites the helpers on the way to the
-# shell. Claude Code fills in ${CLAUDE_SKILL_DIR} when it loads this body; it is
-# a load-time token, not an environment variable, and Codex does not fill it in.
-# When it did not resolve to a directory, substitute the absolute path of the
-# directory holding THIS SKILL.md — every harness states that path to the model.
-SOLO_SKILL_DIR="${CLAUDE_SKILL_DIR}"
+# shell. Claude Code replaces the ${CLAUDE_SKILL_DIR} token below when it loads
+# this body; Codex does not. It is SINGLE-quoted on purpose — it is a load-time
+# token, not an environment variable, and letting the shell expand the name
+# would source whatever an inherited value happened to point at. Unreplaced, it
+# is not a directory, so substitute the absolute path of the directory holding
+# THIS SKILL.md — every harness states that path to the model.
+SOLO_SKILL_DIR='${CLAUDE_SKILL_DIR}'
 [ -d "$SOLO_SKILL_DIR" ] || SOLO_SKILL_DIR="<absolute path of the directory holding this SKILL.md>"
 source "$SOLO_SKILL_DIR/../../shared/config.sh"
 # --- end solopreneur config helpers ---
@@ -274,11 +276,21 @@ source "$SOLO_SKILL_DIR/../../shared/config.sh"
 Code substitutes it into the body text before the model sees it (measured: a body
 carrying `"${CLAUDE_SKILL_DIR}/"scripts` arrives with an absolute path already in
 it, while `env` in a Bash call from that same session shows no such variable).
-That is why the fallback is an explicit `[ -d ]` test rather than a shell
-`${VAR:-default}`: if a harness leaves the token alone, the shell expands it to
-the empty string, and `:-` would then silently take the fallback branch on Claude
-too. Testing the resolved value is the one form that is correct under both
-behaviors. The `SCRIPTS=` line in `greenlight/SKILL.md` uses the same pattern.
+Two consequences, and the three-line shape above is what satisfies both:
+
+- **Single quotes, not double.** A harness that leaves the token alone must not
+  have the shell expand the *name* — on a machine that runs both harnesses,
+  an inherited `CLAUDE_SKILL_DIR` would otherwise pass the `[ -d ]` test and
+  source a different install's `config.sh`. Single-quoted, an unreplaced token is
+  an inert literal that fails the test and falls through to the stated path.
+- **An explicit `[ -d ]` test, not `${VAR:-default}`.** The `:-` form asks the
+  shell for a value the shell never had, so on Claude it would silently take the
+  fallback branch — sourcing a literal `<absolute path…>` — if the substituter
+  matched only the bare token. Testing the resolved value is correct whether the
+  token was replaced or not.
+
+The `SCRIPTS=` line in `greenlight/SKILL.md` uses the same pattern for the same
+reasons.
 
 **Why a file rather than a copy in each body.** The helpers take positional
 parameters, and the harnesses disagree about those: Claude Code substitutes
@@ -304,8 +316,9 @@ grep -rl "# --- solopreneur config helpers" plugins/solopreneur/skills/
 
 **`tests/config-helpers.test.mjs` fails when a consumer re-inlines the
 helpers.** For each of the five it asserts the marker block sources
-`../../shared/config.sh`, defines no functions, and carries no positional
-parameter in any form — the thing that was broken. The behaviour half sources
+`../../shared/config.sh`, defines no functions — in any of bash's three
+declaration forms, `name()` / `name ()` / `function name` — and carries no
+positional parameter in any form, the thing that was broken. The behaviour half sources
 `config.sh` itself, so the cascade is covered directly, including the rule that
 "nothing configured" returns an empty string with a **zero** status, which is
 what keeps callers running under `set -e` alive.

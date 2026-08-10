@@ -25,11 +25,13 @@ Source the cascade config helpers, then determine the operating mode:
 ```bash
 # --- solopreneur config helpers (sourced from shared/config.sh) ---
 # One real shell file, so no harness rewrites the helpers on the way to the
-# shell. Claude Code fills in ${CLAUDE_SKILL_DIR} when it loads this body; it is
-# a load-time token, not an environment variable, and Codex does not fill it in.
-# When it did not resolve to a directory, substitute the absolute path of the
-# directory holding THIS SKILL.md — every harness states that path to the model.
-SOLO_SKILL_DIR="${CLAUDE_SKILL_DIR}"
+# shell. Claude Code replaces the ${CLAUDE_SKILL_DIR} token below when it loads
+# this body; Codex does not. It is SINGLE-quoted on purpose — it is a load-time
+# token, not an environment variable, and letting the shell expand the name
+# would source whatever an inherited value happened to point at. Unreplaced, it
+# is not a directory, so substitute the absolute path of the directory holding
+# THIS SKILL.md — every harness states that path to the model.
+SOLO_SKILL_DIR='${CLAUDE_SKILL_DIR}'
 [ -d "$SOLO_SKILL_DIR" ] || SOLO_SKILL_DIR="<absolute path of the directory holding this SKILL.md>"
 source "$SOLO_SKILL_DIR/../../shared/config.sh"
 # --- end solopreneur config helpers ---

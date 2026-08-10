@@ -62,8 +62,13 @@ for (const skill of CONSUMERS) {
       `${skill}/SKILL.md must source "…/../../shared/config.sh" inside the marker block`);
 
     // A re-inlined helper is the regression this whole refactor exists to
-    // prevent — it would drag `$N` back into a skill body with it.
-    const defs = block.filter((l) => /^[a-z_]+\(\)/.test(l));
+    // prevent — it would drag `$N` back into a skill body with it. All three
+    // bash declaration forms count: `name()`, `name ()`, and `function name`
+    // (with or without parens). Matching only the first would let a re-inline
+    // written either other way pass, and the "defines no functions" guarantee
+    // config.md documents would be false.
+    const defs = block.filter((l) =>
+      /^\s*(?:function\s+[A-Za-z_][\w-]*|[A-Za-z_][\w-]*\s*\(\s*\))/.test(l));
     assert.deepEqual(defs, [],
       `${skill}/SKILL.md re-inlines helper definitions; source shared/config.sh instead`);
 
