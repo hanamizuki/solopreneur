@@ -47,6 +47,14 @@ test('every registry row appears in SKILL.md with its trigger in that same row',
       matches[0].some((cell) => cell.includes(r.trigger)),
       `row for ${id} does not carry its trigger ${JSON.stringify(r.trigger)}: ${matches[0].join(' | ')}`,
     );
+    // Exact cell, not `includes`: `openai` would otherwise match inside a
+    // trigger or a login and let a wrong family cell ship. The family drives
+    // gate independence, so a table that disagrees with the executable registry
+    // teaches the reader the opposite of what the loop enforces.
+    assert.ok(
+      matches[0].includes(r.family),
+      `row for ${id} has no cell equal to its family ${JSON.stringify(r.family)}: ${matches[0].join(' | ')}`,
+    );
   }
 });
 

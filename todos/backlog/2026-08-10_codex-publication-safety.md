@@ -93,6 +93,14 @@ project". If this is ever built, seed it with the five `native_engines` skills
 plus Greenlight's dependency closure and default everything else to
 `unsupported` / `exclude`.
 
+**Pre-decided, do not re-litigate:** Greenlight's `codex-exec` entry is
+**`degraded`** — external mode only, no Phase 1 / Phase 2, a `claude-cli` gate,
+sizes S and M only — with
+[the port spec](../../docs/spec/2026-08-10-codex-greenlight-port.md) as its
+limitation reference. Recorded in `greenlight/SKILL.md`'s "Host support" section
+when W2-W5 landed. This settles the entry's *value*, not its publication:
+Greenlight on Codex stays gated on the safety gates in this todo.
+
 ## 3. Filtered Codex publication view
 
 Rollout PR 4. Today every plugin declares `"skills": "./skills/"`, so installing

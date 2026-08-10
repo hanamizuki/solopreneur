@@ -44,6 +44,54 @@ test('every recipe declares a known kind', () => {
   }
 });
 
+test('every recipe declares a non-empty family', () => {
+  // The family is what makes gate independence decidable. A row without one
+  // would compare `undefined` against the host family, quietly pass the filter,
+  // and be eligible to gate its own host — failing open on the invariant.
+  for (const [id, r] of Object.entries(RECIPES)) {
+    assert.equal(typeof r.family, 'string', `${id}.family is not a string`);
+    assert.ok(r.family.trim(), `${id} has an empty family`);
+  }
+});
+
+test('claude-cli is the anthropic-family gate recipe', () => {
+  const r = RECIPES['claude-cli'];
+  assert.ok(r, 'claude-cli missing from registry');
+  assert.equal(r.kind, 'local-cli');
+  assert.equal(r.family, 'anthropic');
+  assert.equal(r.handshake, 'stdout');
+  assert.deepEqual(r.knownLogins, []);
+  assert.equal(r.poll, undefined, 'a local CLI runs synchronously and has no poll policy');
+  assert.equal(recipeFor('claude cli').id, 'claude-cli');
+});
+
+test('the claude-cli trigger requests the [P*] tags the loop already parses', () => {
+  // No new parser exists for it: the recipe has to ASK for the format the
+  // existing `[P*]` scan reads, and for the exact clean sentence that separates
+  // "reviewed, found nothing" from "never ran".
+  const { trigger } = RECIPES['claude-cli'];
+  for (const needle of ['[P1]', '[P2]', '[P3]', 'No findings.', ' -p ', 'UNTRUSTED']) {
+    assert.ok(trigger.includes(needle), `claude-cli trigger is missing ${JSON.stringify(needle)}`);
+  }
+});
+
+test('the claude-cli gate never bypasses tool permissions', () => {
+  // The diff under review is untrusted and can carry prompt injection; the
+  // reviewer is handed it as inert input on stdin and needs no tools, so
+  // auto-approving them buys nothing and costs command execution under the
+  // operator's own credentials. Same rule the agy recipe already follows.
+  // Measured: default permissions answer fine.
+  const { trigger } = RECIPES['claude-cli'];
+  assert.ok(!trigger.includes('dangerously'), 'claude-cli must not bypass tool permissions');
+  // Dropping the bypass is not sufficient: default permissions still leave tools
+  // available, so an operator whose settings pre-authorize Bash would hand
+  // injected diff text a live shell. `--tools ""` is what removes them.
+  assert.ok(trigger.includes('--tools ""'), 'claude-cli must disable tools outright');
+  // Never a remote ref either: `origin/main` is absent on a repo whose remote is
+  // named differently or unfetched, and the rest of the loop uses local `main`.
+  assert.ok(!trigger.includes('origin/'), 'claude-cli must review against the LOCAL base branch');
+});
+
 test('every recipe declares an aliases array', () => {
   for (const [id, r] of Object.entries(RECIPES)) {
     assert.ok(Array.isArray(r.aliases), `${id}.aliases is not an array`);
