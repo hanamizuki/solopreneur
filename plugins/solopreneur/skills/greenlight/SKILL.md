@@ -37,6 +37,24 @@ Automated review loop. Three modes:
   parallel; merge findings; fix as new commits on top (no amend, no new PR). Skips
   PR-bound bots.
 
+### Host support
+
+On **Claude Code** this skill is fully supported: every mode, every phase.
+
+On **`codex-exec` it is `degraded`** — it runs, with a documented smaller
+surface:
+
+| | On Codex |
+|---|---|
+| Modes | PR mode via `external` only (Phase 1 and Phase 2 need subagents Codex does not have) |
+| Gate | `claude-cli` — the gate must be independent of the host's model family (see [Host-family independence](#host-family-independence)) |
+| Sizes | **S and M only**; an L-size run halts at pre-flight |
+| Invocation | the explicit `$greenlight` mention, plus the `unattended` token for any unattended caller — a one-shot exec session has nobody to answer a prompt |
+
+Limitation reference: `docs/spec/2026-08-10-codex-greenlight-port.md`. Codex
+**publication** remains gated on `todos/backlog/2026-08-10_codex-publication-safety.md`
+— degraded means "works, with limits recorded", not "shipped".
+
 ### Arguments
 
 | Argument | Description | Example |
@@ -300,7 +318,7 @@ retry-vs-blocked without re-deriving intent:
 |---|---|---|---|
 | `transient-dependency` | A dependency is down but may recover. | **Retryable** — orchestrator waits and retries. | External reviewers all exhausted (unattended fallback). |
 | `invariant-violation` | A hard stop the loop cannot resolve itself — a broken correctness / state invariant, or the round budget spent without convergence. | **Do not retry** — orchestrator marks blocked. | Inner verify fails 3×; a post-commit invariant violation (TIP ≠ HEAD, origin/main unreachable, BASE unreachable, push-verification mismatch, branch changed mid-loop); the round budget spent (max `SIZE_MAX_ROUNDS` reached with findings still unresolved). |
-| `authority-boundary` | The next step needs authority the run does not have — refuse. | **Do not retry — a human must intervene.** | A fix would touch a dangerous path outside the size authorization (contradiction ③); the anti-gaming guard's **unattended** halt (a refusal to commit a suspected gaming edit). |
+| `authority-boundary` | The next step needs authority the run does not have — refuse. | **Do not retry — a human must intervene.** | A fix would touch a dangerous path outside the size authorization (contradiction ③); the anti-gaming guard's **unattended** halt (a refusal to commit a suspected gaming edit); **no independent gate** (`RESOLVED.gateBlock == "host-family"` — every authorized reviewer shares the host's model family); an **L-size run on a non-anthropic host**. |
 
 `reason_class` governs only the **unattended** halt's retry routing; it does **not**
 dictate the attended projection (that is set by the level — see
@@ -366,6 +384,10 @@ defers its round bound to greenlight — orchestrator.md). The scattered rules m
   See [Phase 1](#phase-1-internal-review) "All fail".
 - **External fallback exhausted** (all reviewers down) → **halt**,
   `reason_class: transient-dependency` — see [Fallback Logic](#fallback-logic).
+- **No independent gate** (every authorized reviewer shares the host's model
+  family) → **halt**, `reason_class: authority-boundary` — waiting cannot add a
+  reviewer of another family, so this is deliberately NOT routed as retryable.
+  See [Host-family independence](#host-family-independence).
 - **Post-commit invariant violations** → **halt**, `reason_class: invariant-violation` —
   the invariant guards in [Post-commit parsing](#post-commit-mode-parsing-modepost-commit-only)
   and the per-round re-checks.
@@ -485,7 +507,26 @@ case "$EFFECTIVE_SIZE" in S) SIZE_MAX_ROUNDS=3;; M) SIZE_MAX_ROUNDS=5;; L) SIZE_
 # human decision and is NOT flagged.
 [ "$COMPUTED_SIZE" = S ] && [ -z "${SIZE_ARG:-}" ] && echo "FLAG: auto-sized S — verify"
 echo "EFFECTIVE_SIZE=$EFFECTIVE_SIZE SIZE_MAX_ROUNDS=$SIZE_MAX_ROUNDS"
+
+# The host's model family, detected the same way `solopreneur_config_home` detects
+# the harness: CODEX_THREAD_ID is exported on every Codex session.
+HOST_FAMILY=$([ -n "${CODEX_THREAD_ID:-}" ] && echo openai || echo anthropic)
+echo "HOST_FAMILY=$HOST_FAMILY"
+
+# L-size is Claude-Code-only. A host without subagents processes fixes INLINE (see
+# Step 3), and one incomplete S-size round already measured ~212k tokens — up to 10
+# L-size rounds of inline fix processing does not fit. Halting here is honest scope;
+# running anyway would degrade silently, mid-loop, after paying for reviews.
+if [ "$EFFECTIVE_SIZE" = L ] && [ "$HOST_FAMILY" != anthropic ]; then
+  echo "HALT: L-size runs need a Claude Code host (reason_class: authority-boundary)"
+fi
 ```
+
+**An L-size run on a non-anthropic host halts here, before any reviewer is
+triggered** — write the halt payload with `reason_class: authority-boundary` and
+stop. It is not retryable: the host does not change by waiting. The two real
+fixes are to re-run the loop on a Claude Code host, or to split the PR until it
+sizes S or M. See [Host support](#host-support).
 
 When the cascade auto-classifies **S** with no explicit override, add one flag-style
 line — **"auto-sized S — verify"** — to the final report (see the Flags section under
@@ -498,7 +539,7 @@ vocabulary; no bot login is hardcoded here.
 
 | Effective size | Phase 1 internal | Verification gate | Phase 3 external loop (`SIZE_MAX_ROUNDS`) |
 |---|---|---|---|
-| **S** | **skip** | **skip** | Phase 3 only, **one external reviewer** — PR mode via its registry-driven `current_reviewer` + `fallback_order` (default `codex-bot`, preferring codex); Post-commit via the single preferred available CLI (Codex CLI, else agy) instead of its usual parallel pair — loop to clean, **max 3 rounds** |
+| **S** | **skip** | **skip** | Phase 3 only, **one external reviewer** — PR mode via its registry-driven `current_reviewer` + `fallback_order` (default `codex-bot` on a Claude host, `claude-cli` on a Codex host — see [Host-family independence](#host-family-independence)); Post-commit via the single preferred available CLI (Codex CLI, else agy) instead of its usual parallel pair — loop to clean, **max 3 rounds** |
 | **M** (default) | **2 reviewers** — `/specialist-review` + `ponytail:ponytail-review` (rows 4–5 of the Phase 1 table) | **skip** | standard registry loop, **max 5 rounds** |
 | **L** | **all 5 reviewers** | **ON** (when the `Workflow` tool is available) | full registry fallback chain, **max 10 rounds** |
 
@@ -512,7 +553,12 @@ vocabulary; no bot login is hardcoded here.
   `codex-bot`), else the `codex-bot` default with the existing not-detected warning.
   This reuses the pre-flight CLI gate and activity detection (registry vocabulary, no
   hardcoded logins), so an unattended S run uses the authed CLI instead of failing on
-  an absent bot. Post-commit S likewise runs a single preferred available CLI (Codex
+  an absent bot. **The preference above is the Claude-host one.** On a Codex host
+  every codex-family candidate is filtered out of gate selection and the default
+  becomes `claude-cli`, which arrives through the same pre-flight CLI probe; with no
+  independent CLI installed there the run halts rather than gating on its own family
+  (see [Host-family independence](#host-family-independence)).
+  Post-commit S likewise runs a single preferred available CLI (Codex
   CLI, else agy) rather than the usual codex-CLI + agy pair, shedding the doubled cost.
 - The **verification gate** already runs only when the `Workflow` tool is present;
   sizing adds a second condition — it runs **only at size L** (S and M skip it even
@@ -1418,15 +1464,16 @@ If no unresolved threads:
 and the matching row in `scripts/reviewer-registry.mjs` — nothing else
 downstream needs to change.**
 
-| recipe_id | aliases (arg) | kind | trigger | handshake | poll policy | verified login |
-|---|---|---|---|---|---|---|
-| `codex-bot` | `codex bot` | github-bot | PR comment `@codex review` | 👀 reaction | 60s first, 60s × 20 | `chatgpt-codex-connector[bot]` |
-| `gemini` | `gemini` | github-bot | PR comment `/gemini review` | none | 180s first, 120s × 2 | `gemini-code-assist[bot]` |
-| `coderabbit` | `coderabbit` | github-bot | PR comment `@coderabbitai review` | none | default | `coderabbitai[bot]` |
-| `bugbot` | `bugbot`, `cursor` | github-bot | PR comment `bugbot run` (top-level only) | none | default | — |
-| `greptile` | `greptile` | github-bot | PR comment `@greptileai` | none | default | — |
-| `codex-cli` | `codex cli` | local-cli | `codex review --base main` | stdout `[P*]` | n/a | n/a |
-| `agy` | `agy` | local-cli | `agy --print` (model pinned with `--model`) | stdout + marker | n/a | n/a |
+| recipe_id | aliases (arg) | kind | family | trigger | handshake | poll policy | verified login |
+|---|---|---|---|---|---|---|---|
+| `codex-bot` | `codex bot` | github-bot | openai | PR comment `@codex review` | 👀 reaction | 60s first, 60s × 20 | `chatgpt-codex-connector[bot]` |
+| `gemini` | `gemini` | github-bot | google | PR comment `/gemini review` | none | 180s first, 120s × 2 | `gemini-code-assist[bot]` |
+| `coderabbit` | `coderabbit` | github-bot | coderabbit | PR comment `@coderabbitai review` | none | default | `coderabbitai[bot]` |
+| `bugbot` | `bugbot`, `cursor` | github-bot | cursor | PR comment `bugbot run` (top-level only) | none | default | — |
+| `greptile` | `greptile` | github-bot | greptile | PR comment `@greptileai` | none | default | — |
+| `codex-cli` | `codex cli` | local-cli | openai | `codex review --base main` | stdout `[P*]` | n/a | n/a |
+| `claude-cli` | `claude cli` | local-cli | anthropic | `claude --dangerously-skip-permissions -p "Review the diff between origin/main and HEAD as an independent code reviewer. Tag each finding [P1] (must fix) / [P2] (should fix) / [P3] (nit) with file:line and a concrete fix. If there are no findings, output exactly: No findings."` | stdout `[P*]` | n/a | n/a |
+| `agy` | `agy` | local-cli | google | `agy --print` (model pinned with `--model`) | stdout + marker | n/a | n/a |
 
 **Reviewer kinds:**
 - **github-bot** — triggered by a PR comment and polled for. Whether it *also*
@@ -1444,9 +1491,57 @@ GitHub Copilot posts as `Copilot` with no `[bot]` suffix). A `—` tool still
 works: detection collects it by `type == "Bot"`, and an attended identify binds
 its login per repo (see Reviewer selection).
 
+**Family** is the tool's upstream model family. A tool with no upstream family
+of its own (`coderabbit`, `bugbot`, `greptile`) is its own family — it can never
+be the host, so it is never filtered. See
+[Host-family independence](#host-family-independence) for what the column is for.
+
 `scripts/reviewer-registry.mjs` is the executable copy of this table and the one
 the loop actually reads; `tests/skill-sync.test.mjs` fails CI when the two
-drift.
+drift — on the trigger string **and** on the family cell.
+
+### Host-family independence
+
+**The gate must never be the host's own model family.** The gate is the reviewer
+whose clean pass ends the loop, so a same-family gate is a model family
+approving its own work, and the loop terminates on it. Everything below follows
+from that one rule.
+
+```bash
+# Same detection as the sizing block and as `solopreneur_config_home`.
+HOST_FAMILY=$([ -n "${CODEX_THREAD_ID:-}" ] && echo openai || echo anthropic)
+```
+
+- **Only the gate is restricted.** Non-gate reviewers are unrestricted — their
+  findings are advisory, so a same-family reviewer is still triggered and still
+  collected. On a Codex host `codex-cli` stays a perfectly good ordinary
+  reviewer; it just cannot be what closes the round.
+- **`resolve` enforces it, not this prose.** `--host-family` is passed on every
+  invocation, and the script **also** derives the same value from the
+  environment when the flag is missing — a forgotten flag must not be able to
+  produce a same-family gate. Every gate path (explicit `gate=`, the
+  `fallback_order` ladder, the `EXHAUSTED_GATES` advance, the seeded default)
+  runs through the one `canGate` check, so there is no path around it.
+- **Observable:** `RESOLVED.gate.family` and `RESOLVED.hostFamily` are printed.
+  They must never be equal.
+- **The independent gate for a Codex host is `claude-cli`** (registry row above),
+  probed in pre-flight like `codex-cli`.
+
+**No qualifying independent gate → halt.** When `resolve` returns `gate: null`
+with `gateBlock: "host-family"`, every reviewer authorized here is the host's
+own family. Halt with `reason_class: authority-boundary` and report which
+family, plus the two fixes that actually work:
+
+> No independent gate: every authorized reviewer is `<HOST_FAMILY>`-family, the
+> same as this host, and a reviewer cannot gate its own family's work. Install
+> and authenticate a review CLI of another family (on a Codex host: `claude`),
+> or run this loop on a host of another family.
+
+This is **not** the retryable exhaustion case. `gateBlock: "unavailable"` — an
+authorized independent reviewer exists but is down or absent — keeps
+`reason_class: transient-dependency` as before, because waiting can genuinely
+bring that reviewer back. Never fall back to a same-family clean pass, and never
+degrade to "no gate needed": with no gate there is no defensible clean signal.
 
 In the steps below **nothing re-derives a trigger string or a login from a
 name** — both come from `RESOLVED`, built once by the detection block:
@@ -1539,6 +1634,19 @@ if command -v codex >/dev/null 2>&1 && codex login status >/dev/null 2>&1; then
   CLI_AVAILABLE="codex-cli"
 fi
 
+# The host's own model family — see "Host-family independence".
+HOST_FAMILY=$([ -n "${CODEX_THREAD_ID:-}" ] && echo openai || echo anthropic)
+
+# claude-cli is probed ONLY off an anthropic host. It is the independent gate for
+# a Codex host, but on Claude Code adding it to `available` would make M and L
+# rounds trigger and PAY for a reviewer they do not run today — a behaviour change
+# on the host that must not change. codex-cli above is untouched: on a Codex host
+# it stays available as an ordinary non-gate reviewer.
+if [ "$HOST_FAMILY" != anthropic ] \
+   && command -v claude >/dev/null 2>&1 && claude --version >/dev/null 2>&1; then
+  CLI_AVAILABLE="${CLI_AVAILABLE:+$CLI_AVAILABLE,}claude-cli"
+fi
+
 # All-or-nothing: a non-zero return (any source errored — rate limit / network)
 # degrades to `unavailable`. Only a fully successful sample yields `ok`. An
 # empty-but-successful sample (zero-history repo) still returns 0 → `ok` with an
@@ -1550,6 +1658,33 @@ else
   DETECTED='{"bots":[]}'; DETECTION_STATUS=unavailable
 fi
 
+# The host-appropriate effective ladder.
+#
+# `fallback_order` is an AUTHORIZATION list — `resolve` will not gate on anything
+# outside it, and that stays true here. But the recommended order is
+# ["codex-bot", "codex-cli"], both openai, so on a Codex host it authorizes no
+# independent gate at all and every default-config run would halt even with a
+# perfectly good `claude` installed. So the ladder is adapted HERE, by the caller,
+# visibly — never by a hidden exception inside the resolver:
+#
+#   append (never prepend) claude-cli when it probed available on a non-anthropic
+#   host and the user configured a ladder at all.
+#
+# Appending preserves the user's own ordering: any independent reviewer they
+# listed is still tried first, and claude-cli is reached only when those are
+# unavailable. An EMPTY ladder is left empty — `resolve`'s unconfigured branch
+# already picks any available candidate, and synthesizing a one-entry ladder
+# there would change that branch's meaning for no gain.
+EFFECTIVE_FALLBACK_ORDER="$FALLBACK_ORDER"
+case ",$CLI_AVAILABLE," in *,claude-cli,*)
+  if [ -n "$FALLBACK_ORDER" ]; then
+    case ",$FALLBACK_ORDER," in
+      *,claude-cli,*) ;;                                            # already listed
+      *) EFFECTIVE_FALLBACK_ORDER="$FALLBACK_ORDER,claude-cli" ;;
+    esac
+  fi
+;; esac
+
 # Runs in both branches: `resolve` reads the per-repo cache as well as this
 # round's sample, so an `unavailable` detection still produces a decision instead
 # of aborting — that is what keeps detection an enhancement and never a gate.
@@ -1557,9 +1692,14 @@ fi
 # Both selection flags are passed unconditionally. An empty value is a no-op
 # inside the script (`--select ""` selects everything, `--gate ""` falls back to
 # fallback_order), so there is no argv to assemble conditionally.
+#
+# `--host-family` makes the host explicit in the invocation; the script also
+# derives it from the environment when the flag is absent, so a forgotten flag
+# cannot produce a same-family gate. See "Host-family independence".
 RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve \
-  --repo-key "$REPO_KEY" --fallback-order "$FALLBACK_ORDER" \
-  --cli-available "$CLI_AVAILABLE" --select "$SELECTED_RECIPES" --gate "$GATE_RECIPE")
+  --repo-key "$REPO_KEY" --fallback-order "$EFFECTIVE_FALLBACK_ORDER" \
+  --cli-available "$CLI_AVAILABLE" --select "$SELECTED_RECIPES" --gate "$GATE_RECIPE" \
+  --host-family "$HOST_FAMILY")
 
 # Warnings are actionable config problems (a stale recipe id, a `gate=` naming
 # someone who has since been marked unresponsive), not failures.
@@ -1572,6 +1712,12 @@ printf '%s' "$RESOLVED" | jq -r '.warnings[]? | "note: " + .'
 prompt below reads `available[]` / `marked[]`. **Re-run `resolve` after any write
 that changes the answer** — an identify, a retry, or adding `agy` — rather than
 patching `RESOLVED` by hand.
+
+> **Every later `resolve` call passes `--fallback-order "$EFFECTIVE_FALLBACK_ORDER"`
+> and `--host-family "$HOST_FAMILY"`** — the S-size narrowing below, the
+> post-write re-resolves, and the `EXHAUSTED_GATES` advance. Re-reading the raw
+> `FALLBACK_ORDER` on any of them would drop the appended entry mid-run and flip
+> a working Codex gate back to null.
 
 **Size S narrows the selection to one reviewer.** An empty `--select` means "every
 reviewer that acts here", so on a repo with several detected bots (or an authed
@@ -1586,7 +1732,8 @@ Interpret the result:
 | Result | Meaning | What happens |
 |---|---|---|
 | `DETECTION_STATUS=unavailable` | API failure / rate limit | `resolve` runs on the cache alone; an empty cache falls through to the default flow |
-| `available` and `marked` both empty | Nothing has ever acted here and nothing cached | Default flow: trigger `fallback_order`'s first entry (or the `codex bot` default) and let the timeout report the truth |
+| `available` and `marked` both empty | Nothing has ever acted here and nothing cached | Default flow: trigger `fallback_order`'s first **independent** entry (or the host-conditional default — `codex bot` on a Claude host; on a Codex host the probed `claude-cli`, since a local CLI is never seeded) and let the timeout report the truth |
+| `gate` null, `gateBlock` `host-family` | Every authorized reviewer shares the host's model family | Halt, `reason_class: authority-boundary` — see [Host-family independence](#host-family-independence) |
 | `available` non-empty, `gate` set | The common case | Run the round: trigger `trigger[]`, wait on `gate`, collect from `collect[]`. No prompt, however many reviewers act here |
 | `needsPrompt` true (`gate` null, but `available` or `marked` non-empty) | Reviewers are known here but none can close a round | Attended → the [selection prompt](#reviewer-selection-pr-mode). Unattended → degrade per Fallback Logic |
 
@@ -1694,10 +1841,13 @@ below):
   **Every entry with `canGate: true` is selectable** — dispatch reads its
   `triggerText`, `handshake` and `poll` from the registry row, so an identified
   `coderabbit` / `bugbot` / `greptile` is as drivable as `codex-bot`. Entries
-  with `canGate: false` are unidentified bots: shown **informationally**, their
-  findings collected like any other unresolved thread, but they cannot gate —
-  with no recipe there is no way to prompt them and therefore no way to know
-  they have finished.
+  with `canGate: false` **cannot close a round here** and are shown
+  **informationally**, their findings collected like any other unresolved
+  thread. Two reasons, both real: an *unidentified* bot has no recipe, so there
+  is no way to prompt it and therefore no way to know it has finished; and a
+  reviewer of the **host's own model family** is barred from gating however well
+  identified it is (see [Host-family independence](#host-family-independence)) —
+  it is still triggered and still collected, just never as the gate.
 - **Local CLIs** — offer Codex CLI when its gate passes (installed + authed). Never
   hidden for lack of GitHub activity — local CLIs never appear in GitHub data.
 
@@ -1763,6 +1913,12 @@ be exactly the stale-cache problem `triggerable` self-healing exists to avoid.
   collected from `auto` reviewers do **not** rescue this: with no triggerable
   gate there is no way to establish that a round finished, so there is no
   defensible clean signal. Report what was collected, then halt.
+  **Exception — `RESOLVED.gateBlock == "host-family"`:** the halt is
+  `reason_class: authority-boundary` instead, and the attended path reports it
+  rather than opening the selection prompt. The prompt exists to pick a
+  different reviewer, and here there is no independent one to pick — retrying
+  cannot change a model family. See
+  [Host-family independence](#host-family-independence).
 
 **Without config (first use or unconfigured):**
 1. Gate on `RESOLVED.gate` — with no `fallback_order` to authorize a ladder, that is
@@ -1988,6 +2144,7 @@ CLI in `trigger[]`, so hardcoding one here would run Codex when the user chose
 | When `trigger[].recipe` is | Command |
 |---|---|
 | recipe `codex-cli` | `codex review --base main 2>&1` — parse `[P*]` tags from stdout |
+| recipe `claude-cli` | Run **this entry's own `triggerText`** verbatim (the registry row holds the whole command, prompt included — do not retype or paraphrase it), in the PR worktree, inheriting the ambient environment. Parse `[P*]` tags from stdout exactly as for `codex-cli`. An operator who wants a specific Claude profile exports `CLAUDE_CONFIG_DIR` before launching the host — env vars pass through to the nested CLI, and no profile mapping lives in this body |
 | recipe `agy` | The **same** `agy --print` invocation post-commit Phase 3 uses: model pinned to the Gemini family, `AGY_MAX_DIFF_BYTES` argv guard, per-invocation nonce completion marker, no tool-permission bypass. Take the diff from `git diff main...HEAD` instead of a commit range, and parse `[P*]` tags the same way |
 
 > WARNING: **Do not `cd`**: Execute in the current working directory. Never change directories.
@@ -2067,6 +2224,15 @@ Parse stdout:
   invisible to Step 3, and the round would classify `findings`, fix nothing, and
   re-run identically until the round cap.
 - No `[P*]` tags, only summary paragraphs → that reviewer found nothing
+
+**`claude-cli` additionally requires a positive clean signal.** Its trigger asks
+for either `[P*]`-tagged findings or the exact sentence `No findings.`, so
+stdout carrying **neither** is an invocation failure — reviewer unresponsive —
+and is handled by the failure branch above, **never** read as a clean pass. Empty
+or truncated stdout from a headless CLI is indistinguishable from "reviewed and
+found nothing" without that sentence, and guessing clean would end the loop on a
+review that never ran. This is the same failure the `agy` recipe's completion
+marker guards against.
 
 **A clean CLI result does not end the loop unless that CLI is the gate.** A local
 CLI can be triggered as an ordinary non-gate reviewer while a GitHub bot gates the
@@ -2344,6 +2510,16 @@ hand-edited config.
 
 Processing review feedback involves extensive file reading and fixing. To avoid bloating
 the main conversation context, **this must be delegated to a subagent**.
+
+**On a host without subagents, apply the fixes inline in the main context
+instead.** The delegation exists to keep the main context small, not for
+correctness — so where there is no subagent to dispatch to, everything below
+still applies, just executed in this context. The instruction above is **not**
+weakened on Claude Code: there the subagent is mandatory, because an L-size loop
+that inlined ten rounds of fix processing would exhaust the context it is trying
+to protect. That cost is also why Codex is bounded to sizes S and M
+([Host support](#host-support)). **The parent is the only writer either way** —
+inline or delegated, one process commits and pushes.
 
 **3a. Get full content of all unresolved threads:**
 

@@ -22,6 +22,13 @@
  * `@coderabbitai pause` turns CodeRabbit's off), invisible from the repo. It is
  * observed, not declared.
  *
+ * `family` is the tool's upstream model family, and it is what makes gate
+ * independence decidable: the gate must never be the host's own family, or the
+ * loop is a model reviewing its own work. A tool with no upstream family of its
+ * own (`coderabbit`, `bugbot`, `greptile`) is its own family — it can never be
+ * the host, so it is never filtered. This is vendor knowledge by the registry's
+ * own admission rule: identical for every user of the tool.
+ *
  * Adding a tool is one row whose only required thought is the trigger string:
  * `handshake: 'none'`, `poll: DEFAULT_POLL` and `knownLogins: []` are the safe
  * fallbacks, proven by the `gemini` row which has never had a handshake.
@@ -34,6 +41,7 @@ export const RECIPES = {
   'codex-bot': {
     aliases: ['codex bot'],
     kind: 'github-bot',
+    family: 'openai',
     trigger: '@codex review',
     handshake: 'reaction',            // verified: 👀 on the triggering comment
     knownLogins: ['chatgpt-codex-connector[bot]'],
@@ -42,6 +50,7 @@ export const RECIPES = {
   gemini: {
     aliases: ['gemini'],
     kind: 'github-bot',
+    family: 'google',
     trigger: '/gemini review',
     handshake: 'none',
     knownLogins: ['gemini-code-assist[bot]'],
@@ -50,6 +59,7 @@ export const RECIPES = {
   coderabbit: {
     aliases: ['coderabbit'],
     kind: 'github-bot',
+    family: 'coderabbit',             // no upstream family of its own — never the host
     trigger: '@coderabbitai review',  // `full review` re-reviews from scratch
     handshake: 'none',
     knownLogins: ['coderabbitai[bot]'],
@@ -58,6 +68,7 @@ export const RECIPES = {
   bugbot: {
     aliases: ['bugbot', 'cursor'],
     kind: 'github-bot',
+    family: 'cursor',
     trigger: 'bugbot run',            // top-level comment only
     handshake: 'none',
     knownLogins: [],                  // cursor[bot] / cursor-com[bot] / bugbot[bot] all exist; unverified
@@ -66,6 +77,7 @@ export const RECIPES = {
   greptile: {
     aliases: ['greptile'],
     kind: 'github-bot',
+    family: 'greptile',
     trigger: '@greptileai',
     handshake: 'none',
     knownLogins: [],
@@ -74,13 +86,41 @@ export const RECIPES = {
   'codex-cli': {
     aliases: ['codex cli'],
     kind: 'local-cli',
+    family: 'openai',
     trigger: 'codex review --base',
+    handshake: 'stdout',
+    knownLogins: [],
+  },
+  // The independent gate for a Codex host. The trigger is the WHOLE command,
+  // prompt included, because the prompt is the vendor knowledge here: `claude -p`
+  // without the `[P*]` request answers in prose the loop's existing parser cannot
+  // read, and this recipe deliberately reuses that parser rather than inventing a
+  // second verdict format (`codex review` exposes no structured output either).
+  //
+  // On `--dangerously-skip-permissions`, and why this row differs from `agy`,
+  // which deliberately refuses the same flag (see SKILL.md's post-commit agy
+  // block): agy is HANDED the diff inline in its `--print` argument, so it needs
+  // no tools and answers under default permissions. This recipe follows
+  // `codex review --base` instead — the reviewer computes the diff itself, which
+  // needs the Bash tool, and headless `-p` has nobody to answer a permission
+  // prompt, so under default permissions the call is denied and the gate returns
+  // no review at all. The honest cost: this reviewer reads an UNTRUSTED diff with
+  // tools enabled, the same exposure the shipped `codex-cli` gate already carries.
+  // The prompt is not an enforcement boundary and is not claimed to be one;
+  // confining local-CLI reviewers is a property of the whole `local-cli` kind and
+  // belongs to its own measured change, not to this row.
+  'claude-cli': {
+    aliases: ['claude cli'],
+    kind: 'local-cli',
+    family: 'anthropic',
+    trigger: 'claude --dangerously-skip-permissions -p "Review the diff between origin/main and HEAD as an independent code reviewer. Tag each finding [P1] (must fix) / [P2] (should fix) / [P3] (nit) with file:line and a concrete fix. If there are no findings, output exactly: No findings."',
     handshake: 'stdout',
     knownLogins: [],
   },
   agy: {
     aliases: ['agy'],
     kind: 'local-cli',
+    family: 'google',
     trigger: 'agy --print',
     handshake: 'stdout-marker',
     knownLogins: [],

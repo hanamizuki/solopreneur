@@ -869,6 +869,158 @@ test('resolve fails closed on the same malformed containers record rejects', () 
   }
 });
 
+// --- Host-family independence (A4) ------------------------------------------
+//
+// The gate must never be the host's own model family. Every case below fixes the
+// host explicitly — by the CODEX_THREAD_ID the script reads, or by the flag —
+// because the whole invariant is about which host the loop runs on.
+
+/** A Codex host: what `codex exec` exports on every session. */
+const CODEX_HOST = { CODEX_THREAD_ID: 'thr_test' };
+
+test('A4: on a Codex host the codex ladder cannot gate, and says why', () => {
+  // Both ladder entries are openai, the host's own family. fallback_order is an
+  // authorization list, so nothing outside it is substituted here — the run
+  // stops with a reason instead of quietly gating on the host's own family.
+  const { code, stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot,codex-cli',
+  ], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null, 'a same-family gate is exactly what must not happen');
+  assert.equal(out.hostFamily, 'openai');
+  assert.equal(out.gateBlock, 'host-family');
+  assert.ok(out.warnings.some((w) => w.includes('openai-family')), 'names the filter');
+});
+
+test('A4: with claude-cli in the effective ladder a Codex host gates on it', () => {
+  // What pre-flight derives on a Codex host: the configured ladder plus the
+  // probed independent CLI appended.
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot,codex-cli,claude-cli',
+    '--cli-available', 'codex-cli,claude-cli',
+  ], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'claude-cli');
+  assert.equal(out.gate.family, 'anthropic');
+  assert.notEqual(out.gate.family, out.hostFamily, 'A4: the gate is never the host family');
+  assert.equal(out.gateBlock, null);
+});
+
+test('A4: a same-family reviewer is still triggered and collected, just not gating', () => {
+  // Non-gate reviewers are unrestricted — their findings are advisory.
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot,codex-cli,claude-cli',
+    '--cli-available', 'codex-cli,claude-cli',
+  ], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.ok(out.trigger.some((t) => t.recipe === 'codex-cli'), 'still triggered');
+  assert.ok(out.collect.includes(CODEX), 'still collected');
+  assert.equal(out.available.find((r) => r.recipe === 'codex-bot').canGate, false);
+});
+
+test('A4: the same fixture on a Claude host still gates on codex-bot', () => {
+  // The A3 baseline: nothing about Claude Code behaviour changes.
+  const { code, stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot,codex-cli',
+  ], { stdin: BOTS([CODEX]) });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate.recipe, 'codex-bot');
+  assert.equal(out.gate.family, 'openai');
+  assert.equal(out.hostFamily, 'anthropic');
+  assert.equal(out.gateBlock, null);
+  assert.deepEqual(out.warnings, [], 'the unchanged host must stay silent');
+});
+
+test('an explicit --gate of the host family degrades with a warning, like a stale id', () => {
+  const { code, stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot,claude-cli',
+    '--cli-available', 'codex-cli,claude-cli', '--gate', 'codex-cli',
+  ], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.notEqual(out.gate?.recipe, 'codex-cli', 'the request cannot be honoured');
+  assert.equal(out.gate.recipe, 'claude-cli', 'the ladder supplies an independent gate');
+  assert.ok(out.warnings.some((w) => w.includes('codex-cli') && w.includes('openai-family')),
+    'the reason is named, not just the fallback');
+});
+
+test('a same-family --gate cannot be seeded onto a repo with no history either', () => {
+  // The seed path is a gate path: without the filter a fresh Codex-host repo
+  // would seed codex-bot and gate on the host's own family.
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', '', '--gate', 'codex-bot',
+  ], { stdin: BOTS([]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.deepEqual(out.trigger, []);
+  assert.equal(out.gateBlock, 'host-family');
+});
+
+test('the built-in seed default is host-conditional', () => {
+  // Claude host: unchanged, codex-bot is seeded. Codex host: nothing seedable,
+  // because a local CLI's availability never comes from being asked for.
+  const claude = JSON.parse(run(['resolve', '--repo-key', KEY, '--fallback-order', ''],
+    { stdin: BOTS([]) }).stdout);
+  assert.equal(claude.gate.recipe, 'codex-bot');
+
+  const codex = JSON.parse(run(['resolve', '--repo-key', KEY, '--fallback-order', ''],
+    { stdin: BOTS([]), env: CODEX_HOST }).stdout);
+  assert.equal(codex.gate, null);
+  assert.equal(codex.gateBlock, 'host-family');
+});
+
+test('every available candidate sharing the host family prompts rather than gates', () => {
+  const { code, stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', '',
+  ], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.needsPrompt, true, 'something is known here; the caller must be asked');
+  assert.equal(out.gateBlock, 'host-family');
+});
+
+test('an absent-but-authorized independent reviewer stays retryable, not authority-boundary', () => {
+  // The misclassification this field exists to avoid: coderabbit IS authorized
+  // and IS independent, it simply has not acted here. Waiting can genuinely
+  // bring it back, so this must NOT be reported as a host-family dead end.
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'coderabbit,codex-bot',
+  ], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.gateBlock, 'unavailable');
+  assert.ok(!out.warnings.some((w) => w.includes('no independent gate')));
+});
+
+test('--host-family is honoured without the env var', () => {
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot', '--host-family', 'openai',
+  ], { stdin: BOTS([CODEX]) });
+  const out = JSON.parse(stdout);
+  assert.equal(out.hostFamily, 'openai');
+  assert.equal(out.gate, null, 'the flag alone is enough to bar the same-family gate');
+});
+
+test('an empty --host-family falls back to the environment, never to "no filter"', () => {
+  // A caller that passes the flag through an unset shell variable must not
+  // thereby disable the invariant.
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot', '--host-family', '',
+  ], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.hostFamily, 'openai');
+  assert.equal(out.gate, null);
+});
+
+test('an unknown --host-family fails instead of silently filtering nothing', () => {
+  assertFailed(run([
+    'resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot', '--host-family', 'skynet',
+  ], { stdin: BOTS([CODEX]) }), /unknown --host-family/);
+});
+
 test('resolve never writes to the config', () => {
   const dir = tmpConfigDir(CFG({ observed: { [CODEX]: { auto: false } } }));
   const before = fs.readFileSync(path.join(dir, 'solopreneur.json'), 'utf8');

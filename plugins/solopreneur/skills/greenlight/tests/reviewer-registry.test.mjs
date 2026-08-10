@@ -44,6 +44,37 @@ test('every recipe declares a known kind', () => {
   }
 });
 
+test('every recipe declares a non-empty family', () => {
+  // The family is what makes gate independence decidable. A row without one
+  // would compare `undefined` against the host family, quietly pass the filter,
+  // and be eligible to gate its own host — failing open on the invariant.
+  for (const [id, r] of Object.entries(RECIPES)) {
+    assert.equal(typeof r.family, 'string', `${id}.family is not a string`);
+    assert.ok(r.family.trim(), `${id} has an empty family`);
+  }
+});
+
+test('claude-cli is the anthropic-family gate recipe', () => {
+  const r = RECIPES['claude-cli'];
+  assert.ok(r, 'claude-cli missing from registry');
+  assert.equal(r.kind, 'local-cli');
+  assert.equal(r.family, 'anthropic');
+  assert.equal(r.handshake, 'stdout');
+  assert.deepEqual(r.knownLogins, []);
+  assert.equal(r.poll, undefined, 'a local CLI runs synchronously and has no poll policy');
+  assert.equal(recipeFor('claude cli').id, 'claude-cli');
+});
+
+test('the claude-cli trigger requests the [P*] tags the loop already parses', () => {
+  // No new parser exists for it: the recipe has to ASK for the format the
+  // existing `[P*]` scan reads, and for the exact clean sentence that separates
+  // "reviewed, found nothing" from "never ran".
+  const { trigger } = RECIPES['claude-cli'];
+  for (const needle of ['[P1]', '[P2]', '[P3]', 'No findings.', ' -p ', 'origin/main']) {
+    assert.ok(trigger.includes(needle), `claude-cli trigger is missing ${JSON.stringify(needle)}`);
+  }
+});
+
 test('every recipe declares an aliases array', () => {
   for (const [id, r] of Object.entries(RECIPES)) {
     assert.ok(Array.isArray(r.aliases), `${id}.aliases is not an array`);

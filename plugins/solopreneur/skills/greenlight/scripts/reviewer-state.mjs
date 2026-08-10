@@ -17,9 +17,10 @@
  *
  *   reviewer-state.mjs resolve --repo-key <K> --fallback-order <ids>
  *                              [--cli-available <ids>] [--select <ids>] [--gate <id>]
+ *                              [--host-family <id>]
  *       stdin:  {"bots":[…]} — the `detect` output
  *       stdout: {"available","marked","trigger","collect","gate","needsPrompt",
- *                "warnings"}
+ *                "warnings","hostFamily","gateBlock"}
  *
  * This script never calls `gh`, never derives the repo key, and never reads
  * `fallback_order` — all three are passed in. That keeps it testable and keeps
@@ -36,9 +37,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { recipeFor, recipeForLogin } from './reviewer-registry.mjs';
+import { RECIPES, recipeFor, recipeForLogin } from './reviewer-registry.mjs';
 
 const SUBCOMMANDS = ['detect', 'record', 'resolve'];
+
+/** Every model family the registry knows. The only legal --host-family values. */
+const FAMILIES = new Set(Object.values(RECIPES).map((r) => r.family));
 
 /** The feature key this script owns. It never touches `greenlight`. */
 const FEATURE = 'greenlight_reviewers';
@@ -120,6 +124,32 @@ function configPath() {
     ? process.env.CODEX_HOME || path.join(os.homedir(), '.codex')
     : process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
   return path.join(path.resolve(base), 'solopreneur.json');
+}
+
+/**
+ * The model family of the host running this loop.
+ *
+ * Detected by the same rule as `configPath` above and `solopreneur_config_home`
+ * in shared/config.sh: CODEX_THREAD_ID is exported on every Codex session, and
+ * anything that is not Codex takes the historical Claude branch.
+ *
+ * The flag is honoured when given AND the env rule is applied when it is not.
+ * Both, deliberately: the caller passes `--host-family` so the decision is
+ * visible in the invocation, but a caller that forgets it must not thereby be
+ * able to produce a same-family gate — the whole point of the filter is that it
+ * cannot be skipped by omission.
+ *
+ * An unrecognised value is fatal rather than ignored: silently filtering nothing
+ * is exactly the failure this exists to prevent, and it would look like success.
+ */
+function hostFamilyOf(flag) {
+  const explicit = (flag ?? '').trim();
+  const family = explicit || (process.env.CODEX_THREAD_ID ? 'openai' : 'anthropic');
+  if (!FAMILIES.has(family)) {
+    throw new InputError(
+      `unknown --host-family "${family}" (known: ${[...FAMILIES].sort().join(', ')})`);
+  }
+  return family;
 }
 
 /** A JSON object — arrays and null excluded, as in preview/config-resolve.mjs. */
@@ -308,6 +338,15 @@ const csv = (value) => (value ? value.split(',').map((s) => s.trim()).filter(Boo
 /**
  * Decide this round's roles.
  *
+ * **Gate independence.** A candidate whose `family` equals the host's cannot
+ * gate: a clean pass from the host's own model family is a model approving its
+ * own work, and the loop would end on it. The rule lives in `canGate`, which is
+ * the single thing every gate path already consults — the explicit `--gate`, the
+ * `fallback_order` ladder, the unconfigured branch, and the `EXHAUSTED_GATES`
+ * advance (which re-enters through `--gate`). Non-gate reviewers are deliberately
+ * unrestricted: their findings are advisory, so a same-family reviewer is still
+ * triggered and still collected — it just cannot be what closes the round.
+ *
  * Candidates come from two places that cannot be unified — a GitHub bot has a
  * login, a local CLI never appears in GitHub data at all — so each carries its
  * `kind` and its own gating eligibility:
@@ -339,9 +378,14 @@ const csv = (value) => (value ? value.split(',').map((s) => s.trim()).filter(Boo
  * is marked has an empty `available`, and reporting "nothing to ask about" there
  * would strand it with no gate and no way back.
  */
-function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
+function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate, hostFamily }) {
   const warnings = [];
   const { observed } = reviewersBlock(readConfig(), repoKey);
+  /** Independent of the host = eligible to gate. Unknown recipe → never gates. */
+  const independent = (recipe) => {
+    const r = recipeFor(recipe);
+    return r != null && r.family !== hostFamily;
+  };
 
   // Union of remembered and observed, keyed by login.
   const merged = new Map();
@@ -377,7 +421,7 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
       auto: r.auto === true,
       evidence: r.evidence === true,
       lastSeen: r.lastSeen ?? null,
-      canGate: recipe !== null,
+      canGate: recipe !== null && independent(recipe),
     };
   };
 
@@ -405,7 +449,7 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     })
     .map((id) => ({
       kind: 'cli', id, login: null, recipe: recipeFor(id).id, auto: false, evidence: false,
-      lastSeen: null, canGate: true,
+      lastSeen: null, canGate: independent(id),
     }));
 
   const available = [...botCandidates, ...cliCandidates]
@@ -440,6 +484,17 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
 
   let gateEntry = null;
   if (gate) {
+    // An explicitly requested same-family gate can never be honoured — not here,
+    // and not through the seed below, which applies the same filter. Say so with
+    // the reason: the deferred "not an available gate candidate" warning further
+    // down reports THAT the request lost, never WHY, and a caller told only that
+    // would reasonably retry the same id forever.
+    if (recipeFor(gate) && !independent(gate)) {
+      warnings.push(
+        `--gate "${gate}" is ${recipeFor(gate).family}-family, the same as this host `
+        + `(${hostFamily}); the gate must be independent of the host, so it was not selected`,
+      );
+    }
     const found = selected.find((r) => r.recipe === gate || r.id === gate);
     if (found?.canGate) gateEntry = found;
     // The "stale gate" warning is deferred until after the seed below: on an
@@ -502,8 +557,12 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     requested = [gateId, ...requested.filter((id) => id !== gateId)];
   }
   // Only ids that are not already candidates: an available one was matched by the
-  // normal path above, and re-seeding it would duplicate the entry.
+  // normal path above, and re-seeding it would duplicate the entry. A seed becomes
+  // the gate, so the independence filter applies here too — otherwise a fresh repo
+  // on a Codex host would seed `codex-bot` and gate on the host's own family,
+  // which is the exact hole this whole filter exists to close.
   requested = requested.filter((id) => recipeFor(id).kind === 'github-bot'
+    && independent(id)
     && !available.some((r) => r.recipe === id));
 
   // Two ways in. "Nothing is known about this repo at all" is the first-use /
@@ -524,8 +583,15 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     // documented prompt-or-halt path — NOT quietly send the PR to codex-bot, a
     // reviewer that ladder excludes. Only a genuinely unconfigured ladder gets
     // the built-in default, and only when nothing at all is known.
-    const ladderSeed = fallbackOrder.find((id) => recipeFor(id)?.kind === 'github-bot')
-      ?? (fallbackOrder.length === 0 ? 'codex-bot' : null);
+    // `independent` again: the built-in `codex-bot` default is the S-size default
+    // gate, and on a Codex host it is the host's own family. There is no seedable
+    // substitute — a local CLI's availability comes from its own probe, never from
+    // being asked for — so an independent gate there arrives through
+    // `--cli-available` (claude-cli) and the ladder the caller derives for the
+    // host. With neither, this correctly resolves to gate:null.
+    const ladderSeed = fallbackOrder.find(
+      (id) => recipeFor(id)?.kind === 'github-bot' && independent(id),
+    ) ?? (fallbackOrder.length === 0 && independent('codex-bot') ? 'codex-bot' : null);
     const seedIds = requested.length > 0
       ? [...new Set(requested)]
       : [nothingKnown && ladderSeed && recipeFor(ladderSeed).id].filter(Boolean);
@@ -610,8 +676,36 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
       // closes the round (SKILL.md branches on `kind`).
       poll: recipeFor(gateEntry.recipe).poll ?? null,
       handshake: recipeFor(gateEntry.recipe).handshake,
+      // A4 is asserted on this field: on a Codex host it is never `openai`, on a
+      // Claude host never `anthropic`. Printing it is what makes the invariant
+      // checkable in the pre-flight's own output instead of by re-deriving it.
+      family: recipeFor(gateEntry.recipe).family,
     }
     : null;
+
+  // Why no gate, when there is none — the two answers route to different halts,
+  // and only this function knows which applies.
+  //
+  // The question is about the AUTHORIZED set, never "does some same-family
+  // reviewer exist". A ladder of `coderabbit,codex-bot` on a Codex host whose
+  // CodeRabbit is merely absent is `unavailable`: coderabbit is authorized AND
+  // independent, so waiting can genuinely bring the gate back. Only when every
+  // authorized candidate is the host's own family is waiting futile — no amount
+  // of retrying adds a reviewer of another family, and that is the difference
+  // between a retryable halt and one that needs a human.
+  const authorized = wanted ?? (fallbackOrder.length > 0
+    ? fallbackOrder
+    : [...selected.map((r) => r.recipe).filter(Boolean), 'codex-bot']);
+  const gateBlock = gateEntry !== null ? null
+    : (authorized.length > 0 && authorized.every((id) => recipeFor(id) && !independent(id))
+      ? 'host-family' : 'unavailable');
+  if (gateBlock === 'host-family') {
+    warnings.push(
+      `no independent gate: every reviewer authorized here (${authorized.join(', ')}) is `
+      + `${hostFamily}-family, the same as this host; install or authenticate a review CLI `
+      + 'of another family, or run this loop on a host of another family',
+    );
+  }
 
   return {
     available,
@@ -622,6 +716,8 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate }) {
     // Ask only when something is known here but nothing can close a round. A
     // marked reviewer counts as "known": retrying it is one of the answers.
     needsPrompt: gateEntry === null && (available.length > 0 || marked.length > 0),
+    hostFamily,
+    gateBlock,
     warnings,
   };
 }
@@ -647,7 +743,7 @@ async function main() {
 
   if (sub === 'resolve') {
     const flags = parseFlags(process.argv.slice(3),
-      ['repo-key', 'fallback-order', 'cli-available', 'select', 'gate']);
+      ['repo-key', 'fallback-order', 'cli-available', 'select', 'gate', 'host-family']);
     if (!flags['repo-key']) throw new InputError('resolve needs --repo-key');
     if (flags['fallback-order'] === undefined) {
       throw new InputError('resolve needs --fallback-order (read it with read_solopreneur_config)');
@@ -660,6 +756,7 @@ async function main() {
       cliAvailable: csv(flags['cli-available']),
       select: flags.select,
       gate: flags.gate,
+      hostFamily: hostFamilyOf(flags['host-family']),
     }));
   }
 
