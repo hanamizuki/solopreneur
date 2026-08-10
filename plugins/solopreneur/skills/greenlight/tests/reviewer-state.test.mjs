@@ -1049,6 +1049,41 @@ test('a stale id in the ladder does not veto the host-family verdict', () => {
   assert.equal(out.gateBlock, 'host-family');
 });
 
+test('a rejected explicit gate does not hide the ladder it sits on top of', () => {
+  // `--gate` ADDS an authorization; it never REPLACES `fallback_order`. On a
+  // Codex host `--gate codex-cli` is rejected (same family), but the ladder still
+  // authorizes `coderabbit` — an INDEPENDENT reviewer that merely is not
+  // available right now. Reporting `host-family` here would call a retryable
+  // outage a non-retryable authority boundary, and it would arm the pre-flight's
+  // host-family append against a ladder that SKILL.md promises never to widen.
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY,
+    '--fallback-order', 'coderabbit,codex-bot',
+    '--cli-available', 'codex-cli',
+    '--gate', 'codex-cli',
+  ], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null, 'a same-family gate is still refused');
+  assert.equal(out.gateBlock, 'unavailable',
+    'coderabbit is authorized and independent — waiting can fix this');
+});
+
+test('--select still narrows: a gate outside it is not an authorization', () => {
+  // The mirror of the case above. `--select` is a NARROWING list, so a `--gate`
+  // naming someone outside it was never authorized and must not widen the set.
+  // Here every SELECTED reviewer is host-family, so the halt is host-family even
+  // though `fallback_order` names an independent one the selection excluded.
+  const { stdout } = run([
+    'resolve', '--repo-key', KEY,
+    '--fallback-order', 'coderabbit,codex-bot',
+    '--cli-available', 'codex-cli',
+    '--select', 'codex-bot', '--gate', 'codex-cli',
+  ], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.gateBlock, 'host-family');
+});
+
 test('an unidentified reviewer keeps the halt retryable', () => {
   // Its family is UNKNOWN, not host: the attended identify prompt can still bind
   // it to an independent recipe. Concluding `host-family` from the identified
