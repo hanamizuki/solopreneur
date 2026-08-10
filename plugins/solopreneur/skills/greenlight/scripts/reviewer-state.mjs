@@ -739,13 +739,30 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate, hos
   // recovers the run, so that is `unavailable` (retryable), never an authority
   // boundary. Both flags count — an explicit gate is an authorization exactly as
   // a selection is, and honouring only one of them splits the same decision.
+  //
+  // The two flags authorize in OPPOSITE directions, so they cannot share one
+  // branch. `--select` NARROWS: while it is active it IS the authorization list,
+  // and a `--gate` naming someone outside it was never authorized (gate
+  // resolution rejects it for the same reason). `--gate` alone ADDS: it
+  // authorizes one more reviewer on top of the configured ladder, so it must
+  // never REPLACE that ladder — a same-family gate that gets rejected would
+  // otherwise hide an independent reviewer `fallback_order` still authorizes and
+  // report `host-family` for a ladder that has one. That misroutes a retryable
+  // `unavailable` into a non-retryable authority boundary, and it makes the
+  // pre-flight append `claude-cli` to a ladder the user never put it in — which
+  // SKILL.md's host-family append explicitly promises not to do for a ladder
+  // containing any independent reviewer.
   const known = (ids) => ids.filter((id) => recipeFor(id));
-  const explicitlyAuthorized = known([...csv(select), ...(gate ? [gate] : [])]);
-  const authorized = explicitlyAuthorized.length > 0
-    ? explicitlyAuthorized
-    : (fallbackOrder.length > 0
-      ? known(fallbackOrder)
-      : [...selected.map((r) => r.recipe), ...marked.map((m) => m.recipe), 'codex-bot']);
+  const selectIds = known(csv(select));
+  const ladderIds = [...new Set([...known(gate ? [gate] : []), ...known(fallbackOrder)])];
+  let authorized;
+  if (selectIds.length > 0) {
+    authorized = selectIds;
+  } else if (ladderIds.length > 0) {
+    authorized = ladderIds;
+  } else {
+    authorized = [...selected.map((r) => r.recipe), ...marked.map((m) => m.recipe), 'codex-bot'];
+  }
   const gateBlock = gateEntry !== null ? null
     : (authorized.length > 0 && authorized.every((id) => recipeFor(id) && !independent(id))
       ? 'host-family' : 'unavailable');
