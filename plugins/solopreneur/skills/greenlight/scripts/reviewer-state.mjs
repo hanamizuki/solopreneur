@@ -21,6 +21,10 @@
  *       stdin:  {"bots":[…]} — the `detect` output
  *       stdout: {"available","marked","trigger","collect","gate","needsPrompt",
  *                "warnings","hostFamily","gateBlock"}
+ *               `gateBlock` OUTRANKS `needsPrompt`: both are set when the only
+ *               reviewers here share the host's model family, and the prompt
+ *               cannot help — no answer to it adds a reviewer of another family.
+ *               Take the non-retryable halt; do not open the selection prompt.
  *
  * This script never calls `gh`, never derives the repo key, and never reads
  * `fallback_order` — all three are passed in. That keeps it testable and keeps
@@ -561,6 +565,18 @@ function resolve({ bots, repoKey, fallbackOrder, cliAvailable, select, gate, hos
   // the gate, so the independence filter applies here too — otherwise a fresh repo
   // on a Codex host would seed `codex-bot` and gate on the host's own family,
   // which is the exact hole this whole filter exists to close.
+  // Say so when the family filter is what removed an explicitly requested seed.
+  // The `--gate` path above explains WHY; a `--select` that silently vanishes
+  // here would leave the caller with a round where nothing happened and no
+  // reason given.
+  const familyDropped = requested.filter((id) => recipeFor(id).kind === 'github-bot'
+    && !independent(id) && !available.some((r) => r.recipe === id));
+  if (familyDropped.length > 0) {
+    warnings.push(
+      `not seeding ${familyDropped.map((d) => `"${d}"`).join(', ')}: ${hostFamily}-family, `
+      + 'the same as this host, and a gate must be independent of the host',
+    );
+  }
   requested = requested.filter((id) => recipeFor(id).kind === 'github-bot'
     && independent(id)
     && !available.some((r) => r.recipe === id));

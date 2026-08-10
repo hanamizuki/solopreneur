@@ -83,6 +83,10 @@ test('the claude-cli gate never bypasses tool permissions', () => {
   // Measured: default permissions answer fine.
   const { trigger } = RECIPES['claude-cli'];
   assert.ok(!trigger.includes('dangerously'), 'claude-cli must not bypass tool permissions');
+  // Dropping the bypass is not sufficient: default permissions still leave tools
+  // available, so an operator whose settings pre-authorize Bash would hand
+  // injected diff text a live shell. `--tools ""` is what removes them.
+  assert.ok(trigger.includes('--tools ""'), 'claude-cli must disable tools outright');
   // Never a remote ref either: `origin/main` is absent on a repo whose remote is
   // named differently or unfetched, and the rest of the loop uses local `main`.
   assert.ok(!trigger.includes('origin/'), 'claude-cli must review against the LOCAL base branch');
