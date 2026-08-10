@@ -430,7 +430,11 @@ evidence requirements, or acceptance criteria.
   Each host also requires the paired live bundled-specialist evidence in L03;
   an unproven specialist adapter blocks that host's conformance claim, while a
   later transient failure of an already promoted adapter remains a visible
-  `incomplete-review` outcome. Claude additionally requires the L04 direct-
+  `incomplete-review` outcome. Each optional Superpowers, gstack, or Ponytail
+  recipe also requires its own paired parser-valid clean and seeded-finding L03
+  branch on every host where that recipe is promoted; an unavailable or
+  unpromoted optional recipe does not block host conformance, and a transient
+  post-promotion failure remains `incomplete-review`. Claude additionally requires the L04 direct-
   native binding, and Codex requires the full L05 native-provenance and wrong-
   context branches. A verified remote finding cannot enter disposition or the
   fixer until its current-generation blocking windows settle.
