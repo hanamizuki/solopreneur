@@ -1677,8 +1677,13 @@ HOST_FAMILY=$([ -n "${CODEX_THREAD_ID:-}" ] && echo openai || echo anthropic)
 # rounds trigger and PAY for a reviewer they do not run today — a behaviour change
 # on the host that must not change. codex-cli above is untouched: on a Codex host
 # it stays available as an ordinary non-gate reviewer.
+# `claude auth status`, the direct analogue of `codex login status` above — NOT
+# `claude --version`, which prints happily while logged out. A version-only probe
+# would put a non-functional gate in `available`, fail after dispatch, and spend a
+# round arriving at a reviewer-exhaustion halt that pre-flight had already called
+# available. Installed and authenticated are different questions; the gate needs both.
 if [ "$HOST_FAMILY" != anthropic ] \
-   && command -v claude >/dev/null 2>&1 && claude --version >/dev/null 2>&1; then
+   && command -v claude >/dev/null 2>&1 && claude auth status >/dev/null 2>&1; then
   CLI_AVAILABLE="${CLI_AVAILABLE:+$CLI_AVAILABLE,}claude-cli"
 fi
 
@@ -1693,32 +1698,7 @@ else
   DETECTED='{"bots":[]}'; DETECTION_STATUS=unavailable
 fi
 
-# The host-appropriate effective ladder.
-#
-# `fallback_order` is an AUTHORIZATION list — `resolve` will not gate on anything
-# outside it, and that stays true here. But the recommended order is
-# ["codex-bot", "codex-cli"], both openai, so on a Codex host it authorizes no
-# independent gate at all and every default-config run would halt even with a
-# perfectly good `claude` installed. So the ladder is adapted HERE, by the caller,
-# visibly — never by a hidden exception inside the resolver:
-#
-#   append (never prepend) claude-cli when it probed available on a non-anthropic
-#   host and the user configured a ladder at all.
-#
-# Appending preserves the user's own ordering: any independent reviewer they
-# listed is still tried first, and claude-cli is reached only when those are
-# unavailable. An EMPTY ladder is left empty — `resolve`'s unconfigured branch
-# already picks any available candidate, and synthesizing a one-entry ladder
-# there would change that branch's meaning for no gain.
 EFFECTIVE_FALLBACK_ORDER="$FALLBACK_ORDER"
-case ",$CLI_AVAILABLE," in *,claude-cli,*)
-  if [ -n "$FALLBACK_ORDER" ]; then
-    case ",$FALLBACK_ORDER," in
-      *,claude-cli,*) ;;                                            # already listed
-      *) EFFECTIVE_FALLBACK_ORDER="$FALLBACK_ORDER,claude-cli" ;;
-    esac
-  fi
-;; esac
 
 # Runs in both branches: `resolve` reads the per-repo cache as well as this
 # round's sample, so an `unavailable` detection still produces a decision instead
@@ -1735,6 +1715,44 @@ RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve 
   --repo-key "$REPO_KEY" --fallback-order "$EFFECTIVE_FALLBACK_ORDER" \
   --cli-available "$CLI_AVAILABLE" --select "$SELECTED_RECIPES" --gate "$GATE_RECIPE" \
   --host-family "$HOST_FAMILY")
+
+# The host-appropriate effective ladder — applied ONLY when the configured ladder
+# cannot produce an independent gate at all.
+#
+# `fallback_order` is an AUTHORIZATION list: `resolve` refuses to gate on anything
+# outside it, and that stays true. But the recommended order is
+# ["codex-bot", "codex-cli"] — both openai — so on a Codex host it authorizes no
+# independent gate whatsoever, and every default-config run would halt even with a
+# perfectly good `claude` installed. That specific ladder is adapted here, by the
+# caller, visibly — never by a hidden exception inside the resolver.
+#
+# `gateBlock == "host-family"` IS the question "can this ladder yield an
+# independent gate here?", already answered against the registry — so ask the
+# resolver instead of re-deriving family knowledge in shell. A ladder that lists
+# any independent reviewer (say `coderabbit`) never reaches this branch, so an
+# unavailable CodeRabbit still takes the documented prompt-or-halt path rather
+# than silently gating on a reviewer the user never authorized.
+#
+# Appending (never prepending) also preserves the user's ordering. An EMPTY ladder
+# is left alone: `resolve`'s unconfigured branch already picks any available
+# candidate, and synthesizing a one-entry ladder would change its meaning.
+if [ "$(printf '%s' "$RESOLVED" | jq -r '.gateBlock // empty')" = host-family ] \
+   && [ -n "$FALLBACK_ORDER" ]; then
+  case ",$CLI_AVAILABLE," in *,claude-cli,*)
+    case ",$FALLBACK_ORDER," in
+      *,claude-cli,*) ;;                       # already authorized; nothing to add
+      *)
+        EFFECTIVE_FALLBACK_ORDER="$FALLBACK_ORDER,claude-cli"
+        echo "note: fallback_order authorizes no reviewer independent of this \
+$HOST_FAMILY host; appending claude-cli, which probed available"
+        RESOLVED=$(printf '%s' "$DETECTED" | node "$SCRIPTS/reviewer-state.mjs" resolve \
+          --repo-key "$REPO_KEY" --fallback-order "$EFFECTIVE_FALLBACK_ORDER" \
+          --cli-available "$CLI_AVAILABLE" --select "$SELECTED_RECIPES" --gate "$GATE_RECIPE" \
+          --host-family "$HOST_FAMILY")
+        ;;
+    esac
+  ;; esac
+fi
 
 # Warnings are actionable config problems (a stale recipe id, a `gate=` naming
 # someone who has since been marked unresponsive), not failures.
@@ -2188,7 +2206,7 @@ CLI in `trigger[]`, so hardcoding one here would run Codex when the user chose
 | When `trigger[].recipe` is | Command |
 |---|---|
 | recipe `codex-cli` | `codex review --base main 2>&1` — parse `[P*]` tags from stdout |
-| recipe `claude-cli` | `git diff main...HEAD \| <this entry's own `triggerText`>` — **pipe the diff in; run the `triggerText` verbatim** (the registry row holds the whole command including the prompt — do not retype or paraphrase it), in the PR worktree, inheriting the ambient environment. Parse `[P*]` tags from stdout exactly as for `codex-cli`. **No `--dangerously-skip-permissions`, and `--tools ""` to remove tools outright**, for the reason the `agy` row gives: the diff is untrusted, handing it in as inert input means the reviewer needs no tools, and tools reachable by injected instructions are the dangerous combination. Dropping the bypass is not enough on its own — default permissions still leave tools available, and an operator whose settings pre-authorize Bash would hand injected diff text a live shell. Verified: both forms answer fine, so the restriction costs nothing. An operator who wants a specific Claude profile exports `CLAUDE_CONFIG_DIR` before launching the host — env vars pass through to the nested CLI, and no profile mapping lives in this body |
+| recipe `claude-cli` | **Capture the diff first, check it, then pipe it in** — `DIFF=$(git diff main...HEAD)`, and treat a non-zero `git` exit **or an empty `$DIFF`** as an invocation failure for this reviewer (never a clean pass): in a pipeline only the LAST command's status survives, so `git diff … \| claude …` would hand the reviewer empty input, let it answer `No findings.`, and close the round having reviewed nothing. Then `printf '%s' "$DIFF" \| <this entry's own `triggerText`>` — **run the `triggerText` verbatim** (the registry row holds the whole command including the prompt — do not retype or paraphrase it), in the PR worktree, inheriting the ambient environment. Parse `[P*]` tags from stdout exactly as for `codex-cli`. **No `--dangerously-skip-permissions`, and `--tools ""` to remove tools outright**, for the reason the `agy` row gives: the diff is untrusted, handing it in as inert input means the reviewer needs no tools, and tools reachable by injected instructions are the dangerous combination. Dropping the bypass is not enough on its own — default permissions still leave tools available, and an operator whose settings pre-authorize Bash would hand injected diff text a live shell. Verified: both forms answer fine, so the restriction costs nothing. An operator who wants a specific Claude profile exports `CLAUDE_CONFIG_DIR` before launching the host — env vars pass through to the nested CLI, and no profile mapping lives in this body |
 | recipe `agy` | The **same** `agy --print` invocation post-commit Phase 3 uses: model pinned to the Gemini family, `AGY_MAX_DIFF_BYTES` argv guard, per-invocation nonce completion marker, no tool-permission bypass. Take the diff from `git diff main...HEAD` instead of a commit range, and parse `[P*]` tags the same way |
 
 > WARNING: **Do not `cd`**: Execute in the current working directory. Never change directories.
