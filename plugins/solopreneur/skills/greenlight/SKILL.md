@@ -540,7 +540,7 @@ vocabulary; no bot login is hardcoded here.
 
 | Effective size | Phase 1 internal | Verification gate | Phase 3 external loop (`SIZE_MAX_ROUNDS`) |
 |---|---|---|---|
-| **S** | **skip** | **skip** | Phase 3 only, **one external reviewer** — PR mode via its registry-driven `current_reviewer` + `fallback_order` (default `codex-bot` on a Claude host, `claude-cli` on a Codex host — see [Host-family independence](#host-family-independence)); Post-commit via the single preferred available CLI (Codex CLI, else agy) instead of its usual parallel pair — loop to clean, **max 3 rounds** |
+| **S** | **skip** | **skip** | Phase 3 only, **one external reviewer** — PR mode via its registry-driven `current_reviewer` + `fallback_order` (no-history default `codex-bot` on a Claude host, `claude-cli` on a Codex host; any available independent reviewer may gate instead — see [Host-family independence](#host-family-independence)); Post-commit via the single preferred available CLI (Codex CLI, else agy) instead of its usual parallel pair — loop to clean, **max 3 rounds** |
 | **M** (default) | **2 reviewers** — `/specialist-review` + `ponytail:ponytail-review` (rows 4–5 of the Phase 1 table) | **skip** | standard registry loop, **max 5 rounds** |
 | **L** | **all 5 reviewers** | **ON** (when the `Workflow` tool is available) | full registry fallback chain, **max 10 rounds** |
 
@@ -554,10 +554,16 @@ vocabulary; no bot login is hardcoded here.
   `codex-bot`), else the `codex-bot` default with the existing not-detected warning.
   This reuses the pre-flight CLI gate and activity detection (registry vocabulary, no
   hardcoded logins), so an unattended S run uses the authed CLI instead of failing on
-  an absent bot. **The preference above is the Claude-host one.** On a Codex host
-  every codex-family candidate is filtered out of gate selection and the default
-  becomes `claude-cli`, which arrives through the same pre-flight CLI probe; with no
-  independent CLI installed there the run halts rather than gating on its own family
+  an absent bot. **The codex preference above is the Claude-host one.** On a Codex
+  host every codex-family candidate is filtered out of gate selection, so the gate
+  falls to whichever **independent** candidate is available — `claude-cli` via the
+  pre-flight CLI probe when it is the only one, which is the common case, but a
+  detected independent bot (`coderabbit`, `bugbot`, `greptile`) is an equally valid
+  gate and the resolver may pick it. There is deliberately no preference *among*
+  independent reviewers: `claude-cli` is the host-conditional **no-history default**
+  (what gets seeded when nothing is known here), not something that outranks a
+  reviewer already active on the repo. With no independent candidate at all the run
+  halts rather than gating on its own family
   (see [Host-family independence](#host-family-independence)).
   Post-commit S likewise runs a single preferred available CLI (Codex
   CLI, else agy) rather than the usual codex-CLI + agy pair, shedding the doubled cost.
