@@ -190,13 +190,118 @@
         "coderabbit",
         "github-review-bots"
       ]
+    },
+    "solopreneur:merge-pr": {
+      "support": {
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "plugins/solopreneur/skills/merge-pr/SKILL.md",
+      "platformResources": [
+        "plugins/solopreneur/skills/merge-pr/SKILL.md"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-11-codex-autopilot-dependencies.md",
+        "codex-tui": "docs/spec/2026-08-11-codex-autopilot-dependencies.md",
+        "codex-app": "docs/spec/2026-08-11-codex-autopilot-dependencies.md"
+      },
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-11-codex-autopilot-dependencies.md#a5-merge-fail-closed-boundaries",
+          "docs/spec/2026-08-11-codex-autopilot-dependencies.md#a6-atomic-live-merge"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-11-codex-autopilot-dependencies.md#a5-merge-fail-closed-boundaries",
+          "docs/spec/2026-08-11-codex-autopilot-dependencies.md#a6-atomic-live-merge"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-11-codex-autopilot-dependencies.md#a5-merge-fail-closed-boundaries",
+          "docs/spec/2026-08-11-codex-autopilot-dependencies.md#a6-atomic-live-merge"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [
+          "git",
+          "gh",
+          "jq",
+          "bash",
+          "github-network"
+        ],
+        "codex-tui": [
+          "git",
+          "gh",
+          "jq",
+          "bash",
+          "github-network"
+        ],
+        "codex-app": [
+          "git",
+          "gh",
+          "jq",
+          "bash",
+          "github-network"
+        ]
+      },
+      "optionalEnhancements": []
+    },
+    "solopreneur:plan-review": {
+      "support": {
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "plugins/solopreneur/skills/plan-review/SKILL.md",
+      "platformResources": [
+        "plugins/solopreneur/skills/plan-review/SKILL.md"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-11-codex-autopilot-dependencies.md",
+        "codex-tui": "docs/spec/2026-08-11-codex-autopilot-dependencies.md",
+        "codex-app": "docs/spec/2026-08-11-codex-autopilot-dependencies.md"
+      },
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-11-codex-autopilot-dependencies.md#a2-codex-exec-plan-review-internal"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-11-codex-autopilot-dependencies.md#a3-codex-tui-plan-review-internal"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-11-codex-autopilot-dependencies.md#a4-codex-app-plan-review-internal"
+        ]
+      },
+      "dependencies": [
+        "solopreneur:greenlight"
+      ],
+      "requiredCapabilities": {
+        "codex-exec": [
+          "repository-read-access"
+        ],
+        "codex-tui": [
+          "repository-read-access"
+        ],
+        "codex-app": [
+          "repository-read-access"
+        ]
+      },
+      "optionalEnhancements": [
+        "context7",
+        "custom-specialist-agents",
+        "official-docs-network"
+      ]
     }
   },
   "codexHostGuards": {
     "solopreneur:autopilot": "plugins/solopreneur/skills/autopilot/SKILL.md",
-    "solopreneur:merge-pr": "plugins/solopreneur/skills/merge-pr/SKILL.md",
     "solopreneur:mvp": "plugins/solopreneur/skills/mvp/SKILL.md",
-    "solopreneur:plan-review": "plugins/solopreneur/skills/plan-review/SKILL.md",
     "solopreneur:preview": "plugins/solopreneur/skills/preview/SKILL.md",
     "solopreneur:todos-babysit": "plugins/solopreneur/skills/todos-babysit/SKILL.md",
     "solopreneur:worktree-handoff": "plugins/solopreneur/skills/worktree-handoff/SKILL.md"

@@ -19,9 +19,7 @@ PUBLICATION = {"include", "exclude"}
 LEGACY_BASELINE_SHA256 = "4e2c8a00de630db33fceae8abe2e41a14da63d4ddb0118bb84e60e7fd777ca61"
 REQUIRED_GUARDS = {
     "solopreneur:autopilot",
-    "solopreneur:merge-pr",
     "solopreneur:mvp",
-    "solopreneur:plan-review",
     "solopreneur:preview",
     "solopreneur:todos-babysit",
     "solopreneur:worktree-handoff",
