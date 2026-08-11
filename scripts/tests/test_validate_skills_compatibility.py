@@ -278,6 +278,14 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
             "codexHostGuards.solopreneur:autopilot lacks an early fail-closed guard"
         )
 
+    def test_guard_must_precede_other_instructions(self) -> None:
+        path = self.repo_root / self.registry["codexHostGuards"]["solopreneur:autopilot"]
+        path.write_text("Do something first.\n\n" + path.read_text(), encoding="utf-8")
+
+        self.assert_failure_contains(
+            "codexHostGuards.solopreneur:autopilot lacks an early fail-closed guard"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -132,8 +132,9 @@ Each generated Codex plugin manifest copies `name`, `version`, `description`,
 and `license` from the Claude manifest, derives publisher metadata from the
 marketplace owner, declares `./skills/` explicitly, and merges only Codex-
 specific interface metadata from the overlay. The install root contains only
-registry-included skill directories. Overlay files may not replace generator-
-owned fields.
+registry-included skill directories plus the plugin's `agents/*.toml`, which
+the installed bootstrap skill can read only from that snapshot. Overlay files
+may not replace generator-owned fields.
 
 The generated Codex marketplace preserves the Claude marketplace order but
 emits only plugin names with at least one included Codex skill. Each source

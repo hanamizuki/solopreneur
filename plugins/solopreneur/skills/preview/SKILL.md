@@ -5,10 +5,6 @@ description: Create an interactive HTML preview of any proposal, plan, idea, doc
 
 # preview
 
-Turn any proposal / plan / idea into interactive HTML, publish it into a **private Library**, and hand the user a stable URL. Each item gets a catalog sidebar, provenance footer, and comment overlay. External one-off links use **Share** (same Vercel project, Preview environment only — never promotes Library production).
-
-Deep reference (schema, setup, deploy internals): `../../shared/config.md` relative to this skill (repo path `plugins/solopreneur/shared/config.md`).
-
 ## Codex host guard
 
 Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop
@@ -16,6 +12,10 @@ before creating preview files, changing Vercel state, deploying, or minting a
 share link. This release supports Preview only on Claude Code; tell the user
 the Codex publication seam is not shipped yet and to run the workflow there
 instead.
+
+Turn any proposal / plan / idea into interactive HTML, publish it into a **private Library**, and hand the user a stable URL. Each item gets a catalog sidebar, provenance footer, and comment overlay. External one-off links use **Share** (same Vercel project, Preview environment only — never promotes Library production).
+
+Deep reference (schema, setup, deploy internals): `../../shared/config.md` relative to this skill (repo path `plugins/solopreneur/shared/config.md`).
 
 ## Outcome the user is looking for
 

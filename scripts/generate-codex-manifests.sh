@@ -8,9 +8,11 @@
 #   1. .codex/plugins/<n>/ — a filtered install root for each plugin with at
 #      least one registry-included Codex skill. Skill directories are copied
 #      byte-for-byte from the canonical tree; a declared shared config.sh is
-#      overlaid at the already-supported flattened-layout path. Canonical
-#      plugin roots are never installation roots because Codex's default
-#      skills/ discovery would expose every unsupported sibling skill.
+#      overlaid at the already-supported flattened-layout path. Agent TOMLs are
+#      also copied because the install snapshot is the bootstrap skill's only
+#      readable source. Canonical plugin roots are never installation roots
+#      because Codex's default skills/ discovery would expose every unsupported
+#      sibling skill.
 #   2. .agents/plugins/marketplace.json — contains only plugins that have a
 #      filtered install root, and points at ./.codex/plugins/<name>. Entries
 #      carry the documented installation/authentication policy and the overlay
@@ -78,7 +80,7 @@ codex_plugins=()
 while IFS= read -r name; do codex_plugins+=("$name"); done \
   < <(printf '%s' "$published_names" | jq -r '.[]')
 
-for name in "${codex_plugins[@]}"; do
+for name in "${codex_plugins[@]+"${codex_plugins[@]}"}"; do
   if ! jq -e --arg name "$name" 'any(.plugins[]; .name == $name)' \
     "$CLAUDE_MARKETPLACE" >/dev/null; then
     echo "error: registry publishes '$name', but Claude marketplace does not list it" >&2
@@ -113,7 +115,8 @@ fi
 # Overlays own Codex-only fields, nothing else. The merge below is
 # right-biased (`+ $overlay`), so a reserved key in an overlay entry would
 # silently replace the value copied from the Claude manifest — breaking
-# version lockstep or the hooks guard while the drift check stays green.
+# version lockstep or the generated `author` publisher metadata while the drift
+# check stays green.
 # Refuse loudly instead.
 reserved=$(jq -r '
   to_entries[]
@@ -174,7 +177,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 # canonical sibling skills for Codex to fall back to.
 rm -rf "$REPO_ROOT"/plugins/*/.codex-plugin
 rm -rf "$CODEX_PLUGIN_ROOT"
-for name in "${codex_plugins[@]}"; do
+for name in "${codex_plugins[@]+"${codex_plugins[@]}"}"; do
   claude_manifest="$REPO_ROOT/plugins/$name/.claude-plugin/plugin.json"
   output_root="$CODEX_PLUGIN_ROOT/$name"
   mkdir -p "$output_root/.codex-plugin" "$output_root/skills"

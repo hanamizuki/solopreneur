@@ -3,13 +3,20 @@
 # pinned Codex CLI without changing the repository or the caller's Codex home.
 
 set -euo pipefail
+trap 'echo "error: filtered-publication fixture failed at line $LINENO" >&2' ERR
 
 REPO_ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 FIXTURE_ROOT="$(mktemp -d -t codex-filter-repo.XXXXXX)"
 FILTER_HOME="$(mktemp -d -t codex-filter-home.XXXXXX)"
 trap 'rm -rf "$FIXTURE_ROOT" "$FILTER_HOME"' EXIT
 
-cp -R "$REPO_ROOT/." "$FIXTURE_ROOT"
+cp -R \
+  "$REPO_ROOT/plugins" \
+  "$REPO_ROOT/scripts" \
+  "$REPO_ROOT/.claude-plugin" \
+  "$REPO_ROOT/docs" \
+  "$FIXTURE_ROOT/"
+cp "$REPO_ROOT/skills-compatibility.json" "$FIXTURE_ROOT/"
 
 canary_dir="$FIXTURE_ROOT/plugins/solopreneur/skills/filter-canary"
 mkdir -p "$canary_dir"

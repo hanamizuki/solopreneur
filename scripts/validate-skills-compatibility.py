@@ -352,13 +352,33 @@ def main() -> int:
         if skill_id not in discovered or path is None or not path.is_file():
             errors.append(f"codexHostGuards.{skill_id} references a missing skill file")
             continue
-        first_lines = " ".join(path.read_text().splitlines()[:50])
+        lines = path.read_text().splitlines()
+        body_start = 0
+        if lines[:1] == ["---"]:
+            try:
+                body_start = lines.index("---", 1) + 1
+            except ValueError:
+                body_start = len(lines)
+        guard_index = body_start
+        while guard_index < len(lines) and not lines[guard_index].strip():
+            guard_index += 1
+        if guard_index < len(lines) and lines[guard_index].startswith("# "):
+            guard_index += 1
+            while guard_index < len(lines) and not lines[guard_index].strip():
+                guard_index += 1
+
         required_guard_text = (
-            "## Codex host guard",
             "Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop",
             "only on Claude Code",
         )
-        if any(text not in first_lines for text in required_guard_text):
+        guard_lines = []
+        if guard_index < len(lines) and lines[guard_index] == "## Codex host guard":
+            for line in lines[guard_index + 1 :]:
+                if line.startswith("#"):
+                    break
+                guard_lines.append(line)
+        guard_text = " ".join(" ".join(guard_lines).split())
+        if not guard_lines or any(text not in guard_text for text in required_guard_text):
             errors.append(f"codexHostGuards.{skill_id} lacks an early fail-closed guard")
 
     if errors:

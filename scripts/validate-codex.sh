@@ -114,7 +114,8 @@ if [[ -d "$REPO_ROOT/.codex/plugins" ]]; then
     skill="${relative#*/skills/}"
     skill="${skill%/SKILL.md}"
     actual+="${plugin}:${skill}"$'\n'
-  done < <(find "$REPO_ROOT/.codex/plugins" -path '*/skills/*/SKILL.md' -print0)
+  done < <(find "$REPO_ROOT/.codex/plugins" \
+    -mindepth 4 -maxdepth 4 -type f -name SKILL.md -print0)
   actual="$(printf '%s' "$actual" | sed '/^$/d' | sort)"
 fi
 if [[ "$actual" != "$expected" ]]; then
@@ -123,7 +124,9 @@ if [[ "$actual" != "$expected" ]]; then
   fail=1
 fi
 
-if find "$REPO_ROOT/plugins" -mindepth 2 -maxdepth 2 -type d -name .codex-plugin | grep -q .; then
+canonical_manifest="$(find "$REPO_ROOT/plugins" \
+  -mindepth 2 -maxdepth 2 -type d -name .codex-plugin -print -quit)"
+if [[ -n "$canonical_manifest" ]]; then
   echo "error: canonical plugin roots must not carry Codex manifests" >&2
   fail=1
 fi
@@ -174,18 +177,19 @@ fi
 # --- Gate: installed-cache bootstrap integration ----------------------------
 echo "==> bootstrap integration: installed cache to user agents"
 listing="$(CODEX_HOME="$SMOKE_HOME" codex plugin list --json)"
-if printf '%s' "$listing" | jq -e '
-  ([.installed[].name] | index("solopreneur")) != null
-  and ([.installed[].name] | index("marketer")) != null
+if printf '%s' "$listing" | jq -e --arg marketplace "$marketplace_name" '
+  [.installed[] | select(.marketplaceName == $marketplace) | .name] as $names
+  | ($names | index("solopreneur")) != null
+  and ($names | index("marketer")) != null
 ' >/dev/null; then
-  solopreneur_rel="$(printf '%s' "$listing" | jq -er '
+  solopreneur_rel="$(printf '%s' "$listing" | jq -er --arg marketplace "$marketplace_name" '
   .installed[]
-  | select(.name == "solopreneur" and .marketplaceName == "solopreneur")
+  | select(.name == "solopreneur" and .marketplaceName == $marketplace)
   | "\(.marketplaceName)/\(.name)/\(.version)"
 ')"
-  marketer_rel="$(printf '%s' "$listing" | jq -er '
+  marketer_rel="$(printf '%s' "$listing" | jq -er --arg marketplace "$marketplace_name" '
   .installed[]
-  | select(.name == "marketer" and .marketplaceName == "solopreneur")
+  | select(.name == "marketer" and .marketplaceName == $marketplace)
   | "\(.marketplaceName)/\(.name)/\(.version)"
 ')"
   bootstrap_script="$SMOKE_HOME/plugins/cache/$solopreneur_rel/skills/codex-agents-bootstrap/scripts/install-codex-agents.sh"

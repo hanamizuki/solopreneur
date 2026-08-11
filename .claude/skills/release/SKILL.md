@@ -266,7 +266,10 @@ direct form the subject matches, and `CHANGELOG.md` (markdown) plus the
 `plugin.json` bumps land in one commit on `main`:
 
 ```bash
-git add plugins/*/.claude-plugin/plugin.json .agents/plugins/marketplace.json .codex CHANGELOG.md
+git add plugins/*/.claude-plugin/plugin.json .agents/plugins/marketplace.json .codex/agents CHANGELOG.md
+if [[ -d .codex/plugins ]] || [[ -n "$(git ls-files -- .codex/plugins)" ]]; then
+  git add -A -- .codex/plugins
+fi
 git commit \
   -m "chore(release): <one-line summary of what's shipping>" \
   -m "<plugin1> v<old>→v<new>: <reason>

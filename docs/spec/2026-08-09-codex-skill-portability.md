@@ -6,7 +6,7 @@ pending
 
 **Date:** 2026-08-09
 
-**Scope:** all 106 skills in the canonical trees of the seven solopreneur
+**Scope:** all 106 skills in the canonical trees of the seven marketplace
 plugins
 
 **Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md),

@@ -77,6 +77,9 @@ jobs:
           PYTHONDONTWRITEBYTECODE: '1'
         run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
 
+      - name: Regenerate filtered surfaces with the system Bash
+        run: /bin/bash ./scripts/generate-codex-manifests.sh
+
       - name: Run bootstrap fixture suite with the system Bash
         run: node --test plugins/solopreneur/skills/codex-agents-bootstrap/tests/*.test.mjs
 
