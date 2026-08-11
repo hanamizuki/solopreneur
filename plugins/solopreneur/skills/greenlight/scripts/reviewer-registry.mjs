@@ -39,7 +39,11 @@
  * has never had a handshake.
  */
 
-/** Fallback timing for a tool whose acknowledgement behaviour is unverified. */
+/**
+ * Fallback timing for a tool whose acknowledgement behaviour is unverified:
+ * three checks, the first after `firstWaitSec` and the rest `intervalSec`
+ * apart — 180s / 300s / 540s at the values below.
+ */
 export const DEFAULT_POLL = Object.freeze({ firstWaitSec: 180, intervalSec: 120, tries: 3 });
 
 export const RECIPES = {
