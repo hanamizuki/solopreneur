@@ -55,11 +55,24 @@ for (const skill of CONSUMERS) {
   test(`${skill} sources config.sh instead of defining the helpers`, () => {
     const block = extractBlock(path.join(SKILLS, skill, 'SKILL.md'));
 
-    // The relative path, not merely the word `source`: a block that sources a
-    // path which has rotted would otherwise pass every structural check.
-    assert.ok(
-      block.some((l) => l.startsWith('source ') && l.includes('/../../shared/config.sh')),
-      `${skill}/SKILL.md must source "…/../../shared/config.sh" inside the marker block`);
+    // Both candidate paths, not merely the word `source`: a block that resolves
+    // a path which has rotted would otherwise pass every structural check. The
+    // plugin layout keeps the helpers at ../../shared/; a skill republished into
+    // a flattened skills directory carries them at scripts/ instead.
+    assert.ok(block.some((l) => l.includes('/../../shared/config.sh')),
+      `${skill}/SKILL.md must resolve "…/../../shared/config.sh" inside the marker block`);
+    assert.ok(block.some((l) => l.includes('/scripts/config.sh')),
+      `${skill}/SKILL.md must fall back to "…/scripts/config.sh" for a detached layout`);
+    assert.ok(block.some((l) => l.startsWith('source ')),
+      `${skill}/SKILL.md must source the resolved path inside the marker block`);
+
+    // The guard is the point of having two candidates. `source` on a missing
+    // file does not stop the shell: the helpers stay undefined, every config
+    // read returns empty, and the model improvises a path that only resolves
+    // inside this plugin's own repo. Failing loudly is what makes the fallback
+    // honest rather than a second way to be silently wrong.
+    assert.ok(block.some((l) => l.includes('HALT') && l.includes('exit 1')),
+      `${skill}/SKILL.md must halt when neither config.sh candidate exists`);
 
     // A re-inlined helper is the regression this whole refactor exists to
     // prevent — it would drag `$N` back into a skill body with it. All three

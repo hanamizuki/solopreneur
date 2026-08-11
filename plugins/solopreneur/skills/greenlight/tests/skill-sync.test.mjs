@@ -61,3 +61,17 @@ test('every registry row appears in SKILL.md with its trigger in that same row',
 test('the hardcoded login allowlist stays deleted', () => {
   assert.ok(!md.includes('REVIEWER_BOT_LOGINS'), 'hardcoded login list crept back in');
 });
+
+test('no loop depends on the shell splitting an unquoted expansion', () => {
+  // zsh does not word-split unquoted parameter expansions and bash does, so
+  // `for n in $nums` iterates once under the shell both harnesses actually use
+  // on macOS and N times under the one CI uses. Measured 2026-08-11: reviewer
+  // activity detection had been silently returning an empty bot list because of
+  // exactly this line. The failure is invisible by construction — the loop body
+  // just runs against garbage — so guard the shape, not the symptom.
+  const offenders = md.split('\n')
+    .map((line, i) => [i + 1, line])
+    .filter(([, line]) => /^\s*for\s+\w+\s+in\s+\$[\w{]/.test(line));
+  assert.deepEqual(offenders, [],
+    'use `while IFS= read -r x; do … done <<< "$list"` instead of `for x in $list`');
+});

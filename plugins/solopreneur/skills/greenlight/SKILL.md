@@ -244,7 +244,8 @@ orchestrator must do when one fires.
 ### Flags section (final report)
 
 When any flag fired (no verifier configured, an attended anti-gaming catch, an
-auto-classified size **S** without an explicit override, and the other flag sources in
+auto-classified size **S** without an explicit override, **a `DETECTION_STATUS`
+of `unavailable`**, and the other flag sources in
 [Escalation taxonomy](#escalation-taxonomy-halt--flag--note) — a pushed-back P1, a fix
 over 20 lines, a merge with no CI signal, findings contradictions ① and ②),
 append a prominent section to whichever mode's final report runs:
@@ -686,7 +687,18 @@ If `MODE=post-commit`, skip PR-mode pre-flight Step 2 below; do Argument Parsing
    # THIS SKILL.md — every harness states that path to the model.
    SOLO_SKILL_DIR='${CLAUDE_SKILL_DIR}'
    [ -d "$SOLO_SKILL_DIR" ] || SOLO_SKILL_DIR="<absolute path of the directory holding this SKILL.md>"
-   source "$SOLO_SKILL_DIR/../../shared/config.sh"
+   SOLO_CONFIG_SH="$SOLO_SKILL_DIR/../../shared/config.sh"
+   # Two layouts, one contract. Inside the plugin the helpers sit at ../../shared/;
+   # a skill republished on its own — any flattened skills directory — carries them
+   # at scripts/config.sh instead, because shared/ is a sibling of skills/ and does
+   # not travel with a per-skill copy. Try both, then STOP. Sourcing a file that is
+   # not there does not halt the shell: every helper stays undefined, every config
+   # read returns empty, and the 2026-08-11 A2 run showed where that leads — the
+   # model "rescued" it with a repo-relative path, which resolves only when the
+   # repo under review happens to be this plugin's own source repo.
+   [ -f "$SOLO_CONFIG_SH" ] || SOLO_CONFIG_SH="$SOLO_SKILL_DIR/scripts/config.sh"
+   [ -f "$SOLO_CONFIG_SH" ] || { echo "HALT: solopreneur config helpers not found under $SOLO_SKILL_DIR — stop here, do not improvise a path"; exit 1; }
+   source "$SOLO_CONFIG_SH"
    # --- end solopreneur config helpers ---
 
    GL_CFG=$(read_solopreneur_config greenlight)
@@ -888,7 +900,16 @@ LOOP (max 10 rounds):
   3. Parse output:
      - No `[P*]` tags (only summary paragraphs like "looks good" / "no issues") → **clean pass, exit loop**
      - Has `[P*]` tags → extract findings (file, line, priority, description, suggested fix)
-     - Stderr contains "usage limit" / "rate limit" / non-zero exit → stop, tell user codex CLI unavailable, preserve working tree
+     - **Non-zero exit** → stop, tell user codex CLI unavailable, preserve working
+       tree. Search the output for "usage limit" / "rate limit" only to name the
+       reason for the human, and **only once the exit status is already non-zero**
+       — never as the test itself. Capturing `2>&1` merges the reviewer's own prose
+       into the text being searched, and a reviewer that quotes those words while
+       exiting 0 and returning a verdict is not rate-limited: on 2026-08-11 that
+       false positive fired on a `codex review` that had answered normally, because
+       it had read a document containing the phrase. A CLI that really is limited
+       returns no `[P*]` and no clean sentence, which the rules above already
+       classify as unresponsive.
 
   4. Dispatch fix subagent — see Step 4 below.
 
@@ -1235,9 +1256,11 @@ LOOP (max SIZE_MAX_ROUNDS rounds — S 3 / M 5 / L 10; see Sizing):
      non-English language — key off the `[P*]` tags and the marker, not the English
      "No issues found." string.
 
-     If either CLI fails (rate limit, non-zero exit, "usage limit" in stderr, or —
-     for agy — empty/markerless output), proceed with whichever succeeded. If both
-     fail → stop, tell user, preserve commits.
+     If either CLI fails — **non-zero exit**, or, for agy, empty/markerless output
+     — proceed with whichever succeeded. If both fail → stop, tell user, preserve
+     commits. As in uncommitted mode, a "usage limit" / "rate limit" match names
+     the failure **after** a non-zero exit; it never decides one on its own,
+     because the captured text includes the reviewer's own prose.
 
   3. Merge findings (`MERGED_FINDINGS`):
      - For each Codex finding (file, line, topic), check if an agy finding overlaps:
@@ -1630,11 +1653,21 @@ collect_reviewer_activity() {
   printf '%s\n' "$chunk"
   # Source 3: formal reviews, per-PR — a bot may leave ONLY one of these (verified: PR #108).
   nums=$(gh pr list --state all --limit "$DETECT_PR_SCAN" --json number --jq '.[].number') || rc=1
-  for n in $nums; do
+  # read the numbers, never `for n in $nums`: that relies on the shell splitting
+  # an unquoted expansion, and zsh — which is what both harnesses hand this body
+  # to on macOS — does not. Under zsh the loop ran ONCE with the whole newline-
+  # joined list as `$n`, every request 404'd, and the all-or-nothing rule below
+  # then discarded Sources 1 and 2 as well: measured 2026-08-11, detection had
+  # been reporting `unavailable` with an empty bot list. A here-string, matching
+  # the other `<<<` sites in these bodies — and NOT a pipe: a piped `while` runs
+  # in a subshell, so the `rc=1` set inside it would be lost, trading a loud bug
+  # for a silent one.
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
     chunk=$(gh api "repos/$OWNER/$REPO/pulls/$n/reviews" \
               --jq '.[] | [.user.login, .user.type, .submitted_at, "formal-review"] | @tsv') || rc=1
     printf '%s\n' "$chunk"
-  done
+  done <<< "$nums"
   return $rc
 }
 
@@ -1696,6 +1729,12 @@ if ACTIVITY=$(collect_reviewer_activity); then
   DETECTION_STATUS=ok
 else
   DETECTED='{"bots":[]}'; DETECTION_STATUS=unavailable
+  # Degrading here is correct, degrading QUIETLY is not: with an empty bot list
+  # the loop proceeds as if the repo had no reviewers, which looks identical to
+  # a repo that genuinely has none. That silence is why the zsh splitting bug in
+  # Source 3 survived unnoticed until the 2026-08-11 A2 run. Flag it, so the
+  # next cause — an API change, a network blip — surfaces on the first run.
+  echo "FLAG: reviewer activity detection unavailable — resolved on cache alone"
 fi
 
 EFFECTIVE_FALLBACK_ORDER="$FALLBACK_ORDER"
