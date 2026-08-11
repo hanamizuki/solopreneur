@@ -44,8 +44,9 @@ narrated dispatch that did not create a child is not accepted. Context7 remains
 optional; Codex may use web search against primary official documentation for
 the same bounded API checks.
 
-The output contract is unchanged: every run includes a severity-derived
-`Verdict`, Stage 1 and Stage 2 findings, and `findings only — nothing written`.
+A completed `internal` review includes a severity-derived `Verdict`, Stage 1
+and Stage 2 findings, and `findings only — nothing written`. A no-plan exit
+emits its fail-closed Verdict and stops before those stages.
 
 ## Merge PR Codex profile
 
@@ -73,6 +74,8 @@ the order Greenlight → CI → merge-pr.
 - Full attended Plan Review remains Claude-only.
 - Codex Plan Review may use a generic explorer or inline vetting instead of a
   platform-specific reviewer.
+- Live acceptance exercised the built-in explorer path. Custom-agent and
+  depth-limited inline fallbacks remain for Autopilot V1 acceptance.
 - Codex Merge PR omits plan-state consolidation and stale-worktree cleanup.
 - The cleanliness and CI-parser semantics remain aligned with Claude Code:
   Step 2 checks tracked changes only and only in linked worktrees, while Step 4
