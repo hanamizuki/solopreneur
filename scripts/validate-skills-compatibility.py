@@ -123,6 +123,10 @@ def main() -> int:
     for platform, decision in default_publication.items():
         if decision not in PUBLICATION:
             errors.append(f"invalid default publication {platform}={decision!r}")
+    if default_publication.get("claude-code") != "include":
+        errors.append("defaults.publication.claude-code must be include")
+    if default_publication.get("codex") != "exclude":
+        errors.append("defaults.publication.codex must be exclude; Codex inclusion is per skill")
     if default_support.get("claude-code") == "legacy":
         provenance = registry.get("legacyProvenance")
         if not isinstance(provenance, str) or not referenced_path(repo, provenance).is_file():

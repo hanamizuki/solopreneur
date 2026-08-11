@@ -290,9 +290,10 @@ its own behavioral acceptance; the S/M bound stays in force.
 
 - The registry/publication entry for Greenlight on `codex-exec` is `degraded`
   (external-only, no Phase 1/2, claude-cli gate) with this spec as the
-  limitation reference — per the portability architecture, publication stays
-  gated on the safety todos
-  ([registry + filtered view](../../todos/backlog/2026-08-10_codex-publication-safety.md)).
+  limitation reference. The
+  [registry + filtered view](../../todos/done/2026-08-10_codex-publication-safety.md)
+  are complete; publication stays gated on reviewed-head binding and the
+  shared-view surface rule.
 
 ## Acceptance
 

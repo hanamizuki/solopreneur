@@ -101,7 +101,7 @@ host's model family.
 
 The compatibility registry (`skills-compatibility.json`) **does not exist yet** —
 it is rollout PR 3 of the portability spec and is still in
-`todos/backlog/2026-08-10_codex-publication-safety.md`. So W5 is documentation,
+`todos/done/2026-08-10_codex-publication-safety.md`. So W5 is documentation,
 not a registry edit. Two places, both short:
 
 1. A **Host support** note in `greenlight/SKILL.md` recording that Greenlight on
@@ -151,7 +151,7 @@ not a registry edit. Two places, both short:
   (~1537), the pre-flight resolve block (~1620-1700), gate resolution and the
   fallback ladder (~1805-1880), the CLI dispatch table (~2098), and the fix
   step (~2454).
-- `todos/backlog/2026-08-10_codex-publication-safety.md` — §2, where the W5
+- `todos/done/2026-08-10_codex-publication-safety.md` — §2, where the W5
   line lands.
 
 > Line numbers are approximate and PR1 has already shifted some of them. Grep
@@ -175,7 +175,7 @@ not a registry edit. Two places, both short:
 - `plugins/solopreneur/skills/greenlight/tests/skill-sync.test.mjs` — extend
   the row sync to cover the `family` cell so the table and the executable
   registry cannot drift on it.
-- `todos/backlog/2026-08-10_codex-publication-safety.md` — one line in §2.
+- `todos/done/2026-08-10_codex-publication-safety.md` — one line in §2.
 
 ## Acceptance Criteria
 

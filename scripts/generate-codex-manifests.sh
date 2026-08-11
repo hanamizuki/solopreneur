@@ -7,10 +7,10 @@
 #
 #   1. .codex/plugins/<n>/ — a filtered install root for each plugin with at
 #      least one registry-included Codex skill. Skill directories are copied
-#      byte-for-byte from the canonical tree; shared config.sh is overlaid at
-#      the already-supported flattened-layout path. Canonical plugin roots are
-#      never installation roots because Codex's default skills/ discovery
-#      would expose every unsupported skill beside the declared path.
+#      byte-for-byte from the canonical tree; a declared shared config.sh is
+#      overlaid at the already-supported flattened-layout path. Canonical
+#      plugin roots are never installation roots because Codex's default
+#      skills/ discovery would expose every unsupported sibling skill.
 #   2. .agents/plugins/marketplace.json — contains only plugins that have a
 #      filtered install root, and points at ./.codex/plugins/<name>. Entries
 #      carry the documented installation/authentication policy and the overlay
@@ -186,7 +186,11 @@ for name in "${codex_plugins[@]}"; do
 
     # Core skills already resolve this flattened publication seam as their
     # fallback when ../../shared/config.sh is outside the plugin snapshot.
-    if [[ -f "$REPO_ROOT/plugins/$name/shared/config.sh" ]]; then
+    if jq -e \
+      --arg skill_id "$name:$skill" \
+      --arg resource "plugins/$name/shared/config.sh" '
+        (.skills[$skill_id].platformResources // []) | index($resource) != null
+      ' "$COMPATIBILITY_REGISTRY" >/dev/null; then
       mkdir -p "$output_skill/scripts"
       cp "$REPO_ROOT/plugins/$name/shared/config.sh" "$output_skill/scripts/config.sh"
     fi

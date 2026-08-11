@@ -41,4 +41,4 @@ prs:
       - plugins/solopreneur/skills/greenlight/tests/reviewer-registry.test.mjs
       - plugins/solopreneur/skills/greenlight/tests/reviewer-state.test.mjs
       - plugins/solopreneur/skills/greenlight/tests/skill-sync.test.mjs
-      - todos/backlog/2026-08-10_codex-publication-safety.md
+      - todos/done/2026-08-10_codex-publication-safety.md

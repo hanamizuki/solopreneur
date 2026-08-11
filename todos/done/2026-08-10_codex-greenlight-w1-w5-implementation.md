@@ -105,7 +105,7 @@ known-bad — but it is unreviewed.
 
 **A2 subsequently passed.** The second end-to-end run on a real Codex host
 completed the seeded-finding → fix pushed → re-review → clean terminal path;
-the evidence is recorded in the Greenlight port spec. Publication of Greenlight
-on Codex remains gated on
-[the publication-safety todo](../backlog/2026-08-10_codex-publication-safety.md), whose
-§2 now records the pre-decided `degraded` entry.
+the evidence is recorded in the Greenlight port spec. The
+[publication-safety prerequisite](./2026-08-10_codex-publication-safety.md) is
+also complete. Greenlight remains excluded until reviewed-head binding and the
+shared-view surface rule pass.

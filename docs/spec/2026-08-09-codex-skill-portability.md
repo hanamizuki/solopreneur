@@ -1,8 +1,8 @@
 # Codex Skill Portability Architecture
 
-**Status:** Approved design; registry and filtered publication boundary
-implemented; Greenlight remains excluded pending release gates; Autopilot Codex
-V1 pending
+**Status:** Approved design; rollout rows 3–4 complete; Greenlight remains
+excluded pending reviewed-head and shared-view gates; Autopilot Codex V1
+pending
 
 **Date:** 2026-08-09
 
@@ -299,14 +299,16 @@ Codex marketplace lists only plugins with at least one included skill and
 points directly to these generated roots, so specialist plugins can be added
 one at a time without exposing their siblings early.
 
-The physical representation of this view is an implementation gate, not an
-assumption. A fixture must prove the chosen representation through both a local
-marketplace install and a git-ref install. It must also prove that an explicit
-skills path does not cause Codex to fall back to or rescan the canonical
-`skills/` directory. Until that gate passes, no Codex release may advertise the
-complete canonical skill tree as supported. The architecture and marketer
-distribution changes may merge without a release version bump while this gate
-is pending.
+The physical representation of this view was accepted on Codex CLI 0.147.0
+with the one-skill fixture commit
+`7cca235f20bd10388265cad40800338fa4012838`. Local-path and fresh git-ref
+installs both cached exactly the included `filter-canary` directory and no
+canonical sibling such as `autopilot`; the generated manifest also passed the
+official plugin validator. An authenticated git-ref run under an isolated home
+resolved the installed absolute skill path and returned the canary's exact
+`FILTER_CANARY_ONLY` contract (session
+`019ff048-7bb8-7c70-b8c3-fdd8a4ee1a07`). This proves that Codex neither falls
+back to nor rescans the canonical `skills/` directory.
 
 ### 7. Behavioral conformance, not loadability, grants support
 
@@ -479,11 +481,11 @@ the agent-distribution prerequisite and does not certify marketer skill parity.
 | --- | --- | --- |
 | 1. Architecture | This independent spec and backlog update | No runtime, pilot-document, or packaging change |
 | 2. Marketer distribution prerequisite | Resolve the paused agent-distribution vertical slice and update its authoritative pilot documents | complete; accepted at `c8bae27`, merged through PR #155 as `fc943a9`, unreleased, and no marketer domain-skill parity claim |
-| 3. Registry safety | Add the compatibility registry, conditional schema validation, and generated inventory report | Re-enumerate every skill at that commit; current `main` contains 106, but discovery is authoritative |
-| 4. Publication safety | Prove and implement the filtered Codex publication view | Local and git-ref installs expose only registry-included skills through the declared root; inert snapshot bytes do not count as exposure |
+| 3. Registry safety | Complete — all 106 discovered skills are classified and fail-closed defaults, evidence, resources, dependencies, and host guards are validated | Re-enumerate every skill at that commit; discovery remains authoritative |
+| 4. Publication safety | Complete — generated install roots are registry-filtered; local and git-ref canary installs passed on Codex CLI 0.147.0 | Only registry-included skills are exposed through the declared root; inert snapshot bytes do not count as exposure |
 | 5. Shared core foundations | Add one executable config/plugin-root resolver and platform-resource validation | Greenlight scripts and prompts resolve the same platform-aware config; existing Claude behavior remains unchanged |
 | 6. Greenlight baseline | Complete — A2 run 1 ended in push-back on a non-convergent fixture; run 2 produced the accepted seeded-finding → fix → re-review → clean terminal path | The `external` subset runs from the same skill body on both hosts; divergences and the clean-pass size ceiling are recorded in the Greenlight port spec |
-| 7. Greenlight Codex PR mode | Runtime complete for the degraded `external` S/M surface; publication still waits on rows 3–4 and reviewed-head binding | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
+| 7. Greenlight Codex PR mode | Runtime complete for the degraded `external` S/M surface; publication still waits on reviewed-head binding and shared-view guard evidence | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
 | 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Any merge-preparation mutation invalidates the old clean and reruns Greenlight plus CI for the new head |
 | 9. Autopilot Codex V1 | Add run-now, single-PR orchestration through Codex subagents with explicit worktree ownership and a generic-worker fallback | One real PR completes plan review, implementation, Greenlight, CI, atomic merge, cleanup, and structured reporting without a specialist agent |
 | 10. Core workflow expansion | Add Greenlight's remaining modes, then Autopilot multi-PR waves | Each mode earns its own support status and preserves the shared contract |
@@ -509,9 +511,9 @@ optional enhancements in V1. If the requested specialist is unavailable, the
 orchestrator uses a generic Codex worker with the same self-contained brief and
 acceptance contract.
 
-The agent-distribution prerequisite is complete. The registry intentionally
-keeps Greenlight excluded until publication acceptance, reviewed-head binding,
-and the shared-view surface rule all pass. Marketer portability seams and
+The agent-distribution and filtered-publication prerequisites are complete.
+The registry intentionally keeps Greenlight excluded until reviewed-head
+binding and the shared-view surface rule pass. Marketer portability seams and
 remaining agent adapters are not on the core critical path; when resumed, they
 still roll out one plugin at a time after that plugin's skills have complete
 registry entries.
