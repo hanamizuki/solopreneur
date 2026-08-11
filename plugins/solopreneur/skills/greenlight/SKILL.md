@@ -46,7 +46,7 @@ surface:
 
 | | On Codex |
 |---|---|
-| Modes | PR mode via `external` only (Phase 1 and Phase 2 need subagents Codex does not have). Uncommitted and post-commit modes **halt at pre-flight** — they have no gate and never call `resolve`, so their clean signal would be `codex review` approving its own host's work |
+| Modes | PR mode via `external` only. Codex can spawn subagents, but Phase 1 and Phase 2 still depend on reviewer-specific agent definitions and routing coverage that are not shipped. Uncommitted and post-commit modes **halt at pre-flight** — they have no gate and never call `resolve`, so their clean signal would be `codex review` approving its own host's work |
 | Gate | `claude-cli` — the gate must be independent of the host's model family (see [Host-family independence](#host-family-independence)) |
 | Sizes | **S and M only**; an L-size run halts at pre-flight |
 | Invocation | the explicit `$greenlight` mention, plus the `unattended` token for any unattended caller — a one-shot exec session has nobody to answer a prompt |

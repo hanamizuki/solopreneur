@@ -31,9 +31,9 @@ All five work items from the spec, measured and settled on 2026-08-10:
   `greenlight/SKILL.md` + `reviewer-state.mjs`. Acceptance: spec A3
   (Claude baseline unchanged) + A4 (no same-family gate in `RESOLVED`).
 
-Spec A2 (end-to-end seeded-finding run on a Codex host) is a post-merge
-manual acceptance — it waits on live reviewer loops and does not belong in
-PR CI.
+Spec A2 (end-to-end seeded-finding run on a Codex host) was a post-merge
+manual acceptance because it needed live reviewer loops and did not belong in
+PR CI. It subsequently passed; the outcome below links to the evidence.
 
 ## Constraints
 
@@ -103,10 +103,9 @@ invariant still holds under direct behavioural probing (an explicit
 `--gate codex-cli` on a Codex host is still refused). It is unreviewed, not
 known-bad — but it is unreviewed.
 
-**Still open — `A2` is deliberately NOT done here.** The end-to-end
-seeded-finding run on a real Codex host (claude-cli gate triggered → findings
-parsed → fix pushed → re-review → clean terminal report) is post-merge manual
-acceptance; it needs live reviewer loops and a throwaway PR. Publication of
-Greenlight on Codex additionally stays gated on
-[the publication-safety todo](./2026-08-10_codex-publication-safety.md), whose
+**A2 subsequently passed.** The second end-to-end run on a real Codex host
+completed the seeded-finding → fix pushed → re-review → clean terminal path;
+the evidence is recorded in the Greenlight port spec. Publication of Greenlight
+on Codex remains gated on
+[the publication-safety todo](../backlog/2026-08-10_codex-publication-safety.md), whose
 §2 now records the pre-decided `degraded` entry.
