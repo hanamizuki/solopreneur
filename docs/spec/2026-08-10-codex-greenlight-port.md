@@ -301,11 +301,95 @@ already costs ~212k tokens.
   Codex host drives `/greenlight external` to termination: claude-cli gate
   triggered, findings parsed, fix applied and pushed, re-review, clean
   terminal report in the shipped format.
+  **Status: blocked** — four of the five links confirmed on 2026-08-11, the
+  fifth (a *clean* terminal report) not reached. See [A2 run](#a2-run-2026-08-11).
 - **A3 Claude baseline unchanged:** `/greenlight external` on Claude Code
   behaves as today (same gate selection, same report) after W1-W3 land.
 - **A4 Independence:** on a Codex host, `RESOLVED.gate` never carries family
   `openai`; on a Claude host, never `anthropic`. Observable directly in the
   pre-flight's printed `RESOLVED` object.
+
+### A2 run (2026-08-11)
+
+Driven as `codex exec '$greenlight external 164 unattended'` in the PR's
+worktree, `codex-cli 0.147.0`, `gpt-5.6-sol` at max reasoning effort, plugin
+installed from the local marketplace at `d30f396` (snapshot byte-identical to
+the working tree). Fixture: throwaway PR #164, one new module plus its tests,
+carrying a seeded contract violation — a doc comment stating that only `[P1]`
+and `[P2]` block, over a matcher that counted `[P3]` as well.
+
+**What the chain did, link by link.** Every claim below was re-verified against
+the PR and the session log, not taken from the run's own summary.
+
+| Link | Observed |
+| --- | --- |
+| Host + sizing | `CODEX_THREAD_ID` set → `HOST_FAMILY=openai`. `COMPUTED_SIZE=M` (2 files, 20 lines) → `SIZE_MAX_ROUNDS=5`. Both CLI probes passed → `CLI_AVAILABLE=codex-cli,claude-cli` |
+| Gate selection | `RESOLVED.gate = claude-cli` (family `anthropic`); `codex-bot` and `codex-cli` both `canGate:false`; `gateBlock:null`, `needsPrompt:false`, `warnings:[]`. **A4 confirmed live**, not just at the resolver level |
+| Gate trigger | 3 invocations across 3 rounds. The diff was captured first and guarded for emptiness, then piped on stdin to the registry's own `triggerText` with `--tools ""`; `CLAUDE_CONFIG_DIR` reached the nested CLI from the ambient environment, as the Gate profile resolution section intends |
+| Findings parsed | Every round returned `[P*]`-tagged findings with `file:line` and a concrete fix. The shipped `[P*]` scan applied unchanged — no new parser, as the Known constraint section predicted |
+| Fix + push | Applied **inline in the main context** (W4's no-subagent path), three commits `ca599a6`, `ec59afb`, `c61eaca`. Each was verified by `node --test` before commit and by a `LOCAL_HEAD = REMOTE_HEAD` check after push |
+| Re-review | Rounds 2 and 3 re-triggered all five reviewers against the new HEAD; the codex-bot 👀 handshake was polled and observed each round |
+| Terminal report | **`push-back exit` (Exit Condition 2) at round 3 of 5**, in the shipped format: rounds, gate, items fixed, items pushed back, leftovers, plus the Flags section including the required "no objective verifier configured for this loop" |
+
+**Why it is blocked.** The gate never emitted `No findings.` — zero occurrences
+across three invocations — so Exit Condition 1 (clean pass) was never reached.
+The cause is the fixture, not the port: the seeded finding lived in a
+text-parsing regex, which is a design question rather than a defect with one
+right answer. Round 2's gate demanded line-anchored matching; round 3's demanded
+the opposite, on the ground that anchoring under-counts. The loop handled this
+exactly as specified — it recognised the cross-round flip-flop (contradiction ②),
+refused to churn, replied on the thread with its reasoning, and exited. Correct
+handling of an unconvergeable fixture is a push-back exit, so **this run cannot
+produce the clean terminal A2 asks for**. Closing A2 needs a re-run against a
+convergent fixture: a seeded defect with one objectively correct fix and no
+design latitude.
+
+**Gaps found against what this spec expected.**
+
+1. **W1's `config.sh` resolution is not satisfiable from a flat user-skills
+   tree.** Codex loaded the skill from the operator's merged user-skills
+   directory, not the plugin snapshot (both are skills roots on this fleet; the
+   bodies are identical, only the frontmatter description differs, shortened by
+   the skills context budget). `<skill-dir>/scripts` resolved correctly there —
+   W1 item 6 works — but `<skill-dir>/../../shared/config.sh` does not exist in
+   that layout, and the model fell back to the repo-relative
+   `plugins/solopreneur/shared/config.sh`. That resolved **only because the PR
+   under review is the plugin's own source repo**, which is precisely the M3
+   finding-3 failure W1 was meant to close. It is still open whenever the skill
+   is loaded from a flat skills tree.
+2. **The documented shell assumes POSIX word splitting; both hosts run zsh.**
+   `collect_reviewer_activity`'s per-PR loop iterates over an unquoted
+   `$nums`. Codex executes through `/bin/zsh -lc`, and Claude Code's Bash tool
+   on this fleet is also zsh 5.9 with no bash present — and zsh does not split
+   unquoted expansions. Measured against the live repo: **1 iteration under
+   zsh, 5 under bash**. Because the function returns non-zero when any source
+   fails, that one failure discards the other two sources as well, so the first
+   pre-flight reported `DETECTION_STATUS=unavailable` with `DETECTED={"bots":[]}`
+   — no bot reviewers detected at all. The model noticed and re-ran a rewritten
+   block, which returned `ok` with all three bots. This is M1's warning again,
+   and it is **not Codex-specific**: it is a latent defect on Claude Code too.
+3. **The CLI rate-limit guard was applied to the wrong stream.** The body scopes
+   it to stderr; the executed form grepped merged `2>&1` output. The nested
+   `codex review` had read this spec, whose M3 section contains the words
+   "rate-limited", so the guard reported a limit for a reviewer that had in fact
+   answered. Harmless here — the verdict was still processed — but the merged
+   form makes the guard trip on reviewer prose.
+4. **Fixture leakage.** Greenlight reads the PR body, so a fixture PR that
+   describes itself as an A2 acceptance run tells the model what is being
+   measured; this one did, and the run cited the acceptance contract while
+   adjudicating. Keep the purpose out of the body next time.
+5. **Cost.** 286,338 tokens for a complete 3-round M-size loop with three fix
+   cycles, against M3's ~212k for one *incomplete* S round. The dominant cost is
+   the non-gate `codex review`, which opens its own Codex session that reads the
+   full greenlight body and runs the test suite; in round 3 it exceeded the
+   loop's 5-minute CLI ceiling and was killed without affecting the gate.
+
+**Confirmed in passing.** W1 item 7 holds: `reviewer-state.mjs record` wrote
+reviewer state to `$CODEX_HOME/solopreneur.json` with no caller exporting
+anything. The `unattended` token behaved as M3 requires — the run never stopped
+to ask, and exited 0 on an in-contract terminal state rather than on exhaustion.
+CodeRabbit independently found the same seeded contract violation the gate did,
+which is what makes the fixture's first round trustworthy.
 
 ## Not in V1
 
