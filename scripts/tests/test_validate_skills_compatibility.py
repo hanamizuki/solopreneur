@@ -23,7 +23,6 @@ CORE_SKILLS = (
     "worktree-handoff",
 )
 GUARDED_SKILLS = (
-    "autopilot",
     "mvp",
     "preview",
     "todos-babysit",
@@ -272,28 +271,28 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_guard_path_must_be_canonical(self) -> None:
-        self.registry["codexHostGuards"]["solopreneur:autopilot"] = "legacy.md"
+        self.registry["codexHostGuards"]["solopreneur:mvp"] = "legacy.md"
         self.write_registry()
 
         self.assert_failure_contains(
-            "codexHostGuards.solopreneur:autopilot must reference "
-            "plugins/solopreneur/skills/autopilot/SKILL.md"
+            "codexHostGuards.solopreneur:mvp must reference "
+            "plugins/solopreneur/skills/mvp/SKILL.md"
         )
 
     def test_guard_must_be_early(self) -> None:
-        path = self.repo_root / self.registry["codexHostGuards"]["solopreneur:autopilot"]
+        path = self.repo_root / self.registry["codexHostGuards"]["solopreneur:mvp"]
         path.write_text("# No guard\n", encoding="utf-8")
 
         self.assert_failure_contains(
-            "codexHostGuards.solopreneur:autopilot lacks an early fail-closed guard"
+            "codexHostGuards.solopreneur:mvp lacks an early fail-closed guard"
         )
 
     def test_guard_must_precede_other_instructions(self) -> None:
-        path = self.repo_root / self.registry["codexHostGuards"]["solopreneur:autopilot"]
+        path = self.repo_root / self.registry["codexHostGuards"]["solopreneur:mvp"]
         path.write_text("Do something first.\n\n" + path.read_text(), encoding="utf-8")
 
         self.assert_failure_contains(
-            "codexHostGuards.solopreneur:autopilot lacks an early fail-closed guard"
+            "codexHostGuards.solopreneur:mvp lacks an early fail-closed guard"
         )
 
 

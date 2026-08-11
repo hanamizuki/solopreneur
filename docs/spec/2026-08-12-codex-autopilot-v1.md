@@ -1,0 +1,105 @@
+# Codex Autopilot V1
+
+**Status:** Candidate; live lifecycle acceptance pending
+
+**Date:** 2026-08-12
+
+**Related specs:** [Codex skill portability](./2026-08-09-codex-skill-portability.md),
+[Codex Greenlight](./2026-08-10-codex-greenlight-port.md), and
+[Autopilot dependency closure](./2026-08-11-codex-autopilot-dependencies.md)
+
+## Outcome
+
+The canonical Autopilot skill is published to Codex with one degraded but
+complete execution profile: plan and run one pull request immediately. The
+same child owns plan review, implementation, tests, pull-request creation,
+Greenlight, exact-head CI, and Merge PR. The parent owns explicit worktree
+creation, independent merge verification, cleanup, and the final report.
+
+Claude Code keeps its existing single-PR, multi-PR, Workflow, Agent isolation,
+and Cron behavior. Host selection happens before task reads or side effects.
+
+## Supported contract
+
+Codex V1 accepts only a natural single-PR plan followed by run-now. A multi-PR
+plan or scheduling request stops before artifacts, worktrees, pull requests,
+or children exist. It does not emulate Claude-specific control-plane tools.
+
+The parent requires a clean attached branch whose local head exactly matches
+its remote tracking branch. It rejects unsafe spec paths and colliding local
+branches, remote branches, or worktree paths. It then creates one sibling git
+worktree at the captured base commit and validates its absolute root, branch,
+and cleanliness before writing the approved spec there.
+
+The parent selects the requested custom specialist only when that exact agent
+type is callable. Otherwise it sends the same self-contained brief to Codex's
+built-in worker. The child receives no conversation fork and no implicit
+isolation; every repository operation is assigned to the parent's absolute
+worktree path.
+
+The child replaces Claude Plan Mode with an inline implementation plan, runs
+Plan Review in internal mode, implements and tests the spec, creates a pull
+request against the captured base, runs Greenlight unattended, pins CI to the
+final pushed head, and invokes Merge PR. It emits only the existing result
+object. The parent rejects malformed output and independently confirms the
+reported pull request, head, base, merged state, merge commit, and remote-base
+ancestry before cleanup.
+
+Failures retain the child worktree, local branch, and pull request for manual
+recovery. A verified merge remains successful if later local cleanup fails;
+the report carries the exact recovery action instead of rewriting remote truth.
+
+## Dependency closure
+
+The filtered Codex publication includes Autopilot with explicit dependencies
+on Greenlight, Plan Review, and Merge PR. The profile therefore inherits their
+documented requirements: repository read/write access, Bash, git, GitHub CLI,
+jq, GitHub network access, and the Claude CLI gate used by Greenlight.
+
+## Limitations
+
+- Codex multi-PR waves and scheduling are not included.
+- There is one child attempt; V1 does not emulate Workflow retries.
+- Custom specialists are optional and are not required for successful use.
+- A dirty, detached, unpushed, ahead, or behind base checkout is rejected.
+- Failure recovery is manual because run-now has no resumable state file.
+- Greenlight and Merge PR retain the degraded contracts documented in their
+  own specs.
+
+## Acceptance
+
+### A1 Static and hermetic contract
+
+Accepted on Codex CLI 0.147.0. The repository test extracts and executes the
+canonical preflight against a temporary repository with a bare remote, and
+asserts the publication closure, worker fallback, single-child contract,
+explicit base, worktree ownership, retained failure state, and parent cleanup
+boundary. The filtered-publication fixture installed Autopilot plus its three
+dependencies and no unsupported sibling skills. `validate-codex.sh` passed 46
+Python tests, 68 bootstrap tests, registry and agent validation, generated-root
+drift checks, local install smoke, and the filtered publication fixture. The
+official plugin and both canonical/generated Autopilot skill validators also
+passed, and the generated skill is byte-identical to its canonical source.
+
+### A2 Live single-PR lifecycle
+
+Pending. One real pull request must use the built-in worker fallback and
+complete inline planning, Plan Review internal, implementation and tests,
+Greenlight, exact-head CI, Merge PR, parent verification, worktree and local
+branch cleanup, and structured reporting. The acceptance pull request targets
+the candidate feature branch so validation cannot mutate `main` before the
+feature itself is reviewed.
+
+### A3 Surface contract
+
+Pending final validation. Current Codex documentation exposes subagents in the
+desktop App, CLI, and IDE, with built-in worker and explorer roles. Codex App
+automatic worktrees are App-specific, so this profile deliberately relies on
+ordinary git worktrees created and verified by the parent instead of claiming
+automatic child isolation. The same `CODEX_THREAD_ID` profile and callable
+subagent contract is published on Codex exec, TUI, and App.
+
+Official references:
+
+- <https://developers.openai.com/codex/agent-configuration/subagents>
+- <https://learn.chatgpt.com/codex/environments/git-worktrees>

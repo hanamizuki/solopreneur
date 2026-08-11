@@ -128,6 +128,80 @@
     ]
   },
   "skills": {
+    "solopreneur:autopilot": {
+      "support": {
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "plugins/solopreneur/skills/autopilot/SKILL.md",
+      "platformResources": [
+        "plugins/solopreneur/skills/autopilot/SKILL.md",
+        "plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-12-codex-autopilot-v1.md",
+        "codex-tui": "docs/spec/2026-08-12-codex-autopilot-v1.md",
+        "codex-app": "docs/spec/2026-08-12-codex-autopilot-v1.md"
+      },
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-12-codex-autopilot-v1.md#a1-static-and-hermetic-contract",
+          "docs/spec/2026-08-12-codex-autopilot-v1.md#a2-live-single-pr-lifecycle"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-12-codex-autopilot-v1.md#a1-static-and-hermetic-contract",
+          "docs/spec/2026-08-12-codex-autopilot-v1.md#a3-surface-contract"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-12-codex-autopilot-v1.md#a1-static-and-hermetic-contract",
+          "docs/spec/2026-08-12-codex-autopilot-v1.md#a3-surface-contract"
+        ]
+      },
+      "dependencies": [
+        "solopreneur:greenlight",
+        "solopreneur:merge-pr",
+        "solopreneur:plan-review"
+      ],
+      "requiredCapabilities": {
+        "codex-exec": [
+          "git",
+          "gh",
+          "jq",
+          "bash",
+          "claude-cli",
+          "github-network",
+          "codex-subagents",
+          "repository-write-access"
+        ],
+        "codex-tui": [
+          "git",
+          "gh",
+          "jq",
+          "bash",
+          "claude-cli",
+          "github-network",
+          "codex-subagents",
+          "repository-write-access"
+        ],
+        "codex-app": [
+          "git",
+          "gh",
+          "jq",
+          "bash",
+          "claude-cli",
+          "github-network",
+          "codex-subagents",
+          "repository-write-access"
+        ]
+      },
+      "optionalEnhancements": [
+        "custom-specialist-agents"
+      ]
+    },
     "solopreneur:greenlight": {
       "support": {
         "codex-exec": "degraded",
@@ -300,7 +374,6 @@
     }
   },
   "codexHostGuards": {
-    "solopreneur:autopilot": "plugins/solopreneur/skills/autopilot/SKILL.md",
     "solopreneur:mvp": "plugins/solopreneur/skills/mvp/SKILL.md",
     "solopreneur:preview": "plugins/solopreneur/skills/preview/SKILL.md",
     "solopreneur:todos-babysit": "plugins/solopreneur/skills/todos-babysit/SKILL.md",

@@ -66,8 +66,8 @@ generated_skills="$(
   find "$FIXTURE_ROOT/.codex/plugins/solopreneur/skills" \
     -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
 )"
-[[ "$generated_skills" == $'filter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
-[[ ! -e "$FIXTURE_ROOT/.codex/plugins/solopreneur/skills/autopilot" ]]
+[[ "$generated_skills" == $'autopilot\nfilter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
+[[ -f "$FIXTURE_ROOT/.codex/plugins/solopreneur/skills/autopilot/SKILL.md" ]]
 
 CODEX_HOME="$FILTER_HOME" codex plugin marketplace add "$FIXTURE_ROOT" >/dev/null
 CODEX_HOME="$FILTER_HOME" codex plugin add solopreneur@solopreneur >/dev/null
@@ -81,7 +81,7 @@ cached_skills="$(
   find "$FILTER_HOME/plugins/cache/$cache_relative/skills" \
     -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
 )"
-[[ "$cached_skills" == $'filter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
-[[ ! -e "$FILTER_HOME/plugins/cache/$cache_relative/skills/autopilot" ]]
+[[ "$cached_skills" == $'autopilot\nfilter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
+[[ -f "$FILTER_HOME/plugins/cache/$cache_relative/skills/autopilot/SKILL.md" ]]
 
 echo "filtered-publication fixture: included canary and production Codex skills only"
