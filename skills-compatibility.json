@@ -130,10 +130,12 @@
   "skills": {
     "solopreneur:greenlight": {
       "support": {
-        "codex-exec": "degraded"
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
       },
       "publication": {
-        "codex": "exclude"
+        "codex": "include"
       },
       "sharedContract": "plugins/solopreneur/skills/greenlight/SKILL.md",
       "platformResources": [
@@ -142,16 +144,40 @@
         "plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs"
       ],
       "limitations": {
-        "codex-exec": "docs/spec/2026-08-10-codex-greenlight-port.md"
+        "codex-exec": "docs/spec/2026-08-10-codex-greenlight-port.md",
+        "codex-tui": "docs/spec/2026-08-10-codex-greenlight-port.md",
+        "codex-app": "docs/spec/2026-08-10-codex-greenlight-port.md"
       },
       "acceptance": {
         "codex-exec": [
           "docs/spec/2026-08-10-codex-greenlight-port.md#acceptance"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-10-codex-greenlight-port.md#a5-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-10-codex-greenlight-port.md#a6-codex-app"
         ]
       },
       "dependencies": [],
       "requiredCapabilities": {
         "codex-exec": [
+          "git",
+          "gh",
+          "jq",
+          "node>=20",
+          "claude-cli",
+          "github-network"
+        ],
+        "codex-tui": [
+          "git",
+          "gh",
+          "jq",
+          "node>=20",
+          "claude-cli",
+          "github-network"
+        ],
+        "codex-app": [
           "git",
           "gh",
           "jq",
