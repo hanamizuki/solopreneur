@@ -41,8 +41,8 @@
 
 /**
  * Fallback timing for a tool whose acknowledgement behaviour is unverified:
- * three checks, the first after `firstWaitSec` and the rest `intervalSec`
- * apart — 180s / 300s / 540s at the values below.
+ * three checks measured from the trigger: the first after `firstWaitSec`, then
+ * every `intervalSec` — 180s / 300s / 420s at the values below.
  */
 export const DEFAULT_POLL = Object.freeze({ firstWaitSec: 180, intervalSec: 120, tries: 3 });
 
