@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 import { countBlocking } from '../verdict.mjs';
 
 test('counts P1 and P2 findings', () => {
-  const stdout = '**[P1] foo.mjs:3 unguarded read\n- **[P2] bar.mjs:9 rename\n'
+  const stdout = '**[P1]** foo.mjs:3 unguarded read\n> - **[p1]** quoted\n'
+    + '1. [P1]: numbered\n### [P2] heading\n'
     + '[P3] nit — not a [P1] blocker\nSummary: 1 [P1], 1 [P2]\n';
-  assert.equal(countBlocking(stdout), 2);
+  assert.equal(countBlocking(stdout), 4);
 });
 
 test('a clean reviewer answer has no blocking findings', () => {
@@ -17,6 +18,7 @@ test('P3 nit findings are not blocking', () => {
   assert.equal(countBlocking('[P3] nit\n'), 0);
 });
 
-test('missing reviewer output has no findings', () => {
+test('normalizes missing stdout after invocation validation', () => {
+  // Greenlight rejects missing or empty CLI output before counting severities.
   assert.equal(countBlocking(), 0);
 });
