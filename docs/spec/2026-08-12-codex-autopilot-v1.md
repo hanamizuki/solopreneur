@@ -25,11 +25,13 @@ Codex V1 accepts only a natural single-PR plan followed by run-now. A multi-PR
 plan or scheduling request stops before artifacts, worktrees, pull requests,
 or children exist. It does not emulate Claude-specific control-plane tools.
 
-The parent requires a clean attached branch whose local head exactly matches
-its remote tracking branch. It rejects unsafe spec paths and colliding local
-branches, remote branches, or worktree paths. It then creates one sibling git
-worktree at the captured base commit and validates its absolute root, branch,
-and cleanliness before writing the approved spec there.
+The parent requires a clean attached `main` branch whose local head exactly
+matches `origin/main`. The main-only boundary preserves Greenlight's existing
+shared `main...HEAD` PR contract; stacked PRs stop before side effects instead
+of being mis-sized. The parent also rejects unsafe spec paths and colliding
+local branches, remote branches, or worktree paths. It then creates one sibling
+git worktree at the captured base commit and validates its absolute root,
+branch, and cleanliness before writing the approved spec there.
 
 The parent selects the requested custom specialist only when that exact agent
 type is callable. Otherwise it sends the same self-contained brief to Codex's
@@ -61,7 +63,9 @@ jq, GitHub network access, and the Claude CLI gate used by Greenlight.
 - Codex multi-PR waves and scheduling are not included.
 - There is one child attempt; V1 does not emulate Workflow retries.
 - Custom specialists are optional and are not required for successful use.
-- A dirty, detached, unpushed, ahead, or behind base checkout is rejected.
+- A dirty, detached, non-main, unpushed, ahead, or behind base checkout is
+  rejected. Stacked pull requests require a future shared Greenlight base-range
+  contract and are outside Codex V1.
 - Failure recovery is manual because run-now has no resumable state file.
 - Greenlight and Merge PR retain the degraded contracts documented in their
   own specs.
@@ -83,12 +87,19 @@ passed, and the generated skill is byte-identical to its canonical source.
 
 ### A2 Live single-PR lifecycle
 
-Pending. One real pull request must use the built-in worker fallback and
-complete inline planning, Plan Review internal, implementation and tests,
+Pending. One real pull request from `main` must use the built-in worker fallback
+and complete inline planning, Plan Review internal, implementation and tests,
 Greenlight, exact-head CI, Merge PR, parent verification, worktree and local
-branch cleanup, and structured reporting. The acceptance pull request targets
-the candidate feature branch so validation cannot mutate `main` before the
-feature itself is reviewed.
+branch cleanup, and structured reporting.
+
+The first candidate run, PR #173, deliberately targeted the candidate feature
+branch. Plan Review and implementation passed, but Greenlight correctly halted
+before review because its shared `main...HEAD` range included the entire stacked
+feature and classified it as L, which is outside the Codex Greenlight profile.
+The blocked run retained its recovery state; the parent then closed the PR and
+removed only its exact worktree and branches. Autopilot now rejects non-main
+bases before artifacts or worktrees exist rather than attempting that known
+unsupported composition.
 
 ### A3 Surface contract
 

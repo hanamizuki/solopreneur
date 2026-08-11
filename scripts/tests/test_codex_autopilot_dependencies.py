@@ -138,7 +138,8 @@ raise SystemExit(0)
         entry = registry["skills"]["solopreneur:autopilot"]
 
         self.assertNotIn("## Codex host guard", self.autopilot)
-        self.assertIn("only a single PR executed now is supported", self.autopilot)
+        self.assertIn("only a single PR executed now from an up-to-date `main`", self.autopilot)
+        self.assertIn('if [[ "$BASE_BRANCH" != main ]]', self.autopilot)
         self.assertIn('fork_turns="none"', self.autopilot)
         self.assertIn("built-in `worker`", self.autopilot)
         self.assertIn("never dispatch a replacement child", self.autopilot)
@@ -194,6 +195,32 @@ raise SystemExit(0)
                 text=True,
             ).stdout.strip()
             self.assertEqual(branch, env["BRANCH"])
+
+            subprocess.run(
+                ["git", "-C", str(repo), "worktree", "remove", str(worktree)],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "branch", "-D", env["BRANCH"]],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "switch", "-c", "stacked-base"],
+                check=True,
+                capture_output=True,
+            )
+            result = subprocess.run(
+                ["/bin/bash", "-c", "set -euo pipefail\n" + self.autopilot_preflight()],
+                cwd=repo,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("stacked PRs are not supported", result.stdout)
+            self.assertFalse(worktree.exists())
 
     def test_merge_boundaries_and_atomic_command(self) -> None:
         step_1 = self.shell_block("### Step 1:")

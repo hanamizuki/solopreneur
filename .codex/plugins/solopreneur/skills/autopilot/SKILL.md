@@ -20,10 +20,11 @@ host profile for the whole run:
 
 - **Claude Code:** the existing single-PR, multi-PR, run-now, and scheduled
   contracts below remain unchanged.
-- **Codex V1:** only a single PR executed now is supported. If the natural plan
-  needs multiple PRs, or the user asks to schedule the run, stop before writing
-  artifacts, creating a worktree or PR, or spawning a child. Explain that
-  multi-PR waves and scheduling are not shipped on Codex yet. Never emulate
+- **Codex V1:** only a single PR executed now from an up-to-date `main` branch
+  is supported. If the natural plan needs multiple PRs, the caller is not on
+  `main`, or the user asks to schedule the run, stop before writing artifacts,
+  creating a worktree or PR, or spawning a child. Explain that stacked PRs,
+  multi-PR waves, and scheduling are not shipped on Codex yet. Never emulate
   Claude's Workflow, Agent isolation, or Cron tools.
 
 Planning phase for automated PR orchestration. Reads a task file, discusses splitting
@@ -422,6 +423,10 @@ BASE_SHA="$(git rev-parse HEAD)" || exit 1
 
 if [[ -z "$BASE_BRANCH" || -n "$(git status --porcelain)" ]]; then
   echo "Autopilot requires a clean, attached base branch; stopping before side effects."
+  exit 1
+fi
+if [[ "$BASE_BRANCH" != main ]]; then
+  echo "Codex Autopilot V1 requires main because Greenlight evaluates main...HEAD; stacked PRs are not supported."
   exit 1
 fi
 if [[ "$PLAN_DIR" != docs/loops/* || "$PLAN_DIR" == *..* \
