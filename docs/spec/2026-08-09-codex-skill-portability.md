@@ -543,6 +543,6 @@ that plugin's skills have complete registry entries.
 - [Agent Skills specification](https://agentskills.io/specification)
 - [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins)
 - [OpenAI skill metadata and invocation policy](https://developers.openai.com/codex/skills)
-- [OpenAI Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+- [OpenAI Codex subagents](https://developers.openai.com/codex/agent-configuration/subagents)
 - [OpenAI scheduled tasks](https://learn.chatgpt.com/docs/automations)
 - [Superpowers harness-porting architecture](https://github.com/obra/superpowers/blob/main/docs/porting-to-a-new-harness.md)
