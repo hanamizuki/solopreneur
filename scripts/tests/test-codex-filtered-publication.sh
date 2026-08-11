@@ -66,7 +66,7 @@ generated_skills="$(
   find "$FIXTURE_ROOT/.codex/plugins/solopreneur/skills" \
     -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
 )"
-[[ "$generated_skills" == "filter-canary" ]]
+[[ "$generated_skills" == $'filter-canary\ngreenlight' ]]
 [[ ! -e "$FIXTURE_ROOT/.codex/plugins/solopreneur/skills/autopilot" ]]
 
 CODEX_HOME="$FILTER_HOME" codex plugin marketplace add "$FIXTURE_ROOT" >/dev/null
@@ -81,7 +81,7 @@ cached_skills="$(
   find "$FILTER_HOME/plugins/cache/$cache_relative/skills" \
     -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
 )"
-[[ "$cached_skills" == "filter-canary" ]]
+[[ "$cached_skills" == $'filter-canary\ngreenlight' ]]
 [[ ! -e "$FILTER_HOME/plugins/cache/$cache_relative/skills/autopilot" ]]
 
-echo "filtered-publication fixture: included canary only"
+echo "filtered-publication fixture: included canary and Greenlight only"

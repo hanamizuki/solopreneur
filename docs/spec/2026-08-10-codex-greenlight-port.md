@@ -1,8 +1,9 @@
 # Codex Greenlight port
 
-**Status:** Implemented and accepted on `codex-exec` for the degraded
-`external` S/M surface; publication safety complete; reviewed-head binding and
-shared-view surface closure remain pending
+**Status:** Implemented, accepted, and included in the filtered Codex
+publication on `codex-exec`, `codex-tui`, and `codex-app` for the degraded
+`external` S/M surface. Reviewed-head binding remains a shared Claude/Codex
+defect, not a Codex parity or publication gate
 
 **Date:** 2026-08-10 (latest acceptance evidence: 2026-08-11)
 
@@ -289,12 +290,12 @@ its own behavioral acceptance; the S/M bound stays in force.
 
 ### W5 — docs
 
-- The registry/publication entry for Greenlight on `codex-exec` is `degraded`
-  (external-only, no Phase 1/2, claude-cli gate) with this spec as the
-  limitation reference. The
+- The registry marks Greenlight `degraded` on `codex-exec`, `codex-tui`, and
+  `codex-app` (external-only, no Phase 1/2, claude-cli gate), with this spec as
+  the limitation and acceptance reference. The
   [registry + filtered view](../../todos/done/2026-08-10_codex-publication-safety.md)
-  are complete; publication stays gated on reviewed-head binding and the
-  shared-view surface closure.
+  include only Greenlight and its declared resources. Reviewed-head binding is
+  tracked as a shared Claude/Codex defect and does not gate this publication.
 
 ## Acceptance
 
@@ -491,6 +492,38 @@ mid-loop.
   limit` against the operator's merged skills tree, unchanged from M3 — an
   install-sizing concern, not a Greenlight defect.
 - One run, one fixture, one sampling of a non-deterministic reviewer.
+
+### A5 Codex TUI
+
+**Status: done on 2026-08-11.** Codex CLI 0.147.0 ran the generated candidate
+`solopreneur` plugin version `0.5.37+codex.20260811141012` in the interactive TUI
+as `$solopreneur:greenlight external 170 unattended`. The rollout for thread
+`019ff13b-833c-7b13-94b0-3c81b94e4660` records the candidate Greenlight body as
+the loaded skill, not the older merged user-skill copy.
+
+PR #170 started at `c366e77` with the four-line cadence fixture reseeded to
+`540`. The TUI selected the independent `claude-cli` gate, parsed its one P1,
+applied the forced `540` → `420` fix inline, committed and pushed `2b26e37`, and
+waited for the PR head to match. Round 2 returned exactly `No findings.`. The
+closing sweep found no late comments, reviews, or unresolved threads; local,
+remote, and PR heads matched, the PR was `CLEAN`, and the CodeRabbit check was
+successful. Terminal result: clean in 2 rounds, 1 fix, 0 push-backs.
+
+### A6 Codex App
+
+**Status: done on 2026-08-11.** The Codex App exercised the same generated
+candidate and `external unattended` contract against PR #170, initially at
+`d87ec38`. The independent gate found the same P1, the App verified the
+arithmetic, applied the one-token fix, and pushed `fab8681`. Round 2 returned
+exactly `No findings.` and the closing sweep returned no late feedback or
+unresolved threads. Terminal result: clean in 2 rounds, 1 fix, 0 push-backs.
+
+The App shell runner has one measured transport quirk: a non-PTY `claude-cli`
+call can exit zero with empty stdout. The existing positive-clean rule correctly
+classifies that as invocation failure; the same checked diff and verbatim recipe
+under the shell tool's native PTY returned `No findings.`. The shared skill now
+states that App retry explicitly, without changing Claude Code or the other
+Codex surfaces.
 
 ## Not in V1
 
