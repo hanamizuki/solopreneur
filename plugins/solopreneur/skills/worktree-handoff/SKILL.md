@@ -16,6 +16,14 @@ Create an isolated workspace for a new or in-progress task, and record the compl
 task context into a plan file that gets committed to the branch. The next session reads
 the plan file to pick up without re-explanation.
 
+## Codex host guard
+
+Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop
+before creating a worktree or branch, copying configuration, changing a plan,
+or committing. This release supports Worktree Handoff only on Claude Code;
+tell the user the Codex worktree seam is not shipped yet and to run the
+workflow there instead.
+
 ## Flow
 
 ### Step 1: Resolve Mode and Paths

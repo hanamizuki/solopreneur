@@ -13,6 +13,14 @@ description: |
 
 # Merge PR
 
+## Codex host guard
+
+Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop
+before cleaning worktrees, changing plan files, merging, deleting branches, or
+running any other mutating command. This release supports Merge PR only on
+Claude Code; tell the user the Codex merge seam is not shipped yet and to run
+the workflow there instead.
+
 ## Core Design: Why the Current Session's Own Worktree Cannot Be Deleted
 
 When a Claude Code session starts, it locks a primary working directory. After

@@ -29,6 +29,13 @@ execution with a single implementer subagent under the MVP Charter
 `superpowers:subagent-driven-development`, which both enforce TDD
 discipline that kills demo velocity).
 
+## Codex host guard
+
+Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop
+before creating product artifacts, worktrees, commits, or subagent work. This
+release supports the MVP orchestrator only on Claude Code; tell the user its
+Codex engine is not shipped yet and to run the workflow there instead.
+
 ## Flow
 
 ```text

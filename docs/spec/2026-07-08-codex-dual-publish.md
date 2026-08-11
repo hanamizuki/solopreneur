@@ -7,19 +7,20 @@ fresh git-ref matrices; PR #155 was squash-merged as `fc943a9` on 2026-08-09
 without changing the accepted runtime bytes. The slice is not yet included in
 a tagged plugin release and does not certify marketer domain-skill parity.
 **Date:** 2026-07-08
-**Current review:** 2026-08-09
+**Current review:** 2026-08-11
 **Affected plugins:** all seven (`solopreneur`, `designer`, `marketer`,
 `ios-dev`, `android-dev`, `ai-engineer`, `neo4j-dev`)
 **Evidence:** [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)
 
 ## Problem
 
-The repository publishes seven Claude Code plugins from one marketplace. The
-same repository now contains generated Codex manifests and a Codex marketplace,
-so all seven plugin snapshots are installable. The remaining gap is behavioral:
-Codex plugins do not register custom agents, platform-specific agent prompts are
-not portable verbatim, and multi-agent routing needs an explicit adapter and a
-testable installation path.
+The repository publishes seven Claude Code plugins from one marketplace. Codex
+also supports one marketplace containing multiple independently installed
+plugins, but its default `skills/` discovery makes a canonical plugin root an
+unsafe installation boundary until every sibling skill is supported. Codex
+therefore installs only generated, registry-filtered plugin roots. A plugin
+appears in the Codex marketplace only after at least one of its skills is
+approved for that publication view.
 
 The goal is one repository and one skill source of truth, with small
 platform-specific manifests and agent adapters. Installing either platform's
@@ -28,7 +29,8 @@ Code behavior.
 
 ## Goals
 
-- Keep all seven sub-plugins independently installable on both platforms.
+- Keep all seven sub-plugins independently installable on Claude Code and add
+  each one to Codex when its filtered surface earns support.
 - Maintain every shared skill once under `plugins/<name>/skills/`.
 - Generate every derivable Codex surface and fail CI on drift.
 - Preserve hand-authored custom agents and fail closed when managed agents
@@ -110,7 +112,8 @@ documented at <https://learn.chatgpt.com/docs/agent-configuration/subagents>.
 | `plugins/<n>/agents/<n>.md` | Claude Code | hand-maintained |
 | `plugins/<n>/agents/<n>.toml` | Codex source | hand-maintained |
 | `plugins/<n>/.claude-plugin/plugin.json` | Claude Code and version source | hand-maintained |
-| `plugins/<n>/.codex-plugin/plugin.json` | Codex | generated |
+| `skills-compatibility.json` | both publication policy | hand-maintained |
+| `.codex/plugins/<n>/**` | Codex filtered install roots | generated |
 | `scripts/codex-manifest-overlays.json` | Codex metadata | hand-maintained |
 | `.claude-plugin/marketplace.json` | Claude Code | hand-maintained |
 | `.agents/plugins/marketplace.json` | Codex | generated |
@@ -126,13 +129,15 @@ manifests, the Codex marketplace, and project agent copies.
 ## Manifest and marketplace contracts
 
 Each generated Codex plugin manifest copies `name`, `version`, `description`,
-and `license` from the Claude manifest. It sets an empty hooks object to prevent
-Claude-format hooks from being interpreted, declares `./skills/` explicitly,
-and merges only Codex-specific interface metadata from the overlay. Overlay
-files may not replace generator-owned fields.
+and `license` from the Claude manifest, derives publisher metadata from the
+marketplace owner, declares `./skills/` explicitly, and merges only Codex-
+specific interface metadata from the overlay. The install root contains only
+registry-included skill directories. Overlay files may not replace generator-
+owned fields.
 
-The generated Codex marketplace mirrors all seven published plugin names,
-sources, descriptions, and licenses. Installation and authentication policies
+The generated Codex marketplace preserves the Claude marketplace order but
+emits only plugin names with at least one included Codex skill. Each source
+points to `./.codex/plugins/<name>`. Installation and authentication policies
 are explicit, and category comes from the same interface overlay used by the
 plugin manifest.
 
@@ -294,16 +299,20 @@ degradation; a skill that requires a remote service owns that requirement.
 
 Validation is layered so deterministic failures do not consume model calls:
 
-1. **Generation drift** — regenerate all Codex surfaces and fail on any diff.
-2. **Agent source validation** — parse TOML, validate required fields, identity,
+1. **Registry and publication** — classify every canonical skill, validate
+   support evidence and early host guards, and require generated install roots
+   to contain exactly the registry-included skill IDs.
+2. **Generation drift** — regenerate all Codex surfaces and fail on any diff.
+3. **Agent source validation** — parse TOML, validate required fields, identity,
    sibling, uniqueness, marker, symlink status, and forbidden vocabulary.
-3. **Bootstrap fixtures** — run install, update, no-op, collision, symlink,
+4. **Bootstrap fixtures** — run install, update, no-op, collision, symlink,
    orphan, malformed-input, duplicate, path, copy-failure, and rename-failure
    cases with the system `/bin/bash` on Ubuntu and macOS.
-4. **Install integration** — install all seven plugins into a throwaway Codex
-   home, execute the cached bootstrap, compare source and destination bytes,
-   and prove a second run is unchanged.
-5. **Authenticated delegation acceptance** — in isolated user, Codex, and
+5. **Install integration** — install every entry in the filtered marketplace
+   into a throwaway Codex home. The cached bootstrap-to-agent round trip runs
+   when both the core bootstrap and marketer plugin are in that view; its
+   deterministic reconciliation fixtures always run.
+6. **Authenticated delegation acceptance** — in isolated user, Codex, and
    project homes, run the fixed four-case matrix: R02 is the explicit marketer
    request and R07 is the first natural router prompt, both on `codex exec`;
    R08 and R09 are the remaining natural prompts in the interactive TUI. Both
@@ -381,8 +390,8 @@ neither replaces any of the four required live cases.
 ## Versioning and release
 
 The release workflow already runs the Codex generator in the bump commit. Its
-exact staging set includes Claude manifests, Codex manifests, the Codex
-marketplace, generated project agents, and the changelog. Tags remain
+exact staging set includes Claude manifests, filtered Codex plugin roots, the
+Codex marketplace, generated project agents, and the changelog. Tags remain
 `<plugin>--v<version>`, and the changelog stays platform-shared.
 
 Required CI pins a known Codex CLI version so an upstream release cannot change
@@ -396,7 +405,7 @@ contract drift without replacing the pinned gate.
 | 1 | Approved architecture | complete |
 | 2 | Vendored `$N` escape prerequisite | complete |
 | 3 | Move non-skill directories to `vendor/` and `shared/` | complete |
-| 4 | Generate seven manifests and marketplace; add drift/install CI | complete |
+| 4 | Generate the initial unfiltered manifests and marketplace; add drift/install CI | complete; superseded by the stage 6 filtered install roots |
 | 5a | Marketer TOML, router, secure bootstrap, and live delegation gate | complete; PR #155 merged as `fc943a9`, tagged release and marketer parity pending |
 | 5b | Five remaining TOMLs and six remaining routers | deferred until the core workflow V1 is complete |
 | 6 | Core-first skill portability: publication safety, Greenlight, core seams, and Autopilot | active; governed by the skill-portability spec |

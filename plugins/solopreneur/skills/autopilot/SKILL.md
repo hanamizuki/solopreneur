@@ -21,6 +21,14 @@ This skill handles **planning** plus the **single-PR + run-now** dispatch. The
 **scheduled** path (single-PR or multi-PR) hands off to the Orchestrator prompt
 triggered via cron (see `references/orchestrator.md`).
 
+## Codex host guard
+
+Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop
+before reading the task, writing artifacts, creating a worktree or PR, spawning
+work, or scheduling anything. This release supports Autopilot only on Claude
+Code; tell the user the Codex engine is not shipped yet and to run the workflow
+there instead.
+
 ## Flow Overview
 
 ```text

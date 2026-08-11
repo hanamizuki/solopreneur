@@ -7,6 +7,7 @@ on:
       - 'plugins/*/.codex-plugin/**'
       - 'plugins/*/agents/**'
       - 'plugins/*/skills/**'
+      - 'skills-compatibility.json'
       - '.claude-plugin/marketplace.json'
       - '.agents/**'
       - '.codex/**'
@@ -20,6 +21,7 @@ on:
       - 'plugins/*/.codex-plugin/**'
       - 'plugins/*/agents/**'
       - 'plugins/*/skills/**'
+      - 'skills-compatibility.json'
       - '.claude-plugin/marketplace.json'
       - '.agents/**'
       - '.codex/**'
@@ -99,9 +101,9 @@ jobs:
       - name: Check for drift
         run: |
           # `git status --porcelain` instead of `git diff --exit-code`: the
-          # generator can also CREATE files (a plugin newly added to the
-          # marketplace gets a fresh .codex-plugin/plugin.json), and untracked
-          # files are invisible to `git diff`.
+          # generator can also CREATE files (a newly included skill can create
+          # a fresh .codex/plugins/<name> root), and untracked files are
+          # invisible to `git diff`.
           #
           # The wildcard pathspec needs the trailing `/**`: a git pathspec is
           # matched against the full file path, so 'plugins/*/.codex-plugin'

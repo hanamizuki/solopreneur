@@ -4,10 +4,13 @@
 # is the CI workflow re-running generate-codex-manifests.sh and failing on any
 # diff (validate-codex.yml), so it needs git context this script does not.
 #
+#   Gate: registry/publication — every canonical skill is classified, every
+#   required fail-closed guard is early, and the generated Codex roots contain
+#   exactly the registry-included skills.
+#
 #   Gate: structure — every first-level directory under plugins/*/skills/ must
-#   contain a SKILL.md. Codex 0.142.5 rejected offending plugins at install
-#   time; 0.144.1 installs them silently, so this bash check is the only thing
-#   standing between a stray helper directory and a broken skill listing.
+#   contain a SKILL.md. This keeps canonical discovery deterministic before the
+#   filtered publication copy is assembled.
 #
 #   Gate: install smoke — add the working tree as a local Codex marketplace
 #   under a throwaway CODEX_HOME (never the caller's), then `codex plugin add`
@@ -58,6 +61,13 @@ fi
 
 fail=0
 
+# --- Gate: registry ----------------------------------------------------------
+echo "==> registry: classification, support evidence, and host guards"
+if ! env PYTHONDONTWRITEBYTECODE=1 \
+  python3 "$REPO_ROOT/scripts/validate-skills-compatibility.py" "$REPO_ROOT"; then
+  fail=1
+fi
+
 # --- Gate: custom-agent validator fixtures ----------------------------------
 echo "==> agents: hermetic validator fixtures"
 if ! env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
@@ -88,6 +98,51 @@ while IFS= read -r -d '' d; do
   fi
 done < <(find "$REPO_ROOT"/plugins/*/skills -mindepth 1 -maxdepth 1 -type d -print0)
 
+# --- Gate: filtered publication ---------------------------------------------
+echo "==> publication: generated roots match registry includes"
+expected="$(jq -r '
+  .skills
+  | to_entries[]
+  | select(.value.publication.codex == "include")
+  | .key
+' "$REPO_ROOT/skills-compatibility.json" | sort)"
+actual=""
+if [[ -d "$REPO_ROOT/.codex/plugins" ]]; then
+  while IFS= read -r -d '' skill_md; do
+    relative="${skill_md#"$REPO_ROOT/.codex/plugins/"}"
+    plugin="${relative%%/*}"
+    skill="${relative#*/skills/}"
+    skill="${skill%/SKILL.md}"
+    actual+="${plugin}:${skill}"$'\n'
+  done < <(find "$REPO_ROOT/.codex/plugins" -path '*/skills/*/SKILL.md' -print0)
+  actual="$(printf '%s' "$actual" | sed '/^$/d' | sort)"
+fi
+if [[ "$actual" != "$expected" ]]; then
+  echo "error: generated Codex skill set does not match skills-compatibility.json" >&2
+  printf 'expected:\n%s\nactual:\n%s\n' "$expected" "$actual" >&2
+  fail=1
+fi
+
+if find "$REPO_ROOT/plugins" -mindepth 2 -maxdepth 2 -type d -name .codex-plugin | grep -q .; then
+  echo "error: canonical plugin roots must not carry Codex manifests" >&2
+  fail=1
+fi
+
+while IFS= read -r plugin; do
+  source_path="$(jq -r --arg plugin "$plugin" '
+    .plugins[] | select(.name == $plugin) | .source.path
+  ' "$CODEX_MARKETPLACE")"
+  expected_path="./.codex/plugins/$plugin"
+  manifest="$REPO_ROOT/.codex/plugins/$plugin/.codex-plugin/plugin.json"
+  if [[ "$source_path" != "$expected_path" || ! -f "$manifest" ]]; then
+    echo "error: marketplace entry '$plugin' does not resolve to its generated root" >&2
+    fail=1
+  elif [[ "$(jq -r '.skills // empty' "$manifest")" != "./skills/" ]]; then
+    echo "error: $manifest must declare ./skills/" >&2
+    fail=1
+  fi
+done < <(jq -r '.plugins[].name' "$CODEX_MARKETPLACE")
+
 # --- Gate: install smoke ------------------------------------------------------
 SMOKE_HOME="$(mktemp -d -t solopreneur-codex-smoke.XXXXXX)"
 trap 'rm -rf "$SMOKE_HOME"' EXIT
@@ -111,46 +166,53 @@ done < <(jq -r '.plugins[].name' "$CODEX_MARKETPLACE")
 # --- Gate: installed-cache bootstrap integration ----------------------------
 echo "==> bootstrap integration: installed cache to user agents"
 listing="$(CODEX_HOME="$SMOKE_HOME" codex plugin list --json)"
-solopreneur_rel="$(printf '%s' "$listing" | jq -er '
+if printf '%s' "$listing" | jq -e '
+  ([.installed[].name] | index("solopreneur")) != null
+  and ([.installed[].name] | index("marketer")) != null
+' >/dev/null; then
+  solopreneur_rel="$(printf '%s' "$listing" | jq -er '
   .installed[]
   | select(.name == "solopreneur" and .marketplaceName == "solopreneur")
   | "\(.marketplaceName)/\(.name)/\(.version)"
 ')"
-marketer_rel="$(printf '%s' "$listing" | jq -er '
+  marketer_rel="$(printf '%s' "$listing" | jq -er '
   .installed[]
   | select(.name == "marketer" and .marketplaceName == "solopreneur")
   | "\(.marketplaceName)/\(.name)/\(.version)"
 ')"
-bootstrap_script="$SMOKE_HOME/plugins/cache/$solopreneur_rel/skills/codex-agents-bootstrap/scripts/install-codex-agents.sh"
-marketer_source="$SMOKE_HOME/plugins/cache/$marketer_rel/agents/marketer.toml"
-marketer_destination="$SMOKE_HOME/agents/marketer.toml"
+  bootstrap_script="$SMOKE_HOME/plugins/cache/$solopreneur_rel/skills/codex-agents-bootstrap/scripts/install-codex-agents.sh"
+  marketer_source="$SMOKE_HOME/plugins/cache/$marketer_rel/agents/marketer.toml"
+  marketer_destination="$SMOKE_HOME/agents/marketer.toml"
 
-if [[ ! -f "$bootstrap_script" || ! -f "$marketer_source" ]]; then
-  echo "error: installed plugin cache did not preserve the bootstrap script and marketer agent" >&2
-  fail=1
+  if [[ ! -f "$bootstrap_script" || ! -f "$marketer_source" ]]; then
+    echo "error: installed plugin cache did not preserve the bootstrap script and marketer agent" >&2
+    fail=1
+  else
+    if bootstrap_output="$(HOME="$SMOKE_HOME/home" CODEX_HOME="$SMOKE_HOME" /bin/bash "$bootstrap_script")"; then
+      printf '%s\n' "$bootstrap_output"
+      if ! grep -Eq '^Installed:[[:space:]]+marketer\.toml$' <<<"$bootstrap_output" \
+         || ! cmp -s "$marketer_source" "$marketer_destination"; then
+        echo "error: bootstrap did not install a byte-identical marketer.toml" >&2
+        fail=1
+      fi
+    else
+      echo "error: cached bootstrap script failed" >&2
+      fail=1
+    fi
+
+    if second_output="$(HOME="$SMOKE_HOME/home" CODEX_HOME="$SMOKE_HOME" /bin/bash "$bootstrap_script")"; then
+      printf '%s\n' "$second_output"
+      if ! grep -Eq '^Unchanged:[[:space:]]+marketer\.toml$' <<<"$second_output"; then
+        echo "error: second bootstrap run was not idempotent" >&2
+        fail=1
+      fi
+    else
+      echo "error: second cached bootstrap run failed" >&2
+      fail=1
+    fi
+  fi
 else
-  if bootstrap_output="$(HOME="$SMOKE_HOME/home" CODEX_HOME="$SMOKE_HOME" /bin/bash "$bootstrap_script")"; then
-    printf '%s\n' "$bootstrap_output"
-    if ! grep -Eq '^Installed:[[:space:]]+marketer\.toml$' <<<"$bootstrap_output" \
-       || ! cmp -s "$marketer_source" "$marketer_destination"; then
-      echo "error: bootstrap did not install a byte-identical marketer.toml" >&2
-      fail=1
-    fi
-  else
-    echo "error: cached bootstrap script failed" >&2
-    fail=1
-  fi
-
-  if second_output="$(HOME="$SMOKE_HOME/home" CODEX_HOME="$SMOKE_HOME" /bin/bash "$bootstrap_script")"; then
-    printf '%s\n' "$second_output"
-    if ! grep -Eq '^Unchanged:[[:space:]]+marketer\.toml$' <<<"$second_output"; then
-      echo "error: second bootstrap run was not idempotent" >&2
-      fail=1
-    fi
-  else
-    echo "error: second cached bootstrap run failed" >&2
-    fail=1
-  fi
+  echo "skipped: bootstrap and marketer are not both in the filtered marketplace"
 fi
 
 if [[ "$fail" -ne 0 ]]; then

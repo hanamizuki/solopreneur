@@ -5,23 +5,16 @@
 # Owns exactly three generated surfaces (all committed — installers read the
 # repo, there is no build step at install time):
 #
-#   1. plugins/<n>/.codex-plugin/plugin.json  — one per plugin listed in
-#      .claude-plugin/marketplace.json. `name` / `version` / `description` /
-#      `license` copy verbatim from plugins/<n>/.claude-plugin/plugin.json
-#      (version lockstep across platforms is structural, not procedural);
-#      `"hooks": {}` guards against Codex loading Claude-format hook files;
-#      `"skills": "./skills/"` explicitly declares the shared skill root;
-#      Codex-only fields (`interface`, and anything else Codex may grow)
-#      come from the plugin's entry in scripts/codex-manifest-overlays.json.
-#   2. .agents/plugins/marketplace.json — mirrors .claude-plugin/
-#      marketplace.json entries (name, description, license, source); the
-#      `./plugins/<name>` sources make the working tree installable as a
-#      local Codex marketplace. Each entry also carries the fields the
-#      Codex marketplace contract asks for ("Always include
-#      policy.installation, policy.authentication, and category"): a
-#      uniform policy, and category taken from the plugin's overlay
-#      interface — the CLI installs entries without them, but directory-
-#      style consumers may enforce the documented contract.
+#   1. .codex/plugins/<n>/ — a filtered install root for each plugin with at
+#      least one registry-included Codex skill. Skill directories are copied
+#      byte-for-byte from the canonical tree; shared config.sh is overlaid at
+#      the already-supported flattened-layout path. Canonical plugin roots are
+#      never installation roots because Codex's default skills/ discovery
+#      would expose every unsupported skill beside the declared path.
+#   2. .agents/plugins/marketplace.json — contains only plugins that have a
+#      filtered install root, and points at ./.codex/plugins/<name>. Entries
+#      carry the documented installation/authentication policy and the overlay
+#      category. The marketplace can therefore grow one plugin at a time.
 #   3. .codex/agents/*.toml — copies of published
 #      plugins/<name>/agents/*.toml so Codex picks the agents up natively for
 #      in-repo development. If no published plugin has an agent source, the
@@ -44,6 +37,8 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OVERLAYS="$REPO_ROOT/scripts/codex-manifest-overlays.json"
 CLAUDE_MARKETPLACE="$REPO_ROOT/.claude-plugin/marketplace.json"
 CODEX_MARKETPLACE="$REPO_ROOT/.agents/plugins/marketplace.json"
+COMPATIBILITY_REGISTRY="$REPO_ROOT/skills-compatibility.json"
+CODEX_PLUGIN_ROOT="$REPO_ROOT/.codex/plugins"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "error: jq is required (brew install jq)" >&2
@@ -55,18 +50,41 @@ if ! command -v python3 >/dev/null 2>&1 \
   exit 1
 fi
 
-for f in "$OVERLAYS" "$CLAUDE_MARKETPLACE"; do
+for f in "$OVERLAYS" "$CLAUDE_MARKETPLACE" "$COMPATIBILITY_REGISTRY"; do
   if [[ ! -f "$f" ]]; then
     echo "error: input not found: $f" >&2
     exit 1
   fi
 done
 
+# Registry validation is also the publication authorization boundary. Run it
+# before deriving any output or deleting an old generated tree.
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "$REPO_ROOT/scripts/validate-skills-compatibility.py" "$REPO_ROOT"
+
 # The published plugin set is whatever the Claude marketplace lists — a
 # plugins/ directory absent from it is unpublished and gets no Codex surface.
 plugins=()
 while IFS= read -r name; do plugins+=("$name"); done \
   < <(jq -r '.plugins[].name' "$CLAUDE_MARKETPLACE")
+
+published_names=$(jq '[
+  .skills
+  | to_entries[]
+  | select(.value.publication.codex == "include")
+  | (.key | split(":")[0])
+] | unique' "$COMPATIBILITY_REGISTRY")
+codex_plugins=()
+while IFS= read -r name; do codex_plugins+=("$name"); done \
+  < <(printf '%s' "$published_names" | jq -r '.[]')
+
+for name in "${codex_plugins[@]}"; do
+  if ! jq -e --arg name "$name" 'any(.plugins[]; .name == $name)' \
+    "$CLAUDE_MARKETPLACE" >/dev/null; then
+    echo "error: registry publishes '$name', but Claude marketplace does not list it" >&2
+    exit 1
+  fi
+done
 
 # A duplicated name would slip through the set-like 1:1 check below and
 # generate a marketplace with two entries resolving the same plugin name —
@@ -102,7 +120,7 @@ reserved=$(jq -r '
   | .key as $plugin
   | .value
   | keys[]
-  | select(. as $k | ["name", "version", "description", "license", "hooks", "skills"] | index($k))
+  | select(. as $k | ["name", "version", "description", "license", "author", "skills"] | index($k))
   | "\($plugin): \(.)"' "$OVERLAYS")
 if [[ -n "$reserved" ]]; then
   echo "error: scripts/codex-manifest-overlays.json sets fields owned by the Claude manifest:" >&2
@@ -138,36 +156,94 @@ for name in "${plugins[@]}"; do
   fi
 done
 
+if ! jq -e '.owner.name | strings | length > 0' "$CLAUDE_MARKETPLACE" >/dev/null; then
+  echo "error: .claude-plugin/marketplace.json owner.name is required for Codex manifests" >&2
+  exit 1
+fi
+
 # Same pre-flight for surface 3. Plugin installation does not parse custom
 # agents, so validate their TOML schema, managed identity, vocabulary, sibling
 # Claude agent, and cross-plugin uniqueness before rebuilding any output.
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "$REPO_ROOT/scripts/validate-codex-agents.py" "$REPO_ROOT"
 
-# --- Surface 1: per-plugin .codex-plugin/plugin.json ------------------------
-# Removed first, then rebuilt from the current marketplace list, so a plugin
-# dropped from the marketplace loses its manifest (the deletion shows up as
-# drift). Skipping the removal would leave the stale file committed and the
-# drift check green — the same rebuild-from-scratch reasoning as surface 3.
+# --- Surface 1: filtered Codex plugin roots ---------------------------------
+# Legacy manifests in canonical plugin roots are removed: even a custom
+# manifest `skills` path supplements Codex's default skills/ discovery, so that
+# layout cannot enforce publication filtering. The generated root contains no
+# canonical sibling skills for Codex to fall back to.
 rm -rf "$REPO_ROOT"/plugins/*/.codex-plugin
-for name in "${plugins[@]}"; do
+rm -rf "$CODEX_PLUGIN_ROOT"
+for name in "${codex_plugins[@]}"; do
   claude_manifest="$REPO_ROOT/plugins/$name/.claude-plugin/plugin.json"
-  mkdir -p "$REPO_ROOT/plugins/$name/.codex-plugin"
-  jq --argjson overlay "$(jq --arg n "$name" '.[$n]' "$OVERLAYS")" \
-    '{name, version, description, license, hooks: {}, skills: "./skills/"} + $overlay' \
-    "$claude_manifest" > "$REPO_ROOT/plugins/$name/.codex-plugin/plugin.json"
-  echo "generated: plugins/$name/.codex-plugin/plugin.json"
+  output_root="$CODEX_PLUGIN_ROOT/$name"
+  mkdir -p "$output_root/.codex-plugin" "$output_root/skills"
+
+  while IFS= read -r skill; do
+    source_skill="$REPO_ROOT/plugins/$name/skills/$skill"
+    output_skill="$output_root/skills/$skill"
+    cp -R "$source_skill" "$output_skill"
+
+    # Core skills already resolve this flattened publication seam as their
+    # fallback when ../../shared/config.sh is outside the plugin snapshot.
+    if [[ -f "$REPO_ROOT/plugins/$name/shared/config.sh" ]]; then
+      mkdir -p "$output_skill/scripts"
+      cp "$REPO_ROOT/plugins/$name/shared/config.sh" "$output_skill/scripts/config.sh"
+    fi
+    echo "generated: .codex/plugins/$name/skills/$skill"
+  done < <(jq -r --arg prefix "$name:" '
+    .skills
+    | to_entries[]
+    | select(.key | startswith($prefix))
+    | select(.value.publication.codex == "include")
+    | (.key | split(":")[1])
+  ' "$COMPATIBILITY_REGISTRY")
+
+  for toml in "$REPO_ROOT/plugins/$name"/agents/*.toml; do
+    [[ -e "$toml" ]] || continue
+    mkdir -p "$output_root/agents"
+    cp "$toml" "$output_root/agents/$(basename "$toml")"
+  done
+
+  jq \
+    --argjson owner "$(jq '.owner' "$CLAUDE_MARKETPLACE")" \
+    --argjson overlay "$(jq --arg n "$name" '.[$n]' "$OVERLAYS")" '
+      . as $manifest
+      | {
+          name,
+          version,
+          description,
+          license,
+          author: $owner,
+          skills: "./skills/",
+          interface: ({
+            displayName: ($overlay.interface.displayName // $manifest.name),
+            shortDescription: $manifest.description,
+            longDescription: $manifest.description,
+            developerName: $owner.name,
+            category: $overlay.interface.category,
+            capabilities: $overlay.interface.capabilities,
+            defaultPrompt: ["Help me use \($overlay.interface.displayName // $manifest.name)."]
+          } + $overlay.interface)
+        }
+        + ($overlay | del(.interface))
+    ' "$claude_manifest" > "$output_root/.codex-plugin/plugin.json"
+  echo "generated: .codex/plugins/$name/.codex-plugin/plugin.json"
 done
 
 # --- Surface 2: .agents/plugins/marketplace.json -----------------------------
-# policy is uniform: every plugin is plainly installable and has nothing to
-# authenticate beyond install time (no MCP servers shipped today). category
-# reuses the overlay's interface.category rather than duplicating it.
+# Only a plugin with an included skill gets an entry. Policy is uniform: every
+# listed plugin is plainly installable and has nothing to authenticate beyond
+# install time (no MCP servers shipped today).
 mkdir -p "$(dirname "$CODEX_MARKETPLACE")"
-jq --slurpfile ovl "$OVERLAYS" '{
+jq --slurpfile ovl "$OVERLAYS" --argjson published "$published_names" '{
   name,
-  plugins: [.plugins[] | {
-    name, description, license, source,
+  interface: {displayName: "Solopreneur"},
+  plugins: [.plugins[]
+    | select(.name as $name | $published | index($name))
+    | {
+    name,
+    source: {source: "local", path: ("./.codex/plugins/" + .name)},
     policy: {installation: "AVAILABLE", authentication: "ON_INSTALL"},
     category: $ovl[0][.name].interface.category
   }]

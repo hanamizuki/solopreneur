@@ -29,6 +29,13 @@ Three stages produce findings; one resolution phase decides what happens to them
 **No stage writes to the document under review.** Findings stay informational
 until the user approves them one by one in R3 — R4 is the only write.
 
+## Codex host guard
+
+Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop
+before dispatching reviewers or writing back to the plan. This release supports
+Plan Review only on Claude Code; tell the user the Codex reviewer engine is not
+shipped yet and to run the workflow there instead.
+
 ## Arguments
 
 | Argument | Description | Example |
