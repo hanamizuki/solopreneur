@@ -252,8 +252,7 @@ that skips this step breaks CI on the release commit:
 ```
 
 Stage all bumped plugin.json files and the regenerated Codex surfaces
-(`plugins/*/.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`,
-`.codex/agents/`)
+(`.codex/plugins/`, `.agents/plugins/marketplace.json`, `.codex/agents/`)
 **together with the `CHANGELOG.md` update from Step 2.5** and commit them in
 one commit, so the Step 4 tags point at a commit that already contains the
 changelog (zero gap).
@@ -267,7 +266,10 @@ direct form the subject matches, and `CHANGELOG.md` (markdown) plus the
 `plugin.json` bumps land in one commit on `main`:
 
 ```bash
-git add plugins/*/.claude-plugin/plugin.json plugins/*/.codex-plugin/plugin.json .agents/plugins/marketplace.json .codex/agents CHANGELOG.md
+git add plugins/*/.claude-plugin/plugin.json .agents/plugins/marketplace.json .codex/agents CHANGELOG.md
+if [[ -d .codex/plugins ]] || [[ -n "$(git ls-files -- .codex/plugins)" ]]; then
+  git add -A -- .codex/plugins
+fi
 git commit \
   -m "chore(release): <one-line summary of what's shipping>" \
   -m "<plugin1> v<old>→v<new>: <reason>

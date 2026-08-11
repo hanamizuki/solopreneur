@@ -13,6 +13,14 @@ description: |
 
 # Autopilot
 
+## Codex host guard
+
+Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop
+before reading the task, writing artifacts, creating a worktree or PR, spawning
+work, or scheduling anything. This release supports Autopilot only on Claude
+Code; tell the user the Codex engine is not shipped yet and to run the workflow
+there instead.
+
 Planning phase for automated PR orchestration. Reads a task file, discusses splitting
 strategy with the user, produces plan + spec files, and then either schedules execution
 or dispatches inline (single-PR, run now).

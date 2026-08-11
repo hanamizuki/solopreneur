@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "legacyProvenance": "docs/spec/2026-08-09-codex-skill-portability.md#support-status-is-independent-of-source-shape",
+  "defaults": {
+    "support": {
+      "claude-code": "legacy",
+      "codex-exec": "unsupported",
+      "codex-tui": "unsupported",
+      "codex-app": "unsupported"
+    },
+    "publication": {
+      "claude-code": "include",
+      "codex": "exclude"
+    }
+  },
+  "sourceShapes": {
+    "shared": [
+      "ai-engineer:ai-app-templates",
+      "ai-engineer:langgraph",
+      "ai-engineer:senior-prompt-engineer",
+      "android-dev:accessibility",
+      "android-dev:agp-9-upgrade",
+      "android-dev:android-patterns",
+      "android-dev:architecture",
+      "android-dev:compose-navigation",
+      "android-dev:compose-performance-audit",
+      "android-dev:compose-ui",
+      "android-dev:coroutines",
+      "android-dev:data-layer",
+      "android-dev:edge-to-edge",
+      "android-dev:gplay-cli-usage",
+      "android-dev:gplay-gradle-build",
+      "android-dev:gplay-iap-setup",
+      "android-dev:gplay-metadata-sync",
+      "android-dev:gplay-migrate-fastlane",
+      "android-dev:gplay-ppp-pricing",
+      "android-dev:gplay-purchase-verification",
+      "android-dev:gplay-release-flow",
+      "android-dev:gplay-reports-download",
+      "android-dev:gplay-review-management",
+      "android-dev:gplay-rollout-management",
+      "android-dev:gplay-screenshot-automation",
+      "android-dev:gplay-submission-checks",
+      "android-dev:gplay-testers-orchestration",
+      "android-dev:gplay-user-management",
+      "android-dev:gplay-vitals-monitoring",
+      "android-dev:gradle-build-performance",
+      "android-dev:gradle-logic",
+      "android-dev:jetpack-compose",
+      "android-dev:kotlin-concurrency-expert",
+      "android-dev:migrate-xml-views-to-jetpack-compose",
+      "android-dev:mobile-android-design",
+      "android-dev:navigation-3",
+      "android-dev:play-billing-library-version-upgrade",
+      "android-dev:r8-analyzer",
+      "android-dev:testing",
+      "android-dev:viewmodel",
+      "android-dev:xml-to-compose-migration",
+      "designer:taste-brutalist",
+      "designer:taste-gpt",
+      "designer:taste-image-to-code",
+      "designer:taste-minimalist",
+      "designer:taste-output",
+      "designer:taste-redesign",
+      "designer:taste-skill",
+      "designer:taste-soft",
+      "designer:taste-stitch",
+      "ios-dev:apple-design",
+      "ios-dev:asc-app-create-ui",
+      "ios-dev:asc-aso-audit",
+      "ios-dev:asc-build-lifecycle",
+      "ios-dev:asc-cli-usage",
+      "ios-dev:asc-crash-triage",
+      "ios-dev:asc-id-resolver",
+      "ios-dev:asc-localize-metadata",
+      "ios-dev:asc-metadata-sync",
+      "ios-dev:asc-notarization",
+      "ios-dev:asc-ppp-pricing",
+      "ios-dev:asc-release-flow",
+      "ios-dev:asc-revenuecat-catalog-sync",
+      "ios-dev:asc-screenshot-resize",
+      "ios-dev:asc-shots-pipeline",
+      "ios-dev:asc-signing-setup",
+      "ios-dev:asc-submission-health",
+      "ios-dev:asc-subscription-localization",
+      "ios-dev:asc-testflight-orchestration",
+      "ios-dev:asc-wall-submit",
+      "ios-dev:asc-whats-new-writer",
+      "ios-dev:asc-workflow",
+      "ios-dev:asc-xcode-build",
+      "ios-dev:ios-app-templates",
+      "ios-dev:ios-patterns",
+      "ios-dev:iphone-apps",
+      "marketer:gtm",
+      "marketer:humanly",
+      "marketer:linkedin-growth",
+      "marketer:naming",
+      "marketer:x-growth",
+      "marketer:x-writing",
+      "neo4j-dev:neo4j-cli-tools",
+      "neo4j-dev:neo4j-cypher",
+      "neo4j-dev:neo4j-cypher-guide",
+      "neo4j-dev:neo4j-migration",
+      "solopreneur:perspective",
+      "solopreneur:post-mortem"
+    ],
+    "shared_with_seams": [
+      "designer:impeccable",
+      "marketer:slide-design",
+      "solopreneur:codex-agents-bootstrap",
+      "solopreneur:handoff",
+      "solopreneur:merge-pr",
+      "solopreneur:preview",
+      "solopreneur:rebuild-skill-index",
+      "solopreneur:session-retro",
+      "solopreneur:specialist-review",
+      "solopreneur:todos-cleanup",
+      "solopreneur:todos-review",
+      "solopreneur:worktree-handoff"
+    ],
+    "native_engines": [
+      "marketer:using-marketer",
+      "solopreneur:autopilot",
+      "solopreneur:greenlight",
+      "solopreneur:mvp",
+      "solopreneur:plan-review",
+      "solopreneur:todos-babysit"
+    ]
+  },
+  "skills": {
+    "solopreneur:greenlight": {
+      "support": {
+        "codex-exec": "degraded"
+      },
+      "publication": {
+        "codex": "exclude"
+      },
+      "sharedContract": "plugins/solopreneur/skills/greenlight/SKILL.md",
+      "platformResources": [
+        "plugins/solopreneur/shared/config.sh",
+        "plugins/solopreneur/skills/greenlight/scripts/reviewer-registry.mjs",
+        "plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-10-codex-greenlight-port.md"
+      },
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-10-codex-greenlight-port.md#acceptance"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [
+          "git",
+          "gh",
+          "jq",
+          "node>=20",
+          "claude-cli",
+          "github-network"
+        ]
+      },
+      "optionalEnhancements": [
+        "coderabbit",
+        "github-review-bots"
+      ]
+    }
+  },
+  "codexHostGuards": {
+    "solopreneur:autopilot": "plugins/solopreneur/skills/autopilot/SKILL.md",
+    "solopreneur:merge-pr": "plugins/solopreneur/skills/merge-pr/SKILL.md",
+    "solopreneur:mvp": "plugins/solopreneur/skills/mvp/SKILL.md",
+    "solopreneur:plan-review": "plugins/solopreneur/skills/plan-review/SKILL.md",
+    "solopreneur:preview": "plugins/solopreneur/skills/preview/SKILL.md",
+    "solopreneur:todos-babysit": "plugins/solopreneur/skills/todos-babysit/SKILL.md",
+    "solopreneur:worktree-handoff": "plugins/solopreneur/skills/worktree-handoff/SKILL.md"
+  }
+}

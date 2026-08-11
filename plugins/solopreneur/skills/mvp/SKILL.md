@@ -16,6 +16,13 @@ description: |
 
 # MVP Orchestrator
 
+## Codex host guard
+
+Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop
+before creating product artifacts, worktrees, commits, or subagent work. This
+release supports the MVP orchestrator only on Claude Code; tell the user its
+Codex engine is not shipped yet and to run the workflow there instead.
+
 Drives the full new-app / new-product flow with one explicit charter:
 **get to first demo fast.** Tests, edge cases, accessibility, i18n, and
 refactor passes are deferred — if the user wants those later they invoke

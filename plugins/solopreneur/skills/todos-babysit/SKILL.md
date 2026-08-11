@@ -13,6 +13,14 @@ description: |
 
 # Babysit Todos
 
+## Codex host guard
+
+Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop
+before reading or changing todo state, creating worktrees or PRs, dispatching
+implementation, or sending notifications. This release supports Todos Babysit
+only on Claude Code; tell the user its Codex engine is not shipped yet and to
+run the workflow there instead.
+
 Periodic scanner for backlog and in-progress todos. Cross-references with GitHub
 PR status, reviews unhandled items, notifies the user, and auto-implements on approval.
 

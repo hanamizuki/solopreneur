@@ -1,12 +1,13 @@
 # Codex Skill Portability Architecture
 
-**Status:** Approved design; Greenlight runtime slice implemented; publication
-safety and Autopilot Codex V1 pending
+**Status:** Approved design; rollout rows 3–4 complete; Greenlight remains
+excluded pending reviewed-head and shared-view gates; Autopilot Codex V1
+pending
 
 **Date:** 2026-08-09
 
-**Scope:** every skill published by the seven solopreneur plugins; the
-architecture baseline contains 104 and current `main` contains 106
+**Scope:** all 106 skills in the canonical trees of the seven marketplace
+plugins
 
 **Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md),
 [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md),
@@ -168,13 +169,13 @@ network permission, or host capability is absent. A `native_engines` skill can
 be `full` on every surface. Source maintenance and product support must remain
 separate fields in documentation, generation, and CI.
 
-`legacy` is a migration status restricted to the 104 skills already present on
-the canonical `claude-code` surface at this architecture baseline. It cannot be
-used for Codex, for a skill added after this baseline, or as evidence for a
-portability claim. It preserves the honest current product state without
-labelling untested orchestration `full`. Before a legacy skill's control flow
-changes or any Codex surface is promoted, its relevant Claude baseline
-scenarios must replace `legacy` with `full` or an explicit `degraded` result.
+`legacy` is a migration status restricted to the 106 skills present on the
+canonical `claude-code` tree when the first registry lands. It cannot be used
+for Codex, for a later skill, or as evidence for a portability claim. It
+preserves the honest current product state without labelling untested
+orchestration `full`. Before a legacy skill's control flow changes or any Codex
+surface is promoted, its relevant Claude baseline scenarios must replace
+`legacy` with `full` or an explicit `degraded` result.
 
 The canonical tree is the Claude publication surface today. Therefore
 `claude-code: unsupported` is invalid until a future design provides a filtered
@@ -183,13 +184,11 @@ explicitly `degraded`.
 
 Surface support and package publication are separate because all Codex
 surfaces consume one plugin skills view. The registry therefore also records a
-single Codex publication decision. That view is a guarded union: a skill may be
-included when at least one Codex surface is supported and every other reachable
-Codex surface either has a tested fail-closed surface guard or is also
-supported. If the skill cannot reliably identify the active Codex surface, the
-rule falls back to the intersection and one unsupported reachable surface
-excludes it from the shared Codex view. Publication never upgrades that
-surface's support status.
+single Codex publication decision. A guarded union is valid only after the host
+has a reliable surface discriminator and executable guard evidence. Neither is
+accepted in the current schema, so publication enforces the intersection: one
+unsupported Codex surface excludes the skill from the shared Codex view.
+Publication never upgrades that surface's support status.
 
 ### 4. Platform-neutral action vocabulary is the default
 
@@ -213,12 +212,16 @@ unsupported on that platform.
 
 ### 5. Compatibility registry is the publication authority
 
-A hand-maintained root-level `skills-compatibility.json` registry will cover
-every discovered `plugins/*/skills/*/SKILL.md`. JSON matches the existing Codex
+A hand-maintained root-level `skills-compatibility.json` registry covers every
+discovered `plugins/*/skills/*/SKILL.md`. JSON matches the existing Codex
 generator and validation stack, which already use JSON and `jq`; adding a YAML
-parser is not justified for this metadata.
+parser is not justified for this metadata. To keep the initial safety gate
+bounded, common support and publication values are defaults, every skill ID is
+listed exactly once under a source shape, and only exceptions carry a detailed
+override. Validation resolves those three pieces into the product contract
+below.
 
-Each registry entry contains:
+Each resolved registry entry contains:
 
 | Field | Purpose |
 | --- | --- |
@@ -231,6 +234,7 @@ Each registry entry contains:
 | Limitation reference | Required for every `degraded` surface |
 | Acceptance scenarios | Evidence-producing scenarios required for every `full` or `degraded` surface |
 | Legacy provenance | Architecture-baseline identity required for every `legacy` entry |
+| Legacy baseline allowlist | Frozen original identity set that prevents a new skill from silently inheriting `legacy` |
 | Internal skill dependencies | Repository skills that participate in support closure |
 | External required capabilities | Required external skills, CLIs, MCP servers, network, or host capabilities |
 | Optional enhancements | Capabilities that improve results but never gate the contract |
@@ -239,40 +243,47 @@ Missing entries, unknown skills, invalid enum values, invalid use of `legacy`,
 missing resources, or a skill exposed contrary to its platform publication
 decision are CI failures.
 Internal dependencies must resolve to registry entries; a supported skill
-cannot depend on an unsupported internal skill on the same surface unless its
-declared degraded path removes that dependency. External capabilities are
+cannot depend on an unsupported or excluded internal skill on the same surface.
+Because Codex does not enforce plugin dependencies, hard dependencies must also
+remain inside the same generated plugin root. External capabilities are
 validated as declared prerequisites, while optional enhancements never enter
 the hard dependency closure.
 
 `legacy` satisfies only unchanged Claude-to-Claude dependency closure. It
 cannot satisfy a gate for new behavior, a changed control flow, or any Codex
-promotion.
+promotion. `scripts/codex-legacy-skill-baseline.txt` freezes the original 106
+identities, with its bytes pinned by the validator. A promoted original skill
+may leave `legacy` without changing that list; a later skill cannot enter it.
 
-For Codex, the validator also rejects publication when no surface is supported,
-or when an unsupported reachable surface lacks a tested fail-closed guard. The
-guard must stop before workflow side effects and explain the supported surface;
-`allow_implicit_invocation: false` is not a guard because explicit invocation
-remains possible.
+For Codex, the validator rejects publication when any reachable surface is
+unsupported. A future surface-guard exception requires a separately reviewed
+schema, a reliable discriminator, and executable evidence; an arbitrary file
+reference cannot authorize publication. `allow_implicit_invocation: false` is
+not a guard because explicit invocation remains possible. Canonical host guards
+for wholly unsupported side-effecting skills are separately bound to each
+skill's entrypoint and must contain the early stop contract.
 
 Registry structure checks are conditional on support. A future Codex engine
 path is not required while all Codex surfaces are `unsupported`. The validator
 must reject invented placeholder paths and must require the shared contract,
 platform resources, limitations, and scenarios before the related surface can
-be promoted.
+be promoted. A platform resource must already live inside the copied skill
+directory or use that plugin's explicit shared-config overlay; other paths are
+rejected because they would not enter the installed snapshot.
 
 ### 6. Codex gets a generated publication view
 
-The canonical skill tree is not automatically the Codex publication tree.
-Current OpenAI plugin packaging exposes one relative `skills` directory, while
-`allow_implicit_invocation: false` disables only implicit invocation and still
-allows explicit invocation. Therefore metadata alone cannot keep an
-unsupported skill out of the package.
+The canonical skill tree is not the Codex publication tree. Codex performs
+conventional `skills/` discovery at a plugin root, and an alternate manifest
+path cannot be relied on to hide that default directory. Metadata such as
+`allow_implicit_invocation: false` also disables only implicit invocation and
+still allows explicit invocation. Therefore an unsupported skill cannot share
+the Codex installation root with the canonical tree.
 
 For this contract, "published" means discoverable or invokable through the
-plugin's declared skills root. It does not mean that canonical source bytes are
-absent from the installed plugin snapshot. Canonical files excluded from Codex
-publication may be present as inert source, but Codex must not discover or
-invoke them through the declared skills root.
+plugin's installed skills root. Canonical source stays under
+`plugins/<name>/skills/` for maintenance and Claude Code, but excluded skill
+bytes are absent from the generated Codex plugin snapshot.
 
 The Codex generator will assemble its one publication view from the
 compatibility registry. Per-surface statuses do not create separate packages:
@@ -285,14 +296,25 @@ compatibility registry. Per-surface statuses do not create separate packages:
   creating a second hand-maintained skill body.
 - Included skills have a valid supported dependency closure.
 
-The physical representation of this view is an implementation gate, not an
-assumption. A fixture must prove the chosen representation through both a local
-marketplace install and a git-ref install. It must also prove that an explicit
-skills path does not cause Codex to fall back to or rescan the canonical
-`skills/` directory. Until that gate passes, no Codex release may advertise the
-complete canonical skill tree as supported. The architecture and marketer
-distribution changes may merge without a release version bump while this gate
-is pending.
+The physical view is generated under `.codex/plugins/<name>/`. Each generated
+root contains a conventional `.codex-plugin/plugin.json` and `skills/`, with
+whole included skill directories copied from the canonical source. The core
+config helper is copied only to the flattened fallback path already declared by
+the consuming skills. Canonical plugin roots carry no Codex manifest. The
+Codex marketplace lists only plugins with at least one included skill and
+points directly to these generated roots, so specialist plugins can be added
+one at a time without exposing their siblings early.
+
+The physical representation of this view was accepted on Codex CLI 0.147.0
+with the one-skill fixture commit
+`7cca235f20bd10388265cad40800338fa4012838`. Local-path and fresh git-ref
+installs both cached exactly the included `filter-canary` directory and no
+canonical sibling such as `autopilot`; the generated manifest also passed the
+official plugin validator. An authenticated git-ref run under an isolated home
+resolved the installed absolute skill path and returned the canary's exact
+`FILTER_CANARY_ONLY` contract (session
+`019ff048-7bb8-7c70-b8c3-fdd8a4ee1a07`). This proves that Codex neither falls
+back to nor rescans the canonical `skills/` directory.
 
 ### 7. Behavioral conformance, not loadability, grants support
 
@@ -335,25 +357,22 @@ failure, not graceful degradation.
 Promotion from `degraded` to `full`, or acceptance of a new degradation, must
 update the registry and its behavioral scenarios in the same change.
 
-## Source-shape research hypothesis
+## Source-shape inventory
 
-The architecture baseline contained 104 skills. Current `main` contains 106
-after adding `using-marketer` and `codex-agents-bootstrap`. The
-counts below remain a planning hypothesis for the 104-skill baseline, not a
-registry seed or a Codex support claim. The registry PR must enumerate its own
-tree and re-audit every discovered skill against the semantic decision rule
-rather than copying these values.
+The registry enumerates and validates all 106 canonical skills. Source shape is
+a maintenance classification, not a Codex support claim.
 
 | Source shape | Count | Initial scope |
 | --- | ---: | --- |
 | `shared` | 88 | All Android, iOS, AI engineering, and Neo4j skills; nine designer skills; six marketer skills; `perspective` and `post-mortem` |
-| `shared_with_seams` | 11 | `impeccable`, `slide-design`, `handoff`, `merge-pr`, `preview`, `rebuild-skill-index`, `session-retro`, `specialist-review`, `todos-cleanup`, `todos-review`, `worktree-handoff` |
-| `native_engines` | 5 | `greenlight`, `autopilot`, `mvp`, `plan-review`, `todos-babysit` |
+| `shared_with_seams` | 12 | `impeccable`, `slide-design`, `codex-agents-bootstrap`, `handoff`, `merge-pr`, `preview`, `rebuild-skill-index`, `session-retro`, `specialist-review`, `todos-cleanup`, `todos-review`, `worktree-handoff` |
+| `native_engines` | 6 | `greenlight`, `autopilot`, `mvp`, `plan-review`, `todos-babysit`, `using-marketer` |
 
-`handoff` is at least a seam because delivery tools differ. `plan-review` is a
-native-engine candidate because outside-reviewer independence and subagent
-lifecycle affect its control flow. These corrections demonstrate why the
-registry cannot be populated mechanically from token scans alone.
+`handoff` is at least a seam because delivery tools differ. `plan-review` and
+`using-marketer` require native engines because reviewer independence and
+subagent lifecycle affect their control flow. `codex-agents-bootstrap` is a
+seam because the workflow is deterministic but its paths and target host are
+Codex-specific.
 
 New skills default to `unsupported` on all Codex surfaces until their acceptance
 evidence lands.
@@ -468,11 +487,11 @@ the agent-distribution prerequisite and does not certify marketer skill parity.
 | --- | --- | --- |
 | 1. Architecture | This independent spec and backlog update | No runtime, pilot-document, or packaging change |
 | 2. Marketer distribution prerequisite | Resolve the paused agent-distribution vertical slice and update its authoritative pilot documents | complete; accepted at `c8bae27`, merged through PR #155 as `fc943a9`, unreleased, and no marketer domain-skill parity claim |
-| 3. Registry safety | Add the compatibility registry, conditional schema validation, and generated inventory report | Re-enumerate every skill at that commit; current `main` contains 106, but discovery is authoritative |
-| 4. Publication safety | Prove and implement the filtered Codex publication view | Local and git-ref installs expose only registry-included skills through the declared root; inert snapshot bytes do not count as exposure |
+| 3. Registry safety | Complete — all 106 discovered skills are classified and fail-closed defaults, evidence, resources, dependencies, and host guards are validated | Re-enumerate every skill at that commit; discovery remains authoritative |
+| 4. Publication safety | Complete — generated install roots are registry-filtered; local and git-ref canary installs passed on Codex CLI 0.147.0 | Only registry-included skills are exposed through the declared root; inert snapshot bytes do not count as exposure |
 | 5. Shared core foundations | Add one executable config/plugin-root resolver and platform-resource validation | Greenlight scripts and prompts resolve the same platform-aware config; existing Claude behavior remains unchanged |
 | 6. Greenlight baseline | Complete — A2 run 1 ended in push-back on a non-convergent fixture; run 2 produced the accepted seeded-finding → fix → re-review → clean terminal path | The `external` subset runs from the same skill body on both hosts; divergences and the clean-pass size ceiling are recorded in the Greenlight port spec |
-| 7. Greenlight Codex PR mode | Runtime complete for the degraded `external` S/M surface; publication still waits on rows 3–4 and reviewed-head binding | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
+| 7. Greenlight Codex PR mode | Runtime complete for the degraded `external` S/M surface; publication still waits on reviewed-head binding and shared-view surface closure | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
 | 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Any merge-preparation mutation invalidates the old clean and reruns Greenlight plus CI for the new head |
 | 9. Autopilot Codex V1 | Add run-now, single-PR orchestration through Codex subagents with explicit worktree ownership and a generic-worker fallback | One real PR completes plan review, implementation, Greenlight, CI, atomic merge, cleanup, and structured reporting without a specialist agent |
 | 10. Core workflow expansion | Add Greenlight's remaining modes, then Autopilot multi-PR waves | Each mode earns its own support status and preserves the shared contract |
@@ -498,19 +517,19 @@ optional enhancements in V1. If the requested specialist is unavailable, the
 orchestrator uses a generic Codex worker with the same self-contained brief and
 acceptance contract.
 
-The agent-distribution prerequisite is complete. Registry and publication
-safety may proceed in parallel with Greenlight baseline and contract work, but
-Greenlight cannot be published on Codex before both safety gates pass. Marketer
-portability seams and remaining agent adapters are not on the core critical
-path; when resumed, they still roll out one plugin at a time after that plugin's
-skills have complete registry entries.
+The agent-distribution and filtered-publication prerequisites are complete.
+The registry intentionally keeps Greenlight excluded until reviewed-head
+binding and shared-view surface closure pass. Marketer portability seams and
+remaining agent adapters are not on the core critical path; when resumed, they
+still roll out one plugin at a time after that plugin's skills have complete
+registry entries.
 
 ## Release policy
 
 - A plugin release exposes only skills marked for inclusion by the compatibility
   registry for that platform.
-- Registry, generated publication view, manifests, and platform metadata must
-  be regenerated and staged atomically by the release workflow.
+- Registry, generated filtered plugin roots, marketplace, and platform metadata
+  must be regenerated and staged atomically by the release workflow.
 - Release notes distinguish full and degraded capabilities; unsupported work is
   not advertised as an installed feature.
 - Claude and Codex continue to share plugin versions and tags unless a future

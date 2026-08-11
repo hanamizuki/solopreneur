@@ -52,8 +52,9 @@ surface:
 | Invocation | the explicit `$greenlight` mention, plus the `unattended` token for any unattended caller — a one-shot exec session has nobody to answer a prompt |
 
 Limitation reference: `docs/spec/2026-08-10-codex-greenlight-port.md`. Codex
-**publication** remains gated on `todos/backlog/2026-08-10_codex-publication-safety.md`
-— degraded means "works, with limits recorded", not "shipped".
+publication safety is complete, but the skill remains excluded until
+reviewed-head binding and shared-view surface closure land —
+degraded means "works, with limits recorded", not "shipped".
 
 ### Arguments
 
