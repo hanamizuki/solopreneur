@@ -461,20 +461,55 @@ if [[ -e "$WORKTREE_PATH" ]]; then
   echo "Worktree path already exists: $WORKTREE_PATH"
   exit 1
 fi
-git worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_SHA" || exit 1
-ACTUAL_ROOT="$(git -C "$WORKTREE_PATH" rev-parse --show-toplevel)"
-if [[ "$(cd "$ACTUAL_ROOT" && pwd -P)" != "$(cd "$WORKTREE_PATH" && pwd -P)" \
-   || "$(git -C "$WORKTREE_PATH" branch --show-current)" != "$BRANCH" \
-   || -n "$(git -C "$WORKTREE_PATH" status --porcelain)" ]]; then
+cleanup_new_worktree() {
   git worktree remove --force "$WORKTREE_PATH" 2>/dev/null || true
   git branch -D "$BRANCH" 2>/dev/null || true
+}
+if ! git worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_SHA"; then
+  cleanup_new_worktree
+  echo "Worktree creation failed; removed any partial worktree and branch."
+  exit 1
+fi
+ACTUAL_ROOT="$(git -C "$WORKTREE_PATH" rev-parse --show-toplevel)"
+WORKTREE_REAL="$(cd "$WORKTREE_PATH" && pwd -P)"
+if [[ "$(cd "$ACTUAL_ROOT" && pwd -P)" != "$WORKTREE_REAL" \
+   || "$(git -C "$WORKTREE_PATH" branch --show-current)" != "$BRANCH" \
+   || -n "$(git -C "$WORKTREE_PATH" status --porcelain)" ]]; then
+  cleanup_new_worktree
   echo "Explicit worktree validation failed; stopping."
+  exit 1
+fi
+
+# Reject tracked symlinks before mkdir/write can follow them outside the
+# assigned worktree. The lexical PLAN_DIR gate above makes these components
+# relative and traversal-free.
+SPEC_PARENT="$WORKTREE_PATH/$PLAN_DIR"
+PATH_CURSOR="$WORKTREE_PATH"
+IFS='/' read -r -a PLAN_PARTS <<< "$PLAN_DIR"
+for PLAN_PART in "${PLAN_PARTS[@]}"; do
+  PATH_CURSOR="$PATH_CURSOR/$PLAN_PART"
+  if [[ -L "$PATH_CURSOR" ]]; then
+    cleanup_new_worktree
+    echo "Spec path contains a symlink; stopping before writing outside the worktree."
+    exit 1
+  fi
+done
+if ! mkdir -p "$SPEC_PARENT"; then
+  cleanup_new_worktree
+  echo "Could not create the spec directory; stopping."
+  exit 1
+fi
+SPEC_PARENT_REAL="$(cd "$SPEC_PARENT" && pwd -P)"
+SPEC_PATH="$SPEC_PARENT/$SPEC_FILE"
+if [[ "$SPEC_PARENT_REAL" != "$WORKTREE_REAL"/* || -e "$SPEC_PATH" || -L "$SPEC_PATH" ]]; then
+  cleanup_new_worktree
+  echo "Spec destination is outside the worktree or already exists; stopping."
   exit 1
 fi
 ```
 
-2. Write the approved spec to exactly
-   `$WORKTREE_PATH/$PLAN_DIR/$SPEC_FILE`, then require
+2. The preflight has resolved a new, non-symlinked destination as `SPEC_PATH`.
+   Write the approved spec to exactly that path, then require
    `git -C "$WORKTREE_PATH" status --porcelain --untracked-files=all` to equal
    exactly `?? $PLAN_DIR/$SPEC_FILE`. If the write or check fails, remove this
    newly created worktree and branch as in the preflight and stop. Do not create
@@ -497,18 +532,26 @@ fi
    prose. A `failed` or `blocked` result, invalid output, interruption, or tool
    failure retains the worktree, local branch, and any PR for recovery and
    reports their exact paths/identifiers; never dispatch a replacement child.
-6. A child-reported `success` is provisional. Poll `gh pr view` for at most five
-   10-second attempts and require all of: the reported PR is `MERGED`, its head
-   is `BRANCH`, its base is `BASE_BRANCH`, and `mergeCommit.oid` is non-null.
-   Fetch the base and require the merge commit to be an ancestor of
-   `origin/$BASE_BRANCH`. If any check fails, retain recovery state and report
-   failure instead of cleaning up.
-7. After verified merge, remove the child worktree without `--force`, delete
-   only the verified local child branch, and fast-forward the still-clean caller
-   checkout to `origin/$BASE_BRANCH`. Cleanup or fast-forward failure is a
-   warning attached to the verified success, with an exact recovery command; it
-   must never turn a verified GitHub merge into a false failure. Print the
-   completion report below using the validated child result.
+6. A child-reported `success` is provisional. Capture `WORKTREE_HEAD` from
+   `git -C "$WORKTREE_PATH" rev-parse HEAD`, then poll `gh pr view` for at most
+   five 10-second attempts. Require all of: the reported PR is `MERGED`, its
+   `headRefName` is `BRANCH`, its `headRefOid` is exactly `WORKTREE_HEAD`, its
+   base is `BASE_BRANCH`, and `mergeCommit.oid` is non-null. Fetch the base and
+   require the merge commit to be an ancestor of `origin/$BASE_BRANCH`. If any
+   check fails, retain recovery state and report failure instead of cleaning up.
+7. After verified merge, probe
+   `git ls-remote --heads origin "refs/heads/$BRANCH"` and inspect both its exit
+   status and output. Only a successful empty result confirms the child deleted
+   the remote branch; a probe failure is cleanup debt. If the ref still equals
+   `WORKTREE_HEAD`, try that exact deletion once and re-probe; if it remains, attach
+   `git push origin --delete "$BRANCH"` as cleanup debt without changing the
+   verified merge to failure. If the remote ref moved to another OID, never
+   delete it automatically; report the mismatch for manual inspection. Then
+   remove the child worktree without `--force`, delete only the verified local
+   child branch, and fast-forward the still-clean caller checkout to
+   `origin/$BASE_BRANCH`. Any cleanup or fast-forward failure is likewise a
+   warning attached to the verified success. Print the completion report below
+   using the validated child result.
 
 The Codex lifecycle is: inline implementation plan → `/plan-review internal` →
 implement + test → commit + push + PR → `/greenlight unattended` → exact-head

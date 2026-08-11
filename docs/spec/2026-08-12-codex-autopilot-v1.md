@@ -28,10 +28,11 @@ or children exist. It does not emulate Claude-specific control-plane tools.
 The parent requires a clean attached `main` branch whose local head exactly
 matches `origin/main`. The main-only boundary preserves Greenlight's existing
 shared `main...HEAD` PR contract; stacked PRs stop before side effects instead
-of being mis-sized. The parent also rejects unsafe spec paths and colliding
-local branches, remote branches, or worktree paths. It then creates one sibling
-git worktree at the captured base commit and validates its absolute root,
-branch, and cleanliness before writing the approved spec there.
+of being mis-sized. The parent also rejects unsafe or symlinked spec paths and
+colliding local branches, remote branches, or worktree paths. It creates one
+sibling git worktree at the captured base commit, removes exact partial state
+if checkout itself fails, and validates the worktree's absolute root, branch,
+cleanliness, and physical spec destination before writing the approved spec.
 
 The parent selects the requested custom specialist only when that exact agent
 type is callable. Otherwise it sends the same self-contained brief to Codex's
@@ -43,9 +44,11 @@ The child replaces Claude Plan Mode with an inline implementation plan, runs
 Plan Review in internal mode, implements and tests the spec, creates a pull
 request against the captured base, runs Greenlight unattended, pins CI to the
 final pushed head, and invokes Merge PR. It emits only the existing result
-object. The parent rejects malformed output and independently confirms the
-reported pull request, head, base, merged state, merge commit, and remote-base
-ancestry before cleanup.
+object. The parent rejects malformed output and independently binds the
+reported pull request's `headRefOid` to the exact child worktree head, then
+confirms its head name, base, merged state, merge commit, and remote-base
+ancestry before cleanup. It independently verifies remote-branch deletion and
+reports exact cleanup debt without rewriting a verified merge as failure.
 
 Failures retain the child worktree, local branch, and pull request for manual
 recovery. A verified merge remains successful if later local cleanup fails;
@@ -77,8 +80,9 @@ jq, GitHub network access, and the Claude CLI gate used by Greenlight.
 Accepted on Codex CLI 0.147.0. The repository test extracts and executes the
 canonical preflight against a temporary repository with a bare remote, and
 asserts the publication closure, worker fallback, single-child contract,
-explicit base, worktree ownership, retained failure state, and parent cleanup
-boundary. The filtered-publication fixture installed Autopilot plus its three
+explicit base, worktree ownership, partial-checkout cleanup, symlink refusal,
+PR-head binding, retained failure state, and parent remote cleanup boundary.
+The filtered-publication fixture installed Autopilot plus its three
 dependencies and no unsupported sibling skills. `validate-codex.sh` passed 46
 Python tests, 68 bootstrap tests, registry and agent validation, generated-root
 drift checks, local install smoke, and the filtered publication fixture. The

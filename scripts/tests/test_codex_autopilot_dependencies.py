@@ -143,6 +143,8 @@ raise SystemExit(0)
         self.assertIn('fork_turns="none"', self.autopilot)
         self.assertIn("built-in `worker`", self.autopilot)
         self.assertIn("never dispatch a replacement child", self.autopilot)
+        self.assertIn('its `headRefOid` is exactly `WORKTREE_HEAD`', self.autopilot)
+        self.assertIn('git ls-remote --heads origin "refs/heads/$BRANCH"', self.autopilot)
         self.assertIn("the parent already created the worktree", self.autopilot_template)
         self.assertIn('gh pr create --base "{BASE_BRANCH}"', self.autopilot_template)
         self.assertIn("The parent owns cleanup", self.autopilot_template)
@@ -195,6 +197,7 @@ raise SystemExit(0)
                 text=True,
             ).stdout.strip()
             self.assertEqual(branch, env["BRANCH"])
+            self.assertTrue((worktree / env["PLAN_DIR"]).is_dir())
 
             subprocess.run(
                 ["git", "-C", str(repo), "worktree", "remove", str(worktree)],
@@ -205,6 +208,76 @@ raise SystemExit(0)
                 check=True,
                 capture_output=True,
             )
+
+            hooks = root / "hooks"
+            hooks.mkdir()
+            post_checkout = hooks / "post-checkout"
+            post_checkout.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            post_checkout.chmod(0o755)
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "core.hooksPath", str(hooks)],
+                check=True,
+            )
+            hook_env = env | {"BRANCH": "feature/autopilot-hook"}
+            result = subprocess.run(
+                ["/bin/bash", "-c", "set -euo pipefail\n" + self.autopilot_preflight()],
+                cwd=repo,
+                env=hook_env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("removed any partial worktree", result.stdout)
+            self.assertFalse(worktree.exists())
+            self.assertNotEqual(
+                subprocess.run(
+                    ["git", "-C", str(repo), "show-ref", "--verify", "--quiet", f"refs/heads/{hook_env['BRANCH']}"],
+                    check=False,
+                ).returncode,
+                0,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "--unset", "core.hooksPath"],
+                check=True,
+            )
+
+            outside = root / "outside"
+            outside.mkdir()
+            (repo / "docs").mkdir()
+            (repo / "docs/loops").symlink_to(outside, target_is_directory=True)
+            subprocess.run(["git", "-C", str(repo), "add", "docs/loops"], check=True)
+            subprocess.run(
+                ["git", "-C", str(repo), "commit", "-m", "symlink fixture"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "push", "origin", "main"],
+                check=True,
+                capture_output=True,
+            )
+            symlink_env = env | {"BRANCH": "feature/autopilot-symlink"}
+            result = subprocess.run(
+                ["/bin/bash", "-c", "set -euo pipefail\n" + self.autopilot_preflight()],
+                cwd=repo,
+                env=symlink_env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Spec path contains a symlink", result.stdout)
+            self.assertFalse((outside / "2026-08-12_autopilot-contract").exists())
+            self.assertFalse(worktree.exists())
+            self.assertNotEqual(
+                subprocess.run(
+                    ["git", "-C", str(repo), "show-ref", "--verify", "--quiet", f"refs/heads/{symlink_env['BRANCH']}"],
+                    check=False,
+                ).returncode,
+                0,
+            )
+
             subprocess.run(
                 ["git", "-C", str(repo), "switch", "-c", "stacked-base"],
                 check=True,
