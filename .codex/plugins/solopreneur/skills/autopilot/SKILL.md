@@ -445,7 +445,12 @@ if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
   echo "Local branch already exists: $BRANCH"
   exit 1
 fi
-if git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+PUSH_REMOTE_URL="$(git remote get-url --push --all origin)" || exit 1
+if [[ -z "$PUSH_REMOTE_URL" || "$PUSH_REMOTE_URL" == *$'\n'* ]]; then
+  echo "Codex Autopilot V1 requires exactly one origin push URL."
+  exit 1
+fi
+if git ls-remote --exit-code --heads "$PUSH_REMOTE_URL" "refs/heads/$BRANCH" >/dev/null 2>&1; then
   echo "Remote branch already exists: $BRANCH"
   exit 1
 else
@@ -540,9 +545,9 @@ fi
    require the merge commit to be an ancestor of `origin/$BASE_BRANCH`. If any
    check fails, retain recovery state and report failure instead of cleaning up.
 7. After verified merge, probe
-   `git ls-remote --heads origin "refs/heads/$BRANCH"` and inspect both its exit
-   status and output. Only a successful empty result confirms the child deleted
-   the remote branch; a probe failure is cleanup debt. If the ref still equals
+   `git ls-remote --heads "$PUSH_REMOTE_URL" "refs/heads/$BRANCH"` and inspect
+   both its exit status and output. Only a successful empty result confirms the
+   child deleted the remote branch; a probe failure is cleanup debt. If the ref still equals
    `WORKTREE_HEAD`, try that exact deletion once and re-probe; if it remains, attach
    `git push origin --delete "$BRANCH"` as cleanup debt without changing the
    verified merge to failure. If the remote ref moved to another OID, never

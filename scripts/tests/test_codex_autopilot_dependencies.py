@@ -144,7 +144,10 @@ raise SystemExit(0)
         self.assertIn("built-in `worker`", self.autopilot)
         self.assertIn("never dispatch a replacement child", self.autopilot)
         self.assertIn('its `headRefOid` is exactly `WORKTREE_HEAD`', self.autopilot)
-        self.assertIn('git ls-remote --heads origin "refs/heads/$BRANCH"', self.autopilot)
+        self.assertIn(
+            'git ls-remote --heads "$PUSH_REMOTE_URL" "refs/heads/$BRANCH"',
+            self.autopilot,
+        )
         self.assertIn("the parent already created the worktree", self.autopilot_template)
         self.assertIn('gh pr create --base "{BASE_BRANCH}"', self.autopilot_template)
         self.assertIn("The parent owns cleanup", self.autopilot_template)
@@ -207,6 +210,64 @@ raise SystemExit(0)
                 ["git", "-C", str(repo), "branch", "-D", env["BRANCH"]],
                 check=True,
                 capture_output=True,
+            )
+
+            push_origin = root / "push-origin.git"
+            subprocess.run(
+                ["git", "init", "--bare", str(push_origin)],
+                check=True,
+                capture_output=True,
+            )
+            collision_env = env | {"BRANCH": "feature/autopilot-push-collision"}
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "push",
+                    str(push_origin),
+                    f"HEAD:{collision_env['BRANCH']}",
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "remote",
+                    "set-url",
+                    "--push",
+                    "origin",
+                    str(push_origin),
+                ],
+                check=True,
+            )
+            result = subprocess.run(
+                ["/bin/bash", "-c", "set -euo pipefail\n" + self.autopilot_preflight()],
+                cwd=repo,
+                env=collision_env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Remote branch already exists", result.stdout)
+            self.assertFalse(worktree.exists())
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "remote",
+                    "set-url",
+                    "--delete",
+                    "--push",
+                    "origin",
+                    str(push_origin),
+                ],
+                check=True,
             )
 
             hooks = root / "hooks"

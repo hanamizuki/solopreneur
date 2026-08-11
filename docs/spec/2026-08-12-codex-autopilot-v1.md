@@ -28,8 +28,8 @@ or children exist. It does not emulate Claude-specific control-plane tools.
 The parent requires a clean attached `main` branch whose local head exactly
 matches `origin/main`. The main-only boundary preserves Greenlight's existing
 shared `main...HEAD` PR contract; stacked PRs stop before side effects instead
-of being mis-sized. The parent also rejects unsafe or symlinked spec paths and
-colliding local branches, remote branches, or worktree paths. It creates one
+of being mis-sized. The parent also rejects unsafe or symlinked spec paths,
+colliding local branches, branches on the single push target, and worktree paths. It creates one
 sibling git worktree at the captured base commit, removes exact partial state
 if checkout itself fails, and validates the worktree's absolute root, branch,
 cleanliness, and physical spec destination before writing the approved spec.
@@ -47,7 +47,8 @@ final pushed head, and invokes Merge PR. It emits only the existing result
 object. The parent rejects malformed output and independently binds the
 reported pull request's `headRefOid` to the exact child worktree head, then
 confirms its head name, base, merged state, merge commit, and remote-base
-ancestry before cleanup. It independently verifies remote-branch deletion and
+ancestry before cleanup. It independently verifies remote-branch deletion on
+the same push target and
 reports exact cleanup debt without rewriting a verified merge as failure.
 
 Failures retain the child worktree, local branch, and pull request for manual
