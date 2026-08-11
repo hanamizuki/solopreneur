@@ -1658,9 +1658,10 @@ collect_reviewer_activity() {
   # to on macOS — does not. Under zsh the loop ran ONCE with the whole newline-
   # joined list as `$n`, every request 404'd, and the all-or-nothing rule below
   # then discarded Sources 1 and 2 as well: measured 2026-08-11, detection had
-  # been reporting `unavailable` with an empty bot list. A here-string, not a
-  # pipe — a piped `while` runs in a subshell in both shells and the `rc=1` set
-  # inside it would be lost, trading a loud bug for a silent one.
+  # been reporting `unavailable` with an empty bot list. A here-string, matching
+  # the other `<<<` sites in these bodies — and NOT a pipe: a piped `while` runs
+  # in a subshell, so the `rc=1` set inside it would be lost, trading a loud bug
+  # for a silent one.
   while IFS= read -r n; do
     [ -n "$n" ] || continue
     chunk=$(gh api "repos/$OWNER/$REPO/pulls/$n/reviews" \
