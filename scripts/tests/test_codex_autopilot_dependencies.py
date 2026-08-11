@@ -152,6 +152,11 @@ raise SystemExit(0)
             '--force-with-lease="refs/heads/$BRANCH:$WORKTREE_HEAD"',
             self.autopilot,
         )
+        preflight = self.autopilot_preflight()
+        self.assertNotIn("git fetch --quiet origin", preflight)
+        self.assertIn('git update-ref "refs/heads/$BRANCH" "$BASE_SHA" ""', preflight)
+        self.assertIn('git update-ref -d "refs/heads/$BRANCH" "$BASE_SHA"', preflight)
+        self.assertNotIn('git branch -D "$BRANCH"', preflight)
         self.assertIn("the parent already created the worktree", self.autopilot_template)
         self.assertIn('gh pr create --base "{BASE_BRANCH}"', self.autopilot_template)
         self.assertIn("The parent owns cleanup", self.autopilot_template)
@@ -293,7 +298,7 @@ raise SystemExit(0)
                 check=False,
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("removed any partial worktree", result.stdout)
+            self.assertIn("cleanup was limited to this invocation", result.stdout)
             self.assertFalse(worktree.exists())
             self.assertNotEqual(
                 subprocess.run(

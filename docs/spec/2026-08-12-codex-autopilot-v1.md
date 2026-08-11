@@ -29,9 +29,10 @@ The parent requires a clean attached `main` branch whose local head exactly
 matches `origin/main`. The main-only boundary preserves Greenlight's existing
 shared `main...HEAD` PR contract; stacked PRs stop before side effects instead
 of being mis-sized. The parent also rejects unsafe or symlinked spec paths,
-colliding local branches, branches on the single push target, and worktree paths. It creates one
-sibling git worktree at the captured base commit, removes exact partial state
-if checkout itself fails, and validates the worktree's absolute root, branch,
+colliding local branches, branches on the single push target, and worktree paths.
+It verifies the remote base without updating local refs, then atomically reserves
+one sibling path and local branch at the captured base commit. Cleanup is limited
+to those reservations if checkout itself fails. The parent validates the worktree's absolute root, branch,
 cleanliness, and physical spec destination before writing the approved spec.
 
 The parent selects the requested custom specialist only when that exact agent

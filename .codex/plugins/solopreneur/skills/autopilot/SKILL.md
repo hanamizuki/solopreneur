@@ -435,9 +435,8 @@ if [[ "$PLAN_DIR" != docs/loops/* || "$PLAN_DIR" == *..* \
   exit 1
 fi
 git check-ref-format --branch "$BRANCH" >/dev/null || exit 1
-git fetch --quiet origin "$BASE_BRANCH" || exit 1
-REMOTE_BASE_SHA="$(git rev-parse --verify "refs/remotes/origin/$BASE_BRANCH^{commit}")" || exit 1
-if [[ "$BASE_SHA" != "$REMOTE_BASE_SHA" ]]; then
+REMOTE_BASE_LINE="$(git ls-remote --exit-code --heads origin "refs/heads/$BASE_BRANCH")" || exit 1
+if [[ "$REMOTE_BASE_LINE" != "$BASE_SHA"$'\t'"refs/heads/$BASE_BRANCH" ]]; then
   echo "Local $BASE_BRANCH is not exactly origin/$BASE_BRANCH; sync it before Autopilot."
   exit 1
 fi
@@ -466,13 +465,42 @@ if [[ -e "$WORKTREE_PATH" ]]; then
   echo "Worktree path already exists: $WORKTREE_PATH"
   exit 1
 fi
+WORKTREE_RESERVED=0
+BRANCH_RESERVED=0
 cleanup_new_worktree() {
-  git worktree remove --force "$WORKTREE_PATH" 2>/dev/null || true
-  git branch -D "$BRANCH" 2>/dev/null || true
+  local path_clean=1
+  if [[ "$WORKTREE_RESERVED" -eq 1 ]]; then
+    if git -C "$WORKTREE_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      git worktree remove --force "$WORKTREE_PATH" || path_clean=0
+    else
+      rmdir "$WORKTREE_PATH" 2>/dev/null || path_clean=0
+    fi
+    [[ "$path_clean" -eq 1 ]] || echo "Cleanup debt: inspect reserved path $WORKTREE_PATH"
+  fi
+  if [[ "$BRANCH_RESERVED" -eq 1 ]]; then
+    if [[ "$path_clean" -eq 1 ]]; then
+      git update-ref -d "refs/heads/$BRANCH" "$BASE_SHA" \
+        || echo "Cleanup debt: inspect reserved branch $BRANCH"
+    else
+      echo "Cleanup debt: reserved branch retained: $BRANCH"
+    fi
+  fi
+  return 0
 }
-if ! git worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_SHA"; then
+if ! mkdir "$WORKTREE_PATH"; then
+  echo "Could not reserve worktree path: $WORKTREE_PATH"
+  exit 1
+fi
+WORKTREE_RESERVED=1
+if ! git update-ref "refs/heads/$BRANCH" "$BASE_SHA" ""; then
   cleanup_new_worktree
-  echo "Worktree creation failed; removed any partial worktree and branch."
+  echo "Could not atomically reserve local branch: $BRANCH"
+  exit 1
+fi
+BRANCH_RESERVED=1
+if ! git worktree add "$WORKTREE_PATH" "$BRANCH"; then
+  cleanup_new_worktree
+  echo "Worktree creation failed; cleanup was limited to this invocation's reservations."
   exit 1
 fi
 ACTUAL_ROOT="$(git -C "$WORKTREE_PATH" rev-parse --show-toplevel)"
