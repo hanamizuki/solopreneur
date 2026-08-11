@@ -234,7 +234,7 @@ Each resolved registry entry contains:
 | Limitation reference | Required for every `degraded` surface |
 | Acceptance scenarios | Evidence-producing scenarios required for every `full` or `degraded` surface |
 | Legacy provenance | Architecture-baseline identity required for every `legacy` entry |
-| Legacy baseline hash | Frozen identity set that prevents a new skill from silently inheriting `legacy` |
+| Legacy baseline allowlist | Frozen original identity set that prevents a new skill from silently inheriting `legacy` |
 | Internal skill dependencies | Repository skills that participate in support closure |
 | External required capabilities | Required external skills, CLIs, MCP servers, network, or host capabilities |
 | Optional enhancements | Capabilities that improve results but never gate the contract |
@@ -251,7 +251,9 @@ the hard dependency closure.
 
 `legacy` satisfies only unchanged Claude-to-Claude dependency closure. It
 cannot satisfy a gate for new behavior, a changed control flow, or any Codex
-promotion.
+promotion. `scripts/codex-legacy-skill-baseline.txt` freezes the original 106
+identities, with its bytes pinned by the validator. A promoted original skill
+may leave `legacy` without changing that list; a later skill cannot enter it.
 
 For Codex, the validator rejects publication when any reachable surface is
 unsupported. A future surface-guard exception requires a separately reviewed

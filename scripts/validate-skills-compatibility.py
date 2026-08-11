@@ -16,6 +16,7 @@ CODEX_SURFACES = SURFACES[1:]
 STATUSES = {"full", "degraded", "unsupported", "legacy"}
 SHAPES = {"shared", "shared_with_seams", "native_engines"}
 PUBLICATION = {"include", "exclude"}
+LEGACY_BASELINE_SHA256 = "4e2c8a00de630db33fceae8abe2e41a14da63d4ddb0118bb84e60e7fd777ca61"
 REQUIRED_GUARDS = {
     "solopreneur:autopilot",
     "solopreneur:merge-pr",
@@ -74,7 +75,6 @@ def main() -> int:
     expected_root = {
         "schemaVersion",
         "legacyProvenance",
-        "legacyBaselineSha256",
         "defaults",
         "sourceShapes",
         "skills",
@@ -312,16 +312,26 @@ def main() -> int:
                 if dependency.split(":", 1)[0] != skill_plugin:
                     errors.append(f"skills.{skill_id} has cross-plugin Codex dependency {dependency}")
 
-    legacy_ids = sorted(
+    legacy_ids = {
         skill_id
         for skill_id, support in resolved_support.items()
         if support.get("claude-code") == "legacy"
-    )
-    legacy_digest = hashlib.sha256(("\n".join(legacy_ids) + "\n").encode()).hexdigest()
-    if registry.get("legacyBaselineSha256") != legacy_digest:
-        errors.append(
-            "legacyBaselineSha256 does not match the skills still using claude-code legacy"
-        )
+    }
+    baseline_path = repo / "scripts" / "codex-legacy-skill-baseline.txt"
+    try:
+        baseline_body = baseline_path.read_bytes()
+        baseline_ids = baseline_body.decode().splitlines()
+    except (OSError, UnicodeError) as error:
+        errors.append(f"cannot read frozen legacy baseline: {error}")
+        baseline_ids = []
+        baseline_body = b""
+    if hashlib.sha256(baseline_body).hexdigest() != LEGACY_BASELINE_SHA256:
+        errors.append("frozen legacy baseline bytes do not match the validator")
+    if baseline_ids != sorted(set(baseline_ids)):
+        errors.append("frozen legacy baseline must contain sorted unique skill IDs")
+    new_legacy = sorted(legacy_ids - set(baseline_ids))
+    if new_legacy:
+        errors.append(f"new skills cannot inherit claude-code legacy: {', '.join(new_legacy)}")
 
     guard_paths = registry.get("codexHostGuards", {})
     if not isinstance(guard_paths, dict):

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -13,6 +12,7 @@ from pathlib import Path
 
 
 VALIDATOR = Path(__file__).resolve().parents[1] / "validate-skills-compatibility.py"
+LEGACY_BASELINE = Path(__file__).resolve().parents[1] / "codex-legacy-skill-baseline.txt"
 GUARDED_SKILLS = (
     "autopilot",
     "merge-pr",
@@ -33,6 +33,9 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         self.repo_root = Path(self._temporary_directory.name) / "repo"
         (self.repo_root / "legacy.md").parent.mkdir(parents=True, exist_ok=True)
         (self.repo_root / "legacy.md").write_text("legacy\n", encoding="utf-8")
+        baseline = self.repo_root / "scripts" / "codex-legacy-skill-baseline.txt"
+        baseline.parent.mkdir(parents=True)
+        baseline.write_bytes(LEGACY_BASELINE.read_bytes())
 
         guard_paths = {}
         skill_ids = []
@@ -52,9 +55,6 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         self.registry = {
             "schemaVersion": 1,
             "legacyProvenance": "legacy.md",
-            "legacyBaselineSha256": hashlib.sha256(
-                ("\n".join(sorted(skill_ids)) + "\n").encode()
-            ).hexdigest(),
             "defaults": {
                 "support": {
                     "claude-code": "legacy",
@@ -247,8 +247,19 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         self.write_registry()
 
         self.assert_failure_contains(
-            "legacyBaselineSha256 does not match the skills still using claude-code legacy"
+            "new skills cannot inherit claude-code legacy: solopreneur:extra"
         )
+
+    def test_baseline_skill_can_be_promoted_without_changing_baseline(self) -> None:
+        self.registry["skills"]["solopreneur:autopilot"] = {
+            "support": {"claude-code": "full"},
+            "acceptance": {"claude-code": ["legacy.md"]},
+        }
+        self.write_registry()
+
+        result = self.run_validator()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_guard_path_must_be_canonical(self) -> None:
         self.registry["codexHostGuards"]["solopreneur:autopilot"] = "legacy.md"
