@@ -180,7 +180,7 @@ completion is the available signal. The `claude-cli` recipe (W2) therefore
 *requests* `[P*]`-tagged output in its prompt so the existing parsing applies
 unchanged. Measured consequence: asking for `[P3]` nits, on a loop where any new
 finding outranks `clean`, puts a size ceiling on the clean pass — see
-[run 2](#a2-run-2-2026-08-11-after-165-clean-pass).
+[run 2](#a2-run-2-2026-08-11-after-165--clean-pass).
 
 ## Implementation plan
 
@@ -305,7 +305,7 @@ already costs ~212k tokens.
   terminal report in the shipped format.
   **Status: done** — all five links on 2026-08-11, second attempt, against a
   fixture whose one seeded defect has a single objectively correct fix. See
-  [run 2](#a2-run-2-2026-08-11-after-165-clean-pass); the first attempt
+  [run 2](#a2-run-2-2026-08-11-after-165--clean-pass); the first attempt
   ([run 1](#a2-run-1-2026-08-11--blocked-on-the-fixture)) is what produced the
   three defects `0077805` fixes, and its measurements still stand.
 - **A3 Claude baseline unchanged:** `/greenlight external` on Claude Code
@@ -348,7 +348,7 @@ handling of an unconvergeable fixture is a push-back exit, so **this run cannot
 produce the clean terminal A2 asks for**. Closing A2 needs a re-run against a
 convergent fixture: a seeded defect with one objectively correct fix and no
 design latitude — that re-run is
-[run 2](#a2-run-2-2026-08-11-after-165-clean-pass), and the diagnosis above
+[run 2](#a2-run-2-2026-08-11-after-165--clean-pass), and the diagnosis above
 turned out to be half the story (see run 2's size ceiling).
 
 **Gaps found against what this spec expected.**
