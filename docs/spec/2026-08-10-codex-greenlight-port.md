@@ -1,9 +1,9 @@
 # Codex Greenlight port
 
-**Status:** Measured on `codex-exec` (2026-08-10); implementable — see
-[Implementation plan](#implementation-plan)
+**Status:** Implemented and accepted on `codex-exec` for the degraded
+`external` S/M surface; publication safety remains pending
 
-**Date:** 2026-08-10 (measurements added same day)
+**Date:** 2026-08-10 (latest acceptance evidence: 2026-08-11)
 
 **Scope:** Running the existing `/greenlight` pull-request loop on Codex
 
@@ -141,8 +141,8 @@ Measured against the shipped skill:
 | --- | --- | --- |
 | `$N` in skill bodies | substituted on every load; `\$N` escape consumed | no substitution; escape reaches the model (M1) |
 | Skill invocation | `/greenlight …` slash command or model-invoked | `$greenlight …` mention in the prompt; explicit mention required for unattended runs (M2) |
-| Internal review fan-out | five parallel report-only subagents (Phase 1) | unavailable — under `codex exec` the model reads a router skill and works inline; it never spawns a plugin subagent, even at Ultra ([pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)) |
-| Internal reviewers | `/simplify`, `superpowers:requesting-code-review`, gstack `/review`, `/specialist-review`, `ponytail:ponytail-review` | none installed; `codex review` is the native equivalent |
+| Internal review fan-out | five parallel report-only subagents (Phase 1) | platform spawning is available in current interactive and `codex exec` sessions, but the required reviewer definitions and routing coverage are not shipped ([pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)) |
+| Internal reviewers | `/simplify`, `superpowers:requesting-code-review`, gstack `/review`, `/specialist-review`, `ponytail:ponytail-review` | reviewer-specific Codex agents and briefs remain deferred; same-family `codex review` cannot replace the independent final gate |
 | Final gate default | Codex CLI | must not be codex-family (M3); Claude CLI once W2+W3 land |
 | Everything else — pre-flight, sizing, cursors, triggering, polling, classification, fallback, reporting | `gh` + `jq` + `git` | identical as measured (M3); no adapter needed |
 
@@ -153,7 +153,7 @@ The last row is the bulk of the skill, and it held up under measurement.
 **Codex V1 = `/greenlight external` with a Claude CLI gate.**
 
 - `external` already skips Phase 1 and Phase 2 (`SKILL.md:1392`, `SKILL.md:1426`)
-  — exactly the subset that needs no subagent.
+  — exactly the subset that does not depend on the unshipped reviewer-agent set.
 - The per-round fix step is delegated to a subagent on Claude Code to keep the
   main context small (`SKILL.md:2440`), not for correctness. Codex applies
   fixes inline, which bounds V1 to sizes S and M (W4). The parent is the only
@@ -269,14 +269,16 @@ returns nothing, and the updated tests pass.
 
 ### W4 — fix-step wording and the V1 size boundary
 
-Measured basis: the end-to-end run terminated at gate timeout, so
-inline-vs-child was not observed directly. What it did show: the model spawns
-subprocess CLIs when it wants delegation (M3), and one incomplete S round
-already costs ~212k tokens.
+Measured basis: the first end-to-end run terminated at gate timeout, so
+inline-vs-child was not observed directly. Later Codex 0.147.0 calibration
+proved real child threads, but Greenlight's accepted A2 runs exercised the
+inline fix path. Child fix dispatch therefore remains outside V1 until it has
+its own behavioral acceptance; the S/M bound stays in force.
 
 1. `SKILL.md:2440` "this must be delegated to a subagent" becomes
-   host-conditional: on Claude Code, dispatch the subagent as today; on a
-   host without subagents, apply the fixes inline in the main context.
+   host-conditional: on Claude Code, dispatch the subagent as today; when the
+   accepted host path has no validated child dispatch, apply the fixes inline
+   in the main context.
 2. **Codex V1 supports sizes S and M only.** An L-size PR on a Codex host
    halts at pre-flight with an explicit "L-size runs need a Claude Code host"
    message — honest scope, not silent degradation. (Inline fix processing
@@ -494,7 +496,7 @@ mid-loop.
 | --- | --- |
 | Freezing the reviewed head SHA and binding evidence to it | [todo](../../todos/backlog/2026-08-10_greenlight-head-binding.md) |
 | Atomic merge precondition and post-review mutation in `merge-pr` | [todo](../../todos/backlog/2026-08-10_merge-pr-atomic-merge.md) |
-| Internal review on Codex | blocked on the subagent question above |
+| Internal review on Codex | platform spawn is proven; blocked on the missing reviewer-agent definitions, briefs, and routing coverage |
 | Uncommitted and post-commit modes | after PR mode works |
 
 The first two are defects in current Claude Code behavior, not gaps in the

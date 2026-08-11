@@ -1,7 +1,7 @@
 # Codex Skill Portability Architecture
 
-**Status:** Approved design; agent-distribution prerequisite merged; core-first
-implementation pending
+**Status:** Approved design; Greenlight runtime slice implemented; publication
+safety and Autopilot Codex V1 pending
 
 **Date:** 2026-08-09
 
@@ -65,13 +65,13 @@ The design therefore separates two questions that must not be conflated:
 
 ## Product priority and enabling order
 
-The P0 product outcome is a usable Codex Greenlight for the `solopreneur`
-core. Autopilot Codex V1 was originally co-P0 but was cancelled on 2026-08-10:
-the platform bounds it to run-now / single-PR / attended, which forfeits
-unattended operation, multi-PR waves, and scheduling — Autopilot's entire
-value. Its fail-closed host guard (see the
-[publication-safety todo](../../todos/backlog/2026-08-10_codex-publication-safety.md))
-is the end state unless Codex ships subagent or scheduling primitives.
+The P0 product outcome is a usable Codex Greenlight followed by Autopilot Codex
+V1 for the `solopreneur` core. Current Codex releases expose real subagent
+workflows in both interactive sessions and `codex exec`, so V1 is run-now,
+single-PR orchestration with explicit worktree ownership. It uses a generic
+Codex worker when a specialist is unavailable. Multi-PR waves and Codex App
+scheduling remain separate later capabilities; the CLI path does not claim
+Claude Workflow or Cron parity.
 
 The compatibility registry and filtered Codex publication view are minimum
 release-safety prerequisites, not user-facing product priorities. They may land
@@ -84,9 +84,9 @@ The core critical path is:
 
 1. Add the registry, filtered publication view, and shared config/plugin-root
    resolver required to publish an honest Codex surface.
-2. Establish all-mode Claude Greenlight baselines, then extract the shared
-   contract, deterministic artifacts, scenarios, and Claude engine.
-3. Deliver Greenlight Codex pull-request mode with unattended review,
+2. Preserve the measured Greenlight external-mode contract and bind its clean
+   evidence to the reviewed head before public release.
+3. Publish Greenlight Codex pull-request mode with unattended review,
    independent final-diff coverage, objective verification, and structured
    halt and result outputs.
 4. Close only the Autopilot-critical `plan-review internal` and safe
@@ -471,10 +471,10 @@ the agent-distribution prerequisite and does not certify marketer skill parity.
 | 3. Registry safety | Add the compatibility registry, conditional schema validation, and generated inventory report | Re-enumerate every skill at that commit; current `main` contains 106, but discovery is authoritative |
 | 4. Publication safety | Prove and implement the filtered Codex publication view | Local and git-ref installs expose only registry-included skills through the declared root; inert snapshot bytes do not count as exposure |
 | 5. Shared core foundations | Add one executable config/plugin-root resolver and platform-resource validation | Greenlight scripts and prompts resolve the same platform-aware config; existing Claude behavior remains unchanged |
-| 6. Greenlight baseline | Establish Claude baselines for the modes Codex will run, then measure whether Codex can drive the shipped Phase 3 loop end to end | The `external` subset runs from the same skill body on both hosts; every divergence is recorded before Codex publication |
-| 7. Greenlight Codex PR mode | Add unattended pull-request review on Codex and test every claimed surface | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
+| 6. Greenlight baseline | Complete — two `codex-exec` A2 runs measured the shipped Phase 3 loop, including a seeded finding, fix, re-review, and clean termination | The `external` subset runs from the same skill body on both hosts; divergences and the clean-pass size ceiling are recorded in the Greenlight port spec |
+| 7. Greenlight Codex PR mode | Runtime complete for the degraded `external` S/M surface; publication still waits on rows 3–4 and reviewed-head binding | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
 | 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Any merge-preparation mutation invalidates the old clean and reruns Greenlight plus CI for the new head |
-| 9. Autopilot Codex V1 | **Cancelled 2026-08-10** — run-now/single-PR/attended forfeits Autopilot's value; ship the fail-closed `autopilot` host guard instead | Guard stops before any side effect and names the supported surface |
+| 9. Autopilot Codex V1 | Add run-now, single-PR orchestration through Codex subagents with explicit worktree ownership and a generic-worker fallback | One real PR completes plan review, implementation, Greenlight, CI, atomic merge, cleanup, and structured reporting without a specialist agent |
 | 10. Core workflow expansion | Add Greenlight's remaining modes, then Autopilot multi-PR waves | Each mode earns its own support status and preserves the shared contract |
 | 11. Scheduling | Add Codex App scheduling as a separate capability | No CLI or run-now path claims Claude Cron parity |
 | 12. Remaining core | Port `mvp`, `todos-babysit`, and other core seams in dependency-sized changes | No bundled control-plane rewrite |
@@ -521,4 +521,6 @@ skills have complete registry entries.
 - [Agent Skills specification](https://agentskills.io/specification)
 - [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins)
 - [OpenAI skill metadata and invocation policy](https://developers.openai.com/codex/skills)
+- [OpenAI Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+- [OpenAI scheduled tasks](https://learn.chatgpt.com/docs/automations)
 - [Superpowers harness-porting architecture](https://github.com/obra/superpowers/blob/main/docs/porting-to-a-new-harness.md)
