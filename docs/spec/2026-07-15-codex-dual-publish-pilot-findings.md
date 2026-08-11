@@ -291,6 +291,38 @@ exact `agent_type` and `fork_turns` pair it observed is prescribed only by the
 router, is not V2's default fork, and was accepted on the first call in every
 run.
 
+### 2026-08-11 skill reach inside a spawned child
+
+A second probe in the same isolated fixture measured what a spawned child can
+actually use, because spawn capability alone does not size the internal-review
+work. A throwaway probe plugin carried one skill whose body holds an
+unguessable token, and a minimal probe agent was declared with instructions to
+report only what it could verify. The parent was told to delegate once and was
+forbidden from reading the probe skill or naming the token in its brief.
+
+The child received the **complete skill catalog as a plaintext developer
+message**: 36 entries in 22,978 characters, namespaced `plugin:skill`, each with
+its description and resolved `SKILL.md` path. All 27 non-built-in entries were
+present, covering every installed `solopreneur` and `marketer` skill plus the
+probe. Skill **bodies are not preloaded**: the child read the probe body itself
+with one file-read command against the catalog's absolute path, then returned
+the exact token. Guessing it was not possible, so this is byte-level proof of
+real body access rather than narration.
+
+Two consequences. First, a Codex reviewer agent needs no new skill-access
+mechanism — an agent definition plus a brief naming the skill is enough, so the
+remaining internal-review work is agent definitions and routers, not a
+subsystem. Second, the catalog is injected per child at roughly 640 characters
+per entry with only three plugins installed, which is the first real datum for
+the skill-context budget question; a full seven-plugin install has not been
+measured and should not be extrapolated from it.
+
+Two limits worth stating. The body read ran under full filesystem access, so a
+restricted sandbox profile that cannot reach the plugin cache is untested. And
+the catalog observed here is far larger than the 8,000-character initial-context
+figure recorded during the 2026-07-08 research, so that figure should be
+re-derived before it is relied on again.
+
 ## Rebuilt PR 5a contract
 
 ### Agent adapter
@@ -405,5 +437,6 @@ The current product priority is Greenlight and Autopilot in the `solopreneur`
 core. Marketer domain-skill seams and the remaining five agent adapters and six
 routers are deferred until the core workflow V1 is complete. When that track
 resumes, each plugin still needs the same platform-language audit and live
-routing sample. The large-plugin skill-context budget also remains a
-measurement question; it is not answered by the isolated marketer slice.
+routing sample. The large-plugin skill-context budget remains open at full
+install size, but it is no longer unmeasured: a three-plugin install injects a
+36-entry, 22,978-character catalog into every spawned child as well as the root.
