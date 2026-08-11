@@ -2,7 +2,9 @@
 
 **Status:** The Codex 0.144.3 result is retained as historical evidence but no
 longer defines the current platform limit. Codex 0.147.0 can create real custom-
-agent children. Final-byte acceptance SHA
+agent children, and the pilot's one open harness question is now closed: the
+interactive application spawns them, and so does `codex exec` on this version.
+Final-byte acceptance SHA
 `c8bae2710051da659afad879c226e202ad3368d4` passed complete local-path and fresh
 git-ref matrices. PR #155 was squash-merged as `fc943a9` on 2026-08-09 without
 changing the accepted runtime bytes. The slice is not yet included in a tagged
@@ -41,6 +43,8 @@ evidence.
 That result was scoped to `codex exec`; the original pilot did not automate the
 interactive application. The conclusion should have remained version- and
 harness-specific rather than a permanent statement that Codex cannot delegate.
+The 2026-08-11 reproduction below measured both harnesses on one version and
+found the limit was version-scoped, not harness-scoped.
 
 The reusable facts from that run were:
 
@@ -252,6 +256,40 @@ budget. This satisfies the authenticated agent-distribution, routing,
 lifecycle, final-delivery, and recorded-anchor gate. It does not certify
 marketer skill parity or complete content quality. PR #155 was squash-merged to
 `main` as `fc943a9`; a tagged plugin release remains pending.
+
+### 2026-08-11 independent interactive-TUI reproduction
+
+An independent reproduction settled the harness question the original pilot left
+open. It used Codex CLI 0.147.0, `gpt-5.6-sol`, max reasoning, and multi-agent
+V2, from a fresh isolated `HOME` and `CODEX_HOME` seeded only with a copied
+credential and an empty project outside this repository. Both plugins were
+installed through the local marketplace consumer path, and the bootstrapped
+managed agent matched the source `marketer.toml` byte for byte.
+
+Three runs were judged only from persisted rollouts. Model narration was
+ignored.
+
+| Run | Harness | Root thread | Child thread | Child role and depth | waits/lists |
+| --- | --- | --- | --- | --- | --- |
+| R02 explicit | interactive TUI | `019fee53-ddb7` | `019fee54-77e5` | `marketer`, depth 1 | 1/0 |
+| R07 natural | interactive TUI | `019fee56-1987` | `019fee56-dda4` | `marketer`, depth 1 | 4/3 |
+| R02 explicit | `codex exec` | `019fee58-85c3` | `019fee58-e0cc` | `marketer`, depth 1 | 2/1 |
+
+Every root recorded exactly one `spawn_agent` call with `agent_type="marketer"`
+and `fork_turns="none"`. Each child rollout carries its own subagent spawn
+record naming that root as `parent_thread_id`, and root and child each recorded
+a task completion. No generic, nested, or replacement child appeared, and no run
+made a `send_message`, `followup_task`, or `interrupt_agent` call.
+
+The interactive application therefore creates real subagent threads from the
+router skill, and on this version so does `codex exec`. Neither harness inherits
+the other's evidence for anything else.
+
+This reproduction carried no router-body sentinel, so it does not replace the
+final-byte live gate above. It is still stronger than a narration check: the
+exact `agent_type` and `fork_turns` pair it observed is prescribed only by the
+router, is not V2's default fork, and was accepted on the first call in every
+run.
 
 ## Rebuilt PR 5a contract
 
