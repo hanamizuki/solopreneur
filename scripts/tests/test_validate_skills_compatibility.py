@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -39,13 +40,21 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
             skill_id = f"solopreneur:{skill}"
             path = self.repo_root / "plugins" / "solopreneur" / "skills" / skill / "SKILL.md"
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("## Codex host guard\n`CODEX_THREAD_ID`\n", encoding="utf-8")
+            path.write_text(
+                "## Codex host guard\n"
+                "Before any other action, check whether `CODEX_THREAD_ID` is set. "
+                "If it is, stop now. This workflow runs only on Claude Code.\n",
+                encoding="utf-8",
+            )
             guard_paths[skill_id] = str(path.relative_to(self.repo_root))
             skill_ids.append(skill_id)
 
         self.registry = {
             "schemaVersion": 1,
             "legacyProvenance": "legacy.md",
+            "legacyBaselineSha256": hashlib.sha256(
+                ("\n".join(sorted(skill_ids)) + "\n").encode()
+            ).hexdigest(),
             "defaults": {
                 "support": {
                     "claude-code": "legacy",
@@ -69,6 +78,47 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         (self.repo_root / "skills-compatibility.json").write_text(
             json.dumps(self.registry), encoding="utf-8"
         )
+
+    def add_skill(self, skill_id: str) -> str:
+        plugin, skill = skill_id.split(":", 1)
+        resource = f"plugins/{plugin}/skills/{skill}/SKILL.md"
+        path = self.repo_root / resource
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"# {skill}\n", encoding="utf-8")
+        self.registry["sourceShapes"]["shared"].append(skill_id)
+        self.registry["sourceShapes"]["shared"].sort()
+        return resource
+
+    def publish(
+        self,
+        skill_id: str,
+        dependencies: tuple[str, ...] = (),
+        *,
+        claude_full: bool = False,
+    ) -> None:
+        plugin, skill = skill_id.split(":", 1)
+        resource = f"plugins/{plugin}/skills/{skill}/SKILL.md"
+        support = {
+            "codex-exec": "full",
+            "codex-tui": "full",
+            "codex-app": "full",
+        }
+        acceptance = {
+            "codex-exec": [resource],
+            "codex-tui": [resource],
+            "codex-app": [resource],
+        }
+        if claude_full:
+            support["claude-code"] = "full"
+            acceptance["claude-code"] = [resource]
+        self.registry["skills"][skill_id] = {
+            "support": support,
+            "publication": {"codex": "include"},
+            "sharedContract": resource,
+            "platformResources": [resource],
+            "acceptance": acceptance,
+            "dependencies": list(dependencies),
+        }
 
     def run_validator(self) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
@@ -101,6 +151,14 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
             "defaults.publication.codex must be exclude; Codex inclusion is per skill"
         )
 
+    def test_support_defaults_must_remain_fail_closed(self) -> None:
+        self.registry["defaults"]["support"]["codex-exec"] = "full"
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "defaults.support must keep the fail-closed migration baseline"
+        )
+
     def test_unclassified_skill_fails(self) -> None:
         extra = self.repo_root / "plugins" / "solopreneur" / "skills" / "extra" / "SKILL.md"
         extra.parent.mkdir(parents=True)
@@ -116,6 +174,89 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
 
         self.assert_failure_contains(
             "solopreneur:autopilot is included on Codex without a supported surface"
+        )
+
+    def test_partially_supported_skill_cannot_enter_shared_codex_view(self) -> None:
+        self.publish("solopreneur:autopilot")
+        self.registry["skills"]["solopreneur:autopilot"]["support"][
+            "codex-app"
+        ] = "unsupported"
+        del self.registry["skills"]["solopreneur:autopilot"]["acceptance"][
+            "codex-app"
+        ]
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "cannot be included while Codex surfaces are unsupported: codex-app"
+        )
+
+    def test_published_skill_cannot_depend_on_excluded_skill(self) -> None:
+        self.publish("solopreneur:autopilot", ("solopreneur:merge-pr",))
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "solopreneur:autopilot has excluded Codex dependency solopreneur:merge-pr"
+        )
+
+    def test_published_skill_cannot_depend_across_plugins(self) -> None:
+        self.add_skill("other:helper")
+        self.publish("other:helper", claude_full=True)
+        self.publish("solopreneur:autopilot", ("other:helper",))
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "solopreneur:autopilot has cross-plugin Codex dependency other:helper"
+        )
+
+    def test_transitive_excluded_dependency_fails(self) -> None:
+        self.add_skill("solopreneur:helper")
+        self.publish(
+            "solopreneur:helper",
+            ("solopreneur:merge-pr",),
+            claude_full=True,
+        )
+        self.publish("solopreneur:autopilot", ("solopreneur:helper",))
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "solopreneur:helper has excluded Codex dependency solopreneur:merge-pr"
+        )
+
+    def test_platform_resource_must_be_present_in_generated_snapshot(self) -> None:
+        self.registry["skills"]["solopreneur:autopilot"] = {
+            "platformResources": ["legacy.md"]
+        }
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "platformResources must stay inside the skill or use its shared config.sh"
+        )
+
+    def test_repository_reference_cannot_escape_root(self) -> None:
+        outside = self.repo_root.parent / "outside.md"
+        outside.write_text("outside\n", encoding="utf-8")
+        self.registry["legacyProvenance"] = "../outside.md"
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "legacyProvenance must reference an existing file"
+        )
+
+    def test_new_skill_cannot_inherit_frozen_legacy_status(self) -> None:
+        self.add_skill("solopreneur:extra")
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "legacyBaselineSha256 does not match the skills still using claude-code legacy"
+        )
+
+    def test_guard_path_must_be_canonical(self) -> None:
+        self.registry["codexHostGuards"]["solopreneur:autopilot"] = "legacy.md"
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "codexHostGuards.solopreneur:autopilot must reference "
+            "plugins/solopreneur/skills/autopilot/SKILL.md"
         )
 
     def test_guard_must_be_early(self) -> None:

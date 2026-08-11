@@ -184,13 +184,11 @@ explicitly `degraded`.
 
 Surface support and package publication are separate because all Codex
 surfaces consume one plugin skills view. The registry therefore also records a
-single Codex publication decision. That view is a guarded union: a skill may be
-included when at least one Codex surface is supported and every other reachable
-Codex surface either has a tested fail-closed surface guard or is also
-supported. If the skill cannot reliably identify the active Codex surface, the
-rule falls back to the intersection and one unsupported reachable surface
-excludes it from the shared Codex view. Publication never upgrades that
-surface's support status.
+single Codex publication decision. A guarded union is valid only after the host
+has a reliable surface discriminator and executable guard evidence. Neither is
+accepted in the current schema, so publication enforces the intersection: one
+unsupported Codex surface excludes the skill from the shared Codex view.
+Publication never upgrades that surface's support status.
 
 ### 4. Platform-neutral action vocabulary is the default
 
@@ -236,6 +234,7 @@ Each resolved registry entry contains:
 | Limitation reference | Required for every `degraded` surface |
 | Acceptance scenarios | Evidence-producing scenarios required for every `full` or `degraded` surface |
 | Legacy provenance | Architecture-baseline identity required for every `legacy` entry |
+| Legacy baseline hash | Frozen identity set that prevents a new skill from silently inheriting `legacy` |
 | Internal skill dependencies | Repository skills that participate in support closure |
 | External required capabilities | Required external skills, CLIs, MCP servers, network, or host capabilities |
 | Optional enhancements | Capabilities that improve results but never gate the contract |
@@ -244,8 +243,9 @@ Missing entries, unknown skills, invalid enum values, invalid use of `legacy`,
 missing resources, or a skill exposed contrary to its platform publication
 decision are CI failures.
 Internal dependencies must resolve to registry entries; a supported skill
-cannot depend on an unsupported internal skill on the same surface unless its
-declared degraded path removes that dependency. External capabilities are
+cannot depend on an unsupported or excluded internal skill on the same surface.
+Because Codex does not enforce plugin dependencies, hard dependencies must also
+remain inside the same generated plugin root. External capabilities are
 validated as declared prerequisites, while optional enhancements never enter
 the hard dependency closure.
 
@@ -253,17 +253,21 @@ the hard dependency closure.
 cannot satisfy a gate for new behavior, a changed control flow, or any Codex
 promotion.
 
-For Codex, the validator also rejects publication when no surface is supported,
-or when an unsupported reachable surface lacks a tested fail-closed guard. The
-guard must stop before workflow side effects and explain the supported surface;
-`allow_implicit_invocation: false` is not a guard because explicit invocation
-remains possible.
+For Codex, the validator rejects publication when any reachable surface is
+unsupported. A future surface-guard exception requires a separately reviewed
+schema, a reliable discriminator, and executable evidence; an arbitrary file
+reference cannot authorize publication. `allow_implicit_invocation: false` is
+not a guard because explicit invocation remains possible. Canonical host guards
+for wholly unsupported side-effecting skills are separately bound to each
+skill's entrypoint and must contain the early stop contract.
 
 Registry structure checks are conditional on support. A future Codex engine
 path is not required while all Codex surfaces are `unsupported`. The validator
 must reject invented placeholder paths and must require the shared contract,
 platform resources, limitations, and scenarios before the related surface can
-be promoted.
+be promoted. A platform resource must already live inside the copied skill
+directory or use that plugin's explicit shared-config overlay; other paths are
+rejected because they would not enter the installed snapshot.
 
 ### 6. Codex gets a generated publication view
 
@@ -485,7 +489,7 @@ the agent-distribution prerequisite and does not certify marketer skill parity.
 | 4. Publication safety | Complete — generated install roots are registry-filtered; local and git-ref canary installs passed on Codex CLI 0.147.0 | Only registry-included skills are exposed through the declared root; inert snapshot bytes do not count as exposure |
 | 5. Shared core foundations | Add one executable config/plugin-root resolver and platform-resource validation | Greenlight scripts and prompts resolve the same platform-aware config; existing Claude behavior remains unchanged |
 | 6. Greenlight baseline | Complete — A2 run 1 ended in push-back on a non-convergent fixture; run 2 produced the accepted seeded-finding → fix → re-review → clean terminal path | The `external` subset runs from the same skill body on both hosts; divergences and the clean-pass size ceiling are recorded in the Greenlight port spec |
-| 7. Greenlight Codex PR mode | Runtime complete for the degraded `external` S/M surface; publication still waits on reviewed-head binding and shared-view guard evidence | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
+| 7. Greenlight Codex PR mode | Runtime complete for the degraded `external` S/M surface; publication still waits on reviewed-head binding and shared-view surface closure | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer |
 | 8. Autopilot dependency closure | Port `plan-review internal` and a safe `merge-pr` seam | Any merge-preparation mutation invalidates the old clean and reruns Greenlight plus CI for the new head |
 | 9. Autopilot Codex V1 | Add run-now, single-PR orchestration through Codex subagents with explicit worktree ownership and a generic-worker fallback | One real PR completes plan review, implementation, Greenlight, CI, atomic merge, cleanup, and structured reporting without a specialist agent |
 | 10. Core workflow expansion | Add Greenlight's remaining modes, then Autopilot multi-PR waves | Each mode earns its own support status and preserves the shared contract |
@@ -513,7 +517,7 @@ acceptance contract.
 
 The agent-distribution and filtered-publication prerequisites are complete.
 The registry intentionally keeps Greenlight excluded until reviewed-head
-binding and the shared-view surface rule pass. Marketer portability seams and
+binding and shared-view surface closure pass. Marketer portability seams and
 remaining agent adapters are not on the core critical path; when resumed, they
 still roll out one plugin at a time after that plugin's skills have complete
 registry entries.

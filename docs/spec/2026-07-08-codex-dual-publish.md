@@ -311,7 +311,9 @@ Validation is layered so deterministic failures do not consume model calls:
 5. **Install integration** — install every entry in the filtered marketplace
    into a throwaway Codex home. The cached bootstrap-to-agent round trip runs
    when both the core bootstrap and marketer plugin are in that view; its
-   deterministic reconciliation fixtures always run.
+   deterministic reconciliation fixtures always run. While the production
+   view is empty, a hermetic included-canary/excluded-sibling fixture runs the
+   real generator and pinned Codex installer so the non-empty path cannot rot.
 6. **Authenticated delegation acceptance** — in isolated user, Codex, and
    project homes, run the fixed four-case matrix: R02 is the explicit marketer
    request and R07 is the first natural router prompt, both on `codex exec`;

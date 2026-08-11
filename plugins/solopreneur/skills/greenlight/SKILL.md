@@ -53,7 +53,7 @@ surface:
 
 Limitation reference: `docs/spec/2026-08-10-codex-greenlight-port.md`. Codex
 publication safety is complete, but the skill remains excluded until
-reviewed-head binding and the shared-view surface guard evidence land —
+reviewed-head binding and shared-view surface closure land —
 degraded means "works, with limits recorded", not "shipped".
 
 ### Arguments

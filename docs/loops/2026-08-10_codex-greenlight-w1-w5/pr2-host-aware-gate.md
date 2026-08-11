@@ -99,10 +99,10 @@ host's model family.
 
 ### W5 — degraded-status documentation
 
-The compatibility registry (`skills-compatibility.json`) **does not exist yet** —
-it is rollout PR 3 of the portability spec and is still in
-`todos/done/2026-08-10_codex-publication-safety.md`. So W5 is documentation,
-not a registry edit. Two places, both short:
+At W5 implementation time, the compatibility registry did not exist, so W5
+was documentation rather than a registry edit. The registry and filtered view
+subsequently landed and are recorded in
+`todos/done/2026-08-10_codex-publication-safety.md`. W5 covered two places:
 
 1. A **Host support** note in `greenlight/SKILL.md` recording that Greenlight on
    `codex-exec` is **`degraded`**: external mode only, no Phase 1 / Phase 2, a
@@ -111,9 +111,9 @@ not a registry edit. Two places, both short:
    the portability architecture requires for every degraded surface.
 2. One line in the publication-safety todo's §2 recording that Greenlight's
    `codex-exec` entry is **pre-decided as `degraded`** with the same reference,
-   so whoever builds the registry does not re-litigate it. Publication stays
-   gated on that todo's safety gates — **do not** claim Greenlight is publishable
-   on Codex.
+   so the registry implementation would not re-litigate it. Publication safety
+   is now complete, but reviewed-head binding and shared-view surface closure
+   still prohibit claiming Greenlight is publishable on Codex.
 
 ### Constraints
 

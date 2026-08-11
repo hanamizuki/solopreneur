@@ -163,6 +163,14 @@ while IFS= read -r plugin; do
   fi
 done < <(jq -r '.plugins[].name' "$CODEX_MARKETPLACE")
 
+# The production marketplace is intentionally empty until Greenlight closes
+# its remaining surface gates. Keep the non-empty path executable with a
+# hermetic canary that runs this same generator and a real Codex install.
+echo "==> publication fixture: non-empty generated install"
+if ! /bin/bash "$REPO_ROOT/scripts/tests/test-codex-filtered-publication.sh" "$REPO_ROOT"; then
+  fail=1
+fi
+
 # --- Gate: installed-cache bootstrap integration ----------------------------
 echo "==> bootstrap integration: installed cache to user agents"
 listing="$(CODEX_HOME="$SMOKE_HOME" codex plugin list --json)"

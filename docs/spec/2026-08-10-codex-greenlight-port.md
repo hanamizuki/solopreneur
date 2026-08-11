@@ -1,7 +1,8 @@
 # Codex Greenlight port
 
 **Status:** Implemented and accepted on `codex-exec` for the degraded
-`external` S/M surface; publication safety remains pending
+`external` S/M surface; publication safety complete; reviewed-head binding and
+shared-view surface closure remain pending
 
 **Date:** 2026-08-10 (latest acceptance evidence: 2026-08-11)
 
@@ -293,7 +294,7 @@ its own behavioral acceptance; the S/M bound stays in force.
   limitation reference. The
   [registry + filtered view](../../todos/done/2026-08-10_codex-publication-safety.md)
   are complete; publication stays gated on reviewed-head binding and the
-  shared-view surface rule.
+  shared-view surface closure.
 
 ## Acceptance
 

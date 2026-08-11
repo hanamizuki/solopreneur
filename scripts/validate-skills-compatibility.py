@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 
 SURFACES = ("claude-code", "codex-exec", "codex-tui", "codex-app")
@@ -39,8 +40,19 @@ def object_without_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def referenced_path(repo: Path, value: str) -> Path:
-    return repo / value.split("#", 1)[0]
+def referenced_path(repo: Path, value: str) -> Optional[Path]:
+    try:
+        candidate = (repo / value.split("#", 1)[0]).resolve()
+    except (OSError, RuntimeError):
+        return None
+    if candidate != repo and repo not in candidate.parents:
+        return None
+    return candidate
+
+
+def reference_is_file(repo: Path, value: object) -> bool:
+    path = referenced_path(repo, value) if isinstance(value, str) else None
+    return path is not None and path.is_file()
 
 
 def main() -> int:
@@ -62,6 +74,7 @@ def main() -> int:
     expected_root = {
         "schemaVersion",
         "legacyProvenance",
+        "legacyBaselineSha256",
         "defaults",
         "sourceShapes",
         "skills",
@@ -115,6 +128,14 @@ def main() -> int:
         default_publication = {}
     if set(default_support) != set(SURFACES):
         errors.append(f"defaults.support must declare exactly {list(SURFACES)}")
+    expected_default_support = {
+        "claude-code": "legacy",
+        "codex-exec": "unsupported",
+        "codex-tui": "unsupported",
+        "codex-app": "unsupported",
+    }
+    if default_support != expected_default_support:
+        errors.append("defaults.support must keep the fail-closed migration baseline")
     if set(default_publication) != {"claude-code", "codex"}:
         errors.append("defaults.publication must declare claude-code and codex")
     for surface, status in default_support.items():
@@ -129,13 +150,14 @@ def main() -> int:
         errors.append("defaults.publication.codex must be exclude; Codex inclusion is per skill")
     if default_support.get("claude-code") == "legacy":
         provenance = registry.get("legacyProvenance")
-        if not isinstance(provenance, str) or not referenced_path(repo, provenance).is_file():
+        if not reference_is_file(repo, provenance):
             errors.append("legacyProvenance must reference an existing file")
 
     overrides = registry.get("skills", {})
     if not isinstance(overrides, dict):
         errors.append("skills must be an object")
         overrides = {}
+    resolved_support = {skill_id: dict(default_support) for skill_id in discovered}
     allowed_override_keys = {
         "support",
         "publication",
@@ -146,7 +168,6 @@ def main() -> int:
         "dependencies",
         "requiredCapabilities",
         "optionalEnhancements",
-        "surfaceGuards",
     }
     for skill_id, entry in overrides.items():
         if skill_id not in discovered:
@@ -165,6 +186,7 @@ def main() -> int:
             errors.append(f"skills.{skill_id}.support has invalid surfaces")
             support_override = {}
         support.update(support_override)
+        resolved_support[skill_id] = support
         for surface, status in support.items():
             if status not in STATUSES:
                 errors.append(f"skills.{skill_id} has invalid {surface} status {status!r}")
@@ -196,27 +218,47 @@ def main() -> int:
         for surface, status in support.items():
             if status == "degraded":
                 limitation = limitations.get(surface)
-                if not isinstance(limitation, str) or not referenced_path(repo, limitation).is_file():
+                if not reference_is_file(repo, limitation):
                     errors.append(f"skills.{skill_id} degraded {surface} needs a limitation file")
             if status in {"full", "degraded"}:
                 scenarios = acceptance.get(surface)
                 if not isinstance(scenarios, list) or not scenarios:
                     errors.append(f"skills.{skill_id} supported {surface} needs acceptance evidence")
                 elif any(
-                    not isinstance(value, str) or not referenced_path(repo, value).is_file()
+                    not reference_is_file(repo, value)
                     for value in scenarios
                 ):
                     errors.append(f"skills.{skill_id} has missing {surface} acceptance evidence")
 
         resources = entry.get("platformResources", [])
+        resource_paths = (
+            [
+                referenced_path(repo, value) if isinstance(value, str) else None
+                for value in resources
+            ]
+            if isinstance(resources, list)
+            else []
+        )
         if not isinstance(resources, list) or any(
-            not isinstance(value, str) or not referenced_path(repo, value).exists()
-            for value in resources
+            path is None or not path.exists() for path in resource_paths
         ):
             errors.append(f"skills.{skill_id}.platformResources contains a missing path")
+        skill_plugin, skill_name = skill_id.split(":", 1)
+        skill_root = (repo / "plugins" / skill_plugin / "skills" / skill_name).resolve()
+        shared_config = (repo / "plugins" / skill_plugin / "shared" / "config.sh").resolve()
+        if any(
+            path is not None
+            and path != shared_config
+            and path != skill_root
+            and skill_root not in path.parents
+            for path in resource_paths
+        ):
+            errors.append(
+                f"skills.{skill_id}.platformResources must stay inside the skill or use its shared config.sh"
+            )
         if any(support.get(surface) in {"full", "degraded"} for surface in CODEX_SURFACES):
             contract = entry.get("sharedContract")
-            if not isinstance(contract, str) or not referenced_path(repo, contract).is_file():
+            if not reference_is_file(repo, contract):
                 errors.append(f"skills.{skill_id} needs a sharedContract for Codex support")
             if not resources:
                 errors.append(f"skills.{skill_id} needs platformResources for Codex support")
@@ -244,26 +286,42 @@ def main() -> int:
             ]
             if not supported:
                 errors.append(f"skills.{skill_id} is included on Codex without a supported surface")
-            guards = entry.get("surfaceGuards", {})
-            if not isinstance(guards, dict) or set(guards) - set(CODEX_SURFACES):
-                errors.append(f"skills.{skill_id}.surfaceGuards has invalid surfaces")
-                guards = {}
-            for surface in CODEX_SURFACES:
-                if support.get(surface) == "unsupported":
-                    evidence = guards.get(surface)
-                    if not isinstance(evidence, str) or not referenced_path(repo, evidence).is_file():
-                        errors.append(
-                            f"skills.{skill_id} needs tested guard evidence for unsupported {surface}"
-                        )
+            unsupported = [
+                surface for surface in CODEX_SURFACES if support.get(surface) == "unsupported"
+            ]
+            if unsupported:
+                errors.append(
+                    f"skills.{skill_id} cannot be included while Codex surfaces are unsupported: "
+                    + ", ".join(unsupported)
+                )
             for dependency in dependencies if isinstance(dependencies, list) else []:
                 dependency_support = dict(default_support)
+                dependency_publication = dict(default_publication)
                 dependency_entry = overrides.get(dependency, {})
                 if isinstance(dependency_entry, dict):
                     dependency_override = dependency_entry.get("support", {})
                     if isinstance(dependency_override, dict):
                         dependency_support.update(dependency_override)
+                    publication_override = dependency_entry.get("publication", {})
+                    if isinstance(publication_override, dict):
+                        dependency_publication.update(publication_override)
                 if any(dependency_support.get(surface) == "unsupported" for surface in supported):
                     errors.append(f"skills.{skill_id} has unsupported Codex dependency {dependency}")
+                if dependency_publication.get("codex") != "include":
+                    errors.append(f"skills.{skill_id} has excluded Codex dependency {dependency}")
+                if dependency.split(":", 1)[0] != skill_plugin:
+                    errors.append(f"skills.{skill_id} has cross-plugin Codex dependency {dependency}")
+
+    legacy_ids = sorted(
+        skill_id
+        for skill_id, support in resolved_support.items()
+        if support.get("claude-code") == "legacy"
+    )
+    legacy_digest = hashlib.sha256(("\n".join(legacy_ids) + "\n").encode()).hexdigest()
+    if registry.get("legacyBaselineSha256") != legacy_digest:
+        errors.append(
+            "legacyBaselineSha256 does not match the skills still using claude-code legacy"
+        )
 
     guard_paths = registry.get("codexHostGuards", {})
     if not isinstance(guard_paths, dict):
@@ -272,12 +330,25 @@ def main() -> int:
     if set(guard_paths) != REQUIRED_GUARDS:
         errors.append(f"codexHostGuards must declare exactly {sorted(REQUIRED_GUARDS)}")
     for skill_id, raw_path in guard_paths.items():
-        path = referenced_path(repo, raw_path) if isinstance(raw_path, str) else repo / "missing"
-        if skill_id not in discovered or not path.is_file():
+        if skill_id not in REQUIRED_GUARDS:
+            continue
+        plugin, skill = skill_id.split(":", 1)
+        expected_path = repo / "plugins" / plugin / "skills" / skill / "SKILL.md"
+        expected_reference = str(expected_path.relative_to(repo))
+        if raw_path != expected_reference:
+            errors.append(f"codexHostGuards.{skill_id} must reference {expected_reference}")
+            continue
+        path = referenced_path(repo, raw_path) if isinstance(raw_path, str) else None
+        if skill_id not in discovered or path is None or not path.is_file():
             errors.append(f"codexHostGuards.{skill_id} references a missing skill file")
             continue
-        first_lines = "\n".join(path.read_text().splitlines()[:120])
-        if "## Codex host guard" not in first_lines or "CODEX_THREAD_ID" not in first_lines:
+        first_lines = " ".join(path.read_text().splitlines()[:50])
+        required_guard_text = (
+            "## Codex host guard",
+            "Before any other action, check whether `CODEX_THREAD_ID` is set. If it is, stop",
+            "only on Claude Code",
+        )
+        if any(text not in first_lines for text in required_guard_text):
             errors.append(f"codexHostGuards.{skill_id} lacks an early fail-closed guard")
 
     if errors:

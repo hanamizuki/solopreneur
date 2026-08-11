@@ -29,11 +29,13 @@ pass.
    support, publication, evidence, resources, dependencies, capabilities, and
    required guards. Validation rejects missing or duplicate classifications,
    unsafe defaults, unsupported publication, missing evidence or resources,
-   broken dependency closure, and absent early guards.
+   resources outside the generated snapshot, broken dependency or package
+   closure, legacy-baseline drift, and absent or decoy early guards.
 3. The generator removes Codex manifests from canonical plugin roots and emits
    only registry-included skill directories into generated install roots.
    Drift, exact published inventory, manifest location, and local installation
-   are CI gates.
+   are CI gates. A hermetic non-empty canary continuously runs the real
+   generator and Codex installer while the production marketplace is empty.
 
 ## Acceptance evidence
 
@@ -51,4 +53,4 @@ The one-skill acceptance fixture at
 
 This closes publication safety only. It does not publish Greenlight or claim
 Autopilot support. The next critical-path gate is Greenlight reviewed-head
-binding, followed by the shared-view surface guard evidence.
+binding, followed by shared-view surface closure.
