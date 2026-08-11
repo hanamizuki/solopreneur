@@ -178,7 +178,9 @@ its flags are `--strict-config`, `-c`, `--uncommitted`, `--base`, `--enable`,
 verdict that does not exist — the shipped loop's `[P*]` tag parsing plus process
 completion is the available signal. The `claude-cli` recipe (W2) therefore
 *requests* `[P*]`-tagged output in its prompt so the existing parsing applies
-unchanged.
+unchanged. Measured consequence: asking for `[P3]` nits, on a loop where any new
+finding outranks `clean`, puts a size ceiling on the clean pass — see
+[run 2](#a2-run-2-2026-08-11-after-165-clean-pass).
 
 ## Implementation plan
 
@@ -301,15 +303,18 @@ already costs ~212k tokens.
   Codex host drives `/greenlight external` to termination: claude-cli gate
   triggered, findings parsed, fix applied and pushed, re-review, clean
   terminal report in the shipped format.
-  **Status: blocked** — four of the five links confirmed on 2026-08-11, the
-  fifth (a *clean* terminal report) not reached. See [A2 run](#a2-run-2026-08-11).
+  **Status: done** — all five links on 2026-08-11, second attempt, against a
+  fixture whose one seeded defect has a single objectively correct fix. See
+  [run 2](#a2-run-2-2026-08-11-after-165-clean-pass); the first attempt
+  ([run 1](#a2-run-1-2026-08-11--blocked-on-the-fixture)) is what produced the
+  three defects `0077805` fixes, and its measurements still stand.
 - **A3 Claude baseline unchanged:** `/greenlight external` on Claude Code
   behaves as today (same gate selection, same report) after W1-W3 land.
 - **A4 Independence:** on a Codex host, `RESOLVED.gate` never carries family
   `openai`; on a Claude host, never `anthropic`. Observable directly in the
   pre-flight's printed `RESOLVED` object.
 
-### A2 run (2026-08-11)
+### A2 run 1 (2026-08-11) — blocked on the fixture
 
 Driven as `codex exec '$greenlight external 164 unattended'` in the PR's
 worktree, `codex-cli 0.147.0`, `gpt-5.6-sol` at max reasoning effort, plugin
@@ -342,7 +347,9 @@ refused to churn, replied on the thread with its reasoning, and exited. Correct
 handling of an unconvergeable fixture is a push-back exit, so **this run cannot
 produce the clean terminal A2 asks for**. Closing A2 needs a re-run against a
 convergent fixture: a seeded defect with one objectively correct fix and no
-design latitude.
+design latitude — that re-run is
+[run 2](#a2-run-2-2026-08-11-after-165-clean-pass), and the diagnosis above
+turned out to be half the story (see run 2's size ceiling).
 
 **Gaps found against what this spec expected.**
 
@@ -390,6 +397,96 @@ anything. The `unattended` token behaved as M3 requires — the run never stoppe
 to ask, and exited 0 on an in-contract terminal state rather than on exhaustion.
 CodeRabbit independently found the same seeded contract violation the gate did,
 which is what makes the fixture's first round trustworthy.
+
+### A2 run 2 (2026-08-11, after #165) — clean pass
+
+Same harness as run 1 — `codex exec '$greenlight external 167 unattended'` in the
+PR's worktree, `codex-cli 0.147.0`, `gpt-5.6-sol` at max reasoning effort — with
+run 1's three defects fixed and merged (`0077805`). Both skills roots on this
+fleet were refreshed to that commit first and checked byte-identical to the
+working tree's body: run 1 established that the harness loads the operator's
+merged user-skills copy rather than the plugin snapshot, so leaving either stale
+would have re-run the old skill.
+
+**Fixture.** PR #167, one file, six changed lines: a docblock over `DEFAULT_POLL`
+spelling out the schedule its three fields produce, with the third timestamp
+wrong — `540s` where the same line's `firstWaitSec 180 / intervalSec 120 /
+tries 3` give `420s`. The contradiction is inside the diff and it is arithmetic,
+so the fix is forced and there is nothing to hold an opinion about. The PR body
+describes the change and never mentions acceptance (run 1's gap 4).
+
+**Link by link.** Every row re-verified against the PR and the session log, not
+taken from the run's own summary.
+
+| Link | Observed |
+| --- | --- |
+| Host + sizing | `CODEX_THREAD_ID` set → `HOST_FAMILY=openai`. `changed_lines=6` → `computed_size=M` → `SIZE_MAX_ROUNDS=5`. Both CLI probes passed → `CLI_AVAILABLE=codex-cli,claude-cli` |
+| Detection | `DETECTION_STATUS=ok`, `DETECTED` carrying `chatgpt-codex-connector[bot]` and `coderabbitai[bot]`. The same function returned `unavailable` with an empty list in run 1 |
+| Gate selection | `RESOLVED.gate = claude-cli` (family `anthropic`); `codex-bot` and `codex-cli` both `canGate:false`; `gateBlock:null`, `needsPrompt:false`, `warnings:[]`. **`coderabbit` was `canGate:true` and was not chosen** — so A4 now holds with reviewer history present, where run 1 confirmed it against an empty cache |
+| Gate trigger | 2 invocations, rounds 1 and 2. Each captured the diff first, guarded it non-empty, then piped it into the registry's own `triggerText` with `--tools ""` |
+| Findings parsed | Round 1 returned `[P1]` naming the `540`/`420` contradiction with the one-token fix, plus a `[P3]` asking for the timing's reference point. The shipped `[P*]` scan read both, unchanged. `codex-bot` filed the same defect independently as a `P2` inline comment on `e25f5a7` |
+| Fix + push | One commit `7e9b49c` applied **inline in the main context** (W4's no-subagent path), covering both findings, nothing pushed back. `node --test` before the commit; after the push `LOCAL_HEAD = REMOTE_HEAD = PR head`; the processed thread resolved per Step 3c |
+| Re-review | Round 2 re-triggered all four reviewers against the new HEAD; the `codex-bot` 👀 handshake was polled and observed. The gate re-ran over the full `main...HEAD` and its entire stdout was `No findings.` — the exact sentence the recipe asks for, after 39s of real work on a non-empty diff |
+| Terminal report | **Clean pass (Exit Condition 1) at round 2 of 5**, in the shipped format: rounds, gate, items fixed, items pushed back, leftovers, and a Flags section carrying the one line that applied — "no objective verifier configured for this loop". Closing sweep over all three channels found nothing past the cursors. PR left open, worktree clean |
+
+**Run 1's three fixes, checked in the run that mattered.**
+
+1. **Reviewer detection.** The `while IFS= read -r … <<< "$nums"` loop returned
+   `ok` with both bots under zsh. Reproduced outside the run as well, by
+   executing the shipped function verbatim against this repo.
+2. **`config.sh` resolution.** The pre-flight printed
+   `config_helper=<merged skills dir>/greenlight/scripts/config.sh` — the
+   detached-layout candidate `0077805` added is the one that existed, and no
+   repo-relative path was improvised. Run 1's gap 1 is closed at its root, not
+   merely unobserved.
+3. **The rate-limit guard.** Not re-provoked, so not proven. CodeRabbit's
+   "Review rate limited" prose arrived as an ordinary non-gate comment and
+   changed nothing; the nested `codex review` output is still captured `2>&1`
+   but never contained the phrase this round, so the exit-status test now
+   guarding it was never put under the condition that broke the old one.
+
+**Why the fixture is six lines: the clean sentence has a size ceiling.** Before
+seeding anything, the registry's own `claude-cli` `triggerText` was run verbatim
+against several diffs, one shot each, diff on stdin:
+
+| Diff handed to the gate | Verdict |
+| --- | --- |
+| A one-line typo fix in a comment | `No findings.` |
+| This run's fixture in its corrected form (6 lines) | `No findings.` — the run's own round 2 |
+| A correct 4-line docblock | 2 × `[P3]` |
+| A correct 8-line docblock | 2 × `[P3]` |
+| A correct ~46-line new export with its tests | 1 × `[P2]`, 2 × `[P3]` |
+| `0077805` itself — merged, and already reviewed | `[P2]` + `[P3]` |
+
+A reviewer asked for `[P1]/[P2]/[P3]` will find *something* to say about
+anything substantial, including work that has already passed review. Step 2b
+then makes any new finding — a `[P3]` nit included — outrank `clean`. The two
+compose into a real bound on the port: **Exit Condition 1 is reachable at
+roughly this diff size and not far beyond it**, and it is not deterministic at
+the boundary — correct docblocks of 4 and 8 lines drew nits where this run's 6
+drew none. It also completes run 1's diagnosis: that fixture's *corrected* state
+was a ~30-line new module, which by this measure would not have gone clean even
+without the cross-round flip-flop.
+
+Nothing here is changed on the strength of one measurement. The two levers, if
+it turns out to matter on real PRs, are the recipe's prompt (it solicits nits by
+construction) and Step 2b's precedence (a `P3`-only round could classify
+`clean`). Recorded so that choice is made deliberately rather than discovered
+mid-loop.
+
+**What this result does not cover.**
+
+- **Three reviewers decided it, not four.** CodeRabbit answered "Review rate
+  limited" in round 1 and "Already reviewed" in round 2, so the clean pass was
+  never tested against its output.
+- **Cost.** 175,726 tokens on the parent session for a 2-round M loop, against
+  run 1's 286,338 for 3 rounds on the same counter. Neither figure includes the
+  nested `codex review` sessions: each opens its own Codex session, and those
+  rollouts record no token count of their own.
+- **Environment.** `codex exec` still logs `skills scan reached its traversal
+  limit` against the operator's merged skills tree, unchanged from M3 — an
+  install-sizing concern, not a Greenlight defect.
+- One run, one fixture, one sampling of a non-deterministic reviewer.
 
 ## Not in V1
 
