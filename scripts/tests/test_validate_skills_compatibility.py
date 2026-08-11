@@ -13,11 +13,18 @@ from pathlib import Path
 
 VALIDATOR = Path(__file__).resolve().parents[1] / "validate-skills-compatibility.py"
 LEGACY_BASELINE = Path(__file__).resolve().parents[1] / "codex-legacy-skill-baseline.txt"
-GUARDED_SKILLS = (
+CORE_SKILLS = (
     "autopilot",
     "merge-pr",
     "mvp",
     "plan-review",
+    "preview",
+    "todos-babysit",
+    "worktree-handoff",
+)
+GUARDED_SKILLS = (
+    "autopilot",
+    "mvp",
     "preview",
     "todos-babysit",
     "worktree-handoff",
@@ -39,17 +46,20 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
 
         guard_paths = {}
         skill_ids = []
-        for skill in GUARDED_SKILLS:
+        for skill in CORE_SKILLS:
             skill_id = f"solopreneur:{skill}"
             path = self.repo_root / "plugins" / "solopreneur" / "skills" / skill / "SKILL.md"
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(
-                "## Codex host guard\n"
-                "Before any other action, check whether `CODEX_THREAD_ID` is set. "
-                "If it is, stop now. This workflow runs only on Claude Code.\n",
-                encoding="utf-8",
-            )
-            guard_paths[skill_id] = str(path.relative_to(self.repo_root))
+            if skill in GUARDED_SKILLS:
+                path.write_text(
+                    "## Codex host guard\n"
+                    "Before any other action, check whether `CODEX_THREAD_ID` is set. "
+                    "If it is, stop now. This workflow runs only on Claude Code.\n",
+                    encoding="utf-8",
+                )
+                guard_paths[skill_id] = str(path.relative_to(self.repo_root))
+            else:
+                path.write_text(f"# {skill}\n", encoding="utf-8")
             skill_ids.append(skill_id)
 
         self.registry = {
