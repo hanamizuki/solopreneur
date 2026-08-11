@@ -547,11 +547,13 @@ fi
 7. After verified merge, probe
    `git ls-remote --heads "$PUSH_REMOTE_URL" "refs/heads/$BRANCH"` and inspect
    both its exit status and output. Only a successful empty result confirms the
-   child deleted the remote branch; a probe failure is cleanup debt. If the ref still equals
-   `WORKTREE_HEAD`, try that exact deletion once and re-probe; if it remains, attach
-   `git push origin --delete "$BRANCH"` as cleanup debt without changing the
-   verified merge to failure. If the remote ref moved to another OID, never
-   delete it automatically; report the mismatch for manual inspection. Then
+   child deleted the remote branch; a probe failure is cleanup debt. If the ref
+   still equals `WORKTREE_HEAD`, try this conditional deletion once and re-probe:
+   `git push --force-with-lease="refs/heads/$BRANCH:$WORKTREE_HEAD"
+   "$PUSH_REMOTE_URL" ":refs/heads/$BRANCH"`. A lease failure or surviving ref
+   is cleanup debt without changing the verified merge to failure. If the
+   remote ref moved to another OID, never delete it automatically; report the
+   mismatch for manual inspection. Then
    remove the child worktree without `--force`, delete only the verified local
    child branch, and fast-forward the still-clean caller checkout to
    `origin/$BASE_BRANCH`. Any cleanup or fast-forward failure is likewise a

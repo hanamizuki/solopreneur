@@ -148,6 +148,10 @@ raise SystemExit(0)
             'git ls-remote --heads "$PUSH_REMOTE_URL" "refs/heads/$BRANCH"',
             self.autopilot,
         )
+        self.assertIn(
+            '--force-with-lease="refs/heads/$BRANCH:$WORKTREE_HEAD"',
+            self.autopilot,
+        )
         self.assertIn("the parent already created the worktree", self.autopilot_template)
         self.assertIn('gh pr create --base "{BASE_BRANCH}"', self.autopilot_template)
         self.assertIn("The parent owns cleanup", self.autopilot_template)

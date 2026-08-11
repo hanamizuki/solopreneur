@@ -48,7 +48,7 @@ object. The parent rejects malformed output and independently binds the
 reported pull request's `headRefOid` to the exact child worktree head, then
 confirms its head name, base, merged state, merge commit, and remote-base
 ancestry before cleanup. It independently verifies remote-branch deletion on
-the same push target and
+the same push target with an exact-head lease and
 reports exact cleanup debt without rewriting a verified merge as failure.
 
 Failures retain the child worktree, local branch, and pull request for manual
