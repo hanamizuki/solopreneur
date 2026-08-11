@@ -1,8 +1,8 @@
 # Codex Skill Portability Architecture
 
-**Status:** Approved design; rollout rows 3–8 complete; Greenlight, Plan Review,
-and Merge PR are included as degraded on Codex exec, TUI, and App; Autopilot
-Codex V1 pending
+**Status:** Approved design; rollout rows 3–9 complete; Greenlight, Plan Review,
+Merge PR, and Autopilot Codex V1 are included as degraded capabilities on Codex
+exec, TUI, and App
 
 **Date:** 2026-08-09
 
@@ -12,7 +12,8 @@ plugins
 **Related specs:** [Codex dual-publish](./2026-07-08-codex-dual-publish.md),
 [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md),
 [Codex Greenlight port](./2026-08-10-codex-greenlight-port.md),
-[Codex Autopilot dependency closure](./2026-08-11-codex-autopilot-dependencies.md)
+[Codex Autopilot dependency closure](./2026-08-11-codex-autopilot-dependencies.md),
+and [Codex Autopilot V1](./2026-08-12-codex-autopilot-v1.md)
 
 The related specs remain authoritative for agent-distribution status.
 Final-byte acceptance SHA `c8bae2710051da659afad879c226e202ad3368d4`
@@ -494,7 +495,7 @@ the agent-distribution prerequisite and does not certify marketer skill parity.
 | 6. Greenlight baseline | Complete — A2 run 1 ended in push-back on a non-convergent fixture; run 2 produced the accepted seeded-finding → fix → re-review → clean terminal path | The `external` subset runs from the same skill body on both hosts; divergences and the clean-pass size ceiling are recorded in the Greenlight port spec |
 | 7. Greenlight Codex PR mode | Complete — the degraded `external` S/M surface is accepted on exec, TUI, and App and included in the filtered publication | Structured pass, halt, and failure results; no clean result without an independent final-diff reviewer. Reviewed-head binding remains a shared defect, not a Codex parity gate |
 | 8. Autopilot dependency closure | Complete — degraded `plan-review internal` and mutation-free `merge-pr` profiles are accepted on exec, TUI, and App and included in filtered publication | Plan Review is findings-only; Merge PR performs no pre-merge mutation, pins CI to the head, and uses GitHub's atomic head precondition |
-| 9. Autopilot Codex V1 | Add run-now, single-PR orchestration through Codex subagents with explicit worktree ownership and a generic-worker fallback | One real PR completes plan review, implementation, Greenlight, CI, atomic merge, cleanup, and structured reporting without a specialist agent |
+| 9. Autopilot Codex V1 | Complete — this real PR exercised inline planning, Plan Review internal, executable verification, Greenlight unattended, exact-head CI, atomic merge, parent verification, cleanup, structured reporting, and the built-in worker fallback | The live single-PR lifecycle is accepted without a specialist agent |
 | 10. Core workflow expansion | Add Greenlight's remaining modes, then Autopilot multi-PR waves | Each mode earns its own support status and preserves the shared contract |
 | 11. Scheduling | Add Codex App scheduling as a separate capability | No CLI or run-now path claims Claude Cron parity |
 | 12. Remaining core | Port `mvp`, `todos-babysit`, and other core seams in dependency-sized changes | No bundled control-plane rewrite |
@@ -521,8 +522,8 @@ acceptance contract.
 The agent-distribution and filtered-publication prerequisites are complete.
 The registry includes degraded Greenlight, Plan Review, and Merge PR on exec,
 TUI, and App; reviewed-head binding remains in the shared backlog and does not
-block Codex publication. The dependency closure is accepted, so the next core
-slice is Autopilot Codex V1.
+block Codex publication. The dependency closure and Autopilot Codex V1 are accepted, so the next core slice
+is rollout row 10: Greenlight's remaining modes before Autopilot multi-PR waves.
 Marketer portability seams and remaining agent adapters are not on the core
 critical path; when resumed, they still roll out one plugin at a time after
 that plugin's skills have complete registry entries.
