@@ -1,6 +1,6 @@
 # Codex Autopilot V1
 
-**Status:** Candidate; live lifecycle acceptance pending
+**Status:** Accepted for Codex exec, TUI, and App
 
 **Date:** 2026-08-12
 
@@ -87,10 +87,29 @@ passed, and the generated skill is byte-identical to its canonical source.
 
 ### A2 Live single-PR lifecycle
 
-Pending. One real pull request from `main` must use the built-in worker fallback
-and complete inline planning, Plan Review internal, implementation and tests,
-Greenlight, exact-head CI, Merge PR, parent verification, worktree and local
-branch cleanup, and structured reporting.
+Accepted on Codex CLI 0.147.0. Fresh `codex exec` root thread
+`019ff212-c4f6-7f71-b810-651a250ba571` created exactly one depth-1 child,
+`019ff216-3a0c-7fe3-a17f-25828339bb80`, with `fork_turns="none"`. The requested
+`ai-engineer` type was unavailable, so the run exercised the built-in `worker`
+fallback. Plan Review internal ran inline because the documentation-only plan
+matched no platform specialist and returned `Ready to implement` before the
+one-line implementation.
+
+The child opened PR #174 from `main` at head
+`76907f2840ecbcfd7c1b27bfdfaabccfff80f0e9`. Its executable exact-transform,
+two-file scope, and diff checks passed. Greenlight completed one round with an
+independent Claude CLI gate, a clean Codex CLI review, a successful CodeRabbit
+check, a Codex bot handshake, zero fixes, four evidence-backed push-backs, and
+zero unresolved threads. Exact-head CI remained bound to that head. Merge PR
+re-read both GitHub check surfaces and squash-merged with the atomic head
+precondition as `1b0dd7f900b40a4d8a591e0cf0b73c48899379e3`.
+
+The parent treated the child's structured success as provisional, independently
+verified the pull-request identity and merged state, proved the merge commit was
+on `origin/main`, and re-ran the exact-transform and two-file scope checks against
+the merge commit. It then removed the explicit worktree and local branch,
+confirmed the remote branch was absent, fast-forwarded the clean caller checkout,
+and emitted the final report.
 
 The first candidate run, PR #173, deliberately targeted the candidate feature
 branch. Plan Review and implementation passed, but Greenlight correctly halted
@@ -103,12 +122,15 @@ unsupported composition.
 
 ### A3 Surface contract
 
-Pending final validation. Current Codex documentation exposes subagents in the
-desktop App, CLI, and IDE, with built-in worker and explorer roles. Codex App
-automatic worktrees are App-specific, so this profile deliberately relies on
+Accepted for the declared degraded surface. Current Codex documentation exposes
+subagents in the desktop App, CLI, and IDE, with built-in worker and explorer
+roles. Codex App automatic worktrees are App-specific, so this profile relies on
 ordinary git worktrees created and verified by the parent instead of claiming
-automatic child isolation. The same `CODEX_THREAD_ID` profile and callable
-subagent contract is published on Codex exec, TUI, and App.
+automatic child isolation. The same `CODEX_THREAD_ID` profile, callable subagent
+contract, filtered plugin bytes, and required capabilities are published on
+Codex exec, TUI, and App. The dependency spec separately accepted Plan Review
+internal in real exec, TUI, and App sessions. The end-to-end pull-request run in
+A2 is exec evidence; no separate TUI or App lifecycle run is claimed.
 
 Official references:
 
