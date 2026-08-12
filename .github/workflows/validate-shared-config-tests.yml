@@ -11,22 +11,22 @@ name: Validate shared config tests
 on:
   pull_request:
     paths:
-      - 'plugins/solopreneur/shared/**'
-      - 'plugins/solopreneur/skills/greenlight/SKILL.md'
-      - 'plugins/solopreneur/skills/merge-pr/SKILL.md'
-      - 'plugins/solopreneur/skills/worktree-handoff/SKILL.md'
-      - 'plugins/solopreneur/skills/todos-babysit/SKILL.md'
-      - 'plugins/solopreneur/skills/todos-cleanup/SKILL.md'
+      - 'src/solopreneur/shared/**'
+      - 'skills/solopreneur/greenlight/SKILL.md'
+      - 'skills/solopreneur/merge-pr/SKILL.md'
+      - 'skills/solopreneur/worktree-handoff/SKILL.md'
+      - 'skills/solopreneur/todos-babysit/SKILL.md'
+      - 'skills/solopreneur/todos-cleanup/SKILL.md'
       - '.github/workflows/validate-shared-config-tests.yml'
   push:
     branches: [main]
     paths:
-      - 'plugins/solopreneur/shared/**'
-      - 'plugins/solopreneur/skills/greenlight/SKILL.md'
-      - 'plugins/solopreneur/skills/merge-pr/SKILL.md'
-      - 'plugins/solopreneur/skills/worktree-handoff/SKILL.md'
-      - 'plugins/solopreneur/skills/todos-babysit/SKILL.md'
-      - 'plugins/solopreneur/skills/todos-cleanup/SKILL.md'
+      - 'src/solopreneur/shared/**'
+      - 'skills/solopreneur/greenlight/SKILL.md'
+      - 'skills/solopreneur/merge-pr/SKILL.md'
+      - 'skills/solopreneur/worktree-handoff/SKILL.md'
+      - 'skills/solopreneur/todos-babysit/SKILL.md'
+      - 'skills/solopreneur/todos-cleanup/SKILL.md'
       - '.github/workflows/validate-shared-config-tests.yml'
 
 permissions:
@@ -70,7 +70,7 @@ jobs:
           # uses Node built-ins only.
 
       - name: Run the shared config test suite
-        working-directory: plugins/solopreneur/shared
+        working-directory: src/solopreneur/shared
         run: |
           # jq is what the helper block shells out to; the ubuntu runner ships
           # it, but assert rather than discover that through a confusing failure.
@@ -85,6 +85,6 @@ jobs:
           if ! node --test tests/*.test.mjs; then
             echo
             echo "::error::The shared config test suite failed on Node ${{ matrix.node }}."
-            echo "::error::Reproduce with: cd plugins/solopreneur/shared && node --test tests/*.test.mjs"
+            echo "::error::Reproduce with: cd src/solopreneur/shared && node --test tests/*.test.mjs"
             exit 1
           fi

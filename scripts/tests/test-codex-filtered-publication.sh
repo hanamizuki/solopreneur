@@ -8,17 +8,20 @@ trap 'echo "error: filtered-publication fixture failed at line $LINENO" >&2' ERR
 REPO_ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 FIXTURE_ROOT="$(mktemp -d -t codex-filter-repo.XXXXXX)"
 FILTER_HOME="$(mktemp -d -t codex-filter-home.XXXXXX)"
-trap 'rm -rf "$FIXTURE_ROOT" "$FILTER_HOME"' EXIT
+SYMMETRIC_CODEX_HOME="$(mktemp -d -t codex-symmetric-home.XXXXXX)"
+SYMMETRIC_CLAUDE_HOME="$(mktemp -d -t claude-symmetric-home.XXXXXX)"
+trap 'rm -rf "$FIXTURE_ROOT" "$FILTER_HOME" "$SYMMETRIC_CODEX_HOME" "$SYMMETRIC_CLAUDE_HOME"' EXIT
 
 cp -R \
-  "$REPO_ROOT/plugins" \
+  "$REPO_ROOT/skills" \
+  "$REPO_ROOT/src" \
   "$REPO_ROOT/scripts" \
   "$REPO_ROOT/.claude-plugin" \
   "$REPO_ROOT/docs" \
   "$FIXTURE_ROOT/"
 cp "$REPO_ROOT/skills-compatibility.json" "$FIXTURE_ROOT/"
 
-canary_dir="$FIXTURE_ROOT/plugins/solopreneur/skills/filter-canary"
+canary_dir="$FIXTURE_ROOT/skills/solopreneur/filter-canary"
 mkdir -p "$canary_dir"
 cat > "$canary_dir/SKILL.md" <<'EOF'
 ---
@@ -42,20 +45,20 @@ jq '
         "codex-app": "full"
       },
       publication: {codex: "include"},
-      sharedContract: "plugins/solopreneur/skills/filter-canary/SKILL.md",
-      platformResources: ["plugins/solopreneur/skills/filter-canary/SKILL.md"],
+      sharedContract: "skills/solopreneur/filter-canary/SKILL.md",
+      platformResources: ["skills/solopreneur/filter-canary/SKILL.md"],
       acceptance: {
-        "claude-code": ["plugins/solopreneur/skills/filter-canary/SKILL.md"],
-        "codex-exec": ["plugins/solopreneur/skills/filter-canary/SKILL.md"],
-        "codex-tui": ["plugins/solopreneur/skills/filter-canary/SKILL.md"],
-        "codex-app": ["plugins/solopreneur/skills/filter-canary/SKILL.md"]
+        "claude-code": ["skills/solopreneur/filter-canary/SKILL.md"],
+        "codex-exec": ["skills/solopreneur/filter-canary/SKILL.md"],
+        "codex-tui": ["skills/solopreneur/filter-canary/SKILL.md"],
+        "codex-app": ["skills/solopreneur/filter-canary/SKILL.md"]
       },
       dependencies: []
     }
 ' "$registry" > "$registry_next"
 mv "$registry_next" "$registry"
 
-"$FIXTURE_ROOT/scripts/generate-codex-manifests.sh" >/dev/null
+"$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null
 
 jq -e '
   [.plugins[] | {name, path: .source.path}]
@@ -84,4 +87,39 @@ cached_skills="$(
 [[ "$cached_skills" == $'autopilot\nfilter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
 [[ -f "$FILTER_HOME/plugins/cache/$cache_relative/skills/autopilot/SKILL.md" ]]
 
-echo "filtered-publication fixture: included canary and production Codex skills only"
+# Exercise the one-time marketplace cutover branch without changing the real
+# repository. Mixed layouts are forbidden by the generator; all entries move
+# together and the compatibility copies disappear together.
+marketplace="$FIXTURE_ROOT/.claude-plugin/marketplace.json"
+marketplace_next="$marketplace.next"
+jq '.plugins |= map(.source = ("./plugins/claude/" + .name))' \
+  "$marketplace" > "$marketplace_next"
+mv "$marketplace_next" "$marketplace"
+"$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null
+
+[[ ! -d "$FIXTURE_ROOT/.codex/plugins" ]]
+[[ ! -d "$FIXTURE_ROOT/plugins/solopreneur" ]]
+[[ -f "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json" ]]
+[[ -f "$FIXTURE_ROOT/plugins/codex/solopreneur/.codex-plugin/plugin.json" ]]
+jq -e '
+  [.plugins[] | {name, path: .source.path}]
+  == [{name: "solopreneur", path: "./plugins/codex/solopreneur"}]
+' "$FIXTURE_ROOT/.agents/plugins/marketplace.json" >/dev/null
+
+CODEX_HOME="$SYMMETRIC_CODEX_HOME" codex plugin marketplace add "$FIXTURE_ROOT" >/dev/null
+CODEX_HOME="$SYMMETRIC_CODEX_HOME" codex plugin add solopreneur@solopreneur >/dev/null
+CLAUDE_CONFIG_DIR="$SYMMETRIC_CLAUDE_HOME" claude plugin marketplace add "$FIXTURE_ROOT" >/dev/null
+CLAUDE_CONFIG_DIR="$SYMMETRIC_CLAUDE_HOME" \
+  claude plugin install solopreneur@solopreneur --scope user >/dev/null
+
+before_manifest="$(cksum < "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json")"
+jq '.plugins += [{name: "../escape", source: "./plugins/claude/../escape"}]' \
+  "$marketplace" > "$marketplace_next"
+mv "$marketplace_next" "$marketplace"
+if "$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null 2>&1; then
+  echo "error: generator accepted an unsafe plugin name" >&2
+  exit 1
+fi
+[[ "$(cksum < "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json")" == "$before_manifest" ]]
+
+echo "filtered-publication fixture: legacy and symmetric installs passed"

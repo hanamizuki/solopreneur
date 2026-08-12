@@ -26,7 +26,7 @@ autopilot version bumps or release publishing.
 ## Pre-flight
 
 1. Confirm cwd is the repo root or a worktree of it. Run from the directory
-   containing `.claude-plugin/marketplace.json` and `plugins/`.
+   containing `.claude-plugin/marketplace.json`, `skills/`, and `src/`.
 
 2. Confirm working tree is clean:
 
@@ -57,7 +57,7 @@ autopilot version bumps or release publishing.
 ## Step 1: Detect per-plugin changes since last tag
 
 For each sub-plugin, find its last `<plugin>--v*` tag and compare against HEAD.
-Plugin directory names match marketplace names 1:1.
+Plugin names match the first-level directory names under both canonical roots.
 
 ```bash
 PLUGINS=(solopreneur designer marketer ios-dev android-dev ai-engineer neo4j-dev)
@@ -73,13 +73,13 @@ for p in "${PLUGINS[@]}"; do
   fi
   if [ -z "$LAST_TAG" ]; then
     echo "=== $p: NO TAG YET (first release) ==="
-    git log --oneline -- "plugins/$p/"
+    git log --oneline -- "skills/$p/" "src/$p/"
     continue
   fi
-  CHANGED=$(git diff --name-only "$LAST_TAG"..HEAD -- "plugins/$p/" | wc -l | tr -d ' ')
+  CHANGED=$(git diff --name-only "$LAST_TAG"..HEAD -- "skills/$p/" "src/$p/" | wc -l | tr -d ' ')
   if [ "$CHANGED" -gt 0 ]; then
     echo "=== $p: $CHANGED files changed since $LAST_TAG ==="
-    git log --oneline "$LAST_TAG"..HEAD -- "plugins/$p/"
+    git log --oneline "$LAST_TAG"..HEAD -- "skills/$p/" "src/$p/"
   else
     echo "=== $p: no changes since $LAST_TAG ==="
   fi
@@ -95,7 +95,7 @@ git diff "$LAST_RELEASE_BASELINE"..HEAD -- .claude-plugin/marketplace.json
 
 Use the most recent tag of any plugin as `$LAST_RELEASE_BASELINE`. If the
 diff touches a plugin entry's `name` / `source` / `description` / `license`,
-flag those plugins for a bump even if their `plugins/<name>/` directory
+flag those plugins for a bump even if their `skills/<name>/` and `src/<name>/`
 didn't change.
 
 ## Step 1.5: README sync check
@@ -108,15 +108,15 @@ entirely if the diff only touches internals (no surface changes).
 
 Apply judgment — these are signals, not rules:
 
-- A plugin's `description` in `marketplace.json` or `plugins/<p>/.claude-plugin/plugin.json`
+- A plugin's `description` in `marketplace.json` or `src/<p>/plugin.json`
   changed, and the README's row / paragraph for that plugin still quotes the
   old text
-- A new plugin directory was added under `plugins/`, and the README's plugin
+- A new plugin directory was added under `skills/` and `src/`, and the README's plugin
   table doesn't include it
 - A new in-house skill landed in a plugin, and the README's "Bundled skills"
   section for that plugin enumerates skills explicitly (so an addition is
   user-visible)
-- A new agent was added under `plugins/<p>/agents/`, and the README mentions
+- A new agent was added under `src/<p>/agents/`, and the README mentions
   agents per plugin
 - Counts mentioned in the README (e.g. "23 vendored skills") drifted
 
@@ -132,7 +132,7 @@ Examples of cases that don't need a README change:
 1. Pull the changed-files list scoped to surface signals:
    ```bash
    git diff --name-only "$LAST_RELEASE_BASELINE"..HEAD | grep -E \
-     '(\.claude-plugin/(plugin|marketplace)\.json|/skills/[^/]+/SKILL\.md|/agents/.*\.md|^README\.md)$'
+     '(^src/[^/]+/plugin\.json|\.claude-plugin/marketplace\.json|^skills/[^/]+/[^/]+/SKILL\.md|^src/[^/]+/agents/.*\.md|^README\.md)$'
    ```
 
 2. Read `README.md` plus each changed surface file. Compare. For each
@@ -205,7 +205,7 @@ this plugin>
 
 **Compose** — for each bumped plugin:
 
-1. `git diff "<plugin>--v<old>".."HEAD" -- "plugins/<plugin>/"`
+1. `git diff "<plugin>--v<old>".."HEAD" -- "skills/<plugin>/" "src/<plugin>/"`
    (per-plugin scope; baseline = that plugin's previous tag, the same
    `LAST_TAG` resolved in Step 1).
 2. Comprehend the diff and distill into plain outward text. Condense
@@ -240,19 +240,26 @@ committed together with the bumps in Step 3.
 
 ## Step 3: Apply bumps in one commit
 
-For each plugin marked for bump, edit
-`plugins/<name>/.claude-plugin/plugin.json`'s `version` field.
+For each plugin marked for bump, edit `src/<name>/plugin.json`'s `version`
+field. That is the only version source; never edit generated manifests.
 
-Then regenerate the Codex surfaces — they mirror the Claude manifests and
-the `Validate Codex surfaces` CI gate fails on any drift, so a version bump
-that skips this step breaks CI on the release commit:
+If every Claude marketplace source still uses `./plugins/<name>`, this is the
+one-time symmetric-layout cutover release. Require all seven plugins to receive
+at least a patch bump, then change every source to
+`./plugins/claude/<name>`. If the sources are mixed between layouts, stop; a
+partial cutover is invalid. Once all sources are symmetric, later releases
+leave them unchanged.
+
+Then regenerate both platform packages. The generator also switches the Codex
+marketplace path and removes the temporary legacy copies when the Claude
+marketplace has entered symmetric mode:
 
 ```bash
-./scripts/generate-codex-manifests.sh
+./scripts/generate-plugin-packages.sh
 ```
 
-Stage all bumped plugin.json files and the regenerated Codex surfaces
-(`.codex/plugins/`, `.agents/plugins/marketplace.json`, `.codex/agents/`)
+Stage all bumped source manifests, both generated package trees, both
+marketplaces, and `.codex/agents/`
 **together with the `CHANGELOG.md` update from Step 2.5** and commit them in
 one commit, so the Step 4 tags point at a commit that already contains the
 changelog (zero gap).
@@ -266,10 +273,8 @@ direct form the subject matches, and `CHANGELOG.md` (markdown) plus the
 `plugin.json` bumps land in one commit on `main`:
 
 ```bash
-git add plugins/*/.claude-plugin/plugin.json .agents/plugins/marketplace.json .codex/agents CHANGELOG.md
-if [[ -d .codex/plugins ]] || [[ -n "$(git ls-files -- .codex/plugins)" ]]; then
-  git add -A -- .codex/plugins
-fi
+git add -- src/*/plugin.json .claude-plugin/marketplace.json .agents/plugins/marketplace.json CHANGELOG.md
+git add -A -- plugins .codex
 git commit \
   -m "chore(release): <one-line summary of what's shipping>" \
   -m "<plugin1> v<old>→v<new>: <reason>
@@ -288,7 +293,7 @@ For each bumped plugin, create an annotated tag pointing at the bump commit:
 
 ```bash
 for p in "${BUMPED[@]}"; do
-  VERSION=$(jq -r .version "plugins/$p/.claude-plugin/plugin.json")
+  VERSION=$(jq -r .version "src/$p/plugin.json")
   git tag -a "${p}--v${VERSION}" -m "${p} v${VERSION}: <one-line>"
 done
 ```

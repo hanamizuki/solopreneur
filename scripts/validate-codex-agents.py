@@ -17,9 +17,8 @@ from pathlib import Path
 
 TOMLI_LOADER_DIR = (
     Path(__file__).resolve().parent.parent
-    / "plugins"
-    / "solopreneur"
     / "skills"
+    / "solopreneur"
     / "codex-agents-bootstrap"
     / "scripts"
 )
@@ -119,7 +118,7 @@ def main() -> int:
         return 1
 
     for plugin in plugin_names:
-        agents_dir = repo_root / "plugins" / plugin / "agents"
+        agents_dir = repo_root / "src" / plugin / "agents"
         # Path.is_dir() follows directory symlinks. Reject the intermediate
         # component first so an otherwise valid marketplace entry cannot make
         # validation traverse agent sources outside the repository tree.

@@ -1,0 +1,800 @@
+# English AI Writing Patterns
+
+> **Role**: single source of truth for English patterns. Rewrite / review mode reads this file in full.
+> **Adding a pattern**: (1) append a full entry as the last numbered `###` entry, before the Full Example chapter, taking the next number; (2) write a one-line `Summary: ...` under the title (feeds the prewrite appendix index); (3) append `| prewrite` to the summary of patterns writers most often commit — their full text gets extracted into the prewrite file; (4) related words go to `word-table-en.md`; (5) run `python3 scripts/build-prewrite.py`.
+> **Numbering**: zh and en pattern numbers are independent (e.g. en#37 Therapy-Speak = zh#38). Prefix with the language when cross-referencing.
+> **Never hand-edit** `generated/prewrite-en.md` — the script builds it from this file and the word table.
+
+A reference guide for identifying and removing AI-generated writing patterns in English text. Used for comparison during rewrite / review; before writing, read the generated `generated/prewrite-en.md` instead.
+
+Based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup.
+
+---
+
+## Core Rules
+
+5 principles to keep in mind:
+
+1. **Delete filler phrases**: remove openers and emphasis crutches
+2. **Break formulaic structure**: avoid binary contrasts, dramatic setups, rhetorical framing
+3. **Vary rhythm**: mix sentence lengths. Two items beat three. Vary paragraph endings
+4. **Trust the reader**: state facts directly, skip softening, justifying, and hand-holding
+5. **Delete quotable lines**: if it sounds like a pull quote, rewrite it
+
+---
+
+## Personality and Soul
+
+Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as obvious as slop. Good writing has a human behind it.
+
+### Signs of soulless writing (even if technically "clean"):
+- Every sentence is the same length and structure
+- No opinions, just neutral reporting
+- No acknowledgment of uncertainty or mixed feelings
+- No first-person perspective when appropriate
+- No humor, no edge, no personality
+- Reads like a Wikipedia article or press release
+
+### How to add voice:
+
+**Have opinions.** Don't just report facts. React to them. "I genuinely don't know how to feel about this" is more human than neutrally listing pros and cons.
+
+**Vary your rhythm.** Short punchy sentences. Then longer ones that take their time getting where they're going. Mix it up.
+
+**Acknowledge complexity.** Real humans have mixed feelings. "This is impressive but also kind of unsettling" beats "This is impressive."
+
+**Use "I" when it fits.** First person is honest, not unprofessional. "I keep coming back to..." or "Here's what gets me..." signals a real person thinking.
+
+**Let some mess in.** Perfect structure feels algorithmic. Tangents, asides, and half-formed thoughts are human.
+
+**Be specific about feelings.** Instead of "this is concerning," write "there's something unsettling about agents churning away at 3am while nobody's watching."
+
+**Let the information density be uneven.** The line above is about sentence length; this one is about how much space you give things. AI lays every point out at equal length. A person remembers an example halfway through, spends three paragraphs on it, then comes back. Those disproportionate stretches are the parts readers remember. Find the one point you actually have something to say about and give it twice the room.
+
+**You're allowed to not land it.** The model is afraid of an ending that isn't an ending, so it stamps one on. Once you cut the canned sign-off you do not have to supply a replacement. Stopping on the last concrete sentence is fine. So is stopping somewhere you haven't figured out yet ("I've run this for three months. Whether I keep it next month, no idea."). The exception: support replies, notices and reports carry responsibility in their conclusion, so they need one.
+
+### The four don'ts (guardrails on the above)
+
+The six moves above are **directions, not material**. These four exist because "add voice" is the instruction models most often over-execute — performing humanity is just a different flavor of slop:
+
+- **Don't manufacture aphorisms.** Rhythm comes from cutting filler and keeping the point, not from squeezing a quotable line out of every paragraph ending (core rule 5).
+- **Don't perform casualness.** Sprinkling "honestly," "look," and "I mean" into every sentence is as fake as mechanical parallelism. Colloquial fragments are the author's to keep, not yours to add.
+- **Don't perform uncertainty.** Bolting on "I still haven't figured this out" as an ending is the same move as bolting on "In conclusion" — just aimed the other way. Write uncertainty only where it's real; write a change of mind only where one happened.
+- **Don't sacrifice accuracy to sound human.** Technical writing gets to be technical. Precise terms, formal clauses and complete explanations don't need more voice. The target is templated and performative writing, not professionalism.
+
+**The line: the voice belongs to the author, not to you.** When a passage needs a concrete example, a position, or a turning point and the author never gave you one, leave `(needs author input: what did you actually do here?)` — **do not invent one**. A fabricated "I was wrong about this for two years" is far worse than the empty sentence it replaced: empty is boring, invented is a lie told in someone else's name. Full rules in `protected-list.md`.
+
+### Before (clean but soulless):
+> The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.
+
+### After (has a pulse):
+> I genuinely don't know how to feel about this one. 3 million lines of code, generated while the humans presumably slept. Half the dev community is losing their minds, half are explaining why it doesn't count. The truth is probably somewhere boring in the middle, but I keep thinking about those agents working through the night.
+
+A second pair, community-post register:
+
+### Before (community post, soulless):
+> The community has come together in a truly remarkable way, showcasing the power of collaboration and demonstrating that when people unite, incredible things can happen.
+
+### After (community post, has a pulse):
+> Sixty people showed up on a Tuesday night. Nobody expected that.
+
+---
+
+## Formatting and Rhythm Check
+
+Quick pass after writing:
+
+- **Em dashes** (— and --): replace with commas, periods, or parentheses. Target: zero.
+- **Bold**: for scanning, not emphasis on every third phrase.
+- **Emoji in headers**: remove entirely.
+- **Excessive bullets**: if a list has 3+ items that flow naturally, convert to prose.
+- Mix short sentences (3-8 words) with long ones (20+). Fragments are fine.
+- Vary paragraph length. Some paragraphs are one sentence. Others need room.
+- If text-to-speech could read it without pausing, it's too uniform.
+
+---
+
+## How to Read the "After" Examples (they are not a license to fabricate)
+
+Every "After" below shows what a sentence looks like **once the author has
+supplied the material**. They routinely carry specifics the "Before" never had
+("80 people showed up", "three new IT parks", "a 2019 survey by the Chinese
+Academy of Sciences"). That is there to show you the **target shape** — it is
+**not permission to manufacture one**.
+
+When writing or rewriting, if cutting the filler leaves a hole and the author
+never gave you what fills it:
+
+- Missing fact → leave `(needs author input: …)` in place. Do not copy the
+  example and invent a convincing number.
+- Missing source → leave `[source unverified]`. Do not invent a real-sounding
+  institution (see #39).
+
+**The examples teach shape; facts come only from the author.** Full rules:
+Never Invent in `protected-list.md`.
+
+---
+
+## Content Patterns
+
+### 1. Undue Emphasis on Significance, Legacy, and Broader Trends
+
+Summary: don't promote routine events into milestones or broader trends; state what happened | prewrite
+
+**Words to watch:** stands/serves as, is a testament/reminder, a vital/significant/crucial/pivotal/key role/moment, underscores/highlights its importance/significance, reflects broader, symbolizing its ongoing/enduring/lasting, contributing to the, setting the stage for, marking/shaping the, represents/marks a shift, key turning point, evolving landscape, focal point, indelible mark, deeply rooted
+
+**Problem:** LLM writing puffs up importance by adding statements about how arbitrary aspects represent or contribute to a broader topic.
+
+**Before:**
+> The Statistical Institute of Catalonia was officially established in 1989, marking a pivotal moment in the evolution of regional statistics in Spain. This initiative was part of a broader movement across Spain to decentralize administrative functions and enhance regional governance.
+
+**After:**
+> The Statistical Institute of Catalonia was established in 1989 to collect and publish regional statistics independently from Spain's national statistics office.
+
+---
+
+### 2. Undue Emphasis on Notability and Media Coverage
+
+Summary: don't stack media mentions to prove notability; cite one specific source and what it said
+
+**Words to watch:** independent coverage, local/regional/national media outlets, written by a leading expert, active social media presence
+
+**Problem:** LLMs hit readers over the head with claims of notability, often listing sources without context.
+
+**Before:**
+> Her views have been cited in The New York Times, BBC, Financial Times, and The Hindu. She maintains an active social media presence with over 500,000 followers.
+
+**After:**
+> In a 2024 New York Times interview, she argued that AI regulation should focus on outcomes rather than methods.
+
+---
+
+### 3. Superficial Analyses with -ing Endings
+
+Summary: don't tack "-ing" phrases (symbolizing, reflecting...) onto sentences for fake depth
+
+**Words to watch:** highlighting/underscoring/emphasizing..., ensuring..., reflecting/symbolizing..., contributing to..., cultivating/fostering..., encompassing..., showcasing...
+
+**Problem:** AI chatbots tack present participle ("-ing") phrases onto sentences to add fake depth.
+
+**Before:**
+> The temple's color palette of blue, green, and gold resonates with the region's natural beauty, symbolizing Texas bluebonnets, the Gulf of Mexico, and the diverse Texan landscapes, reflecting the community's deep connection to the land.
+
+**After:**
+> The temple uses blue, green, and gold colors. The architect said these were chosen to reference local bluebonnets and the Gulf coast.
+
+---
+
+### 4. Promotional and Advertisement-like Language
+
+Summary: no tourism-brochure prose; describe, don't sell
+
+**Words to watch:** boasts a, vibrant, rich (figurative), profound, enhancing its, showcasing, exemplifies, commitment to, natural beauty, nestled, in the heart of, groundbreaking (figurative), renowned, breathtaking, must-visit, stunning
+
+**Problem:** LLMs have serious problems keeping a neutral tone, especially for "cultural heritage" topics.
+
+**Before:**
+> Nestled within the breathtaking region of Gonder in Ethiopia, Alamata Raya Kobo stands as a vibrant town with a rich cultural heritage and stunning natural beauty.
+
+**After:**
+> Alamata Raya Kobo is a town in the Gonder region of Ethiopia, known for its weekly market and 18th-century church.
+
+---
+
+### 5. Vague Attributions and Weasel Words
+
+Summary: "experts argue" means nothing; name the source or drop the claim
+
+**Words to watch:** Industry reports, Observers have cited, Experts argue, Some critics argue, several sources/publications (when few cited)
+
+**Problem:** AI chatbots attribute opinions to vague authorities without specific sources.
+
+**Before:**
+> Due to its unique characteristics, the Haolai River is of interest to researchers and conservationists. Experts believe it plays a crucial role in the regional ecosystem.
+
+**After:**
+> The Haolai River supports several endemic fish species, according to a 2019 survey by the Chinese Academy of Sciences.
+
+---
+
+### 6. Outline-like "Challenges and Future Prospects" Sections
+
+Summary: don't write formulaic "despite challenges... continues to thrive" sections; report specific events
+
+**Words to watch:** Despite its... faces several challenges..., Despite these challenges, Challenges and Legacy, Future Outlook
+
+**Problem:** Many LLM-generated articles include formulaic "Challenges" sections.
+
+**Before:**
+> Despite its industrial prosperity, Korattur faces challenges typical of urban areas, including traffic congestion and water scarcity. Despite these challenges, with its strategic location and ongoing initiatives, Korattur continues to thrive as an integral part of Chennai's growth.
+
+**After:**
+> Traffic congestion increased after 2015 when three new IT parks opened. The municipal corporation began a stormwater drainage project in 2022 to address recurring floods.
+
+---
+
+## Language and Grammar Patterns
+
+### 7. Overused "AI Vocabulary" Words
+
+Summary: swap high-frequency AI words (additionally, crucial, pivotal...); full table in word-table-en.md
+
+**High-frequency AI words:** Additionally, align with, crucial, delve, emphasizing, enduring, enhance, fostering, garner, highlight (verb), interplay, intricate/intricacies, key (adjective), landscape (abstract noun), pivotal, showcase, tapestry (abstract noun), testament, underscore (verb), valuable, vibrant
+
+**Problem:** These words appear far more frequently in post-2023 text. They often co-occur.
+
+**Before:**
+> Additionally, a distinctive feature of Somali cuisine is the incorporation of camel meat. An enduring testament to Italian colonial influence is the widespread adoption of pasta in the local culinary landscape, showcasing how these dishes have integrated into the traditional diet.
+
+**After:**
+> Somali cuisine also includes camel meat, which is considered a delicacy. Pasta dishes, introduced during Italian colonization, remain common, especially in the south.
+
+---
+
+### 8. Avoidance of "is"/"are" (Copula Avoidance)
+
+Summary: prefer plain "is/has" over "serves as / boasts / features"
+
+**Words to watch:** serves as/stands as/marks/represents [a], boasts/features/offers [a]
+
+**Problem:** LLMs substitute elaborate constructions for simple copulas.
+
+**Before:**
+> Gallery 825 serves as LAAA's exhibition space for contemporary art. The gallery features four separate spaces and boasts over 3,000 square feet.
+
+**After:**
+> Gallery 825 is LAAA's exhibition space for contemporary art. The gallery has four rooms totaling 3,000 square feet.
+
+---
+
+### 9. Negative Parallelisms
+
+Summary: "it's not X, it's Y" is a crutch; usually just state Y | prewrite
+
+**Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts.
+
+**Before:**
+> It's not just about the beat riding under the vocals; it's part of the aggression and atmosphere. It's not merely a song, it's a statement.
+
+**After:**
+> The heavy beat adds to the aggressive tone.
+
+---
+
+### 10. Rule of Three Overuse
+
+Summary: don't force ideas into groups of three; two or four reads more natural
+
+**Problem:** LLMs force ideas into groups of three to appear comprehensive.
+
+**Before:**
+> The event features keynote sessions, panel discussions, and networking opportunities. Attendees can expect innovation, inspiration, and industry insights.
+
+**After:**
+> The event includes talks and panels. There's also time for informal networking between sessions.
+
+---
+
+### 11. Elegant Variation (Synonym Cycling)
+
+Summary: repeat the clear word instead of cycling synonyms
+
+**Problem:** AI has repetition-penalty code causing excessive synonym substitution.
+
+**Before:**
+> The protagonist faces many challenges. The main character must overcome obstacles. The central figure eventually triumphs. The hero returns home.
+
+**After:**
+> The protagonist faces many challenges but eventually triumphs and returns home.
+
+---
+
+### 12. False Ranges
+
+Summary: "from X to Y" needs a meaningful scale; otherwise just list the items
+
+**Problem:** LLMs use "from X to Y" constructions where X and Y aren't on a meaningful scale.
+
+**Before:**
+> Our journey through the universe has taken us from the singularity of the Big Bang to the grand cosmic web, from the birth and death of stars to the enigmatic dance of dark matter.
+
+**After:**
+> The book covers the Big Bang, star formation, and current theories about dark matter.
+
+---
+
+## Style Patterns
+
+### 13. Em Dash Overuse
+
+Summary: em dashes are an AI tell; target zero, use commas or periods
+
+**Problem:** LLMs use em dashes (—) more than humans, mimicking "punchy" sales writing.
+
+**Before:**
+> The term is primarily promoted by Dutch institutions—not by the people themselves. You don't say "Netherlands, Europe" as an address—yet this mislabeling continues—even in official documents.
+
+**After:**
+> The term is primarily promoted by Dutch institutions, not by the people themselves. You don't say "Netherlands, Europe" as an address, yet this mislabeling continues in official documents.
+
+---
+
+### 14. Overuse of Boldface
+
+Summary: bold is for scanning, not for emphasizing every third phrase
+
+**Problem:** AI chatbots emphasize phrases in boldface mechanically.
+
+**Before:**
+> It blends **OKRs (Objectives and Key Results)**, **KPIs (Key Performance Indicators)**, and visual strategy tools such as the **Business Model Canvas (BMC)** and **Balanced Scorecard (BSC)**.
+
+**After:**
+> It blends OKRs, KPIs, and visual strategy tools like the Business Model Canvas and Balanced Scorecard.
+
+---
+
+### 15. Inline-Header Vertical Lists
+
+Summary: don't write "**Header:** explanation" bullet lists; fold into prose
+
+**Problem:** AI outputs lists where items start with bolded headers followed by colons.
+
+**Before:**
+> - **User Experience:** The user experience has been significantly improved with a new interface.
+> - **Performance:** Performance has been enhanced through optimized algorithms.
+> - **Security:** Security has been strengthened with end-to-end encryption.
+
+**After:**
+> The update improves the interface, speeds up load times through optimized algorithms, and adds end-to-end encryption.
+
+---
+
+### 16. Title Case in Headings
+
+Summary: use sentence case in headings, not Title Case
+
+**Problem:** AI chatbots capitalize all main words in headings.
+
+**Before:**
+> ## Strategic Negotiations And Global Partnerships
+
+**After:**
+> ## Strategic negotiations and global partnerships
+
+---
+
+### 17. Emojis
+
+Summary: don't decorate headings or bullets with emojis
+
+**Problem:** AI chatbots often decorate headings or bullet points with emojis.
+
+**Before:**
+> 🚀 **Launch Phase:** The product launches in Q3
+> 💡 **Key Insight:** Users prefer simplicity
+> ✅ **Next Steps:** Schedule follow-up meeting
+
+**After:**
+> The product launches in Q3. User research showed a preference for simplicity. Next step: schedule a follow-up meeting.
+
+---
+
+### 18. Curly Quotation Marks
+
+Summary: use straight quotes, not curly quotes
+
+**Problem:** ChatGPT uses curly quotes ("\u201c...\u201d") instead of straight quotes ("...").
+
+**Before:**
+> He said \u201cthe project is on track\u201d but others disagreed.
+
+**After:**
+> He said "the project is on track" but others disagreed.
+
+---
+
+## Communication Patterns
+
+### 19. Collaborative Communication Artifacts
+
+Summary: "I hope this helps!" is chatbot correspondence, not content; delete
+
+**Words to watch:** I hope this helps, Of course!, Certainly!, You're absolutely right!, Would you like..., let me know, here is a...
+
+**Problem:** Text meant as chatbot correspondence gets pasted as content.
+
+**Before:**
+> Here is an overview of the French Revolution. I hope this helps! Let me know if you'd like me to expand on any section.
+
+**After:**
+> The French Revolution began in 1789 when financial crisis and food shortages led to widespread unrest.
+
+---
+
+### 20. Knowledge-Cutoff Disclaimers
+
+Summary: delete cutoff disclaimers ("as of my last update"); state the fact
+
+**Words to watch:** as of [date], Up to my last training update, While specific details are limited/scarce..., based on available information...
+
+**Problem:** AI disclaimers about incomplete information get left in text.
+
+**Before:**
+> While specific details about the company's founding are not extensively documented in readily available sources, it appears to have been established sometime in the 1990s.
+
+**After:**
+> The company was founded in 1994, according to its registration documents.
+
+---
+
+### 21. Sycophantic/Servile Tone
+
+Summary: cut sycophantic openers ("Great question! You're absolutely right")
+
+**Problem:** Overly positive, people-pleasing language.
+
+**Before:**
+> Great question! You're absolutely right that this is a complex topic. That's an excellent point about the economic factors.
+
+**After:**
+> The economic factors you mentioned are relevant here.
+
+---
+
+### 22. Filler Phrases
+
+Summary: openers, announcements, and restatements are filler; if cutting it changes nothing, cut it | prewrite
+
+**Before → After:**
+- "In order to achieve this goal" → "To achieve this"
+- "Due to the fact that it was raining" → "Because it was raining"
+- "At this point in time" → "Now"
+- "In the event that you need help" → "If you need help"
+- "The system has the ability to process" → "The system can process"
+- "It is important to note that the data shows" → "The data shows"
+
+---
+
+### 23. Excessive Hedging
+
+Summary: don't stack qualifiers ("could potentially possibly"); keep one
+
+**Problem:** Over-qualifying statements.
+
+**Before:**
+> It could potentially possibly be argued that the policy might have some effect on outcomes.
+
+**After:**
+> The policy may affect outcomes.
+
+---
+
+### 24. Generic Positive Conclusions
+
+Summary: don't wrap up with a neat upbeat conclusion; stop when the point is made | prewrite
+
+**Problem:** Vague upbeat endings. AI wraps up with a neat, unassailable conclusion. Real people just stop talking when they're done with the point at hand.
+
+**Before:**
+> The future looks bright for the company. Exciting times lie ahead as they continue their journey toward excellence. This represents a major step in the right direction.
+
+**After:**
+> The company plans to open two more locations next year.
+
+---
+
+### 25. Novelty Inflation
+
+Summary: don't present established concepts as brand-new discoveries
+
+**Problem:** AI treats established concepts as if the speaker invented them: "He introduced a term," "a concept nobody's naming."
+
+**Before:**
+> He introduced a term I hadn't heard before: context poisoning.
+
+**After:**
+> He walked through how context poisoning works in practice.
+
+---
+
+### 26. Emotional Flatline
+
+Summary: don't claim emotions ("what surprised me most"); convey them with concrete facts
+
+**Problem:** AI claims emotions as structural crutch without conveying them: "What surprised me most," "I was fascinated to discover."
+
+**Before:**
+> What surprised me most was how quickly adoption grew.
+
+**After:**
+> Adoption tripled in six months, faster than Slack's first year.
+
+---
+
+### 27. False Concession
+
+Summary: "while X is impressive, Y remains a challenge" weighs nothing; give specifics
+
+**Problem:** AI uses "While X is impressive, Y remains" to sound balanced without weighing anything.
+
+**Before:**
+> While the platform is impressive, scalability remains a challenge.
+
+**After:**
+> The platform handles 10K concurrent users but drops connections above 15K.
+
+---
+
+### 28. Rhetorical Question Openers
+
+Summary: don't stall with rhetorical questions; lead with the point
+
+**Problem:** AI uses rhetorical questions to stall before the point: "But what does this mean for developers?"
+
+**Before:**
+> So why should you care about this change?
+
+**After:**
+> This change affects build times. Here's how.
+
+---
+
+### 29. Parenthetical Hedging
+
+Summary: parenthetical asides "(and, increasingly, Z)" are fake nuance; cut or inline
+
+**Problem:** AI inserts parenthetical asides to sound nuanced: "(and, increasingly, Z)."
+
+**Before:**
+> The API supports REST (and, increasingly, GraphQL) endpoints.
+
+**After:**
+> The API supports REST and GraphQL endpoints.
+
+---
+
+### 30. Numbered List Inflation
+
+Summary: don't default to "N reasons why" lists; tell one or two concrete things
+
+**Problem:** AI defaults to numbered lists because they're structurally safe: "Three key takeaways."
+
+**Before:**
+> Here are 7 reasons why observability matters.
+
+**After:**
+> Observability caught two outages last quarter that monitoring missed. Here's what happened.
+
+---
+
+### 31. Reasoning Chain Artifacts
+
+Summary: "let me break this down" is reasoning scaffolding; keep it out of prose
+
+**Problem:** Chain-of-thought scaffolding leaks into prose: "Let me think step by step," "Breaking this down."
+
+**Before:**
+> Let me break this down systematically. First, we need to consider the architecture.
+
+**After:**
+> The architecture has three layers. The middle one is the problem.
+
+---
+
+### 32. Acknowledgment Loops
+
+Summary: don't restate the question before answering; just answer
+
+**Problem:** AI restates the prompt before answering: "You're asking about," "To answer your question."
+
+**Before:**
+> You're asking about how caching works in distributed systems. Great question.
+
+**After:**
+> Distributed caches solve the cold-start problem but introduce consistency tradeoffs.
+
+---
+
+### 33. "Let's" Constructions
+
+Summary: "let's explore..." is a false-collaborative opener; start with the point
+
+**Words to watch:** Let's explore, Let's take a look, Let's break this down, Let's examine
+
+**Problem:** AI uses "let's" as false-collaborative opener. It's filler that delays the point.
+
+**Before:**
+> Let's take a closer look at how the authentication flow works.
+
+**After:**
+> The authentication flow starts with an OAuth redirect.
+
+---
+
+### 34. Excessive Structure
+
+Summary: don't pack short text with headers; 3+ under 300 words is too many
+
+**Problem:** Too many headers in short text (3+ in under 300 words). Formulaic headers like "Overview," "Key Points," "Summary."
+
+**Before:**
+> ## Overview\n## Key Features\n## Benefits\n## Summary\n(in a 200-word section)
+
+**After:**
+> Merge into 1-2 sections with specific headers that tell the reader something.
+
+---
+
+### 35. Rhythm and Uniformity
+
+Summary: uniform sentence and paragraph length is the #1 AI signal; break the meter | prewrite
+
+**Problem:** AI text is metronomic: uniform sentence length (15-25 words), uniform paragraphs, symmetrical phrasing. Structure is the #1 AI detection signal.
+
+**Before:**
+> The platform processes data efficiently. The system handles requests reliably. The architecture scales horizontally. The team maintains quality consistently.
+
+**After:**
+> The platform chews through data. Requests? Handled. It scales sideways, and somehow the team hasn't lost their minds yet.
+
+---
+
+### 36. Rewrite-vs-Patch Threshold
+
+Summary: 5+ word flags, 3+ pattern categories, uniform rhythm → rewrite, don't patch
+
+**Problem:** When text has 5+ vocabulary flags across categories, 3+ pattern categories, and uniform rhythm, patching won't fix it — the structure itself is AI-generated.
+
+**Guidance:** Advise full rewrite: state the core point in one sentence, then rebuild.
+
+---
+
+### 37. Therapy-Speak (Emotional Validation)
+
+Summary: don't certify feelings ("your anxiety is valid" → "of course you're anxious"); cut absolving lines | prewrite
+
+**Watch for:** your X is valid, your feelings are real, it's not your fault, you deserve to be seen, I see you, your feelings matter, it's okay to feel this way
+
+**Problem:** RLHF-tuned models are trained to be highly empathetic and to avoid contradicting the user, so they pick up two therapist moves: validating the emotion ("your feelings are real") and absolving guilt ("it's not your fault"). Both treat a feeling as something that needs external certification, and the tone talks down instead of across. A real person reassures as a peer. They treat the feeling as ordinary ("of course you're anxious") instead of certifying it ("your anxiety is valid").
+
+**Before:**
+> Parents' anxiety is real and valid, and they shouldn't be blamed.
+
+**After:**
+> Of course parents get anxious.
+
+**Transform tactics (change the move, not the synonym):**
+- Validate → normalize: "your X is valid / real" becomes "of course you feel X" or "it's normal to feel X"
+- Absolve → cut or get specific: "it's not your fault" usually just gets deleted, or becomes "anyone would react that way"
+- Witness → state the fact: "I see how hard you're working" becomes "you've shown up three months straight"
+
+**Examples:**
+
+| Therapy-speak | What a friend says |
+|---|---|
+| your anxiety is valid | of course you're anxious |
+| your feelings are completely valid | makes sense you'd feel that way |
+| none of this is your fault | this really isn't on you |
+| I see how hard you've worked | you've been at this every day |
+
+**Test:** Say it to a friend out loud. A friend doesn't certify your emotion. They say "yeah, of course," "who wouldn't," "same here." If the sentence is stamping a feeling as "real" or "valid," it's therapy-speak.
+
+**Distinguishing from #9 and #24:**
+
+| | #9 Negative Parallelism | #24 Generic Positive Conclusions | #37 Therapy-Speak |
+|---|---|---|---|
+| Trigger | overt syntax markers ("not X, but Y") | upbeat sign-off (bright future, keep going) | validating or absolving emotion ("your X is valid," "not your fault") |
+| Register | slogan symmetry | motivational close | therapist reassurance |
+| Fix | one clause, just state Y | replace with a concrete fact | normalize the feeling, say it plainly |
+
+---
+
+### 38. Reframing as a Substitute for Reasoning
+
+Summary: "on the surface X, deeper down Y" / "the real problem is" fakes insight through tone escalation; cut the frame, add the reasoning | prewrite
+
+**Watch for:** on the surface... but at a deeper level; the real question/problem isn't X, it's Y; the key isn't X, it's Y; you think it's X, but it's actually Y; seemingly paradoxical; paradoxically; what looks like X is actually Y
+
+**Problem:** When asked to write "with a point of view," AI falls into one shape: state a common view, negate or correct it, then present a higher-level take. Contrast should serve analysis. Here contrast becomes the engine that moves the piece forward. No new information, just tone escalation, and the negated X is often a strawman nobody holds. Real thinking distinguishes, qualifies, rebuts, and derives, instead of restating the same thing one level up.
+
+**Before:**
+> On the surface, this is an efficiency problem; at a deeper level, it's really a trust problem. The real key isn't the tooling, it's whether the team dares to hand over decisions.
+
+**After:**
+> After the deploy pipeline went from three days to half a day, overtime didn't drop, because every PR still waits for the manager's personal sign-off. The bottleneck is the manager not delegating review, not the tooling.
+
+**Test:** Ask "what does Y say that X didn't?" If Y is just X restated one level up, or nobody actually holds X, delete the frame, state Y directly, and back it with a concrete example or causal chain. A contrast that lands after the reasoning is human. A contrast that replaces the reasoning is the tell. Legitimate contrasts stay: keep any distinction that gives a criterion, a qualifier, or can say exactly how the two sides differ.
+
+**Density rule:** At most one of these frames per piece. Two or more means the piece is advancing on tone pivots. Go to #36 and rewrite.
+
+**Distinguishing from #9 Negative Parallelisms:**
+
+| | #9 Negative Parallelisms | #38 Reframing as a Substitute for Reasoning |
+|---|---|---|
+| Catches | form (symmetry, slogan feel) | reasoning (the contrast adds no new information) |
+| Test | does it sound like a slogan? | what does Y say that X didn't? |
+| Example | "It's not luck, it's skill" | "On the surface it's efficiency, deeper down it's trust" |
+| Fix | one clause, just state Y | cut the frame, argue Y with examples and causation |
+
+---
+
+### 39. Hallucinated Citations
+
+Summary: a decimal-precise study that doesn't exist, a quote pinned on the wrong person — mark `[source unverified]` and hand it back, never verify or invent for the author
+
+**Watch for:** decimal-precise research figures with no traceable study ("productivity rose 47.3%"), famous quotes attributed to the wrong person, book citations with no page number, dead links, institution names that sound real but have no source
+
+**Problem:** The sibling of #5, and the worse one. #5 withholds the source ("experts believe"); this one supplies a source that looks specific and does not exist. False precision is harder to catch than vagueness and does more damage to the author's credibility.
+
+**Before:**
+> A Harvard study found that workers using a note-taking system are 47.3% more productive. As Einstein said, "Compound interest is the eighth wonder of the world."
+
+**After:**
+> [source unverified] A Harvard study found that workers using a note-taking system are 47.3% more productive.
+> [source unverified] As Einstein said, "Compound interest is the eighth wonder of the world."
+
+Both sentences survive **verbatim**; only the marker is added. Note that "this quote is actually misattributed" is *your* finding, not the author's text — put it in the delivery notes, never in the prose in place of the original.
+
+**Action:** Keep the suspect sentence **verbatim**, prefix it with `[source unverified]`, hand it back to the author. Do not delete it, do not go verify it, do not invent a source, and do not swap in another equally suspect one. Fact-checking is out of scope for this skill — flagging it *is* the correct delivery.
+
+---
+
+### 40. AI Tool Residue
+
+Summary: `utm_source=chatgpt.com` and `turn0search0` are hard proof of unproofread AI output; grep before publishing
+
+**Watch for (hard evidence, clear these first):**
+- Link parameters: `utm_source=chatgpt.com`, `utm_source=openai`, `utm_source=copilot.com`, `utm_source=perplexity`, `referrer=grok.com`
+- Citation placeholder codes: `turn0search0`, `citeturn0news0` and similar residue containing private-use Unicode characters
+- Pasted chat frame: "Here's the cleaned-up version, ready to copy:" (the copy-paste form of #19)
+
+**Action:** Strip the parameters and residue, keep the link itself. The author's own marketing parameters (`utm_source=newsletter`) are protected — see `protected-list.md`.
+
+**How to check:** Before publishing, search for `utm_source=`, `turn0`, `citeturn`. This is the one pattern in the catalog that can be caught mechanically. Don't skip it.
+
+---
+
+### 41. Unfilled Template Placeholders
+
+Summary: `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the author, never fill them in
+
+**Watch for:** `[Product Name]`, `[insert case study here]`, `[Company]`, `XX Corp`, `{{name}}`, `<your name>`
+
+**Problem:** The most embarrassing tell of all. It means nobody read the draft before it shipped.
+
+**Action:** Flag each one for the author to fill. **Do not fill them in yourself** — guessing a placeholder is inventing a fact (see Never Invent in `protected-list.md`).
+
+**False-positive boundary:** Two things look like placeholders and are not.
+
+- **A merge tag in a template is the feature, not an omission.** `{{name}}`, `{{first_name}}`, Liquid/Handlebars variables, placeholders inside code blocks — all pass. Only flag placeholders in *finished copy*. The test: is this text meant to be *sent*, or meant to have *data poured into it*?
+- **Deliberate anonymization is not an omission.** "my last job at [Company]", "one client", "Person A". Asking the author to fill these in is asking them to de-anonymize. Pass.
+
+---
+
+## Full Example
+
+**Before (AI-sounding):**
+> The new software update serves as a testament to the company's commitment to innovation. Moreover, it provides a seamless, intuitive, and powerful user experience—ensuring that users can accomplish their goals efficiently. It's not just an update, it's a revolution in how we think about productivity. Industry experts believe this will have a lasting impact on the entire sector, highlighting the company's pivotal role in the evolving technological landscape.
+
+**After (Humanized):**
+> The software update adds batch processing, keyboard shortcuts, and offline mode. Early feedback from beta testers has been positive, with most reporting faster task completion.
+
+**Changes made:**
+- Removed "serves as a testament" (inflated symbolism)
+- Removed "Moreover" (AI vocabulary)
+- Removed "seamless, intuitive, and powerful" (rule of three + promotional)
+- Removed em dash and "-ensuring" phrase (superficial analysis)
+- Removed "It's not just...it's..." (negative parallelism)
+- Removed "Industry experts believe" (vague attribution)
+- Removed "pivotal role" and "evolving landscape" (AI vocabulary)
+- Added specific features and concrete feedback
+
+---
+
+## Reference
+
+This guide is based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup. The patterns documented there come from observations of thousands of instances of AI-generated text on Wikipedia.
+
+Patterns #39–#41 are adapted from [speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw) (MIT License).
+
+Sources: [blader/humanizer](https://github.com/blader/humanizer), [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop)

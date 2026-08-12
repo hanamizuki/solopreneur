@@ -10,13 +10,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROUTER = (
     REPO_ROOT
-    / "plugins"
-    / "marketer"
     / "skills"
+    / "marketer"
     / "using-marketer"
     / "SKILL.md"
 )
-AGENT = REPO_ROOT / "plugins" / "marketer" / "agents" / "marketer.toml"
+AGENT = REPO_ROOT / "src" / "marketer" / "agents" / "marketer.toml"
 EVAL_FIXTURE = Path(__file__).with_name("fixtures") / "marketer-router-eval.json"
 
 

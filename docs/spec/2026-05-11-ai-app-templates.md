@@ -34,7 +34,7 @@ Trade-off: description triggers broadly (any "AI backend" topic). Acceptable
 ## Skill placement
 
 ```
-plugins/ai-engineer/skills/ai-app-templates/
+skills/ai-engineer/ai-app-templates/
 ├── SKILL.md
 └── references/
     └── simple-llm-api/

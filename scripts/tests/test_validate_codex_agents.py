@@ -54,7 +54,7 @@ class ValidateCodexAgentsTests(unittest.TestCase):
     ) -> Path:
         agent_name = name or plugin
         agent_filename = filename or f"{agent_name}.toml"
-        agents_dir = self.repo_root / "plugins" / plugin / "agents"
+        agents_dir = self.repo_root / "src" / plugin / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
         path = agents_dir / agent_filename
 
@@ -173,7 +173,7 @@ class ValidateCodexAgentsTests(unittest.TestCase):
             "not valid TOML = [",
             encoding="utf-8",
         )
-        agents_dir = self.repo_root / "plugins" / "marketer" / "agents"
+        agents_dir = self.repo_root / "src" / "marketer" / "agents"
         agents_dir.parent.mkdir(parents=True, exist_ok=True)
         agents_dir.symlink_to(external, target_is_directory=True)
 

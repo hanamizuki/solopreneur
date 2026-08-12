@@ -15,7 +15,7 @@ Three interlocking issues in the current `worktree-handoff` flow:
    so the original "why" of the work is lost the moment the PR merges.
 
 2. **Complicates `greenlight` clean-tree precondition.** `greenlight` PR mode
-   (`plugins/solopreneur/skills/greenlight/SKILL.md:120`) checks `git status
+   (`skills/solopreneur/greenlight/SKILL.md:120`) checks `git status
    --porcelain` and asks the user whether to commit first — not a hard refusal,
    but a friction point. More importantly, the fix subagents in Phase 2/3
    auto-commit + push anything in the working tree, so an uncommitted
@@ -103,7 +103,7 @@ discovery and creation. Flat mode is the fallback.
 ### 2. Cascade config helper
 
 A new shared reference document at
-`plugins/solopreneur/skills/_shared/config.md` defines the cascade convention.
+`skills/solopreneur/_shared/config.md` defines the cascade convention.
 All skills source the convention by including the same shell snippet (skills
 are markdown documents — there's no shared lib mechanism, so the snippet is
 the convention).
@@ -325,7 +325,7 @@ appending happens in place. No renaming.
 ### 4. `merge-pr` migration into plugin
 
 Move `~/Agents/skills/hana/merge-pr/SKILL.md` to
-`plugins/solopreneur/skills/merge-pr/SKILL.md`.
+`skills/solopreneur/merge-pr/SKILL.md`.
 
 #### What's kept from the personal-skill version
 
@@ -601,18 +601,18 @@ Manual test scenarios (no automated test infra exists in this repo):
 
 Suggested commit sequence inside the PR:
 
-1. Add `plugins/solopreneur/skills/_shared/config.md` (cascade helper spec).
+1. Add `skills/solopreneur/_shared/config.md` (cascade helper spec).
 2. Sweep existing 14 hardcoded `~/.claude/solopreneur.json` references to
    inline the cascade helper.
 3. Rewrite `worktree-handoff/SKILL.md` (state-machine + flat modes,
    interactive picker, append-or-create flow).
 4. Move `merge-pr` from `~/Agents/skills/hana/` into
-   `plugins/solopreneur/skills/merge-pr/` and extend Step 3 with the
+   `skills/solopreneur/merge-pr/` and extend Step 3 with the
    consolidation pass.
 5. Update `.claude-plugin/marketplace.json` if `merge-pr` needs an entry
    (verify how other skills are listed first — they may be auto-discovered
    from `skills/`).
 6. Update top-level `CLAUDE.md` if any user-facing convention changed
    (probably not — config schema is internal).
-7. Bump `plugins/solopreneur/.claude-plugin/plugin.json` patch version on
+7. Bump `src/solopreneur/plugin.json` patch version on
    release via `/release` skill (don't touch the version manually).

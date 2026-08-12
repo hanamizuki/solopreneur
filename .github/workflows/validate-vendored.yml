@@ -3,16 +3,16 @@ name: Validate vendored skills
 on:
   pull_request:
     paths:
-      - 'plugins/*/skills/**'
-      - 'plugins/*/vendor/**'
-      - 'plugins/*/scripts/sync-vendored.sh'
+      - 'skills/*/**'
+      - 'src/*/vendor/**'
+      - 'src/*/scripts/sync-vendored.sh'
       - '.github/workflows/validate-vendored.yml'
   push:
     branches: [main]
     paths:
-      - 'plugins/*/skills/**'
-      - 'plugins/*/vendor/**'
-      - 'plugins/*/scripts/sync-vendored.sh'
+      - 'skills/*/**'
+      - 'src/*/vendor/**'
+      - 'src/*/scripts/sync-vendored.sh'
 
 permissions:
   contents: read
@@ -36,8 +36,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Re-sync to pinned revs
-        working-directory: plugins/${{ matrix.plugin }}
-        run: ./scripts/sync-vendored.sh --pinned
+        run: ./src/${{ matrix.plugin }}/scripts/sync-vendored.sh --pinned
 
       - name: Check for drift
         run: |
@@ -49,12 +48,12 @@ jobs:
           # what we care about, and any rev mismatch would have triggered
           # re-fetch and produced file diffs outside these excluded paths.
           if ! git diff --exit-code \
-                 -- 'plugins/${{ matrix.plugin }}/skills/' \
-                    'plugins/${{ matrix.plugin }}/vendor/' \
-                 ':!plugins/${{ matrix.plugin }}/vendor/manifest.json' \
-                 ':!plugins/${{ matrix.plugin }}/skills/**/_VENDOR.md'; then
+                 -- 'skills/${{ matrix.plugin }}/' \
+                    'src/${{ matrix.plugin }}/vendor/' \
+                 ':!src/${{ matrix.plugin }}/vendor/manifest.json' \
+                 ':!skills/${{ matrix.plugin }}/**/_VENDOR.md'; then
             echo
-            echo "::error::Vendored skill files in plugins/${{ matrix.plugin }}/ drift from pinned manifest revs."
+            echo "::error::Vendored skill files for ${{ matrix.plugin }} drift from pinned manifest revs."
             echo "::error::Either revert the hand-edits, or update the manifest and re-run sync-vendored.sh."
             exit 1
           fi

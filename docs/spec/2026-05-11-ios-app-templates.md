@@ -36,7 +36,7 @@ V1 的「從 como-ios 複製檔案」策略證實不可行：
 ## 結構
 
 ```
-plugins/ios-dev/skills/ios-app-templates/
+skills/ios-dev/ios-app-templates/
 ├── SKILL.md                            # 觸發描述、catalog、使用流程
 └── references/
     └── photo-analysis-app/
@@ -205,9 +205,9 @@ copy files from `references/<template>/Sources/` into your new project.
 
 V1 spec 漏掉這部分（Codex finding #7）。實作時必須一併更新：
 
-1. **`plugins/ios-dev/agents/ios-dev.md`** — curated skills list 加入 `ios-dev:ios-app-templates`
-2. **`plugins/ios-dev/.claude-plugin/plugin.json`** — `description` 欄位更新，提到 templates
-3. **`plugins/ios-dev/README.md`**（若存在）— 範本清單
+1. **`src/ios-dev/agents/ios-dev.md`** — curated skills list 加入 `ios-dev:ios-app-templates`
+2. **`src/ios-dev/plugin.json`** — `description` 欄位更新，提到 templates
+3. **`src/ios-dev/README.md`**（若存在）— 範本清單
 4. **根目錄 `README.md`** — 提到 `ios-dev` 新增 templates skill
 5. **根目錄 `.claude-plugin/marketplace.json`** — `ios-dev` entry 的 description 同步
 

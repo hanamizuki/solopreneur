@@ -2,19 +2,26 @@
 
 This repo ships **seven sub-plugins** from a single marketplace:
 
-| Plugin | Path | Depends on |
-|---|---|---|
-| `solopreneur` | `plugins/solopreneur/` | — |
-| `designer` | `plugins/designer/` | `solopreneur` |
-| `marketer` | `plugins/marketer/` | `solopreneur` |
-| `ios-dev` | `plugins/ios-dev/` | `solopreneur` |
-| `android-dev` | `plugins/android-dev/` | `solopreneur` |
-| `ai-engineer` | `plugins/ai-engineer/` | `solopreneur` |
-| `neo4j-dev` | `plugins/neo4j-dev/` | `solopreneur` |
+| Plugin | Skills | Non-skill source | Depends on |
+|---|---|---|---|
+| `solopreneur` | `skills/solopreneur/` | `src/solopreneur/` | — |
+| `designer` | `skills/designer/` | `src/designer/` | `solopreneur` |
+| `marketer` | `skills/marketer/` | `src/marketer/` | `solopreneur` |
+| `ios-dev` | `skills/ios-dev/` | `src/ios-dev/` | `solopreneur` |
+| `android-dev` | `skills/android-dev/` | `src/android-dev/` | `solopreneur` |
+| `ai-engineer` | `skills/ai-engineer/` | `src/ai-engineer/` | `solopreneur` |
+| `neo4j-dev` | `skills/neo4j-dev/` | `src/neo4j-dev/` | `solopreneur` |
 
-Each plugin's directory name matches its marketplace `name` 1:1. The
-`Depends on` column shows the marketplace `name` declared in
-`plugins/<dir>/.claude-plugin/plugin.json` `dependencies`.
+Each directory name matches its marketplace `name` 1:1. The `Depends on`
+column comes from `src/<name>/plugin.json`.
+
+`skills/` and `src/` are the only hand-maintained plugin sources. Run
+`scripts/generate-plugin-packages.sh` after changing either root. It rebuilds
+the committed install packages at `plugins/claude/<name>/` and the
+registry-filtered `plugins/codex/<name>/`; never edit those outputs directly.
+Until the first release after this migration, generated compatibility copies
+remain at `plugins/<name>/` and `.codex/plugins/<name>/` so existing tags and
+marketplace paths continue to install without a version gap.
 
 ## Config layering
 
@@ -37,16 +44,16 @@ non-null wins:
 
 Existing configs on the old flat schema (`{ "todos": {...} }` at the
 top level) keep working via layer 5; migration is optional. The helpers
-are implemented once in `plugins/solopreneur/shared/config.sh`, which
-skills `source`; see `plugins/solopreneur/shared/config.md` for the
+are implemented once in `src/solopreneur/shared/config.sh`, which
+skills `source`; see `src/solopreneur/shared/config.md` for the
 cascade documentation and a sample migrated config.
 
 There is a **second, separate config file**: `.solopreneur.json` (leading
 dot), used by the preview Library. It is keyed by **filesystem path**
 rather than by git remote, is read by
-`plugins/solopreneur/skills/preview/scripts/config-resolve.mjs` rather
+`skills/solopreneur/preview/scripts/config-resolve.mjs` rather
 than by the shell helpers, and is validated against
-`plugins/solopreneur/shared/config.schema.json`. The two files coexist
+`src/solopreneur/shared/config.schema.json`. The two files coexist
 and neither reader touches the other's file — same `config.md` covers
 both.
 
@@ -63,7 +70,8 @@ The skill:
 
 1. Detects which sub-plugins changed since their last `<plugin>--v*` tag.
 2. Asks per plugin for `patch` / `minor` / `skip`.
-3. Bumps `plugin.json` versions in one `chore(release): ...` commit.
+3. Bumps `src/<name>/plugin.json`, regenerates packages, and commits them with
+   the changelog in one `chore(release): ...` commit.
 4. Creates double-dash annotated tags (`<plugin-name>--v<version>`).
 5. Updates `CHANGELOG.md` at the repo root with an outward, per-plugin
    note for the release (what installing/updating that plugin gets the
@@ -97,7 +105,7 @@ consistency with installer commands.
 
 ### What does NOT bump
 
-- **Regular commits** — even if they change `plugins/<name>/`. Bumping is
+- **Regular commits** — even if they change `skills/<name>/` or `src/<name>/`. Bumping is
   a release action, not a push action. The version stays at the last tag
   until the next `/release`.
 - **Docs-only changes at the repo root** (`README.md`, `MIGRATION.md`,

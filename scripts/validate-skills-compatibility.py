@@ -83,8 +83,8 @@ def main() -> int:
         errors.append("schemaVersion must be 1")
 
     discovered = {
-        f"{path.parts[-4]}:{path.parent.name}"
-        for path in repo.glob("plugins/*/skills/*/SKILL.md")
+        f"{path.parts[-3]}:{path.parent.name}"
+        for path in repo.glob("skills/*/*/SKILL.md")
     }
 
     source_shapes = registry.get("sourceShapes", {})
@@ -241,8 +241,8 @@ def main() -> int:
         ):
             errors.append(f"skills.{skill_id}.platformResources contains a missing path")
         skill_plugin, skill_name = skill_id.split(":", 1)
-        skill_root = (repo / "plugins" / skill_plugin / "skills" / skill_name).resolve()
-        shared_config = (repo / "plugins" / skill_plugin / "shared" / "config.sh").resolve()
+        skill_root = (repo / "skills" / skill_plugin / skill_name).resolve()
+        shared_config = (repo / "src" / skill_plugin / "shared" / "config.sh").resolve()
         if any(
             path is not None
             and path != shared_config
@@ -340,7 +340,7 @@ def main() -> int:
         if skill_id not in REQUIRED_GUARDS:
             continue
         plugin, skill = skill_id.split(":", 1)
-        expected_path = repo / "plugins" / plugin / "skills" / skill / "SKILL.md"
+        expected_path = repo / "skills" / plugin / skill / "SKILL.md"
         expected_reference = str(expected_path.relative_to(repo))
         if raw_path != expected_reference:
             errors.append(f"codexHostGuards.{skill_id} must reference {expected_reference}")

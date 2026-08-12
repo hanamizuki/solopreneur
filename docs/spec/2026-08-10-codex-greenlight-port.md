@@ -16,7 +16,7 @@ defect, not a Codex parity or publication gate
 
 Run the shipped `/greenlight` PR review loop on Codex. One skill body, no fork.
 
-`plugins/solopreneur/skills/greenlight/SKILL.md` already *is* the specification.
+`skills/solopreneur/greenlight/SKILL.md` already *is* the specification.
 It is a prompt, not a program, and Codex reads prompts too. Porting is therefore
 a question of which parts of that prompt depend on Claude Code — not of
 extracting a shared engine and writing adapters against it.
@@ -101,7 +101,7 @@ terminal classification. Findings:
 3. **Two more Claude-only bindings survived on improvisation.** The body sets
    `SCRIPTS="${CLAUDE_SKILL_DIR}/scripts"` — an env var Codex never sets; the
    model substituted the repo-relative path
-   `plugins/solopreneur/skills/greenlight/scripts`, which resolved only
+   `skills/solopreneur/greenlight/scripts`, which resolved only
    because the PR under review happens to live in the plugin's own source
    repo. On any other repo that path does not exist and the correct answer is
    the plugin snapshot path (M2). And `scripts/reviewer-state.mjs` roots its
@@ -186,8 +186,9 @@ finding outranks `clean`, puts a size ceiling on the clean pass — see
 
 ## Implementation plan
 
-Ordered; W1 unblocks determinism for everything after it. All paths relative
-to `plugins/solopreneur/`.
+Ordered; W1 unblocks determinism for everything after it. Skill paths are
+relative to `skills/solopreneur/`; shared-helper paths are under
+`src/solopreneur/`.
 
 ### W1 — move the config helpers from skill bodies into a sourced script
 
@@ -231,7 +232,7 @@ The five consumers inline one marker-delimited block
    state lands in the active harness's home without callers exporting
    anything.
 
-Done when: `grep -rE '\\\$[0-9@*{]' plugins/solopreneur/skills/*/SKILL.md`
+Done when: `grep -rE '\\\$[0-9@*{]' skills/solopreneur/*/SKILL.md`
 returns nothing, and the updated tests pass.
 
 ### W2 — add the `claude-cli` gate recipe
@@ -365,7 +366,7 @@ turned out to be half the story (see run 2's size ceiling).
    the skills context budget). `<skill-dir>/scripts` resolved correctly there —
    W1 item 6 works — but `<skill-dir>/../../shared/config.sh` does not exist in
    that layout, and the model fell back to the repo-relative
-   `plugins/solopreneur/shared/config.sh`. That resolved **only because the PR
+   `src/solopreneur/shared/config.sh`. That resolved **only because the PR
    under review is the plugin's own source repo**, which is precisely the M3
    finding-3 failure W1 was meant to close. It is still open whenever the skill
    is loaded from a flat skills tree.
