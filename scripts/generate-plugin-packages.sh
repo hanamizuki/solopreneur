@@ -380,6 +380,24 @@ for name in "${plugins[@]}"; do
     queue_output "" "$REPO_ROOT/plugins/$name"
   fi
 done
+
+# plugins/claude, plugins/codex and .codex/plugins are each replaced wholesale, so
+# a de-listed plugin disappears from them on the next run. The flat legacy bridge
+# is not: the loop above only names plugins the marketplace still lists, so
+# removing or renaming one would strand its plugins/<old-name>/ directory —
+# committed, still installable from the tagged marketplace path, and invisible to
+# the drift gate because nothing regenerates it. Derive the removals from what is
+# actually on disk instead.
+for existing in "$REPO_ROOT"/plugins/*/; do
+  [[ -d "$existing" ]] || continue
+  stray="$(basename "$existing")"
+  # Not strays: the two symmetric package roots queued above.
+  [[ "$stray" == claude || "$stray" == codex ]] && continue
+  for name in "${plugins[@]}"; do
+    [[ "$stray" == "$name" ]] && continue 2
+  done
+  queue_output "" "$REPO_ROOT/plugins/$stray"
+done
 if [[ "$layout" == legacy ]]; then
   queue_output "$STAGED_LEGACY_CODEX_ROOT" "$LEGACY_CODEX_ROOT"
 else

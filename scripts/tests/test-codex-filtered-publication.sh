@@ -87,6 +87,20 @@ cached_skills="$(
 [[ "$cached_skills" == $'autopilot\nfilter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
 [[ -f "$FILTER_HOME/plugins/cache/$cache_relative/skills/autopilot/SKILL.md" ]]
 
+# A plugin removed from (or renamed in) the marketplace must not strand its flat
+# legacy bridge. plugins/claude, plugins/codex and .codex/plugins are replaced
+# wholesale, so a de-listed name vanishes from them on its own; plugins/<name> is
+# queued per marketplace name, so only an explicit removal clears it.
+stray_bridge="$FIXTURE_ROOT/plugins/retired-plugin"
+mkdir -p "$stray_bridge/.claude-plugin"
+echo '{}' > "$stray_bridge/.claude-plugin/plugin.json"
+"$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null
+if [[ -d "$stray_bridge" ]]; then
+  echo "error: generator left a stale legacy bridge for a de-listed plugin" >&2
+  exit 1
+fi
+[[ -d "$FIXTURE_ROOT/plugins/solopreneur" ]]
+
 # Exercise the one-time marketplace cutover branch without changing the real
 # repository. Mixed layouts are forbidden by the generator; all entries move
 # together and the compatibility copies disappear together.
