@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 # Build the committed Claude and Codex plugin packages from skills/ and src/.
-# The marketplaces select either the temporary legacy bridge or the symmetric
-# package paths; mixed layouts are rejected.
 
 set -euo pipefail
 
@@ -14,7 +12,6 @@ SOURCE_ROOT="$REPO_ROOT/src"
 SKILLS_ROOT="$REPO_ROOT/skills"
 CLAUDE_PACKAGE_ROOT="$REPO_ROOT/plugins/claude"
 CODEX_PACKAGE_ROOT="$REPO_ROOT/plugins/codex"
-LEGACY_CODEX_ROOT="$REPO_ROOT/.codex/plugins"
 STAGING_ROOT=""
 COMMITTING=0
 OUTPUT_STAGED=()
@@ -122,14 +119,9 @@ if [[ -n "$dupes" ]]; then
   exit 1
 fi
 
-if jq -e 'all(.plugins[]; .source == ("./plugins/" + .name))' \
+if ! jq -e 'all(.plugins[]; .source == ("./plugins/claude/" + .name))' \
   "$CLAUDE_MARKETPLACE" >/dev/null; then
-  layout=legacy
-elif jq -e 'all(.plugins[]; .source == ("./plugins/claude/" + .name))' \
-  "$CLAUDE_MARKETPLACE" >/dev/null; then
-  layout=symmetric
-else
-  echo "error: marketplace sources must all use legacy or symmetric package paths" >&2
+  echo "error: marketplace sources must use symmetric Claude package paths" >&2
   exit 1
 fi
 
@@ -240,7 +232,6 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 STAGING_ROOT="$(mktemp -d "$REPO_ROOT/.plugin-packages.XXXXXX")"
 STAGED_CLAUDE_PACKAGE_ROOT="$STAGING_ROOT/plugins/claude"
 STAGED_CODEX_PACKAGE_ROOT="$STAGING_ROOT/plugins/codex"
-STAGED_LEGACY_CODEX_ROOT="$STAGING_ROOT/.codex/plugins"
 STAGED_CODEX_AGENTS="$STAGING_ROOT/.codex/agents"
 STAGED_CODEX_MARKETPLACE="$STAGING_ROOT/.agents/plugins/marketplace.json"
 mkdir -p "$STAGED_CLAUDE_PACKAGE_ROOT" "$STAGED_CODEX_PACKAGE_ROOT"
@@ -314,25 +305,10 @@ for name in "${codex_plugins[@]+"${codex_plugins[@]}"}"; do
   echo "generated: plugins/codex/$name"
 done
 
-# The legacy copies keep tagged marketplace installs valid until the first
-# release switches both marketplaces to the symmetric paths atomically.
-if [[ "$layout" == legacy ]]; then
-  mkdir -p "$STAGED_LEGACY_CODEX_ROOT"
-  for name in "${plugins[@]}"; do
-    cp -R "$STAGED_CLAUDE_PACKAGE_ROOT/$name" "$STAGING_ROOT/plugins/$name"
-  done
-  for name in "${codex_plugins[@]+"${codex_plugins[@]}"}"; do
-    cp -R "$STAGED_CODEX_PACKAGE_ROOT/$name" "$STAGED_LEGACY_CODEX_ROOT/$name"
-  done
-  codex_prefix='./.codex/plugins/'
-else
-  codex_prefix='./plugins/codex/'
-fi
-
 mkdir -p "$(dirname "$STAGED_CODEX_MARKETPLACE")"
 jq --slurpfile overlays "$OVERLAYS" \
   --argjson published "$published_names" \
-  --arg prefix "$codex_prefix" '{
+  --arg prefix './plugins/codex/' '{
     name,
     interface: {displayName: "Solopreneur"},
     plugins: [.plugins[]
@@ -394,37 +370,6 @@ commit_outputs() {
 
 queue_output "$STAGED_CLAUDE_PACKAGE_ROOT" "$CLAUDE_PACKAGE_ROOT"
 queue_output "$STAGED_CODEX_PACKAGE_ROOT" "$CODEX_PACKAGE_ROOT"
-
-for name in "${plugins[@]}"; do
-  if [[ "$layout" == legacy ]]; then
-    queue_output "$STAGING_ROOT/plugins/$name" "$REPO_ROOT/plugins/$name"
-  else
-    queue_output "" "$REPO_ROOT/plugins/$name"
-  fi
-done
-
-# plugins/claude, plugins/codex and .codex/plugins are each replaced wholesale, so
-# a de-listed plugin disappears from them on the next run. The flat legacy bridge
-# is not: the loop above only names plugins the marketplace still lists, so
-# removing or renaming one would strand its plugins/<old-name>/ directory —
-# committed, still installable from the tagged marketplace path, and invisible to
-# the drift gate because nothing regenerates it. Derive the removals from what is
-# actually on disk instead.
-for existing in "$REPO_ROOT"/plugins/*/; do
-  [[ -d "$existing" ]] || continue
-  stray="$(basename "$existing")"
-  # Not strays: the two symmetric package roots queued above.
-  [[ "$stray" == claude || "$stray" == codex ]] && continue
-  for name in "${plugins[@]}"; do
-    [[ "$stray" == "$name" ]] && continue 2
-  done
-  queue_output "" "$REPO_ROOT/plugins/$stray"
-done
-if [[ "$layout" == legacy ]]; then
-  queue_output "$STAGED_LEGACY_CODEX_ROOT" "$LEGACY_CODEX_ROOT"
-else
-  queue_output "" "$LEGACY_CODEX_ROOT"
-fi
 if [[ "$copied" -gt 0 ]]; then
   queue_output "$STAGED_CODEX_AGENTS" "$REPO_ROOT/.codex/agents"
 else
@@ -433,4 +378,4 @@ fi
 queue_output "$STAGED_CODEX_MARKETPLACE" "$CODEX_MARKETPLACE"
 
 commit_outputs
-echo "generated: .agents/plugins/marketplace.json ($layout layout)"
+echo "generated: .agents/plugins/marketplace.json (symmetric layout)"

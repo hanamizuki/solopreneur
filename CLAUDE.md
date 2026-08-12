@@ -19,9 +19,6 @@ column comes from `src/<name>/plugin.json`.
 `scripts/generate-plugin-packages.sh` after changing either root. It rebuilds
 the committed install packages at `plugins/claude/<name>/` and the
 registry-filtered `plugins/codex/<name>/`; never edit those outputs directly.
-Until the first release after this migration, generated compatibility copies
-remain at `plugins/<name>/` and `.codex/plugins/<name>/` so existing tags and
-marketplace paths continue to install without a version gap.
 
 ## Config layering
 

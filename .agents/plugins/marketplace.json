@@ -8,7 +8,7 @@
       "name": "solopreneur",
       "source": {
         "source": "local",
-        "path": "./.codex/plugins/solopreneur"
+        "path": "./plugins/codex/solopreneur"
       },
       "policy": {
         "installation": "AVAILABLE",

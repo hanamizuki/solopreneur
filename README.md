@@ -47,9 +47,6 @@ Codex package instead of appearing and failing later.
 - `plugins/claude/` and `plugins/codex/` are generated install packages. Do
   not edit them directly.
 
-The repository keeps temporary generated copies at the previous marketplace
-paths until the next tagged release moves both platforms atomically.
-
 ## Plugins
 
 Each plugin section describes the bundled skills (in-house and vendored)

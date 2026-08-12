@@ -8,6 +8,84 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-08-12
+
+### solopreneur 0.5.37 → 0.5.38
+
+Codex now receives a deliberately filtered, fail-closed core package: only
+`autopilot`, `greenlight`, `merge-pr`, and `plan-review` are published, while
+unsupported skills stay out instead of installing and failing later.
+
+`autopilot` gains a Codex profile for immediate single-PR runs from a clean,
+up-to-date `main`. `greenlight` can run its external review loop on Codex with
+an independent Claude CLI final gate, host-aware reviewer selection, and
+fail-closed handling for missing reviewers, authentication, or configuration.
+Codex-specific `plan-review internal` and `merge-pr` profiles complete the
+dependency chain without enabling unsupported paths.
+
+Shared configuration now resolves against the active Claude or Codex home.
+This release also completes the package-layout cutover: Claude installs from
+`plugins/claude/`, Codex installs its filtered package from `plugins/codex/`,
+and the temporary compatibility copies are retired atomically. Plugin names
+and normal install commands do not change.
+(#155, #158, #161, #162, #163, #165, #169, #171, #172, #175, #177)
+
+### designer 0.1.9 → 0.1.10
+
+Packaging-only release for the platform-specific layout cutover. The designer
+agent and ten bundled design skills are unchanged; the plugin name and install
+command remain the same.
+(#177)
+
+### marketer 0.0.10 → 0.0.11
+
+Adds the cross-harness `using-marketer` router and a Codex-native marketer
+agent definition, establishing the agent-distribution pilot without claiming
+full marketer skill parity. The public Codex marketplace remains limited to
+the verified core package.
+
+Claude's existing seven marketing workflows remain intact. The plugin also
+moves to the platform-specific Claude package root without changing its name
+or install command.
+(#155, #177)
+
+### ios-dev 0.4.11 → 0.4.12
+
+Packaging-only release for the platform-specific layout cutover. The iOS
+agent and bundled skills are unchanged; the plugin name and install command
+remain the same.
+(#177)
+
+### android-dev 0.4.11 → 0.4.12
+
+Re-synces the six vendored skills from Android's official skill repository.
+Navigation 3 gains additional recipes for deep links, synthetic back stacks,
+custom matchers, conditional transitions, and lifecycle ownership.
+
+The R8 analyzer workflow is repaired: it detects explicit R8 overrides from
+settings files, uses the standalone analyzer task on AGP 9.3+, retains the
+quantitative path for compatible older versions, and falls back to heuristic
+review otherwise. The repair is applied deterministically during future
+vendor syncs.
+
+The plugin also moves to the platform-specific Claude package root without
+changing its name or install command.
+(#177, #178)
+
+### ai-engineer 0.3.14 → 0.3.15
+
+Packaging-only release for the platform-specific layout cutover. The AI
+engineer agent and bundled skills are unchanged; the plugin name and install
+command remain the same.
+(#177)
+
+### neo4j-dev 0.0.8 → 0.0.9
+
+Packaging-only release for the platform-specific layout cutover. The Neo4j
+agent and four bundled skills are unchanged; the plugin name and install
+command remain the same.
+(#177)
+
 ## 2026-07-31
 
 ### solopreneur 0.5.36 → 0.5.37

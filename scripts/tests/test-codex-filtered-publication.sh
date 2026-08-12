@@ -7,10 +7,9 @@ trap 'echo "error: filtered-publication fixture failed at line $LINENO" >&2' ERR
 
 REPO_ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 FIXTURE_ROOT="$(mktemp -d -t codex-filter-repo.XXXXXX)"
-FILTER_HOME="$(mktemp -d -t codex-filter-home.XXXXXX)"
 SYMMETRIC_CODEX_HOME="$(mktemp -d -t codex-symmetric-home.XXXXXX)"
 SYMMETRIC_CLAUDE_HOME="$(mktemp -d -t claude-symmetric-home.XXXXXX)"
-trap 'rm -rf "$FIXTURE_ROOT" "$FILTER_HOME" "$SYMMETRIC_CODEX_HOME" "$SYMMETRIC_CLAUDE_HOME"' EXIT
+trap 'rm -rf "$FIXTURE_ROOT" "$SYMMETRIC_CODEX_HOME" "$SYMMETRIC_CLAUDE_HOME"' EXIT
 
 cp -R \
   "$REPO_ROOT/skills" \
@@ -60,32 +59,21 @@ mv "$registry_next" "$registry"
 
 "$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null
 
+marketplace="$FIXTURE_ROOT/.claude-plugin/marketplace.json"
+marketplace_next="$marketplace.next"
 jq -e '
   [.plugins[] | {name, path: .source.path}]
-  == [{name: "solopreneur", path: "./.codex/plugins/solopreneur"}]
+  == [{name: "solopreneur", path: "./plugins/codex/solopreneur"}]
 ' "$FIXTURE_ROOT/.agents/plugins/marketplace.json" >/dev/null
 
 generated_skills="$(
-  find "$FIXTURE_ROOT/.codex/plugins/solopreneur/skills" \
+  find "$FIXTURE_ROOT/plugins/codex/solopreneur/skills" \
     -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
 )"
 [[ "$generated_skills" == $'autopilot\nfilter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
-[[ -f "$FIXTURE_ROOT/.codex/plugins/solopreneur/skills/autopilot/SKILL.md" ]]
-
-CODEX_HOME="$FILTER_HOME" codex plugin marketplace add "$FIXTURE_ROOT" >/dev/null
-CODEX_HOME="$FILTER_HOME" codex plugin add solopreneur@solopreneur >/dev/null
-listing="$(CODEX_HOME="$FILTER_HOME" codex plugin list --json)"
-cache_relative="$(printf '%s' "$listing" | jq -er '
-  .installed[]
-  | select(.name == "solopreneur" and .marketplaceName == "solopreneur")
-  | "\(.marketplaceName)/\(.name)/\(.version)"
-')"
-cached_skills="$(
-  find "$FILTER_HOME/plugins/cache/$cache_relative/skills" \
-    -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
-)"
-[[ "$cached_skills" == $'autopilot\nfilter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
-[[ -f "$FILTER_HOME/plugins/cache/$cache_relative/skills/autopilot/SKILL.md" ]]
+[[ -f "$FIXTURE_ROOT/plugins/codex/solopreneur/skills/autopilot/SKILL.md" ]]
+[[ -f "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json" ]]
+[[ -f "$FIXTURE_ROOT/plugins/codex/solopreneur/.codex-plugin/plugin.json" ]]
 
 # A canonical root the marketplace does not list must fail closed. Every list the
 # generator and the validators iterate comes from the marketplace, so an unlisted
@@ -116,39 +104,6 @@ if "$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null 2>&1; then
 fi
 rm -rf "$orphan_skills"
 "$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null
-
-# A plugin removed from (or renamed in) the marketplace must not strand its flat
-# legacy bridge. plugins/claude, plugins/codex and .codex/plugins are replaced
-# wholesale, so a de-listed name vanishes from them on its own; plugins/<name> is
-# queued per marketplace name, so only an explicit removal clears it.
-stray_bridge="$FIXTURE_ROOT/plugins/retired-plugin"
-mkdir -p "$stray_bridge/.claude-plugin"
-echo '{}' > "$stray_bridge/.claude-plugin/plugin.json"
-"$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null
-if [[ -d "$stray_bridge" ]]; then
-  echo "error: generator left a stale legacy bridge for a de-listed plugin" >&2
-  exit 1
-fi
-[[ -d "$FIXTURE_ROOT/plugins/solopreneur" ]]
-
-# Exercise the one-time marketplace cutover branch without changing the real
-# repository. Mixed layouts are forbidden by the generator; all entries move
-# together and the compatibility copies disappear together.
-marketplace="$FIXTURE_ROOT/.claude-plugin/marketplace.json"
-marketplace_next="$marketplace.next"
-jq '.plugins |= map(.source = ("./plugins/claude/" + .name))' \
-  "$marketplace" > "$marketplace_next"
-mv "$marketplace_next" "$marketplace"
-"$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null
-
-[[ ! -d "$FIXTURE_ROOT/.codex/plugins" ]]
-[[ ! -d "$FIXTURE_ROOT/plugins/solopreneur" ]]
-[[ -f "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json" ]]
-[[ -f "$FIXTURE_ROOT/plugins/codex/solopreneur/.codex-plugin/plugin.json" ]]
-jq -e '
-  [.plugins[] | {name, path: .source.path}]
-  == [{name: "solopreneur", path: "./plugins/codex/solopreneur"}]
-' "$FIXTURE_ROOT/.agents/plugins/marketplace.json" >/dev/null
 
 CODEX_HOME="$SYMMETRIC_CODEX_HOME" codex plugin marketplace add "$FIXTURE_ROOT" >/dev/null
 CODEX_HOME="$SYMMETRIC_CODEX_HOME" codex plugin add solopreneur@solopreneur >/dev/null
@@ -222,4 +177,4 @@ mv "$registry_next" "$registry"
 [[ -z "$(find "$FIXTURE_ROOT/plugins/codex" -mindepth 1 -print -quit)" ]]
 jq -e '.plugins == []' "$FIXTURE_ROOT/.agents/plugins/marketplace.json" >/dev/null
 
-echo "filtered-publication fixture: legacy and symmetric installs passed"
+echo "filtered-publication fixture: symmetric installs passed"

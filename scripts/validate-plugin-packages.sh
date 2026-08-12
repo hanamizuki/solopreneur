@@ -202,39 +202,22 @@ if [[ -n "$canonical_manifest" ]]; then
   fail=1
 fi
 
-if jq -e 'all(.plugins[]; .source == ("./plugins/" + .name))' \
+expected_prefix='./plugins/codex/'
+install_root="$CODEX_PACKAGE_ROOT"
+if ! jq -e 'all(.plugins[]; .source == ("./plugins/claude/" + .name))' \
   "$CLAUDE_MARKETPLACE" >/dev/null; then
-  expected_prefix='./.codex/plugins/'
-  install_root="$REPO_ROOT/.codex/plugins"
-  while IFS= read -r plugin; do
-    if ! diff -qr "$CLAUDE_PACKAGE_ROOT/$plugin" "$REPO_ROOT/plugins/$plugin"; then
-      echo "error: legacy Claude bridge '$plugin' differs from its package" >&2
-      fail=1
-    fi
-  done < <(jq -r '.plugins[].name' "$CLAUDE_MARKETPLACE")
-  if ! diff -qr "$CODEX_PACKAGE_ROOT" "$REPO_ROOT/.codex/plugins"; then
-    echo "error: legacy Codex bridge differs from symmetric packages" >&2
+  echo "error: Claude marketplace must use symmetric package paths" >&2
+  fail=1
+fi
+while IFS= read -r plugin; do
+  if [[ -e "$REPO_ROOT/plugins/$plugin" ]]; then
+    echo "error: symmetric layout still carries plugins/$plugin" >&2
     fail=1
   fi
-else
-  expected_prefix='./plugins/codex/'
-  install_root="$CODEX_PACKAGE_ROOT"
-  # Post-cutover the compatibility trees must be gone, and that has to be checked
-  # rather than assumed. The generator only deletes them from its symmetric
-  # branch, so retiring that branch before a regeneration has actually removed
-  # them strands committed, still-installable copies — and every other gate here
-  # reads the symmetric roots, so nothing else would notice.
-  while IFS= read -r plugin; do
-    if [[ -e "$REPO_ROOT/plugins/$plugin" ]]; then
-      echo "error: symmetric layout still carries the legacy bridge plugins/$plugin" >&2
-      echo "       regenerate before retiring the generator's legacy branch" >&2
-      fail=1
-    fi
-  done < <(jq -r '.plugins[].name' "$CLAUDE_MARKETPLACE")
-  if [[ -e "$REPO_ROOT/.codex/plugins" ]]; then
-    echo "error: symmetric layout still carries the legacy bridge .codex/plugins" >&2
-    fail=1
-  fi
+done < <(jq -r '.plugins[].name' "$CLAUDE_MARKETPLACE")
+if [[ -e "$REPO_ROOT/.codex/plugins" ]]; then
+  echo "error: symmetric layout still carries .codex/plugins" >&2
+  fail=1
 fi
 
 while IFS= read -r plugin; do
