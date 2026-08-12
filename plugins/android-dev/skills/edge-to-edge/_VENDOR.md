@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `system/edge-to-edge`
-- **Pinned commit**: 47e1dff74a5cde5d0128c5d15e74e000323135ea
-- **Synced at**: 2026-07-28T06:15:16Z
+- **Pinned commit**: 1e5e7ae6138bebd0835d0d5854b0b9adfeed3181
+- **Synced at**: 2026-08-12T12:21:04Z
 - **License**: see `../../vendor/LICENSES/android-skills-LICENSE.txt` (source repo: `src/android-dev/vendor/LICENSES/android-skills-LICENSE.txt`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied

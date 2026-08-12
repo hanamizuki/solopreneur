@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/new-silvermoon/awesome-android-agent-skills
 - **Source path**: `.github/skills/concurrency_and_networking/android-coroutines`
 - **Pinned commit**: 82900eacc8dbe13de93c6310af27b9df4b2bd2f6
-- **Synced at**: 2026-07-28T06:15:13Z
+- **Synced at**: 2026-08-12T12:20:51Z
 - **License**: see `../../vendor/LICENSES/awesome-android-agent-skills-LICENSE` (source repo: `src/android-dev/vendor/LICENSES/awesome-android-agent-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
