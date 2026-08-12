@@ -7,7 +7,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source path**: `skills/apple-design`
 - **Pinned commit**: 70744e3816f1d93eafb697161a8b880a7384c5ff
 - **Synced at**: 2026-07-28T06:16:12Z
-- **License**: see `src/ios-dev/vendor/LICENSES/emilkowalski-skills-LICENSE`
+- **License**: see `../../vendor/LICENSES/emilkowalski-skills-LICENSE` (source repo: `src/ios-dev/vendor/LICENSES/emilkowalski-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is

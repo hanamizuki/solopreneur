@@ -127,6 +127,26 @@ while IFS= read -r plugin; do
     ! -name plugin.json -print0)
 done < <(jq -r '.plugins[].name' "$CLAUDE_MARKETPLACE")
 
+# A vendored sidecar's license pointer is only useful if it resolves where the
+# file is actually read — inside an installed package, which has no src/ tree.
+# Checked against the generated packages, not the source tree, for that reason.
+echo "==> vendored sidecars: license pointers resolve inside the package"
+while IFS= read -r -d '' sidecar; do
+  # shellcheck disable=SC2016  # the grep patterns below are literals, not expressions
+  while IFS= read -r pointer; do
+    [[ -n "$pointer" ]] || continue
+    if [[ ! -e "$(dirname "$sidecar")/$pointer" ]]; then
+      echo "error: ${sidecar#"$REPO_ROOT/"} license pointer does not resolve: $pointer" >&2
+      fail=1
+    fi
+  done < <(grep -o '`\.\./\.\./vendor/LICENSES/[^`]*`' "$sidecar" | tr -d '`')
+  if ! grep -q '`\.\./\.\./vendor/LICENSES/' "$sidecar" \
+     && grep -q 'vendor/LICENSES/' "$sidecar"; then
+    echo "error: ${sidecar#"$REPO_ROOT/"} names a license but no package-relative pointer" >&2
+    fail=1
+  fi
+done < <(find "$CLAUDE_PACKAGE_ROOT" -type f -name _VENDOR.md -print0)
+
 # --- Gate: filtered publication ---------------------------------------------
 echo "==> publication: generated roots match registry includes"
 expected="$(jq -r '
@@ -177,6 +197,22 @@ if jq -e 'all(.plugins[]; .source == ("./plugins/" + .name))' \
 else
   expected_prefix='./plugins/codex/'
   install_root="$CODEX_PACKAGE_ROOT"
+  # Post-cutover the compatibility trees must be gone, and that has to be checked
+  # rather than assumed. The generator only deletes them from its symmetric
+  # branch, so retiring that branch before a regeneration has actually removed
+  # them strands committed, still-installable copies — and every other gate here
+  # reads the symmetric roots, so nothing else would notice.
+  while IFS= read -r plugin; do
+    if [[ -e "$REPO_ROOT/plugins/$plugin" ]]; then
+      echo "error: symmetric layout still carries the legacy bridge plugins/$plugin" >&2
+      echo "       regenerate before retiring the generator's legacy branch" >&2
+      fail=1
+    fi
+  done < <(jq -r '.plugins[].name' "$CLAUDE_MARKETPLACE")
+  if [[ -e "$REPO_ROOT/.codex/plugins" ]]; then
+    echo "error: symmetric layout still carries the legacy bridge .codex/plugins" >&2
+    fail=1
+  fi
 fi
 
 while IFS= read -r plugin; do

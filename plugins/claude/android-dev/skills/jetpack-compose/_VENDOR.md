@@ -7,7 +7,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source path**: `plugins/specialized/android/skills/jetpack-compose`
 - **Pinned commit**: 00ad890f395114dfb067b52d108f8e727636ba74
 - **Synced at**: 2026-07-28T06:15:14Z
-- **License**: see `src/android-dev/vendor/LICENSES/han-LICENSE`
+- **License**: see `../../vendor/LICENSES/han-LICENSE` (source repo: `src/android-dev/vendor/LICENSES/han-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is

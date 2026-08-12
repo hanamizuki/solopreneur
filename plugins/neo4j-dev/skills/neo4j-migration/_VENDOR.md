@@ -7,7 +7,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source path**: `neo4j-migration-skill`
 - **Pinned commit**: bdbce1aadd5827d1acf69634f2bdc004b7f3692f
 - **Synced at**: 2026-07-15T10:32:21Z
-- **License**: see `src/neo4j-dev/vendor/LICENSES/neo4j-skills-LICENSE`
+- **License**: see `../../vendor/LICENSES/neo4j-skills-LICENSE` (source repo: `src/neo4j-dev/vendor/LICENSES/neo4j-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is

@@ -7,7 +7,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source path**: `skills/asc-screenshot-resize`
 - **Pinned commit**: e30039abddbe388179324d0f9cdccb66c3843115
 - **Synced at**: 2026-07-28T06:16:10Z
-- **License**: see `src/ios-dev/vendor/LICENSES/app-store-connect-cli-skills-LICENSE`
+- **License**: see `../../vendor/LICENSES/app-store-connect-cli-skills-LICENSE` (source repo: `src/ios-dev/vendor/LICENSES/app-store-connect-cli-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is

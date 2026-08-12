@@ -358,7 +358,12 @@ for i in $(seq 0 $((source_count - 1))); do
 
     # Drop a small _VENDOR.md sidecar so the source is traceable from the skill folder.
     if [[ -n "$license_file" ]]; then
-      license_line="see \`src/$PLUGIN_NAME/vendor/LICENSES/$(basename "$license_file")\`"
+      # Package-relative first: the sidecar is read from an installed package,
+      # where vendor/ is a sibling of skills/ and there is no src/ tree. The
+      # repo path follows for a maintainer reading the source checkout, where
+      # the relative form does not resolve (skills/ and src/ are siblings).
+      license_line="see \`../../vendor/LICENSES/$(basename "$license_file")\`"
+      license_line="$license_line (source repo: \`src/$PLUGIN_NAME/vendor/LICENSES/$(basename "$license_file")\`)"
     else
       license_line="(none — upstream has no LICENSE file as of sync)"
     fi

@@ -7,7 +7,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source path**: `skills/expertise/iphone-apps`
 - **Pinned commit**: 1757615b99ab789a72ff2d02e9f6112af2a15c04
 - **Synced at**: 2026-07-28T06:16:11Z
-- **License**: see `src/ios-dev/vendor/LICENSES/taches-cc-resources-LICENSE`
+- **License**: see `../../vendor/LICENSES/taches-cc-resources-LICENSE` (source repo: `src/ios-dev/vendor/LICENSES/taches-cc-resources-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is

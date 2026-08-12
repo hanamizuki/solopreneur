@@ -253,15 +253,28 @@ leave them unchanged.
 The cutover release must also, **in the same commit**, retire the compatibility
 bridge everywhere it is described or implemented — otherwise the repo ships
 prose describing directories that no longer exist and branches that can never
-be taken again. Delete:
+be taken again.
 
-1. the compatibility-bridge paragraph in `CLAUDE.md` ("Until the first release
-   after this migration…"),
-2. the "temporary generated copies" sentence in the Repository layout section
-   of `README.md`, and
-3. the `layout == legacy` branches in `scripts/generate-plugin-packages.sh`
-   (`LEGACY_CODEX_ROOT`, its copy loop, and the `queue_output ""` sentinels)
-   and in `scripts/validate-plugin-packages.sh`.
+**Order matters here, and getting it wrong strands the bridge silently.** The
+generator deletes `plugins/<name>/` and `.codex/plugins/` from its *symmetric*
+branch; retiring that code before a regeneration has actually removed them
+leaves committed, still-installable copies behind. Do it in exactly this order:
+
+1. Flip every marketplace source to `./plugins/claude/<name>` (above), then run
+   `./scripts/generate-plugin-packages.sh`. This is the step that removes the
+   compatibility trees.
+2. Confirm they are gone — `ls plugins/` must show only `claude` and `codex`,
+   and `.codex/plugins` must not exist. `./scripts/validate-plugin-packages.sh`
+   also fails on a leftover once the marketplace is symmetric.
+3. Only now delete the dead code and prose: the `layout == legacy` branches in
+   `scripts/generate-plugin-packages.sh` (`LEGACY_CODEX_ROOT`, its copy loop,
+   and the `queue_output ""` sentinels that were removing those trees) and in
+   `scripts/validate-plugin-packages.sh`; the compatibility-bridge paragraph in
+   `CLAUDE.md` ("Until the first release after this migration…"); and the
+   "temporary generated copies" sentence in the Repository layout section of
+   `README.md`.
+4. Re-run the generator and the validator once more to prove the retired code
+   changed nothing.
 
 Step 1.5's README-sync heuristics key on descriptions, new plugins, new skills
 and counts, so none of them fire on this; it has to be done here.
