@@ -1,0 +1,121 @@
+name: Validate plugin packages
+
+on:
+  pull_request:
+    paths:
+      - 'skills/**'
+      - 'src/**'
+      - 'plugins/**'
+      - 'skills-compatibility.json'
+      - '.claude-plugin/**'
+      - '.agents/**'
+      - '.codex/**'
+      - 'scripts/**'
+      - '.claude/skills/release/SKILL.md'
+      - '.github/workflows/validate-plugin-packages.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'skills/**'
+      - 'src/**'
+      - 'plugins/**'
+      - 'skills-compatibility.json'
+      - '.claude-plugin/**'
+      - '.agents/**'
+      - '.codex/**'
+      - 'scripts/**'
+      - '.claude/skills/release/SKILL.md'
+      - '.github/workflows/validate-plugin-packages.yml'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  bootstrap-tests:
+    name: Agent fixtures (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.9'
+          - os: ubuntu-latest
+            python: '3.14'
+          - os: macos-latest
+            python: '3.14'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: '20'
+
+      - name: Show pinned Python, system Bash, and jq versions
+        run: |
+          python3 --version
+          /bin/bash --version | head -1
+          jq --version
+
+      - name: Run agent-validator fixture suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+
+      - name: Regenerate packages with the system Bash
+        run: /bin/bash ./scripts/generate-plugin-packages.sh
+
+      - name: Run bootstrap fixture suite with the system Bash
+        run: node --test skills/solopreneur/codex-agents-bootstrap/tests/*.test.mjs
+
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: validate-plugin-packages-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: '3.9'
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: '20'
+
+      - name: Regenerate plugin packages
+        run: ./scripts/generate-plugin-packages.sh
+
+      - name: Check for drift
+        run: |
+          # `git status --porcelain` instead of `git diff --exit-code`: the
+          # generator can also CREATE files (a newly included skill can create
+          # a fresh plugins/codex/<name> root), and untracked files are
+          # invisible to `git diff`.
+          drift="$(git status --porcelain -- 'plugins' '.agents' '.codex')"
+          if [[ -n "$drift" ]]; then
+            echo "$drift"
+            git diff -- 'plugins' '.agents' '.codex'
+            echo "::error::Generated plugin packages drift from their sources of truth."
+            echo "::error::Re-run ./scripts/generate-plugin-packages.sh and commit the result."
+            exit 1
+          fi
+
+      - name: Install pinned plugin CLIs
+        run: npm install -g @openai/codex@0.147.0 @anthropic-ai/claude-code@2.1.228
+
+      - name: Validate structure and install smoke
+        run: ./scripts/validate-plugin-packages.sh

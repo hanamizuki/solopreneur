@@ -12,7 +12,7 @@ from types import ModuleType
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = (
-    REPO_ROOT / "plugins" / "solopreneur" / "skills" / "codex-agents-bootstrap"
+    REPO_ROOT / "skills" / "solopreneur" / "codex-agents-bootstrap"
 )
 VENDOR_ROOT = SKILL_ROOT / "vendor" / "tomli"
 LOADER_PATH = SKILL_ROOT / "scripts" / "tomli_loader.py"

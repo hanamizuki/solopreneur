@@ -2,7 +2,7 @@
  * Tests for scripts/reviewer-registry.mjs.
  *
  * Requires Node.js >= 20 (stable `node:test`).
- * Run with:  cd plugins/solopreneur/skills/greenlight && node --test tests/*.test.mjs
+ * Run with:  cd skills/solopreneur/greenlight && node --test tests/*.test.mjs
  *
  * The registry is pure data, so these import it directly rather than spawning a
  * CLI. The completeness cases carry the weight: they are the guard that fires

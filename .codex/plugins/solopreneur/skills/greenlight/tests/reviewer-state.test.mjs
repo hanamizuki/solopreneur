@@ -2,7 +2,7 @@
  * Tests for scripts/reviewer-state.mjs.
  *
  * Requires Node.js >= 20 (stable `node:test`).
- * Run with:  cd plugins/solopreneur/skills/greenlight && node --test tests/*.test.mjs
+ * Run with:  cd skills/solopreneur/greenlight && node --test tests/*.test.mjs
  *
  * Every case spawns the real CLI so the contract under test is the one callers
  * depend on: exit code, stdout shape, and what lands in the config file. The

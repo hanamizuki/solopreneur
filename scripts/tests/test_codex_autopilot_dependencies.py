@@ -17,14 +17,14 @@ class CodexAutopilotDependencyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.autopilot = (
-            REPO_ROOT / "plugins/solopreneur/skills/autopilot/SKILL.md"
+            REPO_ROOT / "skills/solopreneur/autopilot/SKILL.md"
         ).read_text(encoding="utf-8")
         cls.autopilot_template = (
             REPO_ROOT
-            / "plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md"
+            / "skills/solopreneur/autopilot/references/pr-subagent-template.md"
         ).read_text(encoding="utf-8")
         cls.merge_pr = (
-            REPO_ROOT / "plugins/solopreneur/skills/merge-pr/SKILL.md"
+            REPO_ROOT / "skills/solopreneur/merge-pr/SKILL.md"
         ).read_text(encoding="utf-8")
 
     def autopilot_preflight(self) -> str:
@@ -114,10 +114,10 @@ raise SystemExit(0)
 
     def test_codex_profiles_fail_closed_without_pre_merge_mutation(self) -> None:
         plan_review = (
-            REPO_ROOT / "plugins/solopreneur/skills/plan-review/SKILL.md"
+            REPO_ROOT / "skills/solopreneur/plan-review/SKILL.md"
         ).read_text(encoding="utf-8")
         merge_pr = (
-            REPO_ROOT / "plugins/solopreneur/skills/merge-pr/SKILL.md"
+            REPO_ROOT / "skills/solopreneur/merge-pr/SKILL.md"
         ).read_text(encoding="utf-8")
 
         self.assertIn("Codex V1 supports only /plan-review internal", plan_review)

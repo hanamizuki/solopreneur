@@ -2,7 +2,7 @@
 
 The Workflow tool's `args` sometimes arrives in the script as a JSON **string**
 instead of an object (harness stringifies a layer). The template at
-`plugins/solopreneur/skills/autopilot/references/wave-workflow.md:185` reads
+`skills/solopreneur/autopilot/references/wave-workflow.md:185` reads
 `args.prs` directly, so every orchestrator that copies the template verbatim
 crashes with `undefined is not an object (evaluating 'prs.length')` — 0 agents
 dispatched, fails in milliseconds.

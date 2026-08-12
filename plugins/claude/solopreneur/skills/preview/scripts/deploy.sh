@@ -1,0 +1,277 @@
+#!/usr/bin/env bash
+# preview skill: deploy a directory to Vercel and print the URL.
+#
+# Usage:  deploy.sh [--bucket default|keep|public] [--print-project] <dir>
+# Output: a single line — the deployment URL on stdout.
+#         All progress / errors go to stderr.
+#
+# Strategy:
+# - Always runs preflight first (vercel CLI + auth check).
+# - The Vercel project name resolves in this order:
+#     1. $PREVIEW_PROJECT (if set) — used verbatim, highest priority.
+#     2. --bucket keep|public -> the configured project for that bucket.
+#        Fail closed: if neither a per-repo nor a user-global project is
+#        configured for the bucket, exit with an error — an explicit bucket
+#        must never silently fall back (a public-bucket fallback would deploy
+#        to the wrong project AND skip protection).
+#     3. The configured default bucket (projects.default).
+#     4. Legacy derivation: basename of the proposal dir's enclosing git
+#        repo (or the dir's parent outside a repo) + "-preview", sanitized.
+#   Config keys (projects.<bucket>, autoProtect) are read per key, each with a
+#   per-repo override on top of the user-global default:
+#     repos[<rk>].preview.<key>  >  default.preview.<key>
+#   in $CLAUDE_CONFIG_DIR/solopreneur.json, falling back to
+#   ~/.claude/solopreneur.json. Reading per key (not the whole `preview`
+#   subtree) is what lets a repo's preview.path coexist with these keys
+#   instead of shadowing them.
+# - Re-linking: a dir that deployed before carries .vercel/project.json and
+#   normally keeps using that project. When the caller names a project
+#   explicitly ($PREVIEW_PROJECT, or --bucket with a configured project),
+#   the dir is re-linked — explicit intent beats the cache. The configured
+#   default bucket does NOT force a re-link, so a dir promoted to the keep
+#   bucket keeps iterating there on later flag-less deploys.
+# - After a successful deploy, if autoProtect (per-repo or user-global) is
+#   not "false" and the target bucket is not "public", the project's
+#   ssoProtection is enabled via the Vercel API so preview URLs are not
+#   world-readable (safe by default; prints a notice). Requires jq +
+#   readable CLI auth token; degrades to a warning, never blocks the
+#   deploy.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- parse args ---
+BUCKET="default"
+PRINT_PROJECT=false
+DIR=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --bucket)
+      BUCKET="${2:?deploy.sh: --bucket requires a value: default|keep|public}"
+      shift 2 ;;
+    --print-project)
+      PRINT_PROJECT=true
+      shift ;;
+    -*)
+      echo "deploy.sh: unknown flag: $1" >&2
+      exit 1 ;;
+    *)
+      DIR="$1"
+      shift ;;
+  esac
+done
+DIR="${DIR:?usage: deploy.sh [--bucket default|keep|public] [--print-project] <dir>}"
+case "$BUCKET" in
+  default|keep|public) ;;
+  *) echo "deploy.sh: invalid --bucket '$BUCKET' (expected default|keep|public)" >&2; exit 1 ;;
+esac
+
+# --- target dir must exist before we derive its repo key or resolve config ---
+# (checked here, not after preflight, so REPO_KEY is derived from a real dir and
+# --print-project fails on a bad dir instead of resolving against $PWD)
+if [ ! -d "$DIR" ]; then
+  echo "deploy.sh: directory not found: $DIR" >&2
+  exit 1
+fi
+
+# --- repo identity for per-repo preview overrides ---
+# Anchored at $DIR, NOT cwd: deploy.sh's target dir is separate from the
+# directory it is invoked from, so the repo key must follow the proposal dir.
+# Mirrors shared/config.md's solopreneur_repo_key but stays $DIR-anchored in
+# the fallback too (origin URL normalized to host/owner/repo; else git toplevel
+# path; else $DIR's absolute path — NOT $PWD, which would be cwd-anchored and
+# contradict the anchoring above).
+_preview_repo_key() {
+  local url root
+  url=$(git -C "$DIR" remote get-url origin 2>/dev/null || true)
+  if [ -n "$url" ]; then
+    url="${url#https://}"; url="${url#http://}"; url="${url#ssh://}"; url="${url#git://}"
+    url="${url#git@}"; url="${url%.git}"; url="${url/://}"
+    printf '%s' "$url"; return
+  fi
+  root=$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null || true)
+  [ -n "$root" ] && { printf '%s' "$root"; return; }
+  # non-git $DIR: its own absolute path, still $DIR-anchored (never $PWD)
+  (cd -- "$DIR" 2>/dev/null && pwd) || printf '%s' "$DIR"
+}
+REPO_KEY="$(_preview_repo_key)"
+
+# --- read a preview config value: per-repo override -> user-global default ---
+# Cascade (first non-null wins), mirroring shared/config.md layers 1-4:
+#   1. session home .repos[<rk>].preview.<key>
+#   2. session home .default.preview.<key>
+#   3. each remaining config home, in the same two-step order
+# Uses `| values` (NOT `// empty`) so a literal `false` (autoProtect:false) is
+# preserved rather than dropped as if unset — keep this value-semantics in
+# sync with shared/config.md's reader. Reading per key (not the whole
+# `preview` subtree) is deliberate: it lets repos[<rk>].preview.path coexist
+# with these keys instead of shadowing them. No legacy top-level layer —
+# projects/autoProtect have no flat form.
+# The <key> is a dotted path (projects.<bucket> or autoProtect). It is bound via
+# --arg and resolved with getpath($key | split(".")), so it is data, never
+# spliced into the jq program — a key with special characters cannot alter the
+# query.
+# Returns empty when unset, file missing, or jq unavailable.
+# NOTE: this reader falls back per dotted key, so `projects.default` and
+# `autoProtect` can come from different homes — the shared
+# `read_solopreneur_config` returns one whole feature subtree instead. That
+# difference predates the Codex home being added here; widening the search from
+# two homes to three does not change its character. Converting this to the
+# shared reader is tracked in todos/backlog/2026-08-10_deploy-sh-shared-reader.md.
+read_preview_config() {
+  local key="$1"
+  local out f h session seen=""
+  command -v jq >/dev/null 2>&1 || return 0
+  # Same home order as shared/config.md's read cascade: the running harness's
+  # own home first, then each harness's user-global default. Codex exports
+  # CODEX_THREAD_ID on every session; CODEX_HOME only relocates its home.
+  if [ -n "${CODEX_THREAD_ID:-}" ]; then
+    session="${CODEX_HOME:-$HOME/.codex}"
+  else
+    session="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  fi
+  for h in "$session" "$HOME/.claude" "${CODEX_HOME:-$HOME/.codex}"; do
+    f="$h/solopreneur.json"
+    # Read each distinct file once, however the homes happen to resolve.
+    case "$seen" in *"|$f|"*) continue ;; esac
+    seen="$seen|$f|"
+    [ -f "$f" ] || continue
+    out=$(jq -r --arg rk "$REPO_KEY" --arg key "$key" '.repos[$rk].preview | getpath($key | split(".")) | values' "$f" 2>/dev/null || true)
+    if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
+    out=$(jq -r --arg key "$key" '.default.preview | getpath($key | split(".")) | values' "$f" 2>/dev/null || true)
+    if [ -n "$out" ]; then printf '%s' "$out"; return 0; fi
+  done
+  return 0
+}
+
+# --- derive the Vercel project name ---
+FORCE_RELINK=false
+if [ -n "${PREVIEW_PROJECT:-}" ]; then
+  # $PREVIEW_PROJECT wins verbatim — NOT sanitized, so an explicit project
+  # name or a real Vercel project ID (prj_...) passes through untouched.
+  PROJECT_NAME="$PREVIEW_PROJECT"
+  FORCE_RELINK=true
+else
+  PROJECT_NAME=""
+  if [ "$BUCKET" != "default" ]; then
+    PROJECT_NAME="$(read_preview_config "projects.${BUCKET}")"
+    if [ -z "$PROJECT_NAME" ]; then
+      # Fail closed: an explicit bucket must resolve to its configured
+      # project. A silent fallback would deploy to the wrong project — and
+      # for --bucket public, skip ssoProtection on it too.
+      echo "deploy.sh: error — --bucket $BUCKET requested but no project is configured for it (set repos[$REPO_KEY].preview.projects.${BUCKET} or default.preview.projects.${BUCKET} in solopreneur.json)" >&2
+      exit 1
+    fi
+    FORCE_RELINK=true
+  fi
+  if [ -z "$PROJECT_NAME" ]; then
+    PROJECT_NAME="$(read_preview_config "projects.default")"
+  fi
+  if [ -z "$PROJECT_NAME" ]; then
+    if base_dir=$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null) && [ -n "$base_dir" ]; then
+      raw_name="$(basename "$base_dir")"
+    else
+      raw_name="$(basename "$(dirname "$DIR")")"
+    fi
+    # Sanitize the *derived* name to a Vercel-legal project name: lowercase,
+    # only [a-z0-9-], collapse repeated '-', no leading/trailing '-',
+    # max 100 chars. Never empty — fall back to "cc-preview".
+    PROJECT_NAME="$(printf '%s' "${raw_name}-preview" \
+      | tr '[:upper:]' '[:lower:]' \
+      | sed -e 's/[^a-z0-9-]/-/g' -e 's/-\{2,\}/-/g' -e 's/^-*//' -e 's/-*$//' \
+      | cut -c1-100 \
+      | sed -e 's/-*$//')"
+    if [ -z "$PROJECT_NAME" ]; then
+      PROJECT_NAME="cc-preview"
+    fi
+  fi
+fi
+
+if [ "$PRINT_PROJECT" = "true" ]; then
+  printf 'bucket=%s project=%s relink=%s\n' "$BUCKET" "$PROJECT_NAME" "$FORCE_RELINK"
+  exit 0
+fi
+
+# --- preflight (CLI installed, logged in, token valid) ---
+bash "$SCRIPT_DIR/preflight.sh"
+
+# --- sanity check the target dir has something to deploy ---
+# (existence already verified up front, right after arg parsing)
+if [ -z "$(find "$DIR" -maxdepth 1 -type f -name '*.html' -print -quit)" ]; then
+  echo "deploy.sh: warning — no .html file in $DIR" >&2
+fi
+
+cd -- "$DIR"
+
+# --- link to the resolved project ---
+if [ "$FORCE_RELINK" = "true" ] && [ -f .vercel/project.json ]; then
+  echo "re-linking to explicitly requested project: $PROJECT_NAME" >&2
+  rm -rf .vercel
+fi
+if [ ! -f .vercel/project.json ]; then
+  echo "linking to project: $PROJECT_NAME" >&2
+  vercel link --project "$PROJECT_NAME" --yes >&2
+fi
+
+# --- deploy (preview, not production) ---
+RAW=$(vercel deploy --yes 2>&1) || {
+  echo "$RAW" >&2
+  echo "deploy.sh: vercel deploy failed" >&2
+  if [ -f .vercel/project.json ]; then
+    echo "hint: if the linked project was deleted, run 'rm -rf .vercel' in the proposal dir and retry" >&2
+  fi
+  exit 1
+}
+
+# extract the .vercel.app URL
+URL=$(printf "%s\n" "$RAW" | grep -oE 'https://[a-z0-9-]+\.vercel\.app' | tail -1)
+if [ -z "$URL" ]; then
+  echo "$RAW" >&2
+  echo "deploy.sh: could not find deployment URL in vercel output" >&2
+  exit 1
+fi
+
+# --- auto-protect: make sure the project is not world-readable ---
+AUTO_PROTECT="$(read_preview_config "autoProtect")"
+AUTO_PROTECT="${AUTO_PROTECT:-true}"   # safe by default
+if [ "$AUTO_PROTECT" != "false" ] && [ "$BUCKET" != "public" ]; then
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "deploy.sh: warning — jq not found, skipping ssoProtection check; URL may be world-readable" >&2
+  else
+    AUTH_MAC="$HOME/Library/Application Support/com.vercel.cli/auth.json"
+    AUTH_LIN="$HOME/.local/share/com.vercel.cli/auth.json"
+    AUTH_FILE=""
+    [ -f "$AUTH_MAC" ] && AUTH_FILE="$AUTH_MAC"
+    [ -z "$AUTH_FILE" ] && [ -f "$AUTH_LIN" ] && AUTH_FILE="$AUTH_LIN"
+    TOKEN=""
+    [ -n "$AUTH_FILE" ] && TOKEN=$(jq -r '.token // empty' "$AUTH_FILE" 2>/dev/null || true)
+    PROJ_ID=$(jq -r '.projectId // empty' .vercel/project.json 2>/dev/null || true)
+    ORG_ID=$(jq -r '.orgId // empty' .vercel/project.json 2>/dev/null || true)
+    if [ -n "$TOKEN" ] && [ -n "$PROJ_ID" ]; then
+      QS=""
+      case "$ORG_ID" in team_*) QS="?teamId=$ORG_ID" ;; esac
+      CURRENT=$(curl -s "https://api.vercel.com/v9/projects/${PROJ_ID}${QS}" \
+        -H "Authorization: Bearer $TOKEN" \
+        | jq -r '.ssoProtection.deploymentType // "none"' || echo "none")
+      if [ "$CURRENT" = "none" ]; then
+        RESULT=$(curl -s -X PATCH "https://api.vercel.com/v9/projects/${PROJ_ID}${QS}" \
+          -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+          -d '{"ssoProtection":{"deploymentType":"all_except_custom_domains"}}' \
+          | jq -r '.ssoProtection.deploymentType // "FAILED"' || echo "FAILED")
+        if [ "$RESULT" = "all_except_custom_domains" ]; then
+          echo "locked: ssoProtection enabled on '$PROJECT_NAME' — only logged-in Vercel members can view" >&2
+          echo "        to share publicly use --bucket public, or set autoProtect=false (default.preview, or repos[$REPO_KEY].preview)" >&2
+        else
+          echo "deploy.sh: warning — could not enable ssoProtection on '$PROJECT_NAME'; URL may be world-readable" >&2
+        fi
+      fi
+    else
+      echo "deploy.sh: warning — Vercel token or project id unavailable, skipping ssoProtection" >&2
+    fi
+  fi
+fi
+
+# progress to stderr, URL to stdout
+echo "deployed: $URL" >&2
+printf "%s\n" "$URL"

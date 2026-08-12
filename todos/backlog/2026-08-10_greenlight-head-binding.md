@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-10
 **Source:** `/plan-review` of the cross-host contract (PR #157)
-**Applies to:** `plugins/solopreneur/skills/greenlight/SKILL.md` (both hosts —
+**Applies to:** `skills/solopreneur/greenlight/SKILL.md` (both hosts —
 fixing it in the shared body fixes it for Codex too)
 
 ## Problem

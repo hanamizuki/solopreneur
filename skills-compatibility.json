@@ -137,10 +137,10 @@
       "publication": {
         "codex": "include"
       },
-      "sharedContract": "plugins/solopreneur/skills/autopilot/SKILL.md",
+      "sharedContract": "skills/solopreneur/autopilot/SKILL.md",
       "platformResources": [
-        "plugins/solopreneur/skills/autopilot/SKILL.md",
-        "plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md"
+        "skills/solopreneur/autopilot/SKILL.md",
+        "skills/solopreneur/autopilot/references/pr-subagent-template.md"
       ],
       "limitations": {
         "codex-exec": "docs/spec/2026-08-12-codex-autopilot-v1.md",
@@ -211,11 +211,11 @@
       "publication": {
         "codex": "include"
       },
-      "sharedContract": "plugins/solopreneur/skills/greenlight/SKILL.md",
+      "sharedContract": "skills/solopreneur/greenlight/SKILL.md",
       "platformResources": [
-        "plugins/solopreneur/shared/config.sh",
-        "plugins/solopreneur/skills/greenlight/scripts/reviewer-registry.mjs",
-        "plugins/solopreneur/skills/greenlight/scripts/reviewer-state.mjs"
+        "src/solopreneur/shared/config.sh",
+        "skills/solopreneur/greenlight/scripts/reviewer-registry.mjs",
+        "skills/solopreneur/greenlight/scripts/reviewer-state.mjs"
       ],
       "limitations": {
         "codex-exec": "docs/spec/2026-08-10-codex-greenlight-port.md",
@@ -274,9 +274,10 @@
       "publication": {
         "codex": "include"
       },
-      "sharedContract": "plugins/solopreneur/skills/merge-pr/SKILL.md",
+      "sharedContract": "skills/solopreneur/merge-pr/SKILL.md",
       "platformResources": [
-        "plugins/solopreneur/skills/merge-pr/SKILL.md"
+        "src/solopreneur/shared/config.sh",
+        "skills/solopreneur/merge-pr/SKILL.md"
       ],
       "limitations": {
         "codex-exec": "docs/spec/2026-08-11-codex-autopilot-dependencies.md",
@@ -332,9 +333,9 @@
       "publication": {
         "codex": "include"
       },
-      "sharedContract": "plugins/solopreneur/skills/plan-review/SKILL.md",
+      "sharedContract": "skills/solopreneur/plan-review/SKILL.md",
       "platformResources": [
-        "plugins/solopreneur/skills/plan-review/SKILL.md"
+        "skills/solopreneur/plan-review/SKILL.md"
       ],
       "limitations": {
         "codex-exec": "docs/spec/2026-08-11-codex-autopilot-dependencies.md",
@@ -374,9 +375,9 @@
     }
   },
   "codexHostGuards": {
-    "solopreneur:mvp": "plugins/solopreneur/skills/mvp/SKILL.md",
-    "solopreneur:preview": "plugins/solopreneur/skills/preview/SKILL.md",
-    "solopreneur:todos-babysit": "plugins/solopreneur/skills/todos-babysit/SKILL.md",
-    "solopreneur:worktree-handoff": "plugins/solopreneur/skills/worktree-handoff/SKILL.md"
+    "solopreneur:mvp": "skills/solopreneur/mvp/SKILL.md",
+    "solopreneur:preview": "skills/solopreneur/preview/SKILL.md",
+    "solopreneur:todos-babysit": "skills/solopreneur/todos-babysit/SKILL.md",
+    "solopreneur:worktree-handoff": "skills/solopreneur/worktree-handoff/SKILL.md"
   }
 }

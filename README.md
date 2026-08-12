@@ -1,6 +1,6 @@
 # solopreneur
 
-**solopreneur** is a family of Claude Code plugins that gives solo founders
+**solopreneur** is a family of Claude Code and Codex plugins that gives solo founders
 the workflows of a full engineering org: plan review, code review loops,
 automated PR cycles, marketing, design, and platform-specific experts. Install
 à la carte.
@@ -31,8 +31,24 @@ for details and role-based recommendations.
 Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
 **≥ v2.1.110** for plugin dependency resolution.
 
+Codex currently publishes the compatible core subset: `autopilot`,
+`greenlight`, `merge-pr`, and `plan-review`. Unsupported skills stay out of the
+Codex package instead of appearing and failing later.
+
 > Migrating from a previous version? See [MIGRATION.md](./MIGRATION.md).
 > For per-release, per-plugin notes, see [CHANGELOG.md](./CHANGELOG.md).
+
+### Repository layout
+
+- [`skills/`](./skills/) is the single source for all 106 skills, grouped by
+  plugin so each skill is directly browsable.
+- [`src/`](./src/) holds manifests, agents, shared helpers, vendor metadata,
+  and maintainer scripts.
+- `plugins/claude/` and `plugins/codex/` are generated install packages. Do
+  not edit them directly.
+
+The repository keeps temporary generated copies at the previous marketplace
+paths until the next tagged release moves both platforms atomically.
 
 ## Plugins
 
@@ -50,15 +66,15 @@ skills: 15 product workflows plus merge and Codex-agent plumbing.
 
 | Skill | What it does |
 |---|---|
-| [`/mvp`](./plugins/solopreneur/skills/mvp/SKILL.md) | **PM.** Drives the full new-product flow end-to-end: brainstorming → PRD visual confirmation → template lookup (auto-discovers `*-app-templates` in installed plugins) → plan → execution. Use when starting from scratch |
-| [`/plan-review`](./plugins/solopreneur/skills/plan-review/SKILL.md) | **Tech Lead.** Vets a spec, plan, or design doc in three stages — latest official docs + platform best practices, a leanness pass that cuts what the plan doesn't need, and an independent outside reviewer challenging it across 5 dimensions — then walks you through every finding. `internal` runs the first two stages only and reports findings without adjudication or write-back |
-| [`/worktree-handoff`](./plugins/solopreneur/skills/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
-| [`/handoff`](./plugins/solopreneur/skills/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). No worktree, no file save |
-| [`/preview`](./plugins/solopreneur/skills/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into interactive HTML and publishes a **private Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments). Single-item **Share** requests deploy an isolated preview of one entry without changing the Library production URL. Legacy per-page deploy remains for compatibility |
-| [`/specialist-review`](./plugins/solopreneur/skills/specialist-review/SKILL.md) | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
-| [`/post-mortem`](./plugins/solopreneur/skills/post-mortem/SKILL.md) | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
-| [`/session-retro`](./plugins/solopreneur/skills/session-retro/SKILL.md) | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
-| [`/perspective`](./plugins/solopreneur/skills/perspective/SKILL.md) | **Thinking Partner.** Switch between thinker perspectives (Musk, Feynman, Munger, Naval, Jobs, Taleb, …) to analyze problems from a different angle |
+| [`/mvp`](./skills/solopreneur/mvp/SKILL.md) | **PM.** Drives the full new-product flow end-to-end: brainstorming → PRD visual confirmation → template lookup (auto-discovers `*-app-templates` in installed plugins) → plan → execution. Use when starting from scratch |
+| [`/plan-review`](./skills/solopreneur/plan-review/SKILL.md) | **Tech Lead.** Vets a spec, plan, or design doc in three stages — latest official docs + platform best practices, a leanness pass that cuts what the plan doesn't need, and an independent outside reviewer challenging it across 5 dimensions — then walks you through every finding. `internal` runs the first two stages only and reports findings without adjudication or write-back |
+| [`/worktree-handoff`](./skills/solopreneur/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
+| [`/handoff`](./skills/solopreneur/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). No worktree, no file save |
+| [`/preview`](./skills/solopreneur/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into interactive HTML and publishes a **private Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments). Single-item **Share** requests deploy an isolated preview of one entry without changing the Library production URL. Legacy per-page deploy remains for compatibility |
+| [`/specialist-review`](./skills/solopreneur/specialist-review/SKILL.md) | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
+| [`/post-mortem`](./skills/solopreneur/post-mortem/SKILL.md) | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
+| [`/session-retro`](./skills/solopreneur/session-retro/SKILL.md) | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
+| [`/perspective`](./skills/solopreneur/perspective/SKILL.md) | **Thinking Partner.** Switch between thinker perspectives (Musk, Feynman, Munger, Naval, Jobs, Taleb, …) to analyze problems from a different angle |
 
 #### Backlog Management
 
@@ -67,8 +83,8 @@ This repo dogfoods the backlog workflow with public task files under
 
 | Skill | What it does |
 |---|---|
-| [`/todos-review`](./plugins/solopreneur/skills/todos-review/SKILL.md) | **Backlog Reviewer.** Deep-reviews a single todo/backlog item for feasibility and priority — is it worth building? Dispatches platform-specific expert agents and outputs a readiness rating. Specs and implementation plans go to `/plan-review` |
-| [`/todos-cleanup`](./plugins/solopreneur/skills/todos-cleanup/SKILL.md) | **Backlog Janitor.** Batch-scans backlog, matches against git history, moves completed/partial items to done/ or doing/ |
+| [`/todos-review`](./skills/solopreneur/todos-review/SKILL.md) | **Backlog Reviewer.** Deep-reviews a single todo/backlog item for feasibility and priority — is it worth building? Dispatches platform-specific expert agents and outputs a readiness rating. Specs and implementation plans go to `/plan-review` |
+| [`/todos-cleanup`](./skills/solopreneur/todos-cleanup/SKILL.md) | **Backlog Janitor.** Batch-scans backlog, matches against git history, moves completed/partial items to done/ or doing/ |
 
 #### Automation Pipelines
 
@@ -76,17 +92,17 @@ Start them and walk away. They loop until the job is done.
 
 | Skill | What it does |
 |---|---|
-| [`/autopilot`](./plugins/solopreneur/skills/autopilot/SKILL.md) | **Auto Build.** Splits a large feature into multiple PRs and orchestrates unattended implementation, review, and merge. Supports scheduling for off-hours execution |
-| [`/greenlight`](./plugins/solopreneur/skills/greenlight/SKILL.md) | **Code Review Loop.** Triggers external reviewers (Codex bot + CLI, the Gemini bot when active on the repo, CodeRabbit), fixes issues, re-triggers. Review depth scales with PR risk (S/M/L sizing). Loops until the PR is clean |
-| [`/todos-babysit`](./plugins/solopreneur/skills/todos-babysit/SKILL.md) | **Backlog Monitor.** Scans backlog and in-progress todos, cross-references PR status, reviews new items, and maintains worktrees. **Interactive mode**: presents a confirmation checkpoint before acting. **Loop mode** (`/loop 24h /todos-babysit`): auto-executes safe operations and auto-implements bug fixes that pass the readiness gate. Notifies only for items that need human judgment |
-| [`/merge-pr`](./plugins/solopreneur/skills/merge-pr/SKILL.md) | **Merge Gate.** Verifies reviews, checks, branch state, and mergeability before merging the current pull request and cleaning up its worktree |
+| [`/autopilot`](./skills/solopreneur/autopilot/SKILL.md) | **Auto Build.** Splits a large feature into multiple PRs and orchestrates unattended implementation, review, and merge. Supports scheduling for off-hours execution |
+| [`/greenlight`](./skills/solopreneur/greenlight/SKILL.md) | **Code Review Loop.** Triggers external reviewers (Codex bot + CLI, the Gemini bot when active on the repo, CodeRabbit), fixes issues, re-triggers. Review depth scales with PR risk (S/M/L sizing). Loops until the PR is clean |
+| [`/todos-babysit`](./skills/solopreneur/todos-babysit/SKILL.md) | **Backlog Monitor.** Scans backlog and in-progress todos, cross-references PR status, reviews new items, and maintains worktrees. **Interactive mode**: presents a confirmation checkpoint before acting. **Loop mode** (`/loop 24h /todos-babysit`): auto-executes safe operations and auto-implements bug fixes that pass the readiness gate. Notifies only for items that need human judgment |
+| [`/merge-pr`](./skills/solopreneur/merge-pr/SKILL.md) | **Merge Gate.** Verifies reviews, checks, branch state, and mergeability before merging the current pull request and cleaning up its worktree |
 
 #### Discovery and platform plumbing
 
 | Skill | What it does |
 |---|---|
-| [`/rebuild-skill-index`](./plugins/solopreneur/skills/rebuild-skill-index/SKILL.md) | Generates per-platform extended indexes of every relevant skill installed on this machine. Feeds the `ios-dev`, `android-dev`, `designer`, `marketer`, and `neo4j-dev` agents' extended discovery. Run after installing/removing platform skills. |
-| [`codex-agents-bootstrap`](./plugins/solopreneur/skills/codex-agents-bootstrap/SKILL.md) | Installs or refreshes managed solopreneur-family custom agents for Codex, while preserving hand-authored agents and reporting inactive or orphaned managed copies without deleting them. |
+| [`/rebuild-skill-index`](./skills/solopreneur/rebuild-skill-index/SKILL.md) | Generates per-platform extended indexes of every relevant skill installed on this machine. Feeds the `ios-dev`, `android-dev`, `designer`, `marketer`, and `neo4j-dev` agents' extended discovery. Run after installing/removing platform skills. |
+| [`codex-agents-bootstrap`](./skills/solopreneur/codex-agents-bootstrap/SKILL.md) | Installs or refreshes managed solopreneur-family custom agents for Codex, while preserving hand-authored agents and reporting inactive or orphaned managed copies without deleting them. |
 
 #### Requirements
 
@@ -113,14 +129,14 @@ in-house skills: 7 domain workflows and one agent router.
 
 | Skill | What it does |
 |---|---|
-| [`/gtm`](./plugins/marketer/skills/gtm/SKILL.md) | **Strategist.** Generates a complete Go-To-Market strategy. Analyzes the codebase, interviews you across multiple sessions, and produces 4 strategy docs (brand, market landscape, messaging, channel playbook). Supports weekly incremental updates |
-| [`/naming`](./plugins/marketer/skills/naming/SKILL.md) | **Brand Namer.** Generates product or company names through structured brief, multi-model candidate generation (Claude + optional Codex / Gemini), and two-layer evaluation. Supports greenfield and rebrand modes. Grounded in Lexicon / Interbrand / Siegel+Gale methodology plus processing fluency, sound symbolism, and iconicity research. Auto-reuses `docs/gtm/` if present |
-| [`/humanly`](./plugins/marketer/skills/humanly/SKILL.md) | **Editor.** Removes AI writing patterns from text with English and Traditional Chinese pattern catalogs, generated prewrite briefs, 3-tier word tables, and severity-based rewrite/review audits. A fidelity layer keeps prices, quotes, names and commitments verbatim and forbids inventing facts or the author's memories; a Taiwan localization layer catches mainland vocabulary and half-width punctuation |
-| [`/x-writing`](./plugins/marketer/skills/x-writing/SKILL.md) | **Writing Coach.** X/Twitter writing coach for single tweets, threads, and long-form posts. Generates hooks, suggests topics, reviews drafts, and explains craft principles grounded in Aesthetic Writing, RARE hooks, and the algorithmic reality of X |
-| [`/x-growth`](./plugins/marketer/skills/x-growth/SKILL.md) | **X Growth Consultant.** Diagnoses X/Twitter profiles, co-creates personalized 12-week growth plans. Covers algorithm mechanics, content strategy, engagement tactics, monetization, and Dream 100 outreach. Integrates with GTM docs |
-| [`/linkedin-growth`](./plugins/marketer/skills/linkedin-growth/SKILL.md) | **LinkedIn Growth Consultant.** Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans. Covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
-| [`/slide-design`](./plugins/marketer/skills/slide-design/SKILL.md) | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase. Bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, fade-in/out background music, 13 reusable layout components, and AI-slop review via `/humanly` (English + Chinese) |
-| [`using-marketer`](./plugins/marketer/skills/using-marketer/SKILL.md) | Routes explicit marketer requests and cross-concern marketing work to the `marketer` agent when available, with a bounded inline fallback. |
+| [`/gtm`](./skills/marketer/gtm/SKILL.md) | **Strategist.** Generates a complete Go-To-Market strategy. Analyzes the codebase, interviews you across multiple sessions, and produces 4 strategy docs (brand, market landscape, messaging, channel playbook). Supports weekly incremental updates |
+| [`/naming`](./skills/marketer/naming/SKILL.md) | **Brand Namer.** Generates product or company names through structured brief, multi-model candidate generation (Claude + optional Codex / Gemini), and two-layer evaluation. Supports greenfield and rebrand modes. Grounded in Lexicon / Interbrand / Siegel+Gale methodology plus processing fluency, sound symbolism, and iconicity research. Auto-reuses `docs/gtm/` if present |
+| [`/humanly`](./skills/marketer/humanly/SKILL.md) | **Editor.** Removes AI writing patterns from text with English and Traditional Chinese pattern catalogs, generated prewrite briefs, 3-tier word tables, and severity-based rewrite/review audits. A fidelity layer keeps prices, quotes, names and commitments verbatim and forbids inventing facts or the author's memories; a Taiwan localization layer catches mainland vocabulary and half-width punctuation |
+| [`/x-writing`](./skills/marketer/x-writing/SKILL.md) | **Writing Coach.** X/Twitter writing coach for single tweets, threads, and long-form posts. Generates hooks, suggests topics, reviews drafts, and explains craft principles grounded in Aesthetic Writing, RARE hooks, and the algorithmic reality of X |
+| [`/x-growth`](./skills/marketer/x-growth/SKILL.md) | **X Growth Consultant.** Diagnoses X/Twitter profiles, co-creates personalized 12-week growth plans. Covers algorithm mechanics, content strategy, engagement tactics, monetization, and Dream 100 outreach. Integrates with GTM docs |
+| [`/linkedin-growth`](./skills/marketer/linkedin-growth/SKILL.md) | **LinkedIn Growth Consultant.** Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans. Covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
+| [`/slide-design`](./skills/marketer/slide-design/SKILL.md) | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase. Bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, fade-in/out background music, 13 reusable layout components, and AI-slop review via `/humanly` (English + Chinese) |
+| [`using-marketer`](./skills/marketer/using-marketer/SKILL.md) | Routes explicit marketer requests and cross-concern marketing work to the `marketer` agent when available, with a bounded inline fallback. |
 
 #### Requirements
 
@@ -137,8 +153,8 @@ The `designer` agent for UI/UX work that spans web, iOS, and Android. Ships
 
 #### Bundled skills
 
-- [**`impeccable`**](./plugins/designer/skills/impeccable/SKILL.md): vendored from [pbakaus/impeccable](https://github.com/pbakaus/impeccable). Polish / critique / redesign frontend interfaces.
-- [**`taste-skill`**](./plugins/designer/skills/taste-skill/SKILL.md) + 8 archetype skills ([`taste-soft`](./plugins/designer/skills/taste-soft/SKILL.md), [`taste-brutalist`](./plugins/designer/skills/taste-brutalist/SKILL.md), [`taste-minimalist`](./plugins/designer/skills/taste-minimalist/SKILL.md), [`taste-redesign`](./plugins/designer/skills/taste-redesign/SKILL.md), [`taste-stitch`](./plugins/designer/skills/taste-stitch/SKILL.md), [`taste-output`](./plugins/designer/skills/taste-output/SKILL.md), [`taste-gpt`](./plugins/designer/skills/taste-gpt/SKILL.md), [`taste-image-to-code`](./plugins/designer/skills/taste-image-to-code/SKILL.md)): vendored from [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill). The `taste-*` archetype family overrides default LLM design biases.
+- [**`impeccable`**](./skills/designer/impeccable/SKILL.md): vendored from [pbakaus/impeccable](https://github.com/pbakaus/impeccable). Polish / critique / redesign frontend interfaces.
+- [**`taste-skill`**](./skills/designer/taste-skill/SKILL.md) + 8 archetype skills ([`taste-soft`](./skills/designer/taste-soft/SKILL.md), [`taste-brutalist`](./skills/designer/taste-brutalist/SKILL.md), [`taste-minimalist`](./skills/designer/taste-minimalist/SKILL.md), [`taste-redesign`](./skills/designer/taste-redesign/SKILL.md), [`taste-stitch`](./skills/designer/taste-stitch/SKILL.md), [`taste-output`](./skills/designer/taste-output/SKILL.md), [`taste-gpt`](./skills/designer/taste-gpt/SKILL.md), [`taste-image-to-code`](./skills/designer/taste-image-to-code/SKILL.md)): vendored from [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill). The `taste-*` archetype family overrides default LLM design biases.
 
 #### Requirements
 
@@ -157,11 +173,11 @@ build/debug/ship.
 
 #### Bundled skills
 
-- [**`ios-patterns`**](./plugins/ios-dev/skills/ios-patterns/SKILL.md) (in-house): SwiftUI conventions: i18n, date parsing, Previews, state management, sheet & navigation, list spacing, expandable animation, keyboard Done button.
-- [**`ios-app-templates`**](./plugins/ios-dev/skills/ios-app-templates/SKILL.md) (in-house): reference implementations for common app categories (currently `photo-analysis-app` and `portfolio-tracker`).
-- **`asc-cli` skills** (22): vendored from [rudrankriyam/app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills). End-to-end App Store Connect workflows: TestFlight, releases, metadata, IAP, signing, screenshots, crash triage, ASO audit, RevenueCat catalog sync, notarization, submission health. ([`asc-app-create-ui`](./plugins/ios-dev/skills/asc-app-create-ui/SKILL.md), [`asc-aso-audit`](./plugins/ios-dev/skills/asc-aso-audit/SKILL.md), [`asc-build-lifecycle`](./plugins/ios-dev/skills/asc-build-lifecycle/SKILL.md), [`asc-cli-usage`](./plugins/ios-dev/skills/asc-cli-usage/SKILL.md), [`asc-crash-triage`](./plugins/ios-dev/skills/asc-crash-triage/SKILL.md), [`asc-id-resolver`](./plugins/ios-dev/skills/asc-id-resolver/SKILL.md), [`asc-localize-metadata`](./plugins/ios-dev/skills/asc-localize-metadata/SKILL.md), [`asc-metadata-sync`](./plugins/ios-dev/skills/asc-metadata-sync/SKILL.md), [`asc-notarization`](./plugins/ios-dev/skills/asc-notarization/SKILL.md), [`asc-ppp-pricing`](./plugins/ios-dev/skills/asc-ppp-pricing/SKILL.md), [`asc-release-flow`](./plugins/ios-dev/skills/asc-release-flow/SKILL.md), [`asc-revenuecat-catalog-sync`](./plugins/ios-dev/skills/asc-revenuecat-catalog-sync/SKILL.md), [`asc-screenshot-resize`](./plugins/ios-dev/skills/asc-screenshot-resize/SKILL.md), [`asc-shots-pipeline`](./plugins/ios-dev/skills/asc-shots-pipeline/SKILL.md), [`asc-signing-setup`](./plugins/ios-dev/skills/asc-signing-setup/SKILL.md), [`asc-submission-health`](./plugins/ios-dev/skills/asc-submission-health/SKILL.md), [`asc-subscription-localization`](./plugins/ios-dev/skills/asc-subscription-localization/SKILL.md), [`asc-testflight-orchestration`](./plugins/ios-dev/skills/asc-testflight-orchestration/SKILL.md), [`asc-wall-submit`](./plugins/ios-dev/skills/asc-wall-submit/SKILL.md), [`asc-whats-new-writer`](./plugins/ios-dev/skills/asc-whats-new-writer/SKILL.md), [`asc-workflow`](./plugins/ios-dev/skills/asc-workflow/SKILL.md), [`asc-xcode-build`](./plugins/ios-dev/skills/asc-xcode-build/SKILL.md))
-- [**`apple-design`**](./plugins/ios-dev/skills/apple-design/SKILL.md): vendored from [emilkowalski/skills](https://github.com/emilkowalski/skills/tree/main/skills/apple-design). Apple's fluid interface design principles translated for the web — spring animations, gesture-driven UI, momentum projection, translucent materials, typography, reduced-motion.
-- [**`iphone-apps`**](./plugins/ios-dev/skills/iphone-apps/SKILL.md): vendored from [glittercowboy/taches-cc-resources](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps). CLI-only iPhone app workflow (build, debug, test, ship).
+- [**`ios-patterns`**](./skills/ios-dev/ios-patterns/SKILL.md) (in-house): SwiftUI conventions: i18n, date parsing, Previews, state management, sheet & navigation, list spacing, expandable animation, keyboard Done button.
+- [**`ios-app-templates`**](./skills/ios-dev/ios-app-templates/SKILL.md) (in-house): reference implementations for common app categories (currently `photo-analysis-app` and `portfolio-tracker`).
+- **`asc-cli` skills** (22): vendored from [rudrankriyam/app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills). End-to-end App Store Connect workflows: TestFlight, releases, metadata, IAP, signing, screenshots, crash triage, ASO audit, RevenueCat catalog sync, notarization, submission health. ([`asc-app-create-ui`](./skills/ios-dev/asc-app-create-ui/SKILL.md), [`asc-aso-audit`](./skills/ios-dev/asc-aso-audit/SKILL.md), [`asc-build-lifecycle`](./skills/ios-dev/asc-build-lifecycle/SKILL.md), [`asc-cli-usage`](./skills/ios-dev/asc-cli-usage/SKILL.md), [`asc-crash-triage`](./skills/ios-dev/asc-crash-triage/SKILL.md), [`asc-id-resolver`](./skills/ios-dev/asc-id-resolver/SKILL.md), [`asc-localize-metadata`](./skills/ios-dev/asc-localize-metadata/SKILL.md), [`asc-metadata-sync`](./skills/ios-dev/asc-metadata-sync/SKILL.md), [`asc-notarization`](./skills/ios-dev/asc-notarization/SKILL.md), [`asc-ppp-pricing`](./skills/ios-dev/asc-ppp-pricing/SKILL.md), [`asc-release-flow`](./skills/ios-dev/asc-release-flow/SKILL.md), [`asc-revenuecat-catalog-sync`](./skills/ios-dev/asc-revenuecat-catalog-sync/SKILL.md), [`asc-screenshot-resize`](./skills/ios-dev/asc-screenshot-resize/SKILL.md), [`asc-shots-pipeline`](./skills/ios-dev/asc-shots-pipeline/SKILL.md), [`asc-signing-setup`](./skills/ios-dev/asc-signing-setup/SKILL.md), [`asc-submission-health`](./skills/ios-dev/asc-submission-health/SKILL.md), [`asc-subscription-localization`](./skills/ios-dev/asc-subscription-localization/SKILL.md), [`asc-testflight-orchestration`](./skills/ios-dev/asc-testflight-orchestration/SKILL.md), [`asc-wall-submit`](./skills/ios-dev/asc-wall-submit/SKILL.md), [`asc-whats-new-writer`](./skills/ios-dev/asc-whats-new-writer/SKILL.md), [`asc-workflow`](./skills/ios-dev/asc-workflow/SKILL.md), [`asc-xcode-build`](./skills/ios-dev/asc-xcode-build/SKILL.md))
+- [**`apple-design`**](./skills/ios-dev/apple-design/SKILL.md): vendored from [emilkowalski/skills](https://github.com/emilkowalski/skills/tree/main/skills/apple-design). Apple's fluid interface design principles translated for the web — spring animations, gesture-driven UI, momentum projection, translucent materials, typography, reduced-motion.
+- [**`iphone-apps`**](./skills/ios-dev/iphone-apps/SKILL.md): vendored from [glittercowboy/taches-cc-resources](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps). CLI-only iPhone app workflow (build, debug, test, ship).
 
 #### Requirements
 
@@ -178,12 +194,12 @@ from 5 different upstream repos.
 
 #### Bundled skills
 
-- [**`android-patterns`**](./plugins/android-dev/skills/android-patterns/SKILL.md) (in-house): Jetpack Compose patterns: `@Preview` setup (LocalInspectionMode, Vico charts), Scaffold + bottom nav + status bar insets, ModalBottomSheet nested-scroll jitter, ripple clipping on rounded corners, SwipeToDismissBox transparency, locale-aware date formatting (MIUI quirks).
-- **`gplay` skills** (16): vendored from [tamtom/gplay-cli-skills](https://github.com/tamtom/gplay-cli-skills). Google Play Console CLI workflows: build, release flows, metadata, IAP, testing tracks, rollout, reviews, vitals. ([`gplay-cli-usage`](./plugins/android-dev/skills/gplay-cli-usage/SKILL.md), [`gplay-gradle-build`](./plugins/android-dev/skills/gplay-gradle-build/SKILL.md), [`gplay-iap-setup`](./plugins/android-dev/skills/gplay-iap-setup/SKILL.md), [`gplay-metadata-sync`](./plugins/android-dev/skills/gplay-metadata-sync/SKILL.md), [`gplay-migrate-fastlane`](./plugins/android-dev/skills/gplay-migrate-fastlane/SKILL.md), [`gplay-ppp-pricing`](./plugins/android-dev/skills/gplay-ppp-pricing/SKILL.md), [`gplay-purchase-verification`](./plugins/android-dev/skills/gplay-purchase-verification/SKILL.md), [`gplay-release-flow`](./plugins/android-dev/skills/gplay-release-flow/SKILL.md), [`gplay-reports-download`](./plugins/android-dev/skills/gplay-reports-download/SKILL.md), [`gplay-review-management`](./plugins/android-dev/skills/gplay-review-management/SKILL.md), [`gplay-rollout-management`](./plugins/android-dev/skills/gplay-rollout-management/SKILL.md), [`gplay-screenshot-automation`](./plugins/android-dev/skills/gplay-screenshot-automation/SKILL.md), [`gplay-submission-checks`](./plugins/android-dev/skills/gplay-submission-checks/SKILL.md), [`gplay-testers-orchestration`](./plugins/android-dev/skills/gplay-testers-orchestration/SKILL.md), [`gplay-user-management`](./plugins/android-dev/skills/gplay-user-management/SKILL.md), [`gplay-vitals-monitoring`](./plugins/android-dev/skills/gplay-vitals-monitoring/SKILL.md))
-- **13 Compose / architecture skills**: vendored from [new-silvermoon/awesome-android-agent-skills](https://github.com/new-silvermoon/awesome-android-agent-skills). ([`compose-ui`](./plugins/android-dev/skills/compose-ui/SKILL.md), [`compose-navigation`](./plugins/android-dev/skills/compose-navigation/SKILL.md), [`compose-performance-audit`](./plugins/android-dev/skills/compose-performance-audit/SKILL.md), [`architecture`](./plugins/android-dev/skills/architecture/SKILL.md), [`viewmodel`](./plugins/android-dev/skills/viewmodel/SKILL.md), [`data-layer`](./plugins/android-dev/skills/data-layer/SKILL.md), [`coroutines`](./plugins/android-dev/skills/coroutines/SKILL.md), [`kotlin-concurrency-expert`](./plugins/android-dev/skills/kotlin-concurrency-expert/SKILL.md), [`gradle-build-performance`](./plugins/android-dev/skills/gradle-build-performance/SKILL.md), [`gradle-logic`](./plugins/android-dev/skills/gradle-logic/SKILL.md), [`accessibility`](./plugins/android-dev/skills/accessibility/SKILL.md), [`testing`](./plugins/android-dev/skills/testing/SKILL.md), [`xml-to-compose-migration`](./plugins/android-dev/skills/xml-to-compose-migration/SKILL.md))
-- [**`jetpack-compose`**](./plugins/android-dev/skills/jetpack-compose/SKILL.md): vendored from [TheBushidoCollective/han](https://github.com/TheBushidoCollective/han/tree/main/plugins/specialized/android/skills/jetpack-compose).
-- [**`mobile-android-design`**](./plugins/android-dev/skills/mobile-android-design/SKILL.md): vendored from [wshobson/agents](https://github.com/wshobson/agents/tree/main/plugins/ui-design/skills/mobile-android-design).
-- **6 official Android skills**: vendored from [android/skills](https://github.com/android/skills) (Apache-2.0). ([`agp-9-upgrade`](./plugins/android-dev/skills/agp-9-upgrade/SKILL.md), [`migrate-xml-views-to-jetpack-compose`](./plugins/android-dev/skills/migrate-xml-views-to-jetpack-compose/SKILL.md), [`navigation-3`](./plugins/android-dev/skills/navigation-3/SKILL.md), [`r8-analyzer`](./plugins/android-dev/skills/r8-analyzer/SKILL.md), [`play-billing-library-version-upgrade`](./plugins/android-dev/skills/play-billing-library-version-upgrade/SKILL.md), [`edge-to-edge`](./plugins/android-dev/skills/edge-to-edge/SKILL.md))
+- [**`android-patterns`**](./skills/android-dev/android-patterns/SKILL.md) (in-house): Jetpack Compose patterns: `@Preview` setup (LocalInspectionMode, Vico charts), Scaffold + bottom nav + status bar insets, ModalBottomSheet nested-scroll jitter, ripple clipping on rounded corners, SwipeToDismissBox transparency, locale-aware date formatting (MIUI quirks).
+- **`gplay` skills** (16): vendored from [tamtom/gplay-cli-skills](https://github.com/tamtom/gplay-cli-skills). Google Play Console CLI workflows: build, release flows, metadata, IAP, testing tracks, rollout, reviews, vitals. ([`gplay-cli-usage`](./skills/android-dev/gplay-cli-usage/SKILL.md), [`gplay-gradle-build`](./skills/android-dev/gplay-gradle-build/SKILL.md), [`gplay-iap-setup`](./skills/android-dev/gplay-iap-setup/SKILL.md), [`gplay-metadata-sync`](./skills/android-dev/gplay-metadata-sync/SKILL.md), [`gplay-migrate-fastlane`](./skills/android-dev/gplay-migrate-fastlane/SKILL.md), [`gplay-ppp-pricing`](./skills/android-dev/gplay-ppp-pricing/SKILL.md), [`gplay-purchase-verification`](./skills/android-dev/gplay-purchase-verification/SKILL.md), [`gplay-release-flow`](./skills/android-dev/gplay-release-flow/SKILL.md), [`gplay-reports-download`](./skills/android-dev/gplay-reports-download/SKILL.md), [`gplay-review-management`](./skills/android-dev/gplay-review-management/SKILL.md), [`gplay-rollout-management`](./skills/android-dev/gplay-rollout-management/SKILL.md), [`gplay-screenshot-automation`](./skills/android-dev/gplay-screenshot-automation/SKILL.md), [`gplay-submission-checks`](./skills/android-dev/gplay-submission-checks/SKILL.md), [`gplay-testers-orchestration`](./skills/android-dev/gplay-testers-orchestration/SKILL.md), [`gplay-user-management`](./skills/android-dev/gplay-user-management/SKILL.md), [`gplay-vitals-monitoring`](./skills/android-dev/gplay-vitals-monitoring/SKILL.md))
+- **13 Compose / architecture skills**: vendored from [new-silvermoon/awesome-android-agent-skills](https://github.com/new-silvermoon/awesome-android-agent-skills). ([`compose-ui`](./skills/android-dev/compose-ui/SKILL.md), [`compose-navigation`](./skills/android-dev/compose-navigation/SKILL.md), [`compose-performance-audit`](./skills/android-dev/compose-performance-audit/SKILL.md), [`architecture`](./skills/android-dev/architecture/SKILL.md), [`viewmodel`](./skills/android-dev/viewmodel/SKILL.md), [`data-layer`](./skills/android-dev/data-layer/SKILL.md), [`coroutines`](./skills/android-dev/coroutines/SKILL.md), [`kotlin-concurrency-expert`](./skills/android-dev/kotlin-concurrency-expert/SKILL.md), [`gradle-build-performance`](./skills/android-dev/gradle-build-performance/SKILL.md), [`gradle-logic`](./skills/android-dev/gradle-logic/SKILL.md), [`accessibility`](./skills/android-dev/accessibility/SKILL.md), [`testing`](./skills/android-dev/testing/SKILL.md), [`xml-to-compose-migration`](./skills/android-dev/xml-to-compose-migration/SKILL.md))
+- [**`jetpack-compose`**](./skills/android-dev/jetpack-compose/SKILL.md): vendored from [TheBushidoCollective/han](https://github.com/TheBushidoCollective/han/tree/main/plugins/specialized/android/skills/jetpack-compose).
+- [**`mobile-android-design`**](./skills/android-dev/mobile-android-design/SKILL.md): vendored from [wshobson/agents](https://github.com/wshobson/agents/tree/main/plugins/ui-design/skills/mobile-android-design).
+- **6 official Android skills**: vendored from [android/skills](https://github.com/android/skills) (Apache-2.0). ([`agp-9-upgrade`](./skills/android-dev/agp-9-upgrade/SKILL.md), [`migrate-xml-views-to-jetpack-compose`](./skills/android-dev/migrate-xml-views-to-jetpack-compose/SKILL.md), [`navigation-3`](./skills/android-dev/navigation-3/SKILL.md), [`r8-analyzer`](./skills/android-dev/r8-analyzer/SKILL.md), [`play-billing-library-version-upgrade`](./skills/android-dev/play-billing-library-version-upgrade/SKILL.md), [`edge-to-edge`](./skills/android-dev/edge-to-edge/SKILL.md))
 
 #### Requirements
 
@@ -198,9 +214,9 @@ structured output, plus 2 in-house skills and 1 vendored skill.
 
 #### Bundled skills
 
-- [**`langgraph`**](./plugins/ai-engineer/skills/langgraph/SKILL.md) (in-house): deployment-first v1.0 patterns (`agent.py` with `app = ...compile()`, `langgraph.json` config, prefer `create_react_agent`).
-- [**`ai-app-templates`**](./plugins/ai-engineer/skills/ai-app-templates/SKILL.md) (in-house): reference implementations for common AI backend shapes (currently `simple-llm-api`: minimal FastAPI service with one `POST /chat` endpoint, provider chosen at scaffold time — Anthropic / Gemini / OpenRouter).
-- [**`senior-prompt-engineer`**](./plugins/ai-engineer/skills/senior-prompt-engineer/SKILL.md): vendored from [alirezarezvani/claude-skills](https://github.com/alirezarezvani/claude-skills/tree/main/engineering-team/skills/senior-prompt-engineer). Advanced prompt patterns + LLM eval frameworks + agent orchestration.
+- [**`langgraph`**](./skills/ai-engineer/langgraph/SKILL.md) (in-house): deployment-first v1.0 patterns (`agent.py` with `app = ...compile()`, `langgraph.json` config, prefer `create_react_agent`).
+- [**`ai-app-templates`**](./skills/ai-engineer/ai-app-templates/SKILL.md) (in-house): reference implementations for common AI backend shapes (currently `simple-llm-api`: minimal FastAPI service with one `POST /chat` endpoint, provider chosen at scaffold time — Anthropic / Gemini / OpenRouter).
+- [**`senior-prompt-engineer`**](./skills/ai-engineer/senior-prompt-engineer/SKILL.md): vendored from [alirezarezvani/claude-skills](https://github.com/alirezarezvani/claude-skills/tree/main/engineering-team/skills/senior-prompt-engineer). Advanced prompt patterns + LLM eval frameworks + agent orchestration.
 
 (No external requirements.)
 
@@ -214,10 +230,10 @@ skills.
 
 #### Bundled skills
 
-- [**`neo4j-cypher`**](./plugins/neo4j-dev/skills/neo4j-cypher/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). 4.x/5.x → 2025.x upgrade. Covers removed/deprecated syntax and modern replacements.
-- [**`neo4j-cypher-guide`**](./plugins/neo4j-dev/skills/neo4j-cypher-guide/SKILL.md): vendored from [tomasonjo/blogs](https://github.com/tomasonjo/blogs/tree/master/claude-skills/neo4j-cypher-guide). Modern Cypher read patterns (QPP, CALL subqueries, sorting).
-- [**`neo4j-migration`**](./plugins/neo4j-dev/skills/neo4j-migration/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). Driver upgrade across .NET / Go / Java / JS / Python.
-- [**`neo4j-cli-tools`**](./plugins/neo4j-dev/skills/neo4j-cli-tools/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). `neo4j-admin`, `cypher-shell`, `aura-cli`, MCP server setup.
+- [**`neo4j-cypher`**](./skills/neo4j-dev/neo4j-cypher/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). 4.x/5.x → 2025.x upgrade. Covers removed/deprecated syntax and modern replacements.
+- [**`neo4j-cypher-guide`**](./skills/neo4j-dev/neo4j-cypher-guide/SKILL.md): vendored from [tomasonjo/blogs](https://github.com/tomasonjo/blogs/tree/master/claude-skills/neo4j-cypher-guide). Modern Cypher read patterns (QPP, CALL subqueries, sorting).
+- [**`neo4j-migration`**](./skills/neo4j-dev/neo4j-migration/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). Driver upgrade across .NET / Go / Java / JS / Python.
+- [**`neo4j-cli-tools`**](./skills/neo4j-dev/neo4j-cli-tools/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). `neo4j-admin`, `cypher-shell`, `aura-cli`, MCP server setup.
 
 #### Requirements
 

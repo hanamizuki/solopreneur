@@ -15,7 +15,7 @@ Three interlocking issues in the current `worktree-handoff` flow:
    so the original "why" of the work is lost the moment the PR merges.
 
 2. **Complicates `greenlight` clean-tree precondition.** `greenlight` PR mode
-   (`plugins/solopreneur/skills/greenlight/SKILL.md:120`) checks `git status
+   (`skills/solopreneur/greenlight/SKILL.md:120`) checks `git status
    --porcelain` and asks the user whether to commit first — not a hard refusal,
    but a friction point. More importantly, the fix subagents in Phase 2/3
    auto-commit + push anything in the working tree, so an uncommitted
@@ -325,7 +325,7 @@ appending happens in place. No renaming.
 ### 4. `merge-pr` migration into plugin
 
 Move `~/Agents/skills/hana/merge-pr/SKILL.md` to
-`plugins/solopreneur/skills/merge-pr/SKILL.md`.
+`skills/solopreneur/merge-pr/SKILL.md`.
 
 #### What's kept from the personal-skill version
 
@@ -607,12 +607,12 @@ Suggested commit sequence inside the PR:
 3. Rewrite `worktree-handoff/SKILL.md` (state-machine + flat modes,
    interactive picker, append-or-create flow).
 4. Move `merge-pr` from `~/Agents/skills/hana/` into
-   `plugins/solopreneur/skills/merge-pr/` and extend Step 3 with the
+   `skills/solopreneur/merge-pr/` and extend Step 3 with the
    consolidation pass.
 5. Update `.claude-plugin/marketplace.json` if `merge-pr` needs an entry
    (verify how other skills are listed first — they may be auto-discovered
    from `skills/`).
 6. Update top-level `CLAUDE.md` if any user-facing convention changed
    (probably not — config schema is internal).
-7. Bump `plugins/solopreneur/.claude-plugin/plugin.json` patch version on
+7. Bump `src/solopreneur/plugin.json` patch version on
    release via `/release` skill (don't touch the version manually).

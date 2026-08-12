@@ -178,15 +178,15 @@ On block:
 
 ## Files affected
 
-- `plugins/solopreneur/skills/autopilot/SKILL.md` — main edits.
+- `skills/solopreneur/autopilot/SKILL.md` — main edits.
   - Remove the closing line about implementing directly without the skill.
   - Step 2: add the 1-PR branch (descriptor format, what to drop).
   - Step 3: artifact table by mode, spec naming convention, write-ordering rule.
   - Step 4: single-PR confirmation block with run-now / schedule choice.
   - Step 5: inline-dispatch path for run-now; reference the existing CronCreate path for schedule.
-- `plugins/solopreneur/skills/autopilot/references/orchestrator.md` — **no change**.
-- `plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md` — **no change**.
-- `plugins/solopreneur/skills/autopilot/references/schemas.md` — minor: note that `prs[]` may have length 1 in single-PR scheduled mode (it already supports this; just make it explicit).
+- `skills/solopreneur/autopilot/references/orchestrator.md` — **no change**.
+- `skills/solopreneur/autopilot/references/pr-subagent-template.md` — **no change**.
+- `skills/solopreneur/autopilot/references/schemas.md` — minor: note that `prs[]` may have length 1 in single-PR scheduled mode (it already supports this; just make it explicit).
 
 ## Versioning
 

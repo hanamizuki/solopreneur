@@ -1,0 +1,22 @@
+[project]
+name = "simple-llm-api"
+version = "0.1.0"
+description = "Minimal FastAPI service with one pluggable LLM provider."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "python-dotenv>=1.0",
+    "anthropic>=0.40",
+    "google-genai>=0.3",
+    "openai>=1.50",
+]
+
+# All three provider SDKs are listed so the template stays runnable
+# regardless of which provider the consuming agent picks. After picking,
+# run `uv remove <unused-sdk-1> <unused-sdk-2>` to drop only the two
+# SDKs not used by the chosen provider — keep one of `anthropic`,
+# `google-genai`, or `openai`. Running the full
+# `uv remove anthropic google-genai openai` would remove the selected
+# provider's SDK too and break /chat at runtime.

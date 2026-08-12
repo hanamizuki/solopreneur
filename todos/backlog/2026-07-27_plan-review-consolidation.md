@@ -190,10 +190,10 @@ coordinator），合併留下 1 個。它也不解決問題 1（三份 descripti
 
 ### A. 新 skill
 
-- `plugins/solopreneur/skills/tech-vetting/` → `plan-review/`（`git mv`，保留歷史）
+- `skills/solopreneur/tech-vetting/` → `plan-review/`（`git mv`，保留歷史）
 - 重寫 `SKILL.md`：三段 + 收尾 + 兩種模式 + description 收斂觸發詞
 - 段 3 與收尾內容取自 `second-opinion/SKILL.md`
-- 刪除 `plugins/solopreneur/skills/second-opinion/`
+- 刪除 `skills/solopreneur/second-opinion/`
 
 ### B. 呼叫端（改 `internal`）
 
@@ -259,8 +259,8 @@ coordinator），合併留下 1 個。它也不解決問題 1（三份 descripti
 **整合**
 
 - [ ] `autopilot` 走完一輪 PR，plan-review 階段跑了 ponytail 且未燒 Codex
-- [ ] `.github/workflows/validate-codex.yml` CI 通過（skill 目錄變更會觸發；
-      `scripts/validate-codex.sh:48,56` 有 structure 與 install smoke）
+- [ ] `.github/workflows/validate-plugin-packages.yml` CI 通過（skill 目錄變更會觸發；
+      `scripts/validate-plugin-packages.sh:95,197` 有 structure 與 install smoke）
 - [ ] grep 無殘留 `tech-vetting` / `second-opinion`，**排除** `todos/done/**`、
       `CHANGELOG.md`、`MIGRATION.md`
 

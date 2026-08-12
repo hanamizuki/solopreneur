@@ -3,14 +3,14 @@ name: Validate preview tests
 on:
   pull_request:
     paths:
-      - 'plugins/solopreneur/skills/preview/**'
-      - 'plugins/solopreneur/shared/**'
+      - 'skills/solopreneur/preview/**'
+      - 'src/solopreneur/shared/**'
       - '.github/workflows/validate-preview-tests.yml'
   push:
     branches: [main]
     paths:
-      - 'plugins/solopreneur/skills/preview/**'
-      - 'plugins/solopreneur/shared/**'
+      - 'skills/solopreneur/preview/**'
+      - 'src/solopreneur/shared/**'
       - '.github/workflows/validate-preview-tests.yml'
 
 permissions:
@@ -49,7 +49,7 @@ jobs:
           # and the suite uses Node built-ins only, so there is nothing to cache.
 
       - name: Run the preview skill test suite
-        working-directory: plugins/solopreneur/skills/preview
+        working-directory: skills/solopreneur/preview
         run: |
           # failglob, or this gate can pass having run zero tests: with no match
           # bash passes the pattern through literally, Node >= 22.6 treats it as
@@ -65,6 +65,6 @@ jobs:
           if ! node --test tests/*.test.mjs; then
             echo
             echo "::error::The preview skill's test suite failed on Node ${{ matrix.node }}."
-            echo "::error::Reproduce with: cd plugins/solopreneur/skills/preview && node --test tests/*.test.mjs"
+            echo "::error::Reproduce with: cd skills/solopreneur/preview && node --test tests/*.test.mjs"
             exit 1
           fi

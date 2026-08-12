@@ -3,12 +3,12 @@ name: Validate greenlight tests
 on:
   pull_request:
     paths:
-      - 'plugins/solopreneur/skills/greenlight/**'
+      - 'skills/solopreneur/greenlight/**'
       - '.github/workflows/validate-greenlight-tests.yml'
   push:
     branches: [main]
     paths:
-      - 'plugins/solopreneur/skills/greenlight/**'
+      - 'skills/solopreneur/greenlight/**'
       - '.github/workflows/validate-greenlight-tests.yml'
 
 permissions:
@@ -53,7 +53,7 @@ jobs:
           # uses Node built-ins only.
 
       - name: Run the greenlight skill test suite
-        working-directory: plugins/solopreneur/skills/greenlight
+        working-directory: skills/solopreneur/greenlight
         run: |
           # failglob, or this gate can pass having run zero tests: with no match
           # bash passes the pattern through literally, Node >= 22.6 treats it as
@@ -65,6 +65,6 @@ jobs:
           if ! node --test tests/*.test.mjs; then
             echo
             echo "::error::The greenlight skill's test suite failed on Node ${{ matrix.node }}."
-            echo "::error::Reproduce with: cd plugins/solopreneur/skills/greenlight && node --test tests/*.test.mjs"
+            echo "::error::Reproduce with: cd skills/solopreneur/greenlight && node --test tests/*.test.mjs"
             exit 1
           fi

@@ -214,7 +214,7 @@ unsupported on that platform.
 ### 5. Compatibility registry is the publication authority
 
 A hand-maintained root-level `skills-compatibility.json` registry covers every
-discovered `plugins/*/skills/*/SKILL.md`. JSON matches the existing Codex
+discovered `skills/*/*/SKILL.md`. JSON matches the existing Codex
 generator and validation stack, which already use JSON and `jq`; adding a YAML
 parser is not justified for this metadata. To keep the initial safety gate
 bounded, common support and publication values are defaults, every skill ID is
@@ -283,8 +283,8 @@ the Codex installation root with the canonical tree.
 
 For this contract, "published" means discoverable or invokable through the
 plugin's installed skills root. Canonical source stays under
-`plugins/<name>/skills/` for maintenance and Claude Code, but excluded skill
-bytes are absent from the generated Codex plugin snapshot.
+`skills/<name>/`, but excluded skill bytes are absent from the generated Codex
+plugin snapshot.
 
 The Codex generator will assemble its one publication view from the
 compatibility registry. Per-surface statuses do not create separate packages:
@@ -297,14 +297,16 @@ compatibility registry. Per-surface statuses do not create separate packages:
   creating a second hand-maintained skill body.
 - Included skills have a valid supported dependency closure.
 
-The physical view is generated under `.codex/plugins/<name>/`. Each generated
+The physical view is generated under `plugins/codex/<name>/`. Each generated
 root contains a conventional `.codex-plugin/plugin.json` and `skills/`, with
 whole included skill directories copied from the canonical source. The core
 config helper is copied only to the flattened fallback path already declared by
-the consuming skills. Canonical plugin roots carry no Codex manifest. The
-Codex marketplace lists only plugins with at least one included skill and
-points directly to these generated roots, so specialist plugins can be added
-one at a time without exposing their siblings early.
+the consuming skills. Canonical source roots carry no platform manifest
+directories. The Codex marketplace lists only plugins with at least one
+included skill and points directly to these generated roots, so specialist
+plugins can be added one at a time without exposing their siblings early. A
+byte-identical `.codex/plugins/<name>` bridge remains only until the first
+tagged symmetric-layout release.
 
 The physical representation of this view was accepted on Codex CLI 0.147.0
 with the one-skill fixture commit

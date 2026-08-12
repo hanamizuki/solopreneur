@@ -34,6 +34,6 @@ pre-PR failure ＝ agent 死掉或被跳過，重試是安全的。
 
 ## 相關
 
-- `plugins/solopreneur/skills/autopilot/references/wave-workflow.md:56-63`
-- `plugins/solopreneur/skills/autopilot/references/pr-subagent-template.md`（plan review gate）
-- `plugins/solopreneur/skills/greenlight/SKILL.md`（`reason_class` 既有定義）
+- `skills/solopreneur/autopilot/references/wave-workflow.md:56-63`
+- `skills/solopreneur/autopilot/references/pr-subagent-template.md`（plan review gate）
+- `skills/solopreneur/greenlight/SKILL.md`（`reason_class` 既有定義）

@@ -1,7 +1,7 @@
 # Evaluate iPhone Mirroring as a CLI path for driving a real iPhone
 
 `ios-dev` ships a complete CLI debug story for the **simulator** in
-`plugins/ios-dev/skills/iphone-apps/references/cli-observability.md` — logs,
+`skills/ios-dev/iphone-apps/references/cli-observability.md` — logs,
 crash symbolication, lldb, leaks, profiling, network, test results, and a
 "What CLI Can and Cannot Do" matrix at line 442. Physical-device coverage stops
 at install + launch (`<device_debugging>`, line 397).

@@ -16,7 +16,7 @@ defect, not a Codex parity or publication gate
 
 Run the shipped `/greenlight` PR review loop on Codex. One skill body, no fork.
 
-`plugins/solopreneur/skills/greenlight/SKILL.md` already *is* the specification.
+`skills/solopreneur/greenlight/SKILL.md` already *is* the specification.
 It is a prompt, not a program, and Codex reads prompts too. Porting is therefore
 a question of which parts of that prompt depend on Claude Code — not of
 extracting a shared engine and writing adapters against it.
@@ -186,8 +186,9 @@ finding outranks `clean`, puts a size ceiling on the clean pass — see
 
 ## Implementation plan
 
-Ordered; W1 unblocks determinism for everything after it. All paths relative
-to `plugins/solopreneur/`.
+Ordered; W1 unblocks determinism for everything after it. Skill paths are
+relative to `skills/solopreneur/`; shared-helper paths are under
+`src/solopreneur/`.
 
 ### W1 — move the config helpers from skill bodies into a sourced script
 
@@ -231,7 +232,7 @@ The five consumers inline one marker-delimited block
    state lands in the active harness's home without callers exporting
    anything.
 
-Done when: `grep -rE '\\\$[0-9@*{]' plugins/solopreneur/skills/*/SKILL.md`
+Done when: `grep -rE '\\\$[0-9@*{]' skills/solopreneur/*/SKILL.md`
 returns nothing, and the updated tests pass.
 
 ### W2 — add the `claude-cli` gate recipe

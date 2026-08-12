@@ -36,7 +36,7 @@
 
 - `marketer` 補上最小 `.codex-plugin/plugin.json` 後可通過 Codex plugin validator。
 - 其他 plugin 主要卡在結構問題：
-  - `skills/_vendored` 被 Codex 當成 skill directory，但沒有 `SKILL.md`。2026-07-07 複查耦合面：存在於 ai-engineer / android-dev / designer / ios-dev / neo4j-dev 5 個 plugin，內容只有 `LICENSES/` + `manifest.json`；真實引用只有 5 個 `agents/*.md` + `plugins/solopreneur/scripts/sync-vendored.sh`，grep 到的其餘 77 處是自動生成的 `_VENDOR.md` 標記（隨 sync 重生，不需手改）
+  - `skills/_vendored` 被 Codex 當成 skill directory，但沒有 `SKILL.md`。2026-07-07 複查耦合面：存在於 ai-engineer / android-dev / designer / ios-dev / neo4j-dev 5 個 plugin，內容只有 `LICENSES/` + `manifest.json`；真實引用只有 5 個 `agents/*.md` + `src/solopreneur/scripts/sync-vendored.sh`，grep 到的其餘 77 處是自動生成的 `_VENDOR.md` 標記（隨 sync 重生，不需手改）
   - `plugins/solopreneur/skills/_shared` 被 Codex 當成 skill directory，但沒有 `SKILL.md`。2026-07-07 複查：僅 solopreneur 內 7 個檔案引用 `_shared/config.md`，自我封閉，搬移風險低
   - ~~frontmatter 未 quote 冒號~~ 2026-07-07 複查排除：106 個 SKILL.md 中 inline description 含冒號的僅 2 個且都已加引號，另 21 個用 folded/block scalar 本來就 YAML-safe。dry-run 當時的 YAML 錯誤應出自 `/tmp` 臨時 manifest 的生成過程，非 repo 現況
 
@@ -62,7 +62,7 @@
 
 1. **Codex 結構：鏡像 7 個 sub-plugin**（不做 suite）。rollout 先拿 `marketer` 當 pilot（dry-run 已過 validator），驗證安裝 UX 再鋪滿。
 2. **Dependencies：文件要求**。README／描述註明「建議先裝 solopreneur（skill-index / workflow 基座）」；保持現有軟依賴 + graceful degradation（實際耦合僅 5 個 agent 對 skill-index artifact 的可選讀取），Codex 出 dependency schema 再補宣告。
-3. **非 skill 目錄：`skills/_vendored` → `plugins/<n>/vendor/`、`skills/_shared` → `plugins/solopreneur/shared/`**。同 PR 連動 `sync-vendored.sh`、兩個 vendored workflow、5 個 agent 引用、7 個 config.md 引用；排在 backlog 的 `$N escape` todo 之後（共用 sync-vendored.sh）。
+3. **非 skill 目錄：`skills/_vendored` → `src/<n>/vendor/`、`skills/_shared` → `src/solopreneur/shared/`**。同 PR 連動 `sync-vendored.sh`、兩個 vendored workflow、5 個 agent 引用、7 個 config.md 引用；排在 backlog 的 `$N escape` todo 之後（共用 sync-vendored.sh）。
 4. **Agents：TOML + router skill 都做**。6 個 agent 轉 Codex TOML（repo 放 `.codex/agents/`；另做 bootstrap skill 幫安裝者複製到 `~/.codex/agents/`，因 Codex plugin 帶不了 agents）；每個 plugin 加一個平台中立措辭的 router/entrypoint skill 放 `skills/`（Codex 端創造主動路由、Claude 端與 description 路由同向）。pilot 必測：skill 指示 spawn agent 在 Codex 是否真的觸發委派。
 5. **語彙：混合式**。native ~20 檔改寫平台中立（寫動作不寫工具名）；vendored ~13 檔不動、用 per-harness mapping reference（掛 bootstrap／router skill 的 references）；`CLAUDE_CONFIG_DIR` 等 config path 收斂到 shared helper 單點解析。
 6. **Local dev：`.agents/plugins/marketplace.json` local marketplace 直裝**，不做 package artifact（Codex 安裝模型即 marketplace snapshot，無 package 格式）；發佈驗證於 pilot 時用 git `@ref` 實裝一次。
@@ -140,6 +140,6 @@
 | `plugins/*/.claude-plugin/plugin.json` | Existing plugin metadata and dependencies |
 | `plugins/*/skills/` | Shared skill content and current structural blockers |
 | `plugins/*/agents/*.md` | Claude agent behavior to convert or adapt |
-| `plugins/solopreneur/shared/config.md` | Shared config helper that needs a verified Codex resolver |
-| `plugins/solopreneur/skills/rebuild-skill-index/SKILL.md` | Claude-specific skill discovery/indexing behavior |
-| `plugins/solopreneur/skills/preview/SKILL.md` | Deep Claude workflow assumptions and deployment behavior |
+| `src/solopreneur/shared/config.md` | Shared config helper that needs a verified Codex resolver |
+| `skills/solopreneur/rebuild-skill-index/SKILL.md` | Claude-specific skill discovery/indexing behavior |
+| `skills/solopreneur/preview/SKILL.md` | Deep Claude workflow assumptions and deployment behavior |

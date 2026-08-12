@@ -47,7 +47,7 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         skill_ids = []
         for skill in CORE_SKILLS:
             skill_id = f"solopreneur:{skill}"
-            path = self.repo_root / "plugins" / "solopreneur" / "skills" / skill / "SKILL.md"
+            path = self.repo_root / "skills" / "solopreneur" / skill / "SKILL.md"
             path.parent.mkdir(parents=True, exist_ok=True)
             if skill in GUARDED_SKILLS:
                 path.write_text(
@@ -90,7 +90,7 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
 
     def add_skill(self, skill_id: str) -> str:
         plugin, skill = skill_id.split(":", 1)
-        resource = f"plugins/{plugin}/skills/{skill}/SKILL.md"
+        resource = f"skills/{plugin}/{skill}/SKILL.md"
         path = self.repo_root / resource
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"# {skill}\n", encoding="utf-8")
@@ -106,7 +106,7 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         claude_full: bool = False,
     ) -> None:
         plugin, skill = skill_id.split(":", 1)
-        resource = f"plugins/{plugin}/skills/{skill}/SKILL.md"
+        resource = f"skills/{plugin}/{skill}/SKILL.md"
         support = {
             "codex-exec": "full",
             "codex-tui": "full",
@@ -169,7 +169,7 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         )
 
     def test_unclassified_skill_fails(self) -> None:
-        extra = self.repo_root / "plugins" / "solopreneur" / "skills" / "extra" / "SKILL.md"
+        extra = self.repo_root / "skills" / "solopreneur" / "extra" / "SKILL.md"
         extra.parent.mkdir(parents=True)
         extra.write_text("# Extra\n", encoding="utf-8")
 
@@ -276,7 +276,7 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
 
         self.assert_failure_contains(
             "codexHostGuards.solopreneur:mvp must reference "
-            "plugins/solopreneur/skills/mvp/SKILL.md"
+            "skills/solopreneur/mvp/SKILL.md"
         )
 
     def test_guard_must_be_early(self) -> None:
