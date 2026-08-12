@@ -208,6 +208,28 @@ for name in "${plugins[@]}"; do
     fi
   done
 done
+
+# The reverse direction of the check above, and the only thing that makes the
+# canonical roots and the marketplace 1:1. Every list this script and the
+# validators iterate is derived from .claude-plugin/marketplace.json, so a plugin
+# added under skills/ and src/ but never listed there is not "unpublished with a
+# warning" — it is invisible: nothing generates it, nothing looks for it, and
+# every gate passes because none of them ever asks. Measured on a fixture tree:
+# generator exit 0, no output naming it, validate-plugin-packages.sh green.
+# Fail closed instead, before anything is generated.
+for root in "$SKILLS_ROOT" "$SOURCE_ROOT"; do
+  for entry in "$root"/*/; do
+    [[ -d "$entry" ]] || continue
+    canonical="$(basename "$entry")"
+    for name in "${plugins[@]}"; do
+      [[ "$canonical" == "$name" ]] && continue 2
+    done
+    echo "error: canonical root ${root#"$REPO_ROOT/"}/$canonical is not listed in" >&2
+    echo "       .claude-plugin/marketplace.json — add the entry or remove the root" >&2
+    exit 1
+  done
+done
+
 validate_symlinks "$SKILLS_ROOT" "$SOURCE_ROOT"
 
 PYTHONDONTWRITEBYTECODE=1 python3 \

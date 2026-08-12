@@ -87,6 +87,36 @@ cached_skills="$(
 [[ "$cached_skills" == $'autopilot\nfilter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
 [[ -f "$FILTER_HOME/plugins/cache/$cache_relative/skills/autopilot/SKILL.md" ]]
 
+# A canonical root the marketplace does not list must fail closed. Every list the
+# generator and the validators iterate comes from the marketplace, so an unlisted
+# plugin is invisible rather than merely unpublished — before the guard this ran
+# to exit 0 with no output naming it and the validator stayed green.
+orphan_src="$FIXTURE_ROOT/src/orphan-plugin"
+mkdir -p "$orphan_src"
+cat > "$orphan_src/plugin.json" <<'EOF'
+{
+  "name": "orphan-plugin",
+  "version": "0.1.0",
+  "description": "Canonical root deliberately omitted from the marketplace.",
+  "license": "MIT"
+}
+EOF
+if "$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null 2>&1; then
+  echo "error: generator accepted a canonical src root missing from the marketplace" >&2
+  exit 1
+fi
+rm -rf "$orphan_src"
+# Same for a skills-only root: it is caught by the registry classifier only when
+# it carries a skill, so the guard has to cover this side independently.
+orphan_skills="$FIXTURE_ROOT/skills/orphan-plugin"
+mkdir -p "$orphan_skills"
+if "$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null 2>&1; then
+  echo "error: generator accepted a canonical skills root missing from the marketplace" >&2
+  exit 1
+fi
+rm -rf "$orphan_skills"
+"$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null
+
 # A plugin removed from (or renamed in) the marketplace must not strand its flat
 # legacy bridge. plugins/claude, plugins/codex and .codex/plugins are replaced
 # wholesale, so a de-listed name vanishes from them on its own; plugins/<name> is
