@@ -374,8 +374,14 @@ claude plugin install neo4j-dev@solopreneur
 To update later, then start a new session:
 
 ```bash
+# Refresh the marketplace catalog
 claude plugin marketplace update solopreneur
+
+# Update core
 claude plugin update solopreneur@solopreneur
+
+# Repeat for every installed role, for example:
+claude plugin update marketer@solopreneur
 ```
 
 ### Codex
