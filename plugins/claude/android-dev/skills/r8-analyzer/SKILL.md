@@ -25,7 +25,7 @@ metadata:
 
 ## Step 2. Analysis path selection
 
-- Inspect `build.gradle`, `build.gradle.kts`, and `gradle.properties` and `libs.versions.toml` to get the AGP and R8 versions.
+- Inspect `build.gradle`, `build.gradle.kts`, `gradle.properties`, `libs.versions.toml`, and the top-level `settings.gradle` or `settings.gradle.kts` to get the AGP and R8 versions. An explicit `com.android.tools:r8` version in the settings file overrides the version embedded in AGP.
 
 - **If AGP \>= 9.3.0** : Proceed to **Path A (Standalone Task)**.
 
