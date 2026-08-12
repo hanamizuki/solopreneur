@@ -122,4 +122,60 @@ if "$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null 2>&1; then
 fi
 [[ "$(cksum < "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json")" == "$before_manifest" ]]
 
+jq 'del(.plugins[-1])' "$marketplace" > "$marketplace_next"
+mv "$marketplace_next" "$marketplace"
+ln -s missing-resource "$canary_dir/broken-resource"
+if "$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null 2>&1; then
+  echo "error: generator accepted a dangling canonical symlink" >&2
+  exit 1
+fi
+[[ "$(cksum < "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json")" == "$before_manifest" ]]
+
+rm "$canary_dir/broken-resource"
+transaction_before="$(
+  cksum < "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json"
+  cksum < "$FIXTURE_ROOT/plugins/codex/solopreneur/.codex-plugin/plugin.json"
+  cksum < "$FIXTURE_ROOT/.agents/plugins/marketplace.json"
+)"
+fake_bin="$FIXTURE_ROOT/fake-bin"
+mkdir -p "$fake_bin"
+cat > "$fake_bin/mv" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == */.plugin-packages.*/plugins/codex \
+     && "${2:-}" == "$FAIL_TARGET" ]]; then
+  exit 71
+fi
+exec "$REAL_MV" "$@"
+EOF
+chmod +x "$fake_bin/mv"
+source_manifest="$FIXTURE_ROOT/src/solopreneur/plugin.json"
+source_backup="$FIXTURE_ROOT/solopreneur-plugin.json.backup"
+cp "$source_manifest" "$source_backup"
+jq '.description += " staged-failure-canary"' \
+  "$source_manifest" > "$source_manifest.next"
+mv "$source_manifest.next" "$source_manifest"
+if PATH="$fake_bin:$PATH" REAL_MV="$(command -v mv)" \
+   FAIL_TARGET="$FIXTURE_ROOT/plugins/codex" \
+   "$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null 2>&1; then
+  echo "error: generator ignored an injected output-commit failure" >&2
+  exit 1
+fi
+cp "$source_backup" "$source_manifest"
+transaction_after="$(
+  cksum < "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json"
+  cksum < "$FIXTURE_ROOT/plugins/codex/solopreneur/.codex-plugin/plugin.json"
+  cksum < "$FIXTURE_ROOT/.agents/plugins/marketplace.json"
+)"
+[[ "$transaction_after" == "$transaction_before" ]]
+[[ -z "$(find "$FIXTURE_ROOT" -mindepth 1 -maxdepth 1 \
+  -type d -name '.plugin-packages.*' -print -quit)" ]]
+
+jq '(.skills[] | .publication.codex) = "exclude"' \
+  "$registry" > "$registry_next"
+mv "$registry_next" "$registry"
+"$FIXTURE_ROOT/scripts/generate-plugin-packages.sh" >/dev/null
+[[ -d "$FIXTURE_ROOT/plugins/codex" ]]
+[[ -z "$(find "$FIXTURE_ROOT/plugins/codex" -mindepth 1 -print -quit)" ]]
+jq -e '.plugins == []' "$FIXTURE_ROOT/.agents/plugins/marketplace.json" >/dev/null
+
 echo "filtered-publication fixture: legacy and symmetric installs passed"

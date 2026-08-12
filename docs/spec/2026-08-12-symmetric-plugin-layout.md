@@ -40,8 +40,9 @@ One generator owns all committed installation outputs:
 
 Generated files are committed because both plugin installers consume a
 repository snapshot and do not run a build step. They are never edited by
-hand. Generation validates all canonical inputs before deleting or replacing
-an output tree.
+hand. Generation rejects unsafe canonical symlinks, builds every output in a
+repository-local staging tree, and replaces the managed outputs as one
+rollback-capable batch.
 
 ## Compatibility bridge
 

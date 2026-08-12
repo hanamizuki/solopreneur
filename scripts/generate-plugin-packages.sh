@@ -15,6 +15,44 @@ SKILLS_ROOT="$REPO_ROOT/skills"
 CLAUDE_PACKAGE_ROOT="$REPO_ROOT/plugins/claude"
 CODEX_PACKAGE_ROOT="$REPO_ROOT/plugins/codex"
 LEGACY_CODEX_ROOT="$REPO_ROOT/.codex/plugins"
+STAGING_ROOT=""
+COMMITTING=0
+OUTPUT_STAGED=()
+OUTPUT_TARGETS=()
+OUTPUT_BACKUPS=()
+OUTPUT_BACKED_UP=()
+OUTPUT_ACTIVATED=()
+
+cleanup() {
+  local i target backup
+  local rollback_failed=0
+  if [[ "$COMMITTING" -eq 1 ]]; then
+    for ((i=${#OUTPUT_TARGETS[@]} - 1; i >= 0; i--)); do
+      target="${OUTPUT_TARGETS[$i]}"
+      if [[ "${OUTPUT_ACTIVATED[$i]:-0}" -eq 1 ]] \
+         && ! rm -rf "$target"; then
+        echo "error: failed to remove partial output during rollback: $target" >&2
+        rollback_failed=1
+      fi
+    done
+    for ((i=${#OUTPUT_TARGETS[@]} - 1; i >= 0; i--)); do
+      target="${OUTPUT_TARGETS[$i]}"
+      backup="${OUTPUT_BACKUPS[$i]:-}"
+      if [[ "${OUTPUT_BACKED_UP[$i]:-0}" -eq 1 \
+            && ( -e "$backup" || -L "$backup" ) ]] \
+         && ! mv "$backup" "$target"; then
+        echo "error: failed to restore output during rollback: $target" >&2
+        rollback_failed=1
+      fi
+    done
+  fi
+  if [[ "$rollback_failed" -eq 1 ]]; then
+    echo "error: rollback data retained at $STAGING_ROOT" >&2
+    return
+  fi
+  [[ -z "$STAGING_ROOT" ]] || rm -rf "$STAGING_ROOT"
+}
+trap cleanup EXIT
 
 for command in jq python3; do
   if ! command -v "$command" >/dev/null 2>&1; then
@@ -26,6 +64,26 @@ if ! python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 9))'; then
   echo "error: python3 >= 3.9 is required" >&2
   exit 1
 fi
+
+validate_symlinks() {
+  python3 - "$REPO_ROOT" "$@" <<'PY'
+import pathlib
+import sys
+
+repo = pathlib.Path(sys.argv[1]).resolve(strict=True)
+for root_arg in sys.argv[2:]:
+    root = pathlib.Path(root_arg)
+    for path in root.rglob("*"):
+        if not path.is_symlink():
+            continue
+        try:
+            target = path.resolve(strict=True)
+            target.relative_to(repo)
+        except (FileNotFoundError, RuntimeError, ValueError):
+            print(f"error: unsafe or dangling symlink: {path}", file=sys.stderr)
+            raise SystemExit(1)
+PY
+}
 for file in "$CLAUDE_MARKETPLACE" "$COMPATIBILITY_REGISTRY" "$OVERLAYS"; do
   if [[ ! -f "$file" ]]; then
     echo "error: input not found: $file" >&2
@@ -134,14 +192,24 @@ for name in "${plugins[@]}"; do
     exit 1
   fi
 done
+validate_symlinks "$SKILLS_ROOT" "$SOURCE_ROOT"
 
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "$REPO_ROOT/scripts/validate-codex-agents.py" "$REPO_ROOT"
 
+# Build every output before replacing a live package. A bad source tree or a
+# failed copy therefore leaves the previously generated publication intact.
+STAGING_ROOT="$(mktemp -d "$REPO_ROOT/.plugin-packages.XXXXXX")"
+STAGED_CLAUDE_PACKAGE_ROOT="$STAGING_ROOT/plugins/claude"
+STAGED_CODEX_PACKAGE_ROOT="$STAGING_ROOT/plugins/codex"
+STAGED_LEGACY_CODEX_ROOT="$STAGING_ROOT/.codex/plugins"
+STAGED_CODEX_AGENTS="$STAGING_ROOT/.codex/agents"
+STAGED_CODEX_MARKETPLACE="$STAGING_ROOT/.agents/plugins/marketplace.json"
+mkdir -p "$STAGED_CLAUDE_PACKAGE_ROOT" "$STAGED_CODEX_PACKAGE_ROOT"
+
 # Claude packages contain every canonical skill and all non-skill source.
-rm -rf "$CLAUDE_PACKAGE_ROOT" "$CODEX_PACKAGE_ROOT"
 for name in "${plugins[@]}"; do
-  output="$CLAUDE_PACKAGE_ROOT/$name"
+  output="$STAGED_CLAUDE_PACKAGE_ROOT/$name"
   mkdir -p "$output/.claude-plugin"
   cp "$SOURCE_ROOT/$name/plugin.json" "$output/.claude-plugin/plugin.json"
   while IFS= read -r -d '' component; do
@@ -155,7 +223,7 @@ done
 # Codex packages contain only registry-included skills plus declared seams.
 for name in "${codex_plugins[@]+"${codex_plugins[@]}"}"; do
   manifest="$SOURCE_ROOT/$name/plugin.json"
-  output="$CODEX_PACKAGE_ROOT/$name"
+  output="$STAGED_CODEX_PACKAGE_ROOT/$name"
   mkdir -p "$output/.codex-plugin" "$output/skills"
 
   while IFS= read -r skill; do
@@ -210,22 +278,20 @@ done
 
 # The legacy copies keep tagged marketplace installs valid until the first
 # release switches both marketplaces to the symmetric paths atomically.
-for name in "${plugins[@]}"; do rm -rf "$REPO_ROOT/plugins/$name"; done
-rm -rf "$LEGACY_CODEX_ROOT"
 if [[ "$layout" == legacy ]]; then
+  mkdir -p "$STAGED_LEGACY_CODEX_ROOT"
   for name in "${plugins[@]}"; do
-    cp -R "$CLAUDE_PACKAGE_ROOT/$name" "$REPO_ROOT/plugins/$name"
+    cp -R "$STAGED_CLAUDE_PACKAGE_ROOT/$name" "$STAGING_ROOT/plugins/$name"
   done
   for name in "${codex_plugins[@]+"${codex_plugins[@]}"}"; do
-    mkdir -p "$LEGACY_CODEX_ROOT"
-    cp -R "$CODEX_PACKAGE_ROOT/$name" "$LEGACY_CODEX_ROOT/$name"
+    cp -R "$STAGED_CODEX_PACKAGE_ROOT/$name" "$STAGED_LEGACY_CODEX_ROOT/$name"
   done
   codex_prefix='./.codex/plugins/'
 else
   codex_prefix='./plugins/codex/'
 fi
 
-mkdir -p "$(dirname "$CODEX_MARKETPLACE")"
+mkdir -p "$(dirname "$STAGED_CODEX_MARKETPLACE")"
 jq --slurpfile overlays "$OVERLAYS" \
   --argjson published "$published_names" \
   --arg prefix "$codex_prefix" '{
@@ -240,21 +306,75 @@ jq --slurpfile overlays "$OVERLAYS" \
           category: $overlays[0][.name].interface.category
         }
     ]
-  }' "$CLAUDE_MARKETPLACE" > "$CODEX_MARKETPLACE"
-echo "generated: .agents/plugins/marketplace.json ($layout layout)"
+  }' "$CLAUDE_MARKETPLACE" > "$STAGED_CODEX_MARKETPLACE"
 
 # Project-local agent TOMLs make repository development match installed
 # packages. Plugin installation itself does not register custom agents.
-rm -rf "$REPO_ROOT/.codex/agents"
 copied=0
 for name in "${plugins[@]}"; do
   for toml in "$SOURCE_ROOT/$name"/agents/*.toml; do
     [[ -e "$toml" ]] || continue
-    mkdir -p "$REPO_ROOT/.codex/agents"
-    cp "$toml" "$REPO_ROOT/.codex/agents/$(basename "$toml")"
+    mkdir -p "$STAGED_CODEX_AGENTS"
+    cp "$toml" "$STAGED_CODEX_AGENTS/$(basename "$toml")"
     copied=$((copied + 1))
   done
 done
-if [[ "$copied" -eq 0 ]]; then
-  rmdir "$REPO_ROOT/.codex" 2>/dev/null || true
+
+validate_symlinks "$STAGING_ROOT"
+
+queue_output() {
+  OUTPUT_STAGED+=("$1")
+  OUTPUT_TARGETS+=("$2")
+}
+
+commit_outputs() {
+  local count="${#OUTPUT_TARGETS[@]}"
+  local i staged target backup
+
+  mkdir -p "$STAGING_ROOT/backups"
+  COMMITTING=1
+  for ((i=0; i<count; i++)); do
+    target="${OUTPUT_TARGETS[$i]}"
+    backup="$STAGING_ROOT/backups/$i"
+    OUTPUT_BACKUPS[i]="$backup"
+    if [[ -e "$target" || -L "$target" ]]; then
+      OUTPUT_BACKED_UP[i]=1
+      mv "$target" "$backup"
+    fi
+  done
+  for ((i=0; i<count; i++)); do
+    staged="${OUTPUT_STAGED[$i]}"
+    target="${OUTPUT_TARGETS[$i]}"
+    [[ -n "$staged" ]] || continue
+    mkdir -p "$(dirname "$target")"
+    OUTPUT_ACTIVATED[i]=1
+    mv "$staged" "$target"
+  done
+  COMMITTING=0
+  rm -rf "$STAGING_ROOT/backups"
+}
+
+queue_output "$STAGED_CLAUDE_PACKAGE_ROOT" "$CLAUDE_PACKAGE_ROOT"
+queue_output "$STAGED_CODEX_PACKAGE_ROOT" "$CODEX_PACKAGE_ROOT"
+
+for name in "${plugins[@]}"; do
+  if [[ "$layout" == legacy ]]; then
+    queue_output "$STAGING_ROOT/plugins/$name" "$REPO_ROOT/plugins/$name"
+  else
+    queue_output "" "$REPO_ROOT/plugins/$name"
+  fi
+done
+if [[ "$layout" == legacy ]]; then
+  queue_output "$STAGED_LEGACY_CODEX_ROOT" "$LEGACY_CODEX_ROOT"
+else
+  queue_output "" "$LEGACY_CODEX_ROOT"
 fi
+if [[ "$copied" -gt 0 ]]; then
+  queue_output "$STAGED_CODEX_AGENTS" "$REPO_ROOT/.codex/agents"
+else
+  queue_output "" "$REPO_ROOT/.codex/agents"
+fi
+queue_output "$STAGED_CODEX_MARKETPLACE" "$CODEX_MARKETPLACE"
+
+commit_outputs
+echo "generated: .agents/plugins/marketplace.json ($layout layout)"
