@@ -266,15 +266,30 @@ leaves committed, still-installable copies behind. Do it in exactly this order:
 2. Confirm they are gone — `ls plugins/` must show only `claude` and `codex`,
    and `.codex/plugins` must not exist. `./scripts/validate-plugin-packages.sh`
    also fails on a leftover once the marketplace is symmetric.
-3. Only now delete the dead code and prose: the `layout == legacy` branches in
-   `scripts/generate-plugin-packages.sh` (`LEGACY_CODEX_ROOT`, its copy loop,
-   and the `queue_output ""` sentinels that were removing those trees) and in
-   `scripts/validate-plugin-packages.sh`; the compatibility-bridge paragraph in
-   `CLAUDE.md` ("Until the first release after this migration…"); and the
-   "temporary generated copies" sentence in the Repository layout section of
-   `README.md`.
+3. Only now delete the dead code and prose. **All five files, or the release
+   cannot validate** — `validate-plugin-packages.sh` runs the fixture
+   unconditionally, so a fixture still asserting the bridge fails the whole
+   gate even when the cutover itself is perfect (measured: `error:
+   filtered-publication fixture failed at line 66`):
+   - `scripts/generate-plugin-packages.sh` — the `layout == legacy` branches
+     (`LEGACY_CODEX_ROOT`, its copy loop, and the `queue_output ""` sentinels
+     that were removing those trees).
+   - `scripts/validate-plugin-packages.sh` — its `layout == legacy` branch.
+   - `scripts/tests/test-codex-filtered-publication.sh` — the legacy phase:
+     the `./.codex/plugins/solopreneur` marketplace assertion and the
+     `$FILTER_HOME` install that follows it, the "must not strand its flat
+     legacy bridge" case (which requires `plugins/solopreneur` to *exist*),
+     the now-vacuous `[[ ! -d ... ]]` pair in the cutover block, the
+     `FILTER_HOME` declaration and its `trap` entry, and the word "legacy" in
+     the closing message. The fixture copies the repo's marketplace, so once
+     that is symmetric its legacy phase can never pass again.
+   - `CLAUDE.md` — the compatibility-bridge paragraph ("Until the first
+     release after this migration…").
+   - `README.md` — the "temporary generated copies" sentence in the Repository
+     layout section.
 4. Re-run the generator and the validator once more to prove the retired code
-   changed nothing.
+   changed nothing. Verified on a throwaway cutover tree: with all five edits
+   applied, `./scripts/validate-plugin-packages.sh` exits 0.
 
 Step 1.5's README-sync heuristics key on descriptions, new plugins, new skills
 and counts, so none of them fire on this; it has to be done here.
@@ -304,6 +319,12 @@ direct form the subject matches, and `CHANGELOG.md` (markdown) plus the
 ```bash
 git add -- src/*/plugin.json .claude-plugin/marketplace.json .agents/plugins/marketplace.json CHANGELOG.md
 git add -A -- plugins .codex
+# Cutover release ONLY — the five bridge-retirement edits from Step 3 above.
+# They are not covered by any pathspec on the two lines above, so without this
+# the tag commit ships a symmetric marketplace with the bridge code still in it.
+# Skip this line on an ordinary release; those files are untouched then.
+git add -- scripts/generate-plugin-packages.sh scripts/validate-plugin-packages.sh \
+  scripts/tests/test-codex-filtered-publication.sh CLAUDE.md README.md
 git commit \
   -m "chore(release): <one-line summary of what's shipping>" \
   -m "<plugin1> v<old>→v<new>: <reason>
