@@ -36,14 +36,12 @@ metadata:
 ### Path A: Standalone Gradle task (AGP \>= 9.3.0)
 
 - **Step 1: Run standalone task** : Run `./gradlew :app:analyzeReleaseR8Config` to evaluate the R8 configuration. You MUST wait for this command to finish before proceeding.
-- **Step 2: Convert to JSON** : The report is generated at `app/build/reports/r8/r8-config-analyzer-release.pb`. You MUST explicitly run the conversion script by executing: `python3 .agents/skills/r8-analyzer/scripts/convert_pb_to_json.py`. Wait for this command to finish.
-- **Step 3: Analyze** : You MUST explicitly run the analysis script by executing: `python3 .agents/skills/r8-analyzer/scripts/analyze.py`. This outputs `tmp/keepradius/analysis_result.txt`. Wait for this command to finish.
+- **Step 2: Analyze** : Read the generated HTML report at `app/build/reports/r8/r8-config-analyzer-release.html` for scores and rule impact metrics.
 
 ### Path B: Quantitative data generation (R8 \>= 9.3.7-dev and AGP \< 9.3.0)
 
-- **Step 1: Check requirements** : Python and `protobuf` package are mandatory.
-- **Step 2: Generate and analyze** : You MUST run the shell commands described in [references/CONFIGURATION-ANALYZER.md](references/CONFIGURATION-ANALYZER.md) to generate the proto file using R8 configuration analyzer, convert it to JSON and analyze the result.
-- **Step 3: Analyze** : You MUST ensure the analysis produces `tmp/keepradius/analysis_result.txt` for scores and rule impact metrics.
+- **Step 1: Generate report** : Run `mkdir -p "$PWD/tmp/r8analysis" && ./gradlew assembleRelease -Dcom.android.tools.r8.dumpkeepradiushtmltodirectory="$PWD/tmp/r8analysis"`. You MUST wait for this command to finish before proceeding.
+- **Step 2: Analyze** : Read the generated HTML report in `tmp/r8analysis/` for scores and rule impact metrics.
 
 ### Path C: Heuristic evaluation and recommendation (R8 \< 9.3.7-dev)
 
@@ -57,7 +55,7 @@ metadata:
 ## Step 3. Report generation
 
 - **Format** : Follow [references/REPORT_FORMAT.md](references/REPORT_FORMAT.md) strictly.
-- **Input**: Extract metrics (Scores, Impacts, Example Classes) directly from generated file analysis.txt if using Path A, or from manual findings if using Path B.
+- **Input**: Extract metrics (Scores, Impacts, Example Classes) from the generated HTML report if using Path A or Path B, or from manual findings if using Path C.
 - **Output** : Output ONLY the raw Markdown report in the chat. Do NOT output conversational filler (for example, "Here is your report..."). Do NOT provide recommendations, next steps, or any other text outside of the sections defined in [references/REPORT_FORMAT.md](references/REPORT_FORMAT.md) Do NOT mention the path used for analysis of the configuration
 
 ## Constraints

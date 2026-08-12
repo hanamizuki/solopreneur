@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/TheBushidoCollective/han
 - **Source path**: `plugins/specialized/android/skills/jetpack-compose`
 - **Pinned commit**: ca970021d3db3f02f26ef2ad616a1f4a575496e9
-- **Synced at**: 2026-08-12T12:20:54Z
+- **Synced at**: 2026-08-12T13:15:18Z
 - **License**: see `../../vendor/LICENSES/han-LICENSE` (source repo: `src/android-dev/vendor/LICENSES/han-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
