@@ -111,6 +111,9 @@ for name in "${plugins[@]}"; do
   fi
 done
 
+# A duplicated name would slip through the set-like 1:1 checks below and
+# generate a marketplace with two entries resolving the same plugin name —
+# silently ambiguous on install. Refuse loudly.
 dupes=$(jq -r '[.plugins[].name] | group_by(.) | map(select(length > 1) | .[0]) | .[]' \
   "$CLAUDE_MARKETPLACE")
 if [[ -n "$dupes" ]]; then
@@ -158,6 +161,11 @@ if [[ -n "$overlay_mismatch" ]]; then
   exit 1
 fi
 
+# Overlays own Codex-only fields, nothing else. The merge below is right-biased
+# (`+ $overlay`), so a reserved key in an overlay entry would silently replace
+# the value copied from the Claude manifest — breaking version lockstep or the
+# generated `author` publisher metadata while the drift check stays green.
+# Refuse loudly instead.
 reserved=$(jq -r '
   to_entries[]
   | .key as $plugin
@@ -191,6 +199,14 @@ for name in "${plugins[@]}"; do
     echo "error: invalid canonical manifest: $manifest" >&2
     exit 1
   fi
+  # These names collide with directories the package layout creates, so a source
+  # tree carrying one would nest the generated skills instead of replacing them.
+  for reserved_entry in skills .claude-plugin .codex-plugin; do
+    if [[ -e "$SOURCE_ROOT/$name/$reserved_entry" ]]; then
+      echo "error: src/$name/$reserved_entry is reserved for generated output" >&2
+      exit 1
+    fi
+  done
 done
 validate_symlinks "$SKILLS_ROOT" "$SOURCE_ROOT"
 

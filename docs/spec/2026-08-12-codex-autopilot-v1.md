@@ -85,7 +85,7 @@ asserts the publication closure, worker fallback, single-child contract,
 explicit base, worktree ownership, partial-checkout cleanup, symlink refusal,
 PR-head binding, retained failure state, and parent remote cleanup boundary.
 The filtered-publication fixture installed Autopilot plus its three
-dependencies and no unsupported sibling skills. `validate-plugin-packages.sh` passed 46
+dependencies and no unsupported sibling skills. `validate-codex.sh` passed 46
 Python tests, 68 bootstrap tests, registry and agent validation, generated-root
 drift checks, local install smoke, and the filtered publication fixture. The
 official plugin and both canonical/generated Autopilot skill validators also

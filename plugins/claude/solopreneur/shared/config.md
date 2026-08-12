@@ -255,7 +255,9 @@ the path string directly, not wrapped in another object).
 `config.sh`, beside this file, **is** the implementation — the five helpers and
 nothing else. It is sourced, never executed. Each consumer carries a
 marker-delimited block that resolves the path and sources it, and defines no
-functions of its own:
+functions of its own. `skills/solopreneur/merge-pr/SKILL.md` holds the
+canonical copy; the block below reproduces it and must be updated from there,
+never the other way round:
 
 ```bash
 # --- solopreneur config helpers (sourced from shared/config.sh) ---
@@ -269,9 +271,19 @@ functions of its own:
 SOLO_SKILL_DIR='${CLAUDE_SKILL_DIR}'
 [ -d "$SOLO_SKILL_DIR" ] || SOLO_SKILL_DIR="<absolute path of the directory holding this SKILL.md>"
 SOLO_CONFIG_SH="$SOLO_SKILL_DIR/../../shared/config.sh"
+# Three candidates, one contract. Inside the plugin the helpers sit at ../../shared/;
+# authoring against this repo reaches them under src/solopreneur/shared/; and a
+# skill republished on its own — any flattened skills directory — carries them
+# at scripts/config.sh instead, because shared/ is a sibling of skills/ and does
+# not travel with a per-skill copy. Try each in order, then STOP. Sourcing a
+# file that is not there does not halt the shell: every helper stays undefined,
+# every config read returns empty, and the 2026-08-11 A2 run showed where that
+# leads — the model "rescued" it with a repo-relative path, which resolves only
+# when the repo under review happens to be this plugin's own source repo.
+# Canonical authoring keeps non-skill source under src/.
 [ -f "$SOLO_CONFIG_SH" ] || SOLO_CONFIG_SH="$SOLO_SKILL_DIR/../../../src/solopreneur/shared/config.sh"
 [ -f "$SOLO_CONFIG_SH" ] || SOLO_CONFIG_SH="$SOLO_SKILL_DIR/scripts/config.sh"
-[ -f "$SOLO_CONFIG_SH" ] || { echo "HALT: solopreneur config helpers not found"; exit 1; }
+[ -f "$SOLO_CONFIG_SH" ] || { echo "HALT: solopreneur config helpers not found under $SOLO_SKILL_DIR — stop here, do not improvise a path"; exit 1; }
 source "$SOLO_CONFIG_SH"
 # --- end solopreneur config helpers ---
 ```

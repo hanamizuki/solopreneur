@@ -164,12 +164,12 @@ if jq -e 'all(.plugins[]; .source == ("./plugins/" + .name))' \
   "$CLAUDE_MARKETPLACE" >/dev/null; then
   expected_prefix='./.codex/plugins/'
   install_root="$REPO_ROOT/.codex/plugins"
-  for plugin in $(jq -r '.plugins[].name' "$CLAUDE_MARKETPLACE"); do
+  while IFS= read -r plugin; do
     if ! diff -qr "$CLAUDE_PACKAGE_ROOT/$plugin" "$REPO_ROOT/plugins/$plugin"; then
       echo "error: legacy Claude bridge '$plugin' differs from its package" >&2
       fail=1
     fi
-  done
+  done < <(jq -r '.plugins[].name' "$CLAUDE_MARKETPLACE")
   if ! diff -qr "$CODEX_PACKAGE_ROOT" "$REPO_ROOT/.codex/plugins"; then
     echo "error: legacy Codex bridge differs from symmetric packages" >&2
     fail=1

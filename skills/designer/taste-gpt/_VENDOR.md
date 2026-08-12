@@ -16,7 +16,8 @@ normalized to the folder name; bundled-script paths are rewritten to
 `SKILL.md` that takes no arguments are escaped as `\$0`-`\$9`, so
 Claude Code does not substitute them into the body at load time; and
 `disable-model-invocation` is injected when the manifest asks for it. See
-`scripts/sync-vendored.sh` for the exact transformations and the reasons.
+`src/designer/scripts/sync-vendored.sh` for the exact transformations and
+the reasons.
 
-To update: edit `vendor/manifest.json` if needed, then re-run this
-plugin's `./scripts/sync-vendored.sh`.
+To update: edit `src/designer/vendor/manifest.json` if needed, then
+re-run `./src/designer/scripts/sync-vendored.sh`.

@@ -40,14 +40,15 @@ Resolve todo directory paths and optional Discord config. Source the config help
 SOLO_SKILL_DIR='${CLAUDE_SKILL_DIR}'
 [ -d "$SOLO_SKILL_DIR" ] || SOLO_SKILL_DIR="<absolute path of the directory holding this SKILL.md>"
 SOLO_CONFIG_SH="$SOLO_SKILL_DIR/../../shared/config.sh"
-# Two installed layouts, one contract. Inside the plugin the helpers sit at ../../shared/;
-# a skill republished on its own — any flattened skills directory — carries them
+# Three candidates, one contract. Inside the plugin the helpers sit at ../../shared/;
+# authoring against this repo reaches them under src/solopreneur/shared/; and a
+# skill republished on its own — any flattened skills directory — carries them
 # at scripts/config.sh instead, because shared/ is a sibling of skills/ and does
-# not travel with a per-skill copy. Try both, then STOP. Sourcing a file that is
-# not there does not halt the shell: every helper stays undefined, every config
-# read returns empty, and the 2026-08-11 A2 run showed where that leads — the
-# model "rescued" it with a repo-relative path, which resolves only when the
-# repo under review happens to be this plugin's own source repo.
+# not travel with a per-skill copy. Try each in order, then STOP. Sourcing a
+# file that is not there does not halt the shell: every helper stays undefined,
+# every config read returns empty, and the 2026-08-11 A2 run showed where that
+# leads — the model "rescued" it with a repo-relative path, which resolves only
+# when the repo under review happens to be this plugin's own source repo.
 # Canonical authoring keeps non-skill source under src/.
 [ -f "$SOLO_CONFIG_SH" ] || SOLO_CONFIG_SH="$SOLO_SKILL_DIR/../../../src/solopreneur/shared/config.sh"
 [ -f "$SOLO_CONFIG_SH" ] || SOLO_CONFIG_SH="$SOLO_SKILL_DIR/scripts/config.sh"

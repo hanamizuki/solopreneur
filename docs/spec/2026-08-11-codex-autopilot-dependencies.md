@@ -94,7 +94,7 @@ that documented surface rather than Claude-specific Agent or Workflow tools.
 ### A1 Registry and publication
 
 Accepted. Regeneration produced no drift outside the intended files.
-`./scripts/validate-plugin-packages.sh` passed the registry validator, local install
+`./scripts/validate-codex.sh` passed the registry validator, local install
 smoke, 45 Python tests, and 68 bootstrap tests; the official plugin validator
 and both skill validators also passed. The publication fixture exposes its
 canary plus exactly Greenlight, Plan Review, and Merge PR. The generated

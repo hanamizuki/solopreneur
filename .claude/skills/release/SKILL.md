@@ -250,6 +250,22 @@ at least a patch bump, then change every source to
 partial cutover is invalid. Once all sources are symmetric, later releases
 leave them unchanged.
 
+The cutover release must also, **in the same commit**, retire the compatibility
+bridge everywhere it is described or implemented — otherwise the repo ships
+prose describing directories that no longer exist and branches that can never
+be taken again. Delete:
+
+1. the compatibility-bridge paragraph in `CLAUDE.md` ("Until the first release
+   after this migration…"),
+2. the "temporary generated copies" sentence in the Repository layout section
+   of `README.md`, and
+3. the `layout == legacy` branches in `scripts/generate-plugin-packages.sh`
+   (`LEGACY_CODEX_ROOT`, its copy loop, and the `queue_output ""` sentinels)
+   and in `scripts/validate-plugin-packages.sh`.
+
+Step 1.5's README-sync heuristics key on descriptions, new plugins, new skills
+and counts, so none of them fire on this; it has to be done here.
+
 Then regenerate both platform packages. The generator also switches the Codex
 marketplace path and removes the temporary legacy copies when the Claude
 marketplace has entered symmetric mode:

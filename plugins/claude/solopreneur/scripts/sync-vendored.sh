@@ -36,6 +36,17 @@ REPO_ROOT="$(cd "$PLUGIN_DIR/../.." && pwd)"
 MANIFEST="$PLUGIN_DIR/vendor/manifest.json"
 LICENSES_DIR="$PLUGIN_DIR/vendor/LICENSES"
 SKILLS_DIR="$REPO_ROOT/skills/$PLUGIN_NAME"
+
+# Only the canonical source copy may sync. The generated packages ship working
+# symlinks to this script, and running one of those would write the manifest
+# bump into generated output (silently reverted on the next regeneration) or
+# fabricate a skills tree under plugins/.
+if [[ "$(basename "$(dirname "$PLUGIN_DIR")")" != src || ! -d "$SKILLS_DIR" ]]; then
+  echo "error: run the canonical source copy: ./src/<plugin>/scripts/sync-vendored.sh" >&2
+  echo "       ($PLUGIN_DIR is a generated package)" >&2
+  exit 1
+fi
+
 TMP_ROOT="$(mktemp -d -t solopreneur-vendor-sync.XXXXXX)"
 
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -347,7 +358,7 @@ for i in $(seq 0 $((source_count - 1))); do
 
     # Drop a small _VENDOR.md sidecar so the source is traceable from the skill folder.
     if [[ -n "$license_file" ]]; then
-      license_line="see \`../../vendor/LICENSES/$(basename "$license_file")\`"
+      license_line="see \`src/$PLUGIN_NAME/vendor/LICENSES/$(basename "$license_file")\`"
     else
       license_line="(none — upstream has no LICENSE file as of sync)"
     fi
@@ -370,10 +381,11 @@ normalized to the folder name; bundled-script paths are rewritten to
 \`SKILL.md\` that takes no arguments are escaped as \`\\\$0\`-\`\\\$9\`, so
 Claude Code does not substitute them into the body at load time; and
 \`disable-model-invocation\` is injected when the manifest asks for it. See
-\`scripts/sync-vendored.sh\` for the exact transformations and the reasons.
+\`src/$PLUGIN_NAME/scripts/sync-vendored.sh\` for the exact transformations and
+the reasons.
 
-To update: edit \`vendor/manifest.json\` if needed, then re-run this
-plugin's \`./scripts/sync-vendored.sh\`.
+To update: edit \`src/$PLUGIN_NAME/vendor/manifest.json\` if needed, then
+re-run \`./src/$PLUGIN_NAME/scripts/sync-vendored.sh\`.
 EOF
 
     echo "    skill: $from -> skills/$to/"

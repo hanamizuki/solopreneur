@@ -101,7 +101,7 @@ terminal classification. Findings:
 3. **Two more Claude-only bindings survived on improvisation.** The body sets
    `SCRIPTS="${CLAUDE_SKILL_DIR}/scripts"` — an env var Codex never sets; the
    model substituted the repo-relative path
-   `skills/solopreneur/greenlight/scripts`, which resolved only
+   `plugins/solopreneur/skills/greenlight/scripts`, which resolved only
    because the PR under review happens to live in the plugin's own source
    repo. On any other repo that path does not exist and the correct answer is
    the plugin snapshot path (M2). And `scripts/reviewer-state.mjs` roots its
@@ -366,7 +366,7 @@ turned out to be half the story (see run 2's size ceiling).
    the skills context budget). `<skill-dir>/scripts` resolved correctly there —
    W1 item 6 works — but `<skill-dir>/../../shared/config.sh` does not exist in
    that layout, and the model fell back to the repo-relative
-   `src/solopreneur/shared/config.sh`. That resolved **only because the PR
+   `plugins/solopreneur/shared/config.sh`. That resolved **only because the PR
    under review is the plugin's own source repo**, which is precisely the M3
    finding-3 failure W1 was meant to close. It is still open whenever the skill
    is loaded from a flat skills tree.

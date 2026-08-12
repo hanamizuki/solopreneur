@@ -103,7 +103,7 @@ discovery and creation. Flat mode is the fallback.
 ### 2. Cascade config helper
 
 A new shared reference document at
-`skills/solopreneur/_shared/config.md` defines the cascade convention.
+`plugins/solopreneur/skills/_shared/config.md` defines the cascade convention.
 All skills source the convention by including the same shell snippet (skills
 are markdown documents — there's no shared lib mechanism, so the snippet is
 the convention).
@@ -601,7 +601,7 @@ Manual test scenarios (no automated test infra exists in this repo):
 
 Suggested commit sequence inside the PR:
 
-1. Add `skills/solopreneur/_shared/config.md` (cascade helper spec).
+1. Add `plugins/solopreneur/skills/_shared/config.md` (cascade helper spec).
 2. Sweep existing 14 hardcoded `~/.claude/solopreneur.json` references to
    inline the cascade helper.
 3. Rewrite `worktree-handoff/SKILL.md` (state-machine + flat modes,

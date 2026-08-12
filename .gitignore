@@ -71,6 +71,10 @@ htmlcov/
 # Git worktrees
 .worktrees/
 
+# Staging tree of scripts/generate-plugin-packages.sh; the rollback path keeps
+# it deliberately, and a killed run leaves it behind.
+/.plugin-packages.*/
+
 # Claude Code per-project state. Skills are tracked so they ship with the
 # repo (every maintainer machine gets the same `/release`, `/preview`, etc.);
 # everything else under .claude/ (settings.local.json, sessions, worktrees)

@@ -7,7 +7,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source path**: `skills/asc-localize-metadata`
 - **Pinned commit**: e30039abddbe388179324d0f9cdccb66c3843115
 - **Synced at**: 2026-07-28T06:16:09Z
-- **License**: see `../../vendor/LICENSES/app-store-connect-cli-skills-LICENSE`
+- **License**: see `src/ios-dev/vendor/LICENSES/app-store-connect-cli-skills-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is
@@ -16,7 +16,8 @@ normalized to the folder name; bundled-script paths are rewritten to
 `SKILL.md` that takes no arguments are escaped as `\$0`-`\$9`, so
 Claude Code does not substitute them into the body at load time; and
 `disable-model-invocation` is injected when the manifest asks for it. See
-`scripts/sync-vendored.sh` for the exact transformations and the reasons.
+`src/ios-dev/scripts/sync-vendored.sh` for the exact transformations and
+the reasons.
 
-To update: edit `vendor/manifest.json` if needed, then re-run this
-plugin's `./scripts/sync-vendored.sh`.
+To update: edit `src/ios-dev/vendor/manifest.json` if needed, then
+re-run `./src/ios-dev/scripts/sync-vendored.sh`.

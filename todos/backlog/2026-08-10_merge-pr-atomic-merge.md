@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-10
 **Source:** `/plan-review` of the cross-host contract (PR #157)
-**Applies to:** `plugins/solopreneur/skills/merge-pr/SKILL.md`
+**Applies to:** `skills/solopreneur/merge-pr/SKILL.md`
 
 Two independent defects, both live today. Either can be fixed without the other.
 

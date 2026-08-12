@@ -7,7 +7,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source path**: `.claude/skills/impeccable`
 - **Pinned commit**: 1cf7d7ab0f1ac0bb3319fd20be389a3009f4037d
 - **Synced at**: 2026-07-28T06:16:41Z
-- **License**: see `../../vendor/LICENSES/impeccable-LICENSE`
+- **License**: see `src/designer/vendor/LICENSES/impeccable-LICENSE`
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is
@@ -16,7 +16,8 @@ normalized to the folder name; bundled-script paths are rewritten to
 `SKILL.md` that takes no arguments are escaped as `\$0`-`\$9`, so
 Claude Code does not substitute them into the body at load time; and
 `disable-model-invocation` is injected when the manifest asks for it. See
-`scripts/sync-vendored.sh` for the exact transformations and the reasons.
+`src/designer/scripts/sync-vendored.sh` for the exact transformations and
+the reasons.
 
-To update: edit `vendor/manifest.json` if needed, then re-run this
-plugin's `./scripts/sync-vendored.sh`.
+To update: edit `src/designer/vendor/manifest.json` if needed, then
+re-run `./src/designer/scripts/sync-vendored.sh`.

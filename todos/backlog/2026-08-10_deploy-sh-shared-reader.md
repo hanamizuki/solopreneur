@@ -6,7 +6,7 @@
 
 ## Problem
 
-`plugins/solopreneur/skills/preview/scripts/deploy.sh` carries its own
+`skills/solopreneur/preview/scripts/deploy.sh` carries its own
 `read_preview_config`, which falls back **per dotted key** across config homes.
 The shared `read_solopreneur_config <feature>` instead returns the first
 non-null **whole feature subtree**, so it can never mix values from two files.

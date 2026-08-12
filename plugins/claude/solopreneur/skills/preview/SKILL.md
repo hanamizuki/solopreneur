@@ -15,7 +15,7 @@ instead.
 
 Turn any proposal / plan / idea into interactive HTML, publish it into a **private Library**, and hand the user a stable URL. Each item gets a catalog sidebar, provenance footer, and comment overlay. External one-off links use **Share** (same Vercel project, Preview environment only — never promotes Library production).
 
-Deep reference (schema, setup, deploy internals): `../../shared/config.md` relative to this skill (repo path `src/solopreneur/shared/config.md`).
+Deep reference (schema, setup, deploy internals): `src/solopreneur/shared/config.md`.
 
 ## Outcome the user is looking for
 

@@ -24,6 +24,10 @@ The repository has two hand-maintained roots:
 non-skill component must not have a second hand-maintained copy under a package
 directory.
 
+Dated documents under `docs/spec/` and `docs/journal/` describe the repository
+as of their own date. A layout migration does not sweep their paths: rewriting
+an acceptance log or a quoted tool output turns a true record into a false one.
+
 ## Generated packages
 
 One generator owns all committed installation outputs:
