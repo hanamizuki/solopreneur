@@ -84,3 +84,6 @@ htmlcov/
 
 # Local-only backlog notes that are not useful as public dogfood examples.
 /todos/private/
+
+# Local technical journals and unpublished drafts.
+/docs/journal/
