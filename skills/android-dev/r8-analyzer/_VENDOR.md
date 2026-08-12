@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `performance/r8-analyzer`
-- **Pinned commit**: 47e1dff74a5cde5d0128c5d15e74e000323135ea
-- **Synced at**: 2026-07-28T06:15:16Z
+- **Pinned commit**: 1e5e7ae6138bebd0835d0d5854b0b9adfeed3181
+- **Synced at**: 2026-08-12T13:15:26Z
 - **License**: see `../../vendor/LICENSES/android-skills-LICENSE.txt` (source repo: `src/android-dev/vendor/LICENSES/android-skills-LICENSE.txt`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
@@ -15,7 +15,9 @@ normalized to the folder name; bundled-script paths are rewritten to
 `"${CLAUDE_SKILL_DIR}/"`; argument tokens (`$0`-`$9`) in a
 `SKILL.md` that takes no arguments are escaped as `\$0`-`\$9`, so
 Claude Code does not substitute them into the body at load time; and
-`disable-model-invocation` is injected when the manifest asks for it. See
+`disable-model-invocation` is injected when the manifest asks for it;
+`../../vendor/patches/r8-analyzer.patch` (source repo: `src/android-dev/vendor/patches/r8-analyzer.patch`)
+is applied after copying upstream. See
 `src/android-dev/scripts/sync-vendored.sh` for the exact transformations and
 the reasons.
 

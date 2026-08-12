@@ -21,6 +21,8 @@
 #
 # Optional manifest fields per source:
 #   disable_model_invocation: true  # inject `disable-model-invocation: true` into each synced SKILL.md
+# Optional manifest fields per skill:
+#   patch: patches/<name>.patch      # apply a deterministic patch relative to the copied skill root
 #
 # Requires: git, jq, perl (perl ships with macOS and is Essential on Debian/Ubuntu,
 # so unlike jq it needs no install; the argument-token escape below needs its
@@ -137,6 +139,7 @@ for i in $(seq 0 $((source_count - 1))); do
   for j in $(seq 0 $((skills_count - 1))); do
     from=$(echo "$src" | jq -r ".skills[$j].from")
     to=$(echo "$src" | jq -r ".skills[$j].to")
+    patch_rel=$(echo "$src" | jq -r ".skills[$j].patch // empty")
     src_path="$clone_dir/$from"
     dst_path="$SKILLS_DIR/$to"
 
@@ -151,6 +154,23 @@ for i in $(seq 0 $((source_count - 1))); do
 
     rm -rf "$dst_path"
     cp -R "$src_path" "$dst_path"
+
+    # Local fixes live as patches so a pinned re-sync reproduces them, while
+    # upstream context drift fails closed instead of silently discarding them.
+    if [[ -n "$patch_rel" ]]; then
+      if [[ "$patch_rel" == /* || "$patch_rel" == *".."* ]]; then
+        echo "    error: patch path must stay under vendor/: $patch_rel" >&2
+        exit 1
+      fi
+      patch_path="$PLUGIN_DIR/vendor/$patch_rel"
+      if [[ ! -f "$patch_path" ]]; then
+        echo "    error: patch file missing: $patch_rel" >&2
+        exit 1
+      fi
+      git -C "$REPO_ROOT" apply --unidiff-zero --check --directory="skills/$PLUGIN_NAME/$to" "$patch_path"
+      git -C "$REPO_ROOT" apply --unidiff-zero --directory="skills/$PLUGIN_NAME/$to" "$patch_path"
+      echo "    patch: $patch_rel"
+    fi
 
     # Normalize frontmatter `name:` to match the folder name `to`. Upstream
     # often pre-prefixes with `android-` (or `neo4j-` etc.), but inside a
@@ -385,7 +405,9 @@ normalized to the folder name; bundled-script paths are rewritten to
 \`"\${CLAUDE_SKILL_DIR}/"\`; argument tokens (\`\$0\`-\`\$9\`) in a
 \`SKILL.md\` that takes no arguments are escaped as \`\\\$0\`-\`\\\$9\`, so
 Claude Code does not substitute them into the body at load time; and
-\`disable-model-invocation\` is injected when the manifest asks for it. See
+\`disable-model-invocation\` is injected when the manifest asks for it${patch_rel:+;
+\`../../vendor/$patch_rel\` (source repo: \`src/$PLUGIN_NAME/vendor/$patch_rel\`)
+is applied after copying upstream}. See
 \`src/$PLUGIN_NAME/scripts/sync-vendored.sh\` for the exact transformations and
 the reasons.
 

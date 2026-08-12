@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/tamtom/gplay-cli-skills
 - **Source path**: `skills/gplay-testers-orchestration`
 - **Pinned commit**: 10301b24639e4f768d009b2edda9315cb2149712
-- **Synced at**: 2026-07-28T06:15:16Z
+- **Synced at**: 2026-08-12T13:15:23Z
 - **License**: see `../../vendor/LICENSES/gplay-cli-skills-LICENSE` (source repo: `src/android-dev/vendor/LICENSES/gplay-cli-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
