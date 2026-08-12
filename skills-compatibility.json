@@ -276,6 +276,7 @@
       },
       "sharedContract": "skills/solopreneur/merge-pr/SKILL.md",
       "platformResources": [
+        "src/solopreneur/shared/config.sh",
         "skills/solopreneur/merge-pr/SKILL.md"
       ],
       "limitations": {

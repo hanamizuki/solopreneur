@@ -147,6 +147,28 @@ while IFS= read -r -d '' sidecar; do
   fi
 done < <(find "$CLAUDE_PACKAGE_ROOT" -type f -name _VENDOR.md -print0)
 
+# A Codex package carries only the skills the registry includes plus the seams it
+# declares in platformResources — no shared/ and no src/, so the first two
+# candidates in the config-helper resolution block cannot resolve there and the
+# third, scripts/config.sh, only exists when the skill declared the seam. A skill
+# that sources the helpers without declaring them therefore ships a package that
+# HALTs on first use. That is a registry mistake, but it is invisible in the
+# registry: only the built artifact shows it, so check the artifact.
+echo "==> Codex packages: config-helper consumers can resolve a helper"
+while IFS= read -r -d '' skill_md; do
+  grep -q 'SOLO_CONFIG_SH' "$skill_md" || continue
+  skill_dir="$(dirname "$skill_md")"
+  resolved=0
+  for candidate in ../../shared/config.sh ../../../src/*/shared/config.sh scripts/config.sh; do
+    [[ -f "$skill_dir/$candidate" ]] && resolved=1
+  done
+  if [[ "$resolved" -eq 0 ]]; then
+    echo "error: ${skill_md#"$REPO_ROOT/"} sources the config helpers but its package ships none" >&2
+    echo "       add src/<plugin>/shared/config.sh to its platformResources" >&2
+    fail=1
+  fi
+done < <(find "$CODEX_PACKAGE_ROOT" -type f -name SKILL.md -print0 2>/dev/null)
+
 # --- Gate: filtered publication ---------------------------------------------
 echo "==> publication: generated roots match registry includes"
 expected="$(jq -r '
