@@ -8,6 +8,21 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-08-12 — Codex milestone
+
+### solopreneur 0.5.38 → 0.6.0
+
+Promotes the Codex integration introduced in 0.5.38 to a minor release,
+reflecting the new officially supported platform surface.
+
+Codex users can install the verified, filtered core plugin with `autopilot`,
+`greenlight`, `merge-pr`, and `plan-review`. Unsupported skills remain excluded,
+and the documented Codex V1 limitations remain unchanged. Claude Code behavior
+is unchanged.
+
+There are no functional differences from 0.5.38; this version corrects the
+release classification and establishes Codex support as the 0.6 milestone.
+
 ## 2026-08-12
 
 ### solopreneur 0.5.37 → 0.5.38
