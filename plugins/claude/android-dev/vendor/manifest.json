@@ -92,7 +92,7 @@
       "license_file": "LICENSES/wshobson-agents-LICENSE",
       "skills": [
         {
-          "from": "skills/ui-design/mobile-android-design",
+          "from": "plugins/ui-design/skills/mobile-android-design",
           "to": "mobile-android-design"
         }
       ]
