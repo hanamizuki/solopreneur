@@ -7,14 +7,23 @@ automated PR cycles, marketing, design, and platform-specific experts. Install
 
 ## Quick Start
 
+Claude Code:
+
 ```bash
 claude plugin marketplace add hanamizuki/solopreneur
 claude plugin install solopreneur@solopreneur
 ```
 
-Then add whichever roles you need (`marketer`, `designer`, `ios-dev`,
-`android-dev`, `ai-engineer`, `neo4j-dev`). See the [full install guide](#install)
-for details and role-based recommendations.
+Codex:
+
+```bash
+codex plugin marketplace add hanamizuki/solopreneur --ref main
+codex plugin add solopreneur@solopreneur
+```
+
+Claude Code can also install the role plugins (`marketer`, `designer`,
+`ios-dev`, `android-dev`, `ai-engineer`, `neo4j-dev`). Codex currently ships
+the verified core subset only. See the [full install guide](#install).
 
 ## What's in the box
 
@@ -28,12 +37,24 @@ for details and role-based recommendations.
 | [`ai-engineer`](#ai-engineer) | `ai-engineer` agent + `langgraph` + `ai-app-templates` + 1 vendored skill (`senior-prompt-engineer`) |
 | [`neo4j-dev`](#neo4j-dev) | `neo4j-dev` agent + 4 vendored Neo4j skills |
 
-Installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
+On Claude Code, installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
 **≥ v2.1.110** for plugin dependency resolution.
 
 Codex currently publishes the compatible core subset: `autopilot`,
 `greenlight`, `merge-pr`, and `plan-review`. Unsupported skills stay out of the
 Codex package instead of appearing and failing later.
+
+Codex V1 is intentionally a smaller, fail-closed surface:
+
+| Invoke on Codex | Supported V1 contract |
+|---|---|
+| `$solopreneur:autopilot` | One natural PR, run now, from a clean and up-to-date `main`. No multi-PR waves or scheduling. |
+| `$solopreneur:greenlight external` | Open PRs sized S or M, with an authenticated Claude CLI as the independent final gate. No uncommitted, post-commit, or L-size runs. |
+| `$solopreneur:merge-pr` | Merge-only flow with exact-head checks; no pre-merge plan or worktree mutation. |
+| `$solopreneur:plan-review internal` | Technical and lean findings only; no outside review, adjudication, or write-back. |
+
+The skill descriptions below document the full Claude Code surface. Use the
+contracts above when running the four published skills on Codex.
 
 > Migrating from a previous version? See [MIGRATION.md](./MIGRATION.md).
 > For per-release, per-plugin notes, see [CHANGELOG.md](./CHANGELOG.md).
@@ -112,7 +133,7 @@ Start them and walk away. They loop until the job is done.
 - **[gstack review](https://github.com/garrytan/gstack/tree/main/review)**: optional. `/greenlight` uses it when the current session can resolve the real gstack review capability; a similarly named bundled command is not treated as gstack without matching provenance.
 - **[Codex GitHub bot](https://github.com/apps/chatgpt-codex-connector)**: optional. It is the preferred GitHub final gate for Claude-hosted `/greenlight` PR runs, with Codex CLI as the local fallback.
 - **[Cursor Bugbot](https://docs.cursor.com/bugbot)**: optional, and not currently usable as a final gate — the registry holds no verified login for it, and a reviewer with no login cannot close a round. It can still be triggered as an additional reviewer.
-- **[Claude CLI](https://code.claude.com/docs/en/headless)**: optional for the current Claude runtime and required for the planned Codex-host local final gate. Cross-host calls use the Claude profile matching the active Codex config and never guess another profile.
+- **[Claude CLI](https://code.claude.com/docs/en/headless)**: optional on Claude Code and required on Codex for Greenlight's independent final gate. Cross-host calls use the Claude profile matching the active Codex config and never guess another profile.
 - **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR-mode reviewer (`/gemini review`), offered only when activity detection finds it acting on the repo. Consumer Code Assist stopped GitHub code review on 2026-07-17; **enterprise is unaffected**. For post-commit review, `/greenlight` uses the Antigravity CLI (`agy`) as its Gemini-family reviewer.
 - **[CodeRabbit](https://coderabbit.ai)**: optional. `/greenlight` can trigger it with `@coderabbitai review` and also collects its automatic PR review activity.
 - **[Vercel CLI](https://vercel.com/docs/cli)**: optional. `/preview` publishes a private Library (and optional per-item Share deployments) to a Vercel project when present; first-run setup provisions a single private target. Gracefully degrades to a local `open` of the HTML when absent.
@@ -330,6 +351,8 @@ stages only and get the findings reported back without adjudication or write-bac
 
 ## Install
 
+### Claude Code
+
 Add this repo as a marketplace source once, then install the pieces you need:
 
 ```bash
@@ -348,11 +371,32 @@ claude plugin install ai-engineer@solopreneur
 claude plugin install neo4j-dev@solopreneur
 ```
 
-To update later:
+To update later, then start a new session:
 
 ```bash
+# Refresh the marketplace catalog
 claude plugin marketplace update solopreneur
-claude plugin update solopreneur        # and any other installed plugins
+
+# Update core
+claude plugin update solopreneur@solopreneur
+
+# Repeat for every installed role, for example:
+claude plugin update marketer@solopreneur
+```
+
+### Codex
+
+Codex publishes the core plugin only:
+
+```bash
+codex plugin marketplace add hanamizuki/solopreneur --ref main
+codex plugin add solopreneur@solopreneur
+```
+
+To refresh the marketplace and installed plugin later, then start a new session:
+
+```bash
+codex plugin marketplace upgrade solopreneur
 ```
 
 ### Quick-start by role
