@@ -265,6 +265,52 @@
         "github-review-bots"
       ]
     },
+    "solopreneur:handoff": {
+      "support": {
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/solopreneur/handoff/SKILL.md",
+      "platformResources": [
+        "skills/solopreneur/handoff/SKILL.md"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-13-codex-nonmutating-skills.md",
+        "codex-tui": "docs/spec/2026-08-13-codex-nonmutating-skills.md",
+        "codex-app": "docs/spec/2026-08-13-codex-nonmutating-skills.md"
+      },
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-13-codex-nonmutating-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-13-codex-nonmutating-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-13-codex-nonmutating-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [
+          "git",
+          "bash"
+        ],
+        "codex-tui": [
+          "git",
+          "bash"
+        ],
+        "codex-app": [
+          "git",
+          "bash"
+        ]
+      },
+      "optionalEnhancements": []
+    },
     "solopreneur:merge-pr": {
       "support": {
         "codex-exec": "degraded",
@@ -324,6 +370,44 @@
       },
       "optionalEnhancements": []
     },
+    "solopreneur:perspective": {
+      "support": {
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/solopreneur/perspective/SKILL.md",
+      "platformResources": [
+        "skills/solopreneur/perspective/SKILL.md",
+        "skills/solopreneur/perspective/references"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-13-codex-nonmutating-skills.md",
+        "codex-tui": "docs/spec/2026-08-13-codex-nonmutating-skills.md",
+        "codex-app": "docs/spec/2026-08-13-codex-nonmutating-skills.md"
+      },
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-13-codex-nonmutating-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-13-codex-nonmutating-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-13-codex-nonmutating-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
     "solopreneur:plan-review": {
       "support": {
         "codex-exec": "degraded",
@@ -372,6 +456,52 @@
         "custom-specialist-agents",
         "official-docs-network"
       ]
+    },
+    "solopreneur:post-mortem": {
+      "support": {
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/solopreneur/post-mortem/SKILL.md",
+      "platformResources": [
+        "skills/solopreneur/post-mortem/SKILL.md"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-13-codex-nonmutating-skills.md",
+        "codex-tui": "docs/spec/2026-08-13-codex-nonmutating-skills.md",
+        "codex-app": "docs/spec/2026-08-13-codex-nonmutating-skills.md"
+      },
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-13-codex-nonmutating-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-13-codex-nonmutating-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-13-codex-nonmutating-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [
+          "git",
+          "repository-read-access"
+        ],
+        "codex-tui": [
+          "git",
+          "repository-read-access"
+        ],
+        "codex-app": [
+          "git",
+          "repository-read-access"
+        ]
+      },
+      "optionalEnhancements": []
     }
   },
   "codexHostGuards": {

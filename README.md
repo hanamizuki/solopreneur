@@ -41,8 +41,9 @@ On Claude Code, installing any sub-plugin auto-pulls `solopreneur`. Requires Cla
 **≥ v2.1.110** for plugin dependency resolution.
 
 Codex currently publishes the compatible core subset: `autopilot`,
-`greenlight`, `merge-pr`, and `plan-review`. Unsupported skills stay out of the
-Codex package instead of appearing and failing later.
+`greenlight`, `handoff`, `merge-pr`, `perspective`, `plan-review`, and
+`post-mortem`. Unsupported skills stay out of the Codex package instead of
+appearing and failing later.
 
 Codex V1 is intentionally a smaller, fail-closed surface:
 
@@ -50,11 +51,14 @@ Codex V1 is intentionally a smaller, fail-closed surface:
 |---|---|
 | `$solopreneur:autopilot` | One natural PR, run now, from a clean and up-to-date `main`. No multi-PR waves or scheduling. |
 | `$solopreneur:greenlight external` | Open PRs sized S or M, with an authenticated Claude CLI as the independent final gate. No uncommitted, post-commit, or L-size runs. |
+| `$solopreneur:handoff` | Document printed inline, plus a best-effort `/tmp` file. A read-only sandbox blocks the file; the printed document is the deliverable. |
 | `$solopreneur:merge-pr` | Merge-only flow with exact-head checks; no pre-merge plan or worktree mutation. |
+| `$solopreneur:perspective` | Same ten perspectives. Name the one you want up front in `codex exec` — the menu needs a conversational surface. |
 | `$solopreneur:plan-review internal` | Technical and lean findings only; no outside review, adjudication, or write-back. |
+| `$solopreneur:post-mortem` | Same git archaeology and report. In `codex exec`, put the bug description in the prompt; the run stops at the printed report. |
 
 The skill descriptions below document the full Claude Code surface. Use the
-contracts above when running the four published skills on Codex.
+contracts above when running the seven published skills on Codex.
 
 > Migrating from a previous version? See [MIGRATION.md](./MIGRATION.md).
 > For per-release, per-plugin notes, see [CHANGELOG.md](./CHANGELOG.md).
@@ -87,7 +91,7 @@ skills: 15 product workflows plus merge and Codex-agent plumbing.
 | [`/mvp`](./skills/solopreneur/mvp/SKILL.md) | **PM.** Drives the full new-product flow end-to-end: brainstorming → PRD visual confirmation → template lookup (auto-discovers `*-app-templates` in installed plugins) → plan → execution. Use when starting from scratch |
 | [`/plan-review`](./skills/solopreneur/plan-review/SKILL.md) | **Tech Lead.** Vets a spec, plan, or design doc in three stages — latest official docs + platform best practices, a leanness pass that cuts what the plan doesn't need, and an independent outside reviewer challenging it across 5 dimensions — then walks you through every finding. `internal` runs the first two stages only and reports findings without adjudication or write-back |
 | [`/worktree-handoff`](./skills/solopreneur/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
-| [`/handoff`](./skills/solopreneur/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). No worktree, no file save |
+| [`/handoff`](./skills/solopreneur/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). Also saved under `/tmp/handoff/`. No worktree |
 | [`/preview`](./skills/solopreneur/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into interactive HTML and publishes a **private Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments). Single-item **Share** requests deploy an isolated preview of one entry without changing the Library production URL. Legacy per-page deploy remains for compatibility |
 | [`/specialist-review`](./skills/solopreneur/specialist-review/SKILL.md) | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
 | [`/post-mortem`](./skills/solopreneur/post-mortem/SKILL.md) | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
