@@ -52,41 +52,61 @@ Read the full diff and identify which tech stacks are involved based on file pat
 List all detected stacks and which subagents will be dispatched. If only one stack
 is detected, dispatch one agent. If multiple, dispatch them **in parallel**.
 
+On Codex the last two rows never resolve to their agent — `marketer` and
+`designer` publish no Codex package — and `general-purpose` has no Codex
+equivalent. All three fall through the ladder in Step 2.25 to the built-in
+`explorer`.
+
 Also extract the key libraries/frameworks used in the diff (e.g., `jetpack compose`,
 `swiftui`, `langgraph`, `react`, `room`, `fastapi`). These will be passed to subagents
 for documentation lookup.
 
-## Step 2.25: Check Specialist Agent Availability
+## Step 2.25: Pick a Reviewer for Each Stack
 
 Each specialist agent ships as its own sub-plugin (`ios-dev`,
 `android-dev`, `ai-engineer`, `neo4j-dev`). Users may have
-only installed `solopreneur` (the core plugin).
+only installed `solopreneur` (the core plugin), and on Codex none of the four
+agents exist yet — only their knowledge skills are published.
 
-For each agent you plan to dispatch in Step 3, attempt the Agent dispatch
-directly. Handle the result:
+For each stack detected in Step 2, take the first rung that works. This is the
+ladder [`plan-review`](../plan-review/SKILL.md#host-profiles) already uses;
+don't invent another one.
 
-- **Success** → proceed as normal.
-- **Unknown-subagent-type error** (i.e., Claude Code reports the subagent
-  type doesn't exist) → still perform the review for that stack, but do it
-  **inline** using generic expertise. Prefix that stack's section in the
-  final report with the template below, substituting `<plugin>` with the
-  agent / plugin name for that stack (`ios-dev`, `android-dev`,
-  `ai-engineer`, or `neo4j-dev`; the agent and plugin share the same name):
+1. **The matching specialist agent** — dispatch it directly.
+2. **A generic reviewer subagent** — `general-purpose` on Claude Code, the
+   built-in `explorer` on Codex. The `general-purpose` rows of the Step 2 table
+   start here.
+3. **Inline** — when spawning is unavailable or rejected at the current
+   subagent depth, review that stack yourself in this thread.
 
-  > ⚠️ Plugin `<plugin>` not installed. Review done with generic expertise.
-  > Install it for deeper, skill-index-backed review.
+Rungs 2 and 3 are degradations, and that stack's section opens with the matching
+banner, substituting `<plugin>` with the agent / plugin name for that stack (the
+agent and plugin share the same name):
 
-- **Any other Agent error** (crash, timeout, tool failure) → surface to the
-  user; do not silently fall back.
+> ⚠️ Specialist agent `<plugin>` unavailable. Reviewed by a generic reviewer
+> against the installed `<plugin>` skills.
 
-Do **not** pre-check via Glob on the plugin cache path — the cache layout
-depends on the local marketplace name the user chose, and the dispatch
+> ⚠️ Specialist agent `<plugin>` unavailable and no subagent could be spawned.
+> Reviewed inline with generic expertise.
+
+The rung-2 banner is written by the reviewer itself — it is in the Step 3 output
+format — so keep it when you paste the report in. The rung-3 banner is yours to
+write, since nobody else was there to write it.
+
+Report the rung you actually used, and **never narrate a dispatch that did not
+happen**. Any other dispatch error (crash, timeout, tool failure) → surface it
+to the user; do not silently fall back.
+
+Do **not** pre-check the plugin cache path to decide the rung — the cache
+layout depends on the local marketplace name the user chose, and the dispatch
 error is the authoritative signal.
 
 ## Step 2.5: Check context7 Availability
 
-Check if `mcp__context7__resolve-library-id` tool is available (via ToolSearch or by
-checking deferred tools list).
+Check whether this session exposes the context7 MCP tools — `resolve-library-id`
+and `query-docs`. Enumerate tools however this host does it; each host prefixes
+MCP tool names its own way (`mcp__context7__resolve-library-id` on Claude Code).
+A call that fails because the tool does not exist counts as unavailable.
 
 - **Available**: Note this for Step 3. Each subagent will query context7 for the
   technologies it's reviewing.
@@ -98,7 +118,15 @@ checking deferred tools list).
 
 ## Step 3: Dispatch Subagents
 
-For each detected tech stack, spawn a subagent **in parallel** with this prompt template.
+For each detected tech stack, spawn the reviewer Step 2.25 picked, **in
+parallel**, with this prompt template.
+
+On Codex that is one `spawn_agent` call per stack. `fork_turns="none"` is
+required — a named agent inheriting full parent history is rejected, and a
+reviewer that inherits your framing is not an independent read. Prefer
+`agent_type="explorer"`, which keeps the reviewer read-only; omitting it spawns
+an unscoped peer that can write, so the read-only sandbox and the "do NOT modify
+any files" line below are what actually hold the boundary.
 
 If context7 is **available** (from Step 2.5), include the `[CONTEXT7 BLOCK]` below.
 If **not available**, omit it entirely.
@@ -108,9 +136,16 @@ You are an expert reviewer. Do NOT modify any files. Only analyze and report.
 
 ## Task
 
-1. Your subagent system prompt (`agents/<platform>-dev.md`) lists curated
-   skills and points to the extended skill index. Follow those instructions
-   to discover relevant skills for your domain.
+1. Discover the skills for your domain:
+   - **If you have a specialist system prompt** (`agents/<platform>-dev.md`): it
+     lists curated skills and points to the extended skill index. Follow it.
+   - **If you don't** (you are a generic reviewer): list the installed plugin
+     cache yourself and pick the 3-5 skills whose names match the diff, e.g.
+     `ls -d "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/*/<plugin>/*/skills/*/`.
+     The marketplace directory is named whatever the user chose when adding the
+     marketplace, so glob that segment; never hardcode it. Nothing there means
+     the plugin is not installed — say so and review with your own expertise.
+   Report the absolute path of every SKILL.md you actually read.
 
 2. From the diff below, identify which specific technologies and APIs are used
    (e.g., "Jetpack Compose remember", "LazyColumn key", "SwiftData @Model",
@@ -158,10 +193,19 @@ You are an expert reviewer. Do NOT modify any files. Only analyze and report.
 
 ### Tech Stack: [platform name]
 
+[If you are not this platform's specialist agent — you had no specialist system
+prompt and discovered skills from the plugin cache — open the section with this
+line, substituting `<plugin>`. It is the only signal the reader gets that the
+named specialist did not run:
+> ⚠️ Specialist agent `<plugin>` unavailable. Reviewed by a generic reviewer
+> against the installed `<plugin>` skills.]
+
 #### Skills Checked
 | Skill | Aspect | Status | Finding |
 |-------|--------|--------|---------|
 | skill-name | what was checked | check/warning | details |
+
+Skills read: one absolute SKILL.md path per line.
 
 #### context7 Documentation Consulted
 | Library | Topic Queried | Key Insight |
@@ -189,7 +233,10 @@ Wait for all subagents to complete, then compile a unified report:
 
 ### Reviews
 
-[paste each subagent's report, grouped by platform]
+[per stack: the Step 2.25 degradation banner whenever rung 2 or 3 ran, then that
+stack's report pasted verbatim — keep its Skills Checked table and its Skills
+read paths; that list is how the user tells a real skill-backed review from a
+plausible one. Saying "a generic reviewer ran" in prose is not the banner]
 
 ### Cross-Cutting Concerns
 [issues that span multiple platforms, if any]
@@ -204,6 +251,8 @@ Wait for all subagents to complete, then compile a unified report:
 - If a skill index doesn't exist for a detected stack, the subagent should use
   its built-in expertise instead
 - Each subagent should read at most 3-5 most relevant skills (not the entire index)
+- On Codex, discovery is the installed plugin cache only — the extended skill
+  index (`/rebuild-skill-index`) is a Claude Code path and is not ported
 - The subagent prompt includes the full diff so it can reference specific lines
 - If the diff is very large (>500 lines), mention this to the user and suggest
   focusing on specific files

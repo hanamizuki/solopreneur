@@ -72,6 +72,22 @@ Claude 專屬。context7 在 Codex 走 MCP 是可用的，偵測方式要改成�
 - 真 diff 建議用 android 或 neo4j 的改動（那兩個 plugin 的知識庫最厚），
   才驗得出「有沒有真的用到 Phase 1 發的知識」。
 
+### A 的結果（2026-08-14，已完成）
+
+A-1～A-5 全部落地，三個 surface 都拿到真證據，紀錄在
+`docs/spec/2026-08-14-codex-specialist-review.md`。registry 的 Codex
+included 從 18 變 19。
+
+實測改掉了兩處原本的設計假設：
+
+- **`agent_type="explorer"` 是真的存在**（直接指示的 probe 拿到
+  `agent_role: explorer` 的 child），但四次驗收 run 裡模型每次都只設
+  `fork_turns="none"`、省略 `agent_type`。SKILL.md 因此寫成「偏好」而不是
+  保證，唯讀邊界靠 sandbox ＋ prompt 撐。
+- **降級橫幅本來掛在 parent 的彙總樣板上，App surface 會整段不寫**（skill-only
+  的 turn 直接以 reviewer 的區段收尾）。改成由 reviewer 自己印在區段開頭後，
+  三個 surface 都有橫幅。
+
 ---
 
 ## 里程碑 B：解鎖 greenlight 在 Codex 的 Phase 1

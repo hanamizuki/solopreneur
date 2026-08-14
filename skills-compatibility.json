@@ -913,6 +913,57 @@
         ]
       },
       "optionalEnhancements": []
+    },
+    "solopreneur:specialist-review": {
+      "support": {
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/solopreneur/specialist-review/SKILL.md",
+      "platformResources": [
+        "skills/solopreneur/specialist-review/SKILL.md"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-14-codex-specialist-review.md",
+        "codex-tui": "docs/spec/2026-08-14-codex-specialist-review.md",
+        "codex-app": "docs/spec/2026-08-14-codex-specialist-review.md"
+      },
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-review.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-review.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-review.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [
+          "git",
+          "repository-read-access"
+        ],
+        "codex-tui": [
+          "git",
+          "repository-read-access"
+        ],
+        "codex-app": [
+          "git",
+          "repository-read-access"
+        ]
+      },
+      "optionalEnhancements": [
+        "context7",
+        "custom-specialist-agents",
+        "gh",
+        "specialist-knowledge-plugins"
+      ]
     }
   },
   "codexHostGuards": {
