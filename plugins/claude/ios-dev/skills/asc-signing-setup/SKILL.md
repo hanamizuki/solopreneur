@@ -20,12 +20,24 @@ Use this skill when you need to create or renew signing assets for iOS/macOS app
    - `asc bundle-ids capabilities list --bundle "BUNDLE_ID"`
    - `asc bundle-ids capabilities add --bundle "BUNDLE_ID" --capability ICLOUD`
    - Add capability settings when required:
-     - `--settings '[{"key":"ICLOUD_VERSION","options":[{"key":"XCODE_13","enabled":true}]}]'`
+     - `--settings '[{"key":"ICLOUD_VERSION","options":[{"key":"XCODE_6","enabled":true}]}]'`
+   - For the Developer Portal-only `PRIVATE_CLOUD_COMPUTE` capability, use a
+     user-owned web session and the Developer Portal Bundle ID resource ID:
+     - `asc web bundle-ids capabilities enable --bundle-id "BUNDLE_RESOURCE_ID" --capability PRIVATE_CLOUD_COMPUTE --confirm`
+     - This capability is not available through the public App Store Connect
+     capability enum. If the cached session cannot access Developer Portal,
+       clear its scoped cache, then log in again with the same binary:
+       - `asc web auth logout --apple-id "user@example.com"`
+       - `asc web auth login --apple-id "user@example.com"`
 3. Create a signing certificate:
    - `asc certificates list --certificate-type IOS_DISTRIBUTION`
    - `asc certificates create --certificate-type IOS_DISTRIBUTION --csr "./cert.csr"`
    - Or generate a key and CSR inline:
      - `asc certificates create --certificate-type IOS_DISTRIBUTION --generate-csr --key-out "./signing/dist.key" --csr-out "./signing/dist.csr"`
+   - For Wallet passes, create the Pass Type ID first, then create its certificate:
+     - `asc pass-type-ids create --identifier "pass.com.example" --name "Example Pass"`
+     - `asc certificates create --certificate-type PASS_TYPE_ID --pass-type-id "PASS_TYPE_ID" --csr "./pass.csr"`
+     - `asc pass-type-ids certificates list --pass-type-id "PASS_TYPE_ID" --paginate`
 4. Create a provisioning profile:
    - `asc profiles create --name "AppStore Profile" --profile-type IOS_APP_STORE --bundle "BUNDLE_ID" --certificate "CERT_ID"`
    - Include devices for development/ad-hoc:
@@ -37,6 +49,8 @@ Use this skill when you need to create or renew signing assets for iOS/macOS app
    - `asc profiles inspect --path "./profiles/AppStore.mobileprovision" --entitlements --output markdown`
    - `asc profiles local install --path "./profiles/AppStore.mobileprovision"`
    - `asc profiles local list --output table`
+   - On macOS, the default directory follows the active Xcode: Xcode 16 or newer uses `~/Library/Developer/Xcode/UserData/Provisioning Profiles`; Xcode 15 or older uses `~/Library/MobileDevice/Provisioning Profiles`. Hosts without a full active Xcode fall back to the legacy directory and print a note to stderr.
+   - Pass `--install-dir` when automation must target a fixed directory.
 
 ## Rotation and cleanup
 - Revoke old certificates:
@@ -49,6 +63,7 @@ Use this skill when you need to create or renew signing assets for iOS/macOS app
 - Clean local Xcode provisioning profiles:
   - `asc profiles local clean --expired --dry-run`
   - `asc profiles local clean --expired --confirm`
+  - Check the resolved directory in the dry-run output before confirming, or pin it with `--install-dir`.
 
 ## Shared team storage with `asc signing sync`
 Use this when you want a lightweight, non-interactive alternative to fastlane match for encrypted git-backed certificate/profile storage.
