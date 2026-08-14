@@ -145,6 +145,43 @@ export const RECIPES = {
     handshake: 'stdout-marker',
     knownLogins: [],
   },
+  // Grok CLI running its bundled `/code-review` skill — a deliberately harsh
+  // maintainability audit (structural regressions, code-judo simplifications,
+  // 1000-line files, spaghetti branching). Two pieces of vendor knowledge:
+  //
+  // The prompt MUST start with the literal `/code-review`. That skill ships
+  // `disable-model-invocation: true`, so only the slash command loads its
+  // standards — "do a code review" prose gets a generic answer — and headless
+  // mode has no --skill flag to load it any other way.
+  //
+  // The tool allowlist is read-only, the middle ground between the claude-cli
+  // row (`--tools ""`) and an unrestricted run. The diff is UNTRUSTED — see the
+  // claude-cli comment above — so write/shell tools must not be reachable by
+  // injected text; but `/code-review` judges structure by reading surrounding
+  // files, so removing every tool would gut it. And because the diff is
+  // untrusted, `--sandbox strict` puts the kernel sandbox (Seatbelt/Landlock)
+  // under the allowlist, capping read reach at the worktree + system paths —
+  // verified live (home dotfile read denied; probe and CWD reads unaffected).
+  // `--always-approve` is still required (headless stalls on the permission
+  // prompt otherwise) and only ever approves this read-only set.
+  //
+  // Headless `grok -p` does NOT read stdin (documented), so the diff rides in
+  // the -p argument like the agy row: same ARG_MAX guard (GROK_MAX_DIFF_BYTES)
+  // and same per-invocation completion marker. The full prompt contract —
+  // `[P*]` findings, the `No findings.` clean sentence, the severity mapping —
+  // lives in SKILL.md's Flow B dispatch table, because unlike claude-cli's
+  // prompt it is not itself vendor knowledge; the slash command is.
+  //
+  // Opt-in like agy, never auto-probed into `--cli-available`. `xai` is never a
+  // host family, so it can gate on both Claude and Codex hosts.
+  'grok-cli': {
+    aliases: ['grok', 'grok cli'],
+    kind: 'local-cli',
+    family: 'xai',
+    trigger: 'grok --sandbox strict --always-approve --tools "read_file,grep,list_dir" -p "/code-review"',
+    handshake: 'stdout-marker',
+    knownLogins: [],
+  },
 };
 
 /**

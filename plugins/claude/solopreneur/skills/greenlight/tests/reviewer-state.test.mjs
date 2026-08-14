@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { RECIPES } from '../scripts/reviewer-registry.mjs';
 
 const SCRIPT = path.join(
   path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'reviewer-state.mjs',
@@ -1028,12 +1029,44 @@ test('an explicitly selected independent reviewer keeps the halt retryable', () 
 test('an explicitly requested independent gate keeps the halt retryable', () => {
   // The --gate twin of the --select case above: an explicit gate is an
   // authorization too, so an unavailable-but-authorized independent CLI is a
-  // retryable dependency failure, not an authority boundary.
-  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot',
-    '--gate', 'claude-cli'], { stdin: BOTS([CODEX]), env: CODEX_HOST });
-  const out = JSON.parse(stdout);
-  assert.equal(out.gate, null);
-  assert.equal(out.gateBlock, 'unavailable');
+  // retryable dependency failure, not an authority boundary. grok-cli rides
+  // the same generic branch — no recipe-specific handling to regress.
+  for (const id of ['claude-cli', 'grok-cli']) {
+    const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot',
+      '--gate', id], { stdin: BOTS([CODEX]), env: CODEX_HOST });
+    const out = JSON.parse(stdout);
+    assert.equal(out.gate, null, `${id} gate must stay null while unavailable`);
+    assert.equal(out.gateBlock, 'unavailable', `${id} halt must be retryable`);
+  }
+});
+
+test('grok-cli gates on a Claude host and on a Codex host alike', () => {
+  // The reason the recipe exists: xai is never a host family, so an available
+  // grok-cli is an independent gate under either host — unlike codex-cli and
+  // claude-cli, each filtered on the host of its own family.
+  for (const env of [{}, CODEX_HOST]) {
+    const { stdout } = run([
+      'resolve', '--repo-key', KEY, '--fallback-order', 'grok-cli',
+      '--cli-available', 'grok-cli',
+    ], { stdin: BOTS([]), env });
+    const out = JSON.parse(stdout);
+    assert.equal(out.gate?.recipe, 'grok-cli', `host ${out.hostFamily} must accept the gate`);
+    assert.equal(out.gate.family, 'xai');
+    assert.notEqual(out.gate.family, out.hostFamily);
+    assert.ok(out.available.find((r) => r.recipe === 'grok-cli').canGate);
+  }
+});
+
+test('no local CLI appears in available unless --cli-available lists it', () => {
+  // Opt-in by construction: pre-flight probes CLIs into --cli-available, and
+  // resolve must not invent one — an implied entry would put a paid reviewer
+  // into every M/L round without the user ever asking for it.
+  const { stdout } = resolve([], { stdin: BOTS([CODEX]) });
+  const available = JSON.parse(stdout).available;
+  for (const [id, r] of Object.entries(RECIPES)) {
+    if (r.kind !== 'local-cli') continue;
+    assert.ok(!available.some((x) => x.recipe === id), `${id} must be opt-in`);
+  }
 });
 
 test('a stale id in the ladder does not veto the host-family verdict', () => {
