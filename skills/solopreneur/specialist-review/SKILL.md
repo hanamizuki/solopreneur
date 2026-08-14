@@ -226,7 +226,8 @@ this instead. Do not claim skills you never read:
 |-------|--------|--------|---------|
 | skill-name | what was checked | check/warning | details |
 
-Skills read: one absolute SKILL.md path per line.
+Skills read: one absolute SKILL.md path per line, marketplace and version
+segments included. A bare skill name does not count — the path is the evidence.
 
 #### context7 Documentation Consulted
 | Library | Topic Queried | Key Insight |

@@ -151,6 +151,14 @@ that commit — `MainActivity.kt` and `MainScreen.kt`, 53 insertions and 44
 deletions — were restored as uncommitted changes. Every run detected its own
 scope from `git status`; no diff was pasted into a prompt.
 
+**Dated evidence.** The A2–A4 runs of 2026-08-14 exercised the original
+dispatch prompt, which globbed the plugin cache. Review of #190 replaced that
+with enabled-install resolution, so A2 was re-run on the new prompt (below) to
+cover the step the change touches. A3 and A4 were not repeated: their evidence
+is that a child thread is created and that the aggregate report survives each
+surface, neither of which the discovery change alters. Their skill paths date
+from the globbing prompt.
+
 ### A1 Registry, publication, and generation
 
 Accepted on 2026-08-14.
@@ -176,6 +184,26 @@ degradation banner and listed four skills read, each an absolute path under
 `…/plugins/cache/solopreneur/android-dev/0.4.12/skills/`: `android-patterns`,
 `edge-to-edge`, `navigation-3`, `viewmodel`. All four files exist in the cache
 and are byte-identical to their canonical sources.
+
+**Re-run on 2026-08-15, after discovery changed.** The dispatch prompt stopped
+globbing the cache and started resolving the enabled install, which is exactly
+what A2 verifies, so A2 was repeated on the new prompt with the same fixture.
+Root thread `01a00104-3bd9-79d1-b451-2c156cf4cfc4` spawned child
+`01a00104-c6ed-7b23-bd98-923a965c5f2d`, whose rollout carries `parent_thread_id`
+back to the root. The child ran `codex plugin list --json` inside the spawned
+thread — the one step no prior evidence covered — and its output carried
+`marketplaceName: solopreneur`, `version: 0.6.0`, `enabled: true`. It then read
+the same four skills under
+`…/plugins/cache/solopreneur/android-dev/0.4.12/skills/`, byte-identical to
+canonical, and opened its section with the rung-2 banner. It also ran
+`git diff HEAD`, picking up a staged-only fixture that plain `git diff` would
+have shown as empty.
+
+Two things this run also showed. The model again omitted `agent_type`, so the
+child rollout records no `agent_role` — consistent with every earlier run. And
+the child listed its skills by bare name rather than absolute path, so the
+output format now says a bare name does not count; the path is the evidence.
+That tightening is wording only and postdates the run.
 
 ### A3 Codex TUI
 
