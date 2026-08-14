@@ -1099,7 +1099,13 @@ export function buildLibrary({ root, collections, include, gitCommit = defaultGi
  * of the committed Library contract, so a first-run append is a one-time
  * migration commit per root.
  */
-const LOCAL_IGNORE_RULES = ['/library/', '/library.tmp/', '/library.bak/'];
+// `/library.*` covers every swap sibling this file creates — `library.tmp`,
+// `library.bak`, `library.lock` — and anything added later, so the rule set
+// never has to grow again. Deliberately a glob and not three exact rules: a
+// content root is a preview library, not a source tree, so shadowing a stray
+// `library.md` there is a better trade than an ignore list that drifts behind
+// the code.
+const LOCAL_IGNORE_RULES = ['/library/', '/library.*'];
 
 export function ensureLibraryIgnored(root) {
   const file = path.join(root, '.gitignore');
@@ -1115,6 +1121,62 @@ export function ensureLibraryIgnored(root) {
   const sep = text && !text.endsWith('\n') ? '\n' : '';
   fs.writeFileSync(file, `${text}${sep}${missing.join('\n')}\n`);
   return missing;
+}
+
+/**
+ * Serialize everything that touches `<root>/library*` against another build of
+ * the SAME root. Without this, two builds interleave destructively: both use the
+ * same `library.tmp` / `library.bak` paths, so B's pre-swap cleanup deletes the
+ * tree A just staged (or the only live copy A moved aside), and A can then
+ * rename B's half-copied staging onto `library` and report success — a silently
+ * incomplete catalog, which is worse than either an error or a missing tree.
+ * Concurrency here is not theoretical: every preview run rebuilds the whole
+ * library, and two agent sessions can finish within the same second.
+ *
+ * `wx` is the atomic create-if-absent primitive; the holder's pid goes in the
+ * file so a lock left by a crash can be told from a live one. Liveness is
+ * checked with signal 0 rather than a timeout — same machine by construction
+ * (the library is per-machine, gitignored), so the answer is exact and there is
+ * no staleness window to tune. An unparseable lock body is treated as stale: it
+ * cannot name a live holder.
+ */
+function acquireSwapLock(rootReal) {
+  const lockPath = path.join(rootReal, 'library.lock');
+  const alive = (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (err) {
+      // EPERM means the process exists but belongs to another user.
+      return err.code === 'EPERM';
+    }
+  };
+
+  // Two attempts: the second runs only after a stale lock was cleared, so a
+  // live holder is reported rather than spun on.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      fs.writeFileSync(lockPath, `${process.pid}\n`, { flag: 'wx' });
+      return lockPath;
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+      let holder;
+      try {
+        holder = Number.parseInt(fs.readFileSync(lockPath, 'utf8').trim(), 10);
+      } catch {
+        holder = NaN; // unreadable: treat as stale, same as unparseable
+      }
+      if (Number.isInteger(holder) && holder > 0 && alive(holder)) {
+        throw new BuildError(
+          `another local library build is running for this root (pid ${holder})\n`
+          + `  lock: ${lockPath}\n`
+          + '  re-run once it finishes; the two builds would otherwise overwrite each other.',
+        );
+      }
+      fs.rmSync(lockPath, { force: true });
+    }
+  }
+  throw new BuildError(`cannot acquire the local build lock: ${lockPath}`);
 }
 
 /**
@@ -1153,42 +1215,65 @@ export function buildLocalLibrary({ root, collections, include, gitCommit = defa
       path.join(built.stagingDir, 'assets', 'directory.js'),
       `window.__previewDirectory = ${jsonIsland(built.directory)};\n`,
     );
-    const ignoreRulesAdded = ensureLibraryIgnored(rootReal);
-
     const dest = path.join(rootReal, 'library');
     const tmp = path.join(rootReal, 'library.tmp');
     const bak = path.join(rootReal, 'library.bak');
-    // Residue from a previous interrupted swap, cleared before it can be
-    // mistaken for this run's backup.
-    fs.rmSync(tmp, { recursive: true, force: true });
-    fs.rmSync(bak, { recursive: true, force: true });
-    fs.cpSync(built.stagingDir, tmp, { recursive: true });
 
-    let movedAside = false;
+    // Everything from here to the lock release touches shared paths under the
+    // root — including the .gitignore read-modify-write, which two concurrent
+    // builds would otherwise both find missing and both append.
+    const lockPath = acquireSwapLock(rootReal);
     try {
-      fs.renameSync(dest, bak);
-      movedAside = true;
-    } catch (err) {
-      // No previous library (first build here) is the only tolerable reason
-      // this rename cannot happen.
-      if (err.code !== 'ENOENT') throw err;
-    }
-    try {
-      fs.renameSync(tmp, dest);
-    } catch (err) {
-      // Put the previous library back rather than leave the root with no
-      // library at all; the caller still sees the original failure.
-      if (movedAside) fs.renameSync(bak, dest);
-      throw err;
-    }
-    fs.rmSync(bak, { recursive: true, force: true });
+      const ignoreRulesAdded = ensureLibraryIgnored(rootReal);
 
-    return {
-      libraryDir: dest,
-      directory: built.directory,
-      sizeReport: built.sizeReport,
-      ignoreRulesAdded,
-    };
+      // Residue from a previous interrupted swap. Safe to remove unconditionally:
+      // the lock proves no other build owns these paths right now.
+      fs.rmSync(tmp, { recursive: true, force: true });
+      fs.rmSync(bak, { recursive: true, force: true });
+      fs.cpSync(built.stagingDir, tmp, { recursive: true });
+
+      let movedAside = false;
+      try {
+        fs.renameSync(dest, bak);
+        movedAside = true;
+      } catch (err) {
+        // No previous library (first build here) is the only tolerable reason
+        // this rename cannot happen.
+        if (err.code !== 'ENOENT') throw err;
+      }
+      try {
+        fs.renameSync(tmp, dest);
+      } catch (err) {
+        // Put the previous library back rather than leave the root with no
+        // library at all; the caller still sees the original failure.
+        if (movedAside) {
+          try {
+            fs.renameSync(bak, dest);
+          } catch (restoreErr) {
+            // Never let the rescue hide what actually failed — and name both
+            // trees, since recovery is now a human decision.
+            throw new BuildError(
+              `local library swap failed and the previous tree could not be restored\n`
+              + `  swap:    ${err.message}\n`
+              + `  restore: ${restoreErr.message}\n`
+              + `  new tree:      ${tmp}\n`
+              + `  previous tree: ${bak}`,
+            );
+          }
+        }
+        throw err;
+      }
+      fs.rmSync(bak, { recursive: true, force: true });
+
+      return {
+        libraryDir: dest,
+        directory: built.directory,
+        sizeReport: built.sizeReport,
+        ignoreRulesAdded,
+      };
+    } finally {
+      fs.rmSync(lockPath, { force: true });
+    }
   } finally {
     fs.rmSync(built.stagingDir, { recursive: true, force: true });
   }

@@ -85,6 +85,13 @@ staging build, with these differences:
   is derived, gitignored, and rebuilt by one command, while the canonical
   items it renders are never touched. This replacement is the only write the
   build makes inside the content tree.
+- Concurrent builds of the same root are serialized by a `library.lock`
+  file, created atomically and carrying the holder's pid; a lock whose
+  holder is no longer alive is stale and is taken over. Without it two
+  builds share the same swap paths and one can publish the other's
+  half-copied staging tree while reporting success — a silently incomplete
+  catalog, which is worse than either an error or a missing tree. A build
+  that finds a live lock fails with the holder's pid rather than waiting.
 - All injected references are relative. Item pages reference the staged
   shared assets and the catalog data relative to their own location, and
   every catalog link targets an explicit `index.html` — `file://` has no
@@ -94,8 +101,8 @@ staging build, with these differences:
   `fetch` of `directory.json` remains the deployed-origin path. Browsers
   block `fetch`/XHR under `file://` but load classic script subresources.
 - The build ensures the content root's committed `.gitignore` covers the
-  build output and its two swap siblings (`library/`, `library.tmp/`,
-  `library.bak/`), idempotently. Without those rules the untracked build
+  build output and every swap sibling — `/library/` plus the glob
+  `/library.*` — idempotently. Without those rules the untracked build
   output would make the root dirty and trip the deploy fetch-guard.
 
 **The rendered pages keep the full Library UX.** Sidebar catalog with

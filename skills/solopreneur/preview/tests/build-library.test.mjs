@@ -1099,26 +1099,26 @@ test('the local build appends the two ignore rules once, preserving existing con
   fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules'); // no trailing newline
 
   const first = localBuild(root);
-  assert.deepEqual(first.ignoreRulesAdded, ['/library/', '/library.tmp/', '/library.bak/']);
+  assert.deepEqual(first.ignoreRulesAdded, ['/library/', '/library.*']);
   assert.equal(
     fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
-    'node_modules\n/library/\n/library.tmp/\n/library.bak/\n',
+    'node_modules\n/library/\n/library.*\n',
   );
 
   const second = localBuild(root);
   assert.deepEqual(second.ignoreRulesAdded, []);
   assert.equal(
     fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
-    'node_modules\n/library/\n/library.tmp/\n/library.bak/\n',
+    'node_modules\n/library/\n/library.*\n',
   );
 });
 
 test('ensureLibraryIgnored creates a fresh .gitignore when none exists', () => {
   const root = tmp();
-  assert.deepEqual(ensureLibraryIgnored(root), ['/library/', '/library.tmp/', '/library.bak/']);
+  assert.deepEqual(ensureLibraryIgnored(root), ['/library/', '/library.*']);
   assert.equal(
     fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
-    '/library/\n/library.tmp/\n/library.bak/\n',
+    '/library/\n/library.*\n',
   );
 });
 
@@ -1212,6 +1212,34 @@ test('library home cards link relatively under file://, absolutely on a deployed
   assert.deepEqual(renderBuiltIndex(root, 'https:').sort(), ['/p/a/', '/p/b/']);
 });
 
+test('a live lock blocks a second build instead of corrupting the first', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  const before = readLocal(root, 'directory.json');
+
+  // The current process IS alive, so this stands in for a concurrent builder.
+  fs.writeFileSync(path.join(root, 'library.lock'), `${process.pid}\n`);
+  assert.throws(() => localBuild(root), isBuildError(/another local library build is running/));
+
+  assert.equal(readLocal(root, 'directory.json'), before, 'the live library is untouched');
+  assert.ok(!fs.existsSync(path.join(root, 'library.bak')), 'no half-finished swap');
+  fs.rmSync(path.join(root, 'library.lock'));
+});
+
+test('a lock left by a dead process does not block, and is cleared on success', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  // Unparseable body: it cannot name a live holder, so it is stale by
+  // construction — the same branch a crashed builder's lock takes.
+  fs.writeFileSync(path.join(root, 'library.lock'), 'not-a-pid\n');
+
+  localBuild(root);
+
+  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')));
+  assert.ok(!fs.existsSync(path.join(root, 'library.lock')), 'lock released after a clean build');
+});
+
 test('a leftover backup from an interrupted swap does not survive the next build', () => {
   const root = tmp();
   writeItem(root, 'active', 'a');
@@ -1230,7 +1258,7 @@ test('the CLI --local builds into the configured root and reports it', () => {
   const res = runCli(['--local', '--from', activeDir]);
   assert.equal(res.status, 0, res.stderr);
   assert.match(res.stdout, /library:\s+\S*\/previews\/library/);
-  assert.match(res.stdout, /gitignore: added \/library\/ \/library\.tmp\//);
+  assert.match(res.stdout, /gitignore: added \/library\/ \/library\.\*/);
   assert.ok(fs.existsSync(path.join(base, 'previews', 'library', 'p', 'a', 'index.html')));
 
   const json = runCli(['--local', '--json', '--from', activeDir]);
