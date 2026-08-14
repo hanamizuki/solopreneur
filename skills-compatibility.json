@@ -125,6 +125,420 @@
     ]
   },
   "skills": {
+    "ai-engineer:senior-prompt-engineer": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/ai-engineer/senior-prompt-engineer/SKILL.md",
+      "platformResources": [
+        "skills/ai-engineer/senior-prompt-engineer/SKILL.md",
+        "skills/ai-engineer/senior-prompt-engineer/references",
+        "skills/ai-engineer/senior-prompt-engineer/scripts"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [
+          "python3"
+        ],
+        "codex-tui": [
+          "python3"
+        ],
+        "codex-app": [
+          "python3"
+        ]
+      },
+      "optionalEnhancements": []
+    },
+    "android-dev:agp-9-upgrade": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/android-dev/agp-9-upgrade/SKILL.md",
+      "platformResources": [
+        "skills/android-dev/agp-9-upgrade/SKILL.md",
+        "skills/android-dev/agp-9-upgrade/references"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
+    "android-dev:android-patterns": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/android-dev/android-patterns/SKILL.md",
+      "platformResources": [
+        "skills/android-dev/android-patterns/SKILL.md",
+        "skills/android-dev/android-patterns/references"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
+    "android-dev:edge-to-edge": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/android-dev/edge-to-edge/SKILL.md",
+      "platformResources": [
+        "skills/android-dev/edge-to-edge/SKILL.md"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
+    "android-dev:migrate-xml-views-to-jetpack-compose": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/android-dev/migrate-xml-views-to-jetpack-compose/SKILL.md",
+      "platformResources": [
+        "skills/android-dev/migrate-xml-views-to-jetpack-compose/SKILL.md",
+        "skills/android-dev/migrate-xml-views-to-jetpack-compose/references"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
+    "android-dev:navigation-3": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/android-dev/navigation-3/SKILL.md",
+      "platformResources": [
+        "skills/android-dev/navigation-3/SKILL.md",
+        "skills/android-dev/navigation-3/references"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
+    "android-dev:play-billing-library-version-upgrade": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/android-dev/play-billing-library-version-upgrade/SKILL.md",
+      "platformResources": [
+        "skills/android-dev/play-billing-library-version-upgrade/SKILL.md",
+        "skills/android-dev/play-billing-library-version-upgrade/references"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
+    "android-dev:r8-analyzer": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/android-dev/r8-analyzer/SKILL.md",
+      "platformResources": [
+        "skills/android-dev/r8-analyzer/SKILL.md",
+        "skills/android-dev/r8-analyzer/references"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
+    "android-dev:viewmodel": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/android-dev/viewmodel/SKILL.md",
+      "platformResources": [
+        "skills/android-dev/viewmodel/SKILL.md"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
+    "ios-dev:ios-patterns": {
+      "support": {
+        "codex-exec": "full",
+        "codex-tui": "full",
+        "codex-app": "full"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/ios-dev/ios-patterns/SKILL.md",
+      "platformResources": [
+        "skills/ios-dev/ios-patterns/SKILL.md",
+        "skills/ios-dev/ios-patterns/references"
+      ],
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [],
+        "codex-tui": [],
+        "codex-app": []
+      },
+      "optionalEnhancements": []
+    },
+    "neo4j-dev:neo4j-cypher": {
+      "support": {
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/neo4j-dev/neo4j-cypher/SKILL.md",
+      "platformResources": [
+        "skills/neo4j-dev/neo4j-cypher/SKILL.md",
+        "skills/neo4j-dev/neo4j-cypher/README.md",
+        "skills/neo4j-dev/neo4j-cypher/references",
+        "skills/neo4j-dev/neo4j-cypher/scripts"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-14-codex-specialist-skills.md",
+        "codex-tui": "docs/spec/2026-08-14-codex-specialist-skills.md",
+        "codex-app": "docs/spec/2026-08-14-codex-specialist-skills.md"
+      },
+      "acceptance": {
+        "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a2-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a3-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a1-registry-publication-and-install",
+          "docs/spec/2026-08-14-codex-specialist-skills.md#a4-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "codex-exec": [
+          "python3"
+        ],
+        "codex-tui": [
+          "python3"
+        ],
+        "codex-app": [
+          "python3"
+        ]
+      },
+      "optionalEnhancements": []
+    },
     "solopreneur:autopilot": {
       "support": {
         "codex-exec": "degraded",

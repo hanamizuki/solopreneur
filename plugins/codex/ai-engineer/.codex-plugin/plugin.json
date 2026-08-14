@@ -1,0 +1,25 @@
+{
+  "name": "ai-engineer",
+  "version": "0.3.15",
+  "description": "AI / LLM application engineering expertise. Ships the ai-engineer agent plus the in-house ai-app-templates skill and 1 vendored skill (senior-prompt-engineer) for production LLM systems, RAG, agents, and prompt design.",
+  "license": "MIT",
+  "author": {
+    "name": "Hana Chang"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "AI Engineer",
+    "shortDescription": "AI / LLM application engineering expertise. Ships the ai-engineer agent plus the in-house ai-app-templates skill and 1 vendored skill (senior-prompt-engineer) for production LLM systems, RAG, agents, and prompt design.",
+    "longDescription": "AI / LLM application engineering expertise. Ships the ai-engineer agent plus the in-house ai-app-templates skill and 1 vendored skill (senior-prompt-engineer) for production LLM systems, RAG, agents, and prompt design.",
+    "developerName": "Hana Chang",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Help me use AI Engineer."
+    ]
+  }
+}
