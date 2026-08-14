@@ -158,9 +158,12 @@ export const RECIPES = {
   // row (`--tools ""`) and an unrestricted run. The diff is UNTRUSTED — see the
   // claude-cli comment above — so write/shell tools must not be reachable by
   // injected text; but `/code-review` judges structure by reading surrounding
-  // files, so removing every tool would gut it. `--always-approve` is still
-  // required (headless stalls on the permission prompt otherwise) and only ever
-  // approves this read-only set.
+  // files, so removing every tool would gut it. And because the diff is
+  // untrusted, `--sandbox strict` puts the kernel sandbox (Seatbelt/Landlock)
+  // under the allowlist, capping read reach at the worktree + system paths —
+  // verified live (home dotfile read denied; probe and CWD reads unaffected).
+  // `--always-approve` is still required (headless stalls on the permission
+  // prompt otherwise) and only ever approves this read-only set.
   //
   // Headless `grok -p` does NOT read stdin (documented), so the diff rides in
   // the -p argument like the agy row: same ARG_MAX guard (GROK_MAX_DIFF_BYTES)
@@ -175,7 +178,7 @@ export const RECIPES = {
     aliases: ['grok', 'grok cli'],
     kind: 'local-cli',
     family: 'xai',
-    trigger: 'grok --always-approve --tools "read_file,grep,list_dir" -p "/code-review"',
+    trigger: 'grok --sandbox strict --always-approve --tools "read_file,grep,list_dir" -p "/code-review"',
     handshake: 'stdout-marker',
     knownLogins: [],
   },

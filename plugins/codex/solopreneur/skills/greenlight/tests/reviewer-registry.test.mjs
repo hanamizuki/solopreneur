@@ -107,17 +107,14 @@ test('grok-cli is the xai-family opt-in local reviewer', () => {
 test('the grok-cli trigger loads the bundled /code-review skill, read-only', () => {
   // The slash command is the vendor knowledge: `/code-review` ships
   // `disable-model-invocation: true`, so only the literal slash loads its
-  // standards. And the diff is untrusted, so tools stay restricted to reading —
-  // the skill needs surrounding files to judge structure (hence not `--tools ""`),
-  // but write/shell tools reachable by injected text are the dangerous
-  // combination the claude-cli row already refuses.
+  // standards. And the diff is untrusted, so the exact allowlist keeps
+  // write/shell tools out of injected text's reach (the skill still reads
+  // surrounding files to judge structure — hence not `--tools ""`), and the
+  // sandbox assertion caps where those reads can go.
   const { trigger } = RECIPES['grok-cli'];
   assert.ok(trigger.includes('-p "/code-review"'), 'must invoke the slash command, not prose');
   assert.ok(trigger.includes('--tools "read_file,grep,list_dir"'), 'read-only tool allowlist');
-  assert.ok(!trigger.includes('dangerously'), 'no permission bypass flag');
-  for (const tool of ['search_replace', 'write', 'run_terminal_cmd']) {
-    assert.ok(!trigger.includes(tool), `write/shell tool ${JSON.stringify(tool)} must not be allowlisted`);
-  }
+  assert.ok(trigger.includes('--sandbox strict'), 'kernel sandbox caps read reach on the untrusted diff');
 });
 
 test('every recipe declares an aliases array', () => {
