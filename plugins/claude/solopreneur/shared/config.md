@@ -393,6 +393,10 @@ config read through the shell helpers in `config.sh`. This section describes
 `.solopreneur.json` (note the leading dot), a **different file** introduced for
 the preview Library.
 
+This config belongs only to Preview's explicit Claude Code Vercel workflow.
+The default local workflow neither resolves nor writes it and creates no
+`preview.json` sidecar.
+
 **The two coexist and neither reads the other.** Nothing in this section changes
 `solopreneur_repo_key`, `read_solopreneur_config`, `write_solopreneur_config` or
 `write_solopreneur_repo_config`; their cascade, their `| values` semantics and

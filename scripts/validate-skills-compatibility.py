@@ -19,10 +19,10 @@ PUBLICATION = {"include", "exclude"}
 LEGACY_BASELINE_SHA256 = "65f0701418237730a2cd1fbe912b475ea8d83c848ec14ec50d24f58668cf60df"
 REQUIRED_GUARDS = {
     "solopreneur:mvp",
-    "solopreneur:preview",
     "solopreneur:todos-babysit",
     "solopreneur:worktree-handoff",
 }
+REQUIRED_MODE_GATES = {"solopreneur:preview"}
 
 
 class DuplicateKey(ValueError):
@@ -115,6 +115,7 @@ def main() -> int:
         "sourceShapes",
         "skills",
         "codexHostGuards",
+        "codexModeGates",
     }
     if set(registry) != expected_root:
         errors.append(f"root keys must be exactly {sorted(expected_root)}")
@@ -423,6 +424,84 @@ def main() -> int:
         guard_text = " ".join(" ".join(guard_lines).split())
         if not guard_lines or any(text not in guard_text for text in required_guard_text):
             errors.append(f"codexHostGuards.{skill_id} lacks an early fail-closed guard")
+
+    mode_gates = registry.get("codexModeGates", {})
+    if not isinstance(mode_gates, dict):
+        errors.append("codexModeGates must be an object")
+        mode_gates = {}
+    if set(mode_gates) != REQUIRED_MODE_GATES:
+        errors.append(f"codexModeGates must declare exactly {sorted(REQUIRED_MODE_GATES)}")
+    for skill_id, gate in mode_gates.items():
+        if skill_id not in REQUIRED_MODE_GATES:
+            continue
+        if not isinstance(gate, dict) or set(gate) != {"entrypoint", "resolver"}:
+            errors.append(f"codexModeGates.{skill_id} must declare entrypoint and resolver")
+            continue
+
+        plugin, skill = skill_id.split(":", 1)
+        expected_entrypoint = f"skills/{plugin}/{skill}/SKILL.md"
+        expected_resolver = f"skills/{plugin}/{skill}/scripts/resolve-delivery.mjs"
+        if gate.get("entrypoint") != expected_entrypoint:
+            errors.append(f"codexModeGates.{skill_id}.entrypoint must reference {expected_entrypoint}")
+        if gate.get("resolver") != expected_resolver:
+            errors.append(f"codexModeGates.{skill_id}.resolver must reference {expected_resolver}")
+
+        raw_entrypoint = gate.get("entrypoint")
+        raw_resolver = gate.get("resolver")
+        entrypoint = referenced_path(repo, raw_entrypoint) if isinstance(raw_entrypoint, str) else None
+        resolver = referenced_path(repo, raw_resolver) if isinstance(raw_resolver, str) else None
+        if entrypoint is None or not entrypoint.is_file() or resolver is None or not resolver.is_file():
+            errors.append(f"codexModeGates.{skill_id} references a missing contract file")
+            continue
+
+        body = entrypoint.read_text()
+        body_lines = body.splitlines()
+        try:
+            body_start = body_lines.index("---", 1) + 1 if body_lines[:1] == ["---"] else 0
+        except ValueError:
+            body_start = len(body_lines)
+        headings = [
+            (index, line)
+            for index, line in enumerate(body_lines[body_start:], body_start)
+            if line.startswith("#")
+        ]
+        instruction_start = body_start
+        while instruction_start < len(body_lines) and not body_lines[instruction_start].strip():
+            instruction_start += 1
+        if instruction_start < len(body_lines) and body_lines[instruction_start].startswith("# "):
+            instruction_start += 1
+            while instruction_start < len(body_lines) and not body_lines[instruction_start].strip():
+                instruction_start += 1
+        first_h2 = next(((index, line) for index, line in headings if line.startswith("## ")), None)
+        gate_end = next(
+            (index for index, line in headings if first_h2 and index > first_h2[0] and line.startswith("## ")),
+            len(body_lines),
+        )
+        gate_text = " ".join(" ".join(body_lines[first_h2[0] + 1 : gate_end]).split()) if first_h2 else ""
+        required_gate_text = (
+            "`local` is the default",
+            "node scripts/resolve-delivery.mjs [--vercel]",
+            "`CODEX_THREAD_ID`",
+            "fails closed before any network or state change",
+        )
+        if (
+            first_h2 is None
+            or first_h2[0] != instruction_start
+            or first_h2[1] != "## Delivery mode gate"
+            or any(text not in gate_text for text in required_gate_text)
+            or "## Codex host guard" in body
+        ):
+            errors.append(f"codexModeGates.{skill_id} lacks an early mode-specific safety contract")
+
+        publication = dict(default_publication)
+        skill_entry = overrides.get(skill_id, {})
+        if isinstance(skill_entry, dict):
+            publication_override = skill_entry.get("publication", {})
+            if isinstance(publication_override, dict):
+                publication.update(publication_override)
+        resources = skill_entry.get("platformResources", []) if isinstance(skill_entry, dict) else []
+        if publication.get("codex") == "include" and gate.get("resolver") not in resources:
+            errors.append(f"codexModeGates.{skill_id}.resolver must be a published platformResource")
 
     if errors:
         for error in errors:
