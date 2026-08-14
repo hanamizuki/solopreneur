@@ -70,7 +70,7 @@ generated_skills="$(
   find "$FIXTURE_ROOT/plugins/codex/solopreneur/skills" \
     -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
 )"
-[[ "$generated_skills" == $'autopilot\nfilter-canary\ngreenlight\nmerge-pr\nplan-review' ]]
+[[ "$generated_skills" == $'autopilot\nfilter-canary\ngreenlight\nhandoff\nmerge-pr\nperspective\nplan-review\npost-mortem' ]]
 [[ -f "$FIXTURE_ROOT/plugins/codex/solopreneur/skills/autopilot/SKILL.md" ]]
 [[ -f "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json" ]]
 [[ -f "$FIXTURE_ROOT/plugins/codex/solopreneur/.codex-plugin/plugin.json" ]]

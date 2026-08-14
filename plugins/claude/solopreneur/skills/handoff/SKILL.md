@@ -122,15 +122,23 @@ decision the user already made about it.>
 
 Derive a slug from the task title (lowercase, hyphens, no special chars).
 Ensure the directory exists (`mkdir -p /tmp/handoff`), then write the document
-to `/tmp/handoff/<YYYY-MM-DD>_<slug>.md` using the Write tool. Then use
-SendUserFile to deliver it.
+to `/tmp/handoff/<YYYY-MM-DD>_<slug>.md`. How, and what you print afterwards,
+depends on the host — check whether `CODEX_THREAD_ID` is set:
+
+- **Unset — Claude Code:** write with the Write tool, then deliver the file
+  with SendUserFile.
+- **Set — Codex:** write it with whatever file-write mechanism the host offers.
+  A read-only sandbox denies `/tmp`, so this write can fail; a denied write is
+  not a failed run, because the printed document is the deliverable. On
+  success, print the absolute path on its own line. On denial, print
+  `file not written: <reason>` instead. Codex has no SendUserFile — never
+  report a file as delivered.
 
 ### 5. Stop
 
-The printed document plus the file delivery is the entire response. Do not add
-a preamble before the markdown (no "Here's the handoff doc"), a closing line
-after it (no "ready, copy it"), a summary, or any commentary. The only
-post-doc output is the file delivery via SendUserFile.
+The printed document plus step 4's one-line file result is the entire response.
+Do not add a preamble before the markdown (no "Here's the handoff doc"), a
+closing line after it (no "ready, copy it"), a summary, or any commentary.
 
 The only exception is step 1: if the next step is unclear, ask the focused
 question first and wait. After the answer, generate the doc and stop.
@@ -153,9 +161,9 @@ The output must pass these checks. Revise before printing if any fails.
    should be backed by a file path or command listed in the doc.
 7. **No secret values.** Env var names only. Never paste keys, tokens, or
    passwords.
-8. **Document + file delivery is the entire response.** No text before the
-   markdown block, no commentary after it. The only post-doc output is the
-   SendUserFile delivery.
+8. **Document + file result is the entire response.** No text before the
+   markdown block, no commentary after it. The only post-doc output is step 4's
+   one-line file result.
 
 ## Anti-patterns
 
@@ -194,5 +202,6 @@ User: `/handoff`
    dead ends, env requirements.
 5. Compose the markdown using the template, filling only the meaningful
    sections.
-6. Print it, write to `/tmp/handoff/<YYYY-MM-DD>_<slug>.md`, and deliver via
-   SendUserFile. Nothing else — no preamble, no closing line, no commentary.
+6. Print it, write to `/tmp/handoff/<YYYY-MM-DD>_<slug>.md`, and report the
+   result the way step 4 requires for the current host. Nothing else — no
+   preamble, no closing line, no commentary.
