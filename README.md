@@ -40,10 +40,12 @@ the verified core subset only. See the [full install guide](#install).
 On Claude Code, installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
 **≥ v2.1.110** for plugin dependency resolution.
 
-Codex currently publishes the compatible core subset: `autopilot`,
-`greenlight`, `handoff`, `merge-pr`, `perspective`, `plan-review`, and
-`post-mortem`. Unsupported skills stay out of the Codex package instead of
-appearing and failing later.
+Codex currently publishes the compatible `solopreneur` core subset:
+`autopilot`, `greenlight`, `handoff`, `merge-pr`, `perspective`,
+`plan-review`, `post-mortem`, and `preview`; the specialist plugins publish
+their own vendored knowledge skills alongside it. `skills-compatibility.json`
+is the source of truth for what ships. Unsupported skills stay out of the
+Codex package instead of appearing and failing later.
 
 Codex V1 is intentionally a smaller, fail-closed surface:
 
@@ -56,9 +58,10 @@ Codex V1 is intentionally a smaller, fail-closed surface:
 | `$solopreneur:perspective` | Same ten perspectives. Name the one you want up front in `codex exec` — the menu needs a conversational surface. |
 | `$solopreneur:plan-review internal` | Technical and lean findings only; no outside review, adjudication, or write-back. |
 | `$solopreneur:post-mortem` | Same git archaeology and report. In `codex exec`, put the bug description in the prompt; the run stops at the printed report. |
+| `$solopreneur:preview` | Local delivery only — the `file://` Library and the single-file ephemeral mode. An explicit Vercel, online, cross-device, or external-sharing request fails closed before any file, config, network, or deployment action. |
 
 The skill descriptions below document the full Claude Code surface. Use the
-contracts above when running the seven published skills on Codex.
+contracts above when running these skills on Codex.
 
 > Migrating from a previous version? See [MIGRATION.md](./MIGRATION.md).
 > For per-release, per-plugin notes, see [CHANGELOG.md](./CHANGELOG.md).

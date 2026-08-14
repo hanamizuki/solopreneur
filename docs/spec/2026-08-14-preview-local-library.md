@@ -86,12 +86,20 @@ staging build, with these differences:
   items it renders are never touched. This replacement is the only write the
   build makes inside the content tree.
 - Concurrent builds of the same root are serialized by a `library.lock`
-  file, created atomically and carrying the holder's pid; a lock whose
-  holder is no longer alive is stale and is taken over. Without it two
-  builds share the same swap paths and one can publish the other's
-  half-copied staging tree while reporting success — a silently incomplete
-  catalog, which is worse than either an error or a missing tree. A build
-  that finds a live lock fails with the holder's pid rather than waiting.
+  file, created atomically and carrying the holder's pid; the lock is held
+  across the scan, the copy and the swap. Without it two builds share the
+  same swap paths and one can publish the other's half-copied staging tree
+  while reporting success — a silently incomplete catalog, which is worse
+  than either an error or a missing tree. A build that finds a live lock
+  fails with the holder's pid rather than waiting. A lock is taken over only
+  when its holder is demonstrably gone (or is this process, which cannot
+  hold a lock it is acquiring); a lock that names nobody identifiable is
+  reported rather than stolen, because the create-then-write window makes an
+  empty lock indistinguishable from a live one being taken. A build releases
+  only a lock that still names it.
+- A build first completes any interrupted swap it finds — a backup with no
+  library is restored before the new build runs, so a later failure cannot
+  strand the root with neither.
 - All injected references are relative. Item pages reference the staged
   shared assets and the catalog data relative to their own location, and
   every catalog link targets an explicit `index.html` — `file://` has no

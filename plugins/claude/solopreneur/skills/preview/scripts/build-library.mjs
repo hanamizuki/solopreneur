@@ -1137,9 +1137,21 @@ export function ensureLibraryIgnored(root) {
  * file so a lock left by a crash can be told from a live one. Liveness is
  * checked with signal 0 rather than a timeout — same machine by construction
  * (the library is per-machine, gitignored), so the answer is exact and there is
- * no staleness window to tune. An unparseable lock body is treated as stale: it
- * cannot name a live holder.
+ * no staleness window to tune.
+ *
+ * A lock whose body does NOT name a live holder is NOT assumed stale. `wx`
+ * creates the file and writes the pid in two steps, so there is a moment where a
+ * live holder's lock is still empty; reading that as stale and unlinking it
+ * would let both processes believe they hold the lock — reopening the exact
+ * interleaving this function exists to close, and then the loser's release would
+ * delete the winner's lock. An empty body is therefore re-read a few times (the
+ * writer lands within microseconds) and only an unidentifiable lock that
+ * survives that is reported, with the path to remove. The one case that is
+ * genuinely safe to take over is a body naming THIS process: at acquisition we
+ * demonstrably do not hold it, so it is a crashed run whose pid the OS reused.
  */
+const LOCK_PID_READ_TRIES = 5;
+
 function acquireSwapLock(rootReal) {
   const lockPath = path.join(rootReal, 'library.lock');
   const alive = (pid) => {
@@ -1151,6 +1163,26 @@ function acquireSwapLock(rootReal) {
       return err.code === 'EPERM';
     }
   };
+  // Read the holder pid, tolerating the create-then-write window: `null` means
+  // "no identifiable holder after retrying", not "nobody".
+  const readHolder = () => {
+    for (let attempt = 0; attempt < LOCK_PID_READ_TRIES; attempt += 1) {
+      let body = '';
+      try {
+        body = fs.readFileSync(lockPath, 'utf8').trim();
+      } catch (err) {
+        if (err.code === 'ENOENT') return null; // released while we looked
+        throw err;
+      }
+      const pid = Number.parseInt(body, 10);
+      if (Number.isInteger(pid) && pid > 0) return pid;
+      // Busy-wait deliberately: the gap is a couple of syscalls wide, and a
+      // timer would need this function to become async for no real benefit.
+      const until = Date.now() + 20;
+      while (Date.now() < until) { /* spin briefly, then re-read */ }
+    }
+    return null;
+  };
 
   // Two attempts: the second runs only after a stale lock was cleared, so a
   // live holder is reported rather than spun on.
@@ -1160,23 +1192,44 @@ function acquireSwapLock(rootReal) {
       return lockPath;
     } catch (err) {
       if (err.code !== 'EEXIST') throw err;
-      let holder;
-      try {
-        holder = Number.parseInt(fs.readFileSync(lockPath, 'utf8').trim(), 10);
-      } catch {
-        holder = NaN; // unreadable: treat as stale, same as unparseable
+      const holder = readHolder();
+      if (holder === null) {
+        // Either the lock vanished (retry immediately) or it names nobody we
+        // can identify. Fail closed on the second: stealing it is what breaks
+        // the guarantee.
+        if (!fs.existsSync(lockPath)) continue;
+        throw new BuildError(
+          `a local library build lock exists but names no identifiable holder\n`
+          + `  lock: ${lockPath}\n`
+          + '  if no build is running, remove that file and re-run.',
+        );
       }
-      if (Number.isInteger(holder) && holder > 0 && alive(holder)) {
+      if (holder !== process.pid && alive(holder)) {
         throw new BuildError(
           `another local library build is running for this root (pid ${holder})\n`
           + `  lock: ${lockPath}\n`
           + '  re-run once it finishes; the two builds would otherwise overwrite each other.',
         );
       }
+      // Dead holder, or this pid recycled from a crashed run — take it over.
       fs.rmSync(lockPath, { force: true });
     }
   }
   throw new BuildError(`cannot acquire the local build lock: ${lockPath}`);
+}
+
+/**
+ * Release a lock ONLY while it still names this process. A lock that now names
+ * someone else was taken over after this process was presumed dead, and
+ * deleting it would strip a live builder of its protection.
+ */
+function releaseSwapLock(lockPath) {
+  try {
+    if (Number.parseInt(fs.readFileSync(lockPath, 'utf8').trim(), 10) !== process.pid) return;
+  } catch {
+    return; // already gone, or unreadable — not ours to remove
+  }
+  fs.rmSync(lockPath, { force: true });
 }
 
 /**
@@ -1207,29 +1260,42 @@ function acquireSwapLock(rootReal) {
  */
 export function buildLocalLibrary({ root, collections, include, gitCommit = defaultGitCommit }) {
   const rootReal = fs.realpathSync(root);
-  const built = buildLibrary({
-    root, collections, include, gitCommit, injectEntry: chromeInjectLocal,
-  });
-  try {
-    fs.writeFileSync(
-      path.join(built.stagingDir, 'assets', 'directory.js'),
-      `window.__previewDirectory = ${jsonIsland(built.directory)};\n`,
-    );
-    const dest = path.join(rootReal, 'library');
-    const tmp = path.join(rootReal, 'library.tmp');
-    const bak = path.join(rootReal, 'library.bak');
+  const dest = path.join(rootReal, 'library');
+  const tmp = path.join(rootReal, 'library.tmp');
+  const bak = path.join(rootReal, 'library.bak');
 
-    // Everything from here to the lock release touches shared paths under the
-    // root — including the .gitignore read-modify-write, which two concurrent
-    // builds would otherwise both find missing and both append.
-    const lockPath = acquireSwapLock(rootReal);
+  // The lock covers the scan too, not just the swap: everything below touches
+  // shared paths under the root — including the .gitignore read-modify-write,
+  // which two concurrent builds would otherwise both find missing and both
+  // append.
+  const lockPath = acquireSwapLock(rootReal);
+  try {
+    // Finish a previous run's interrupted swap FIRST — before this build can
+    // fail for an unrelated reason (a malformed item, say) and leave the root
+    // with no library while the previous one sits right there in the backup.
+    // The lock proves nobody else owns these paths, so the state is
+    // unambiguous: a backup with no library means the previous run died
+    // between its two renames, and that backup is the only copy — restoring it
+    // is what makes "re-run to recover" true, and what keeps the promise of
+    // the failed-restore error, which tells a human that tree is there.
+    // A backup ALONGSIDE a live library is merely superseded, and goes.
+    if (fs.existsSync(dest)) {
+      fs.rmSync(bak, { recursive: true, force: true });
+    } else if (fs.existsSync(bak)) {
+      fs.renameSync(bak, dest);
+    }
+
+    const built = buildLibrary({
+      root, collections, include, gitCommit, injectEntry: chromeInjectLocal,
+    });
     try {
+      fs.writeFileSync(
+        path.join(built.stagingDir, 'assets', 'directory.js'),
+        `window.__previewDirectory = ${jsonIsland(built.directory)};\n`,
+      );
       const ignoreRulesAdded = ensureLibraryIgnored(rootReal);
 
-      // Residue from a previous interrupted swap. Safe to remove unconditionally:
-      // the lock proves no other build owns these paths right now.
       fs.rmSync(tmp, { recursive: true, force: true });
-      fs.rmSync(bak, { recursive: true, force: true });
       fs.cpSync(built.stagingDir, tmp, { recursive: true });
 
       let movedAside = false;
@@ -1272,10 +1338,10 @@ export function buildLocalLibrary({ root, collections, include, gitCommit = defa
         ignoreRulesAdded,
       };
     } finally {
-      fs.rmSync(lockPath, { force: true });
+      fs.rmSync(built.stagingDir, { recursive: true, force: true });
     }
   } finally {
-    fs.rmSync(built.stagingDir, { recursive: true, force: true });
+    releaseSwapLock(lockPath);
   }
 }
 

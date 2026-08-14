@@ -155,10 +155,11 @@ node scripts/build-library.mjs --local --json --from "$PATH_UNDER_ROOT"
   `<root>/library/` — generated output, never edited, never committed. A
   failed build leaves the previous library untouched; re-running the command
   is always the recovery.
-- First run on a root appends `/library/` + `/library.tmp/` to the content
-  root's `.gitignore` and reports it — commit that line with the content
-  (untracked build output would otherwise dirty the root and trip the deploy
-  fetch-guard).
+- First run on a root appends `/library/` + `/library.*` to the content root's
+  `.gitignore` and reports it — commit those lines with the content. The glob
+  covers the build's swap siblings (`library.tmp`, `library.bak`,
+  `library.lock`); untracked build output would otherwise dirty the root and
+  trip the deploy fetch-guard.
 - The built pages render under `file://` with the full Library UX: catalog
   sidebar, provenance footer, comment overlay. Comments persist per item in
   that browser's `localStorage` (this machine only — export markdown if they

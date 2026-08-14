@@ -871,12 +871,24 @@ test('a preview.json rewritten between scan and copy aborts', () => {
 test('a failed build leaves no staging tree behind', () => {
   const root = tmp();
   const itemDir = writeItem(root, 'active', 'a');
-  const count = () => fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('preview-build-')).length;
-  const before = count();
-  assert.throws(() => build(root, ['active'], {
-    hooks: { afterFingerprint: () => fs.writeFileSync(path.join(itemDir, 'index.html'), 'CHANGED') },
-  }), BuildError);
-  assert.equal(count(), before, 'the aborted build must remove its own staging dir');
+  // This counts staging dirs by name, so it needs a temp dir nobody else is
+  // building into: `node --test` runs test FILES in parallel processes that all
+  // stage under the shared os.tmpdir(), and a sibling's dir appearing between
+  // the two counts would fail an otherwise-correct build. os.tmpdir() re-reads
+  // TMPDIR on every call, so pointing it at a private directory is enough.
+  const previousTmpDir = process.env.TMPDIR;
+  process.env.TMPDIR = tmp();
+  try {
+    const count = () => fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('preview-build-')).length;
+    const before = count();
+    assert.throws(() => build(root, ['active'], {
+      hooks: { afterFingerprint: () => fs.writeFileSync(path.join(itemDir, 'index.html'), 'CHANGED') },
+    }), BuildError);
+    assert.equal(count(), before, 'the aborted build must remove its own staging dir');
+  } finally {
+    if (previousTmpDir === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = previousTmpDir;
+  }
 });
 
 // --- collections, size report, document-level fields ------------------------
@@ -1212,32 +1224,87 @@ test('library home cards link relatively under file://, absolutely on a deployed
   assert.deepEqual(renderBuiltIndex(root, 'https:').sort(), ['/p/a/', '/p/b/']);
 });
 
+/** A pid that is certainly not running: a child spawned and already reaped. */
+function deadPid() {
+  const { pid } = spawnSync(process.execPath, ['-e', '0']);
+  assert.ok(Number.isInteger(pid), 'the probe child must report a pid');
+  return pid;
+}
+
 test('a live lock blocks a second build instead of corrupting the first', () => {
   const root = tmp();
   writeItem(root, 'active', 'a');
   localBuild(root);
   const before = readLocal(root, 'directory.json');
 
-  // The current process IS alive, so this stands in for a concurrent builder.
-  fs.writeFileSync(path.join(root, 'library.lock'), `${process.pid}\n`);
+  // The parent process is alive and is NOT this process, so it stands in for a
+  // concurrent builder. (This process's own pid is deliberately treated as a
+  // recycled-pid takeover instead — see acquireSwapLock.)
+  fs.writeFileSync(path.join(root, 'library.lock'), `${process.ppid}\n`);
   assert.throws(() => localBuild(root), isBuildError(/another local library build is running/));
 
   assert.equal(readLocal(root, 'directory.json'), before, 'the live library is untouched');
   assert.ok(!fs.existsSync(path.join(root, 'library.bak')), 'no half-finished swap');
+  assert.ok(fs.existsSync(path.join(root, 'library.lock')), 'the holder keeps its lock');
   fs.rmSync(path.join(root, 'library.lock'));
 });
 
 test('a lock left by a dead process does not block, and is cleared on success', () => {
   const root = tmp();
   writeItem(root, 'active', 'a');
-  // Unparseable body: it cannot name a live holder, so it is stale by
-  // construction — the same branch a crashed builder's lock takes.
-  fs.writeFileSync(path.join(root, 'library.lock'), 'not-a-pid\n');
+  fs.writeFileSync(path.join(root, 'library.lock'), `${deadPid()}\n`);
 
   localBuild(root);
 
   assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')));
   assert.ok(!fs.existsSync(path.join(root, 'library.lock')), 'lock released after a clean build');
+});
+
+test('a lock naming this pid is taken over, not treated as a live holder', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  // Only reachable when the OS recycled a crashed run's pid onto this process:
+  // at acquisition we demonstrably do not hold the lock, so blocking on it
+  // would deadlock the root until someone deleted the file by hand.
+  fs.writeFileSync(path.join(root, 'library.lock'), `${process.pid}\n`);
+
+  localBuild(root);
+
+  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')));
+  assert.ok(!fs.existsSync(path.join(root, 'library.lock')));
+});
+
+test('an unidentifiable lock is reported, never stolen', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  // The create-then-write window leaves exactly this: a lock that exists and
+  // names nobody. Stealing it would let two builds run at once.
+  fs.writeFileSync(path.join(root, 'library.lock'), '');
+
+  assert.throws(() => localBuild(root), isBuildError(/names no identifiable holder/));
+  assert.ok(fs.existsSync(path.join(root, 'library.lock')), 'the other builder keeps its lock');
+  fs.rmSync(path.join(root, 'library.lock'));
+});
+
+test('an interrupted swap is completed by the next build, not discarded', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+
+  // Exactly the state a kill between the two renames leaves: no library, the
+  // only copy sitting in library.bak.
+  fs.renameSync(path.join(root, 'library'), path.join(root, 'library.bak'));
+  // The next build fails on a broken item — the previous tree must still be
+  // restored rather than deleted along the way.
+  writeItem(root, 'active', 'broken', { rawMeta: '{not json' });
+  assert.throws(() => localBuild(root), isBuildError(/malformed JSON/));
+
+  assert.ok(
+    fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')),
+    'the previous library is restored, not lost',
+  );
+  assert.ok(!fs.existsSync(path.join(root, 'library.bak')));
 });
 
 test('a leftover backup from an interrupted swap does not survive the next build', () => {
