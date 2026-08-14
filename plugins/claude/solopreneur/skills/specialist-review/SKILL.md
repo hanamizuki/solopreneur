@@ -22,7 +22,8 @@ Detect the review scope automatically, in this priority order:
 1. **User specified a PR number or URL** → use that PR's diff
 2. **Current branch has an open PR** → `gh pr diff`
 3. **Current branch is not main/master** → `git diff main...HEAD`
-4. **Uncommitted changes exist** → `git diff` (staged + unstaged)
+4. **Uncommitted changes exist** → `git diff HEAD` (staged + unstaged; plain
+   `git diff` misses anything already staged)
 5. **None of the above** → ask the user what to review
 
 Run these checks:
