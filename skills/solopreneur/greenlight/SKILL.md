@@ -1730,6 +1730,25 @@ if [ "$HOST_FAMILY" != anthropic ] \
   CLI_AVAILABLE="${CLI_AVAILABLE:+$CLI_AVAILABLE,}claude-cli"
 fi
 
+# grok-cli is opt-in (see the registry row): never probed unconditionally. But
+# a caller who NAMED it — gate=/select= token, positional alias, or a persisted
+# fallback_order entry — has opted in, and resolve only admits a local CLI via
+# --cli-available, so the name must be able to reach it. Probe exactly then.
+# One minimal completion proves installed AND authenticated AND non-TTY stdout
+# (a version check prints happily while logged out); --sandbox strict and
+# --tools "" match the dispatch's own hardening. Reading login/402 strings
+# without a non-zero exit is safe HERE only: this probe's transcript contains
+# no reviewer prose to false-match against.
+case ",$GATE_RECIPE,$SELECTED_RECIPES,$FALLBACK_ORDER," in *,grok-cli,*)
+  if command -v grok >/dev/null 2>&1; then
+    GROK_PROBE=$(grok --sandbox strict --always-approve --tools "" -p "reply with the single word READY" 2>&1)
+    if printf '%s' "$GROK_PROBE" | grep -q "READY" \
+       && ! printf '%s' "$GROK_PROBE" | grep -qiE "402|payment required|authentication|log ?in"; then
+      CLI_AVAILABLE="${CLI_AVAILABLE:+$CLI_AVAILABLE,}grok-cli"
+    fi
+  fi
+;; esac
+
 # All-or-nothing: a non-zero return (any source errored — rate limit / network)
 # degrades to `unavailable`. Only a fully successful sample yields `ok`. An
 # empty-but-successful sample (zero-history repo) still returns 0 → `ok` with an
@@ -1899,7 +1918,10 @@ Attended runs then ask **one** question, offering:
   recommended `fallback_order` already pairs them.
 
 - **Add `grok-cli`** to `--cli-available` for this run — the same opt-in rule as
-  `agy`, for the same reason. Its lens is different from every other reviewer
+  `agy`, for the same reason. The add runs the detection block's grok-cli probe
+  first and appends only when it passes — the same single probe definition the
+  named paths (`gate=`/`select=`/alias/`fallback_order`) go through.
+  Its lens is different from every other reviewer
   here: the bundled `/code-review` skill is a deliberately harsh maintainability
   audit (structural regressions, missed simplifications, file-size growth), so
   expect `[P2]` structural findings ordinary correctness reviewers skip. `xai`
@@ -2264,32 +2286,17 @@ CLI in `trigger[]`, so hardcoding one here would run Codex when the user chose
 | recipe `codex-cli` | `codex review --base main 2>&1` — parse `[P*]` tags from stdout |
 | recipe `claude-cli` | **Capture the diff first, check it, then pipe it in** — `DIFF=$(git diff main...HEAD)`, and treat a non-zero `git` exit **or an empty `$DIFF`** as an invocation failure for this reviewer (never a clean pass): in a pipeline only the LAST command's status survives, so `git diff … \| claude …` would hand the reviewer empty input, let it answer `No findings.`, and close the round having reviewed nothing. Then `printf '%s' "$DIFF" \| <this entry's own `triggerText`>` — **run the `triggerText` verbatim** (the registry row holds the whole command including the prompt — do not retype or paraphrase it), in the PR worktree, inheriting the ambient environment. Parse `[P*]` tags from stdout exactly as for `codex-cli`. **No `--dangerously-skip-permissions`, and `--tools ""` to remove tools outright**, for the reason the `agy` row gives: the diff is untrusted, handing it in as inert input means the reviewer needs no tools, and tools reachable by injected instructions are the dangerous combination. Dropping the bypass is not enough on its own — default permissions still leave tools available, and an operator whose settings pre-authorize Bash would hand injected diff text a live shell. Verified: both forms answer fine, so the restriction costs nothing. An operator who wants a specific Claude profile exports `CLAUDE_CONFIG_DIR` before launching the host — env vars pass through to the nested CLI, and no profile mapping lives in this body |
 | recipe `agy` | The **same** `agy --print` invocation post-commit Phase 3 uses: model pinned to the Gemini family, `AGY_MAX_DIFF_BYTES` argv guard, per-invocation nonce completion marker, no tool-permission bypass. Take the diff from `git diff main...HEAD` instead of a commit range, and parse `[P*]` tags the same way |
-| recipe `grok-cli` | The opt-in xai-family reviewer — in `trigger[]` only when the user asked for it (see detection / Reviewer selection). Run the probe and dispatch blocks below. The prompt MUST start with the literal `/code-review` — Grok's bundled skill of that name ships `disable-model-invocation: true`, so only the slash command loads its (deliberately harsh) maintainability standards, and headless mode has no `--skill` flag. Headless `grok -p` does not read stdin, so the diff rides inside the `-p` argument with the agy-shaped size guard; tools stay read-only; output follows the same `[P*]` / `No findings.` / nonce-marker contract as the other local CLIs |
+| recipe `grok-cli` | The opt-in xai-family reviewer — in `trigger[]` only when the user asked for it (see detection / Reviewer selection). Run the dispatch block below. The prompt MUST start with the literal `/code-review` — Grok's bundled skill of that name ships `disable-model-invocation: true`, so only the slash command loads its (deliberately harsh) maintainability standards, and headless mode has no `--skill` flag. Headless `grok -p` does not read stdin, so the diff rides inside the `-p` argument with the agy-shaped size guard; tools stay read-only; output follows the same `[P*]` / `No findings.` / nonce-marker contract as the other local CLIs |
 
-**`grok-cli` availability probe** (once per run, before the loop — mirrors the
-agy probe). Not a version check: `grok --version` prints happily while logged
-out or over quota. One minimal headless completion proves installed AND
-authenticated AND that non-TTY stdout is not being dropped:
-
-```bash
-GROK_AVAILABLE=false
-if command -v grok >/dev/null 2>&1; then
-  # --tools "": the probe needs no tools at all. An unauthenticated or
-  # quota-exhausted grok answers with login/402 text instead of the word.
-  # (Reading those strings without a non-zero exit is safe HERE only: this
-  # probe's transcript contains no reviewer prose to false-match against.)
-  GROK_PROBE=$(grok --sandbox strict --always-approve --tools "" -p "reply with the single word READY" 2>&1)
-  if printf '%s' "$GROK_PROBE" | grep -q "READY" \
-     && ! printf '%s' "$GROK_PROBE" | grep -qiE "402|payment required|authentication|log ?in"; then
-    GROK_AVAILABLE=true
-  fi
-fi
-```
-
-If `GROK_AVAILABLE=false` while `grok-cli` was explicitly requested
-(`select=` / `gate=` / the attended add), treat it as an unavailable reviewer —
-the existing degrade paths apply; never silently substitute another reviewer
-without saying so.
+**`grok-cli` availability** — the probe lives in the detection block (with the
+other `CLI_AVAILABLE` probes), not here, so it exists in exactly one place. It
+runs when the caller named grok-cli — a `gate=`/`select=` token, the positional
+alias, or a persisted `fallback_order` entry — and the attended "Add
+`grok-cli`" prompt path reaches the same probe: that add re-runs `resolve` with
+grok-cli appended to `--cli-available` only after the probe passes. If the
+probe fails while grok-cli was explicitly requested, treat it as an unavailable
+reviewer — the existing degrade paths apply; never silently substitute another
+reviewer without saying so.
 
 **`grok-cli` dispatch** (each round the entry is in `trigger[]`):
 
