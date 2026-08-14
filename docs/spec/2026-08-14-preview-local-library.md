@@ -71,10 +71,16 @@ target uses.
 scan, validation, metadata projection, and chrome injection as the deploy
 staging build, with these differences:
 
-- The staging tree is assembled off to the side and then atomically
-  replaces `<root>/library/`. Readers never observe a torn tree; a failed
-  build leaves the previous `library/` intact. This is the only write the
-  build makes inside the content tree.
+- The staging tree is assembled off to the side and only then replaces
+  `<root>/library/`. Every failure mode that can produce a partial tree —
+  scan, validation, copy, injection — happens before the replacement, so a
+  failed build leaves the previous `library/` untouched and no reader ever
+  sees a half-written one. The replacement itself is a remove followed by a
+  rename, so it is not transactional: a process killed inside that window
+  leaves the directory absent rather than stale. That is the accepted
+  ceiling — `library/` is derived, gitignored, and rebuilt by one command,
+  while the canonical items it renders are never touched. This replacement
+  is the only write the build makes inside the content tree.
 - All injected references are relative. Item pages reference the staged
   shared assets and the catalog data relative to their own location, and
   every catalog link targets an explicit `index.html` — `file://` has no

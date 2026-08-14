@@ -1128,9 +1128,17 @@ export function ensureLibraryIgnored(root) {
  * untouched; the swap then copies to `<root>/library.tmp` (a rename from temp
  * could cross devices) and renames over `library/`.
  *
- * ponytail: the swap is atomic-enough, not transactional — between removing the
- * old `library/` and the rename there is a moment with neither. A reader mid-
- * click can retry; a crash leaves `library.tmp` for the next run to clear.
+ * ponytail: the swap is atomic-enough, not transactional. POSIX `rename` cannot
+ * replace a non-empty directory, so the old tree is removed first and there is a
+ * window with neither. The window is two metadata operations wide, and the
+ * expensive, failure-prone part (the copy) has already completed on the same
+ * filesystem by then — so the realistic loss is a process killed inside those
+ * microseconds, which leaves the directory absent rather than stale. A
+ * keep-a-backup dance would shrink that window without closing it (the same
+ * rename restriction applies) and buys recovery of a DERIVED tree: `library/` is
+ * gitignored, rebuilt by re-running this command, and the canonical items it
+ * renders are never touched. Readers retry; a crash leaves `library.tmp` for the
+ * next run to clear.
  */
 export function buildLocalLibrary({ root, collections, include, gitCommit = defaultGitCommit }) {
   const rootReal = fs.realpathSync(root);

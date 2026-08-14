@@ -151,8 +151,10 @@ node scripts/build-library.mjs --local --from "$PATH_UNDER_ROOT"
 node scripts/build-library.mjs --local --json --from "$PATH_UNDER_ROOT"
 ```
 
-- Rebuilds the whole catalog and atomically swaps it into `<root>/library/` —
-  generated output, never edited, never committed.
+- Rebuilds the whole catalog in a temporary tree and swaps it into
+  `<root>/library/` — generated output, never edited, never committed. A
+  failed build leaves the previous library untouched; re-running the command
+  is always the recovery.
 - First run on a root appends `/library/` + `/library.tmp/` to the content
   root's `.gitignore` and reports it — commit that line with the content
   (untracked build output would otherwise dirty the root and trip the deploy
