@@ -1184,9 +1184,10 @@ function acquireSwapLock(rootReal) {
     return null;
   };
 
-  // Two attempts: the second runs only after a stale lock was cleared, so a
-  // live holder is reported rather than spun on.
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  // Each pass either acquires, reports a live holder, or claims a dead one and
+  // retries the create. Three is enough for the only loop that exists: claim,
+  // then create (a lost claim race costs one extra pass).
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       fs.writeFileSync(lockPath, `${process.pid}\n`, { flag: 'wx' });
       return lockPath;
@@ -1211,7 +1212,26 @@ function acquireSwapLock(rootReal) {
           + '  re-run once it finishes; the two builds would otherwise overwrite each other.',
         );
       }
-      // Dead holder, or this pid recycled from a crashed run — take it over.
+
+      // A FOREIGN dead holder is reported, never taken over automatically.
+      // Every automatic takeover is inspect-then-remove, and the two steps
+      // cannot be made one: whether the removal is an unlink or a rename, the
+      // lock may have been replaced by another builder's LIVE lock in between,
+      // and removing that is precisely the overlap this lock exists to
+      // prevent — reached through its own recovery path. Failing closed costs
+      // one manual delete after a hard kill, and the message says so; the
+      // routine interruption (Ctrl-C) is handled by releasing on the signal
+      // instead, so it never gets here.
+      if (holder !== process.pid) {
+        throw new BuildError(
+          `a local library build lock names a process that is no longer running (pid ${holder})\n`
+          + `  lock: ${lockPath}\n`
+          + '  a build was killed before it could release it; delete that file and re-run.',
+        );
+      }
+      // This pid, recycled from a crashed run: at acquisition we cannot be the
+      // holder, and no other process can claim our pid, so this is the one
+      // takeover with no second party to race.
       fs.rmSync(lockPath, { force: true });
     }
   }
@@ -1231,6 +1251,17 @@ function releaseSwapLock(lockPath) {
   }
   fs.rmSync(lockPath, { force: true });
 }
+
+// ponytail: no SIGINT handler here, deliberately. The obvious reach is to
+// release the lock on Ctrl-C, since a foreign dead holder is never taken over
+// automatically — but this whole build is synchronous, so a signal cannot be
+// serviced until the event loop is free, which is after the build has already
+// finished and `finally` has released the lock. Measured: SIGINT 0.6s into a
+// 1.4s build leaves a COMPLETE library and no lock; the same kill with SIGKILL
+// leaves no library and a stale lock. A handler would therefore add
+// process-global side effects to a library call while changing nothing that
+// actually happens. Only a hard kill strands a lock, which is what the
+// acquire-time message is written for.
 
 /**
  * Build the browsable local library and swap it into `<root>/library/`.

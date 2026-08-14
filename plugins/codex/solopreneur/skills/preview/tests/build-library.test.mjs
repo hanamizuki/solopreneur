@@ -1249,15 +1249,21 @@ test('a live lock blocks a second build instead of corrupting the first', () => 
   fs.rmSync(path.join(root, 'library.lock'));
 });
 
-test('a lock left by a dead process does not block, and is cleared on success', () => {
+test('a lock naming a dead FOREIGN process is reported, not taken over', () => {
   const root = tmp();
   writeItem(root, 'active', 'a');
-  fs.writeFileSync(path.join(root, 'library.lock'), `${deadPid()}\n`);
+  const lock = path.join(root, 'library.lock');
+  fs.writeFileSync(lock, `${deadPid()}\n`);
 
-  localBuild(root);
-
-  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')));
-  assert.ok(!fs.existsSync(path.join(root, 'library.lock')), 'lock released after a clean build');
+  // Automatic takeover cannot be made atomic — inspect-then-remove can always
+  // remove a live lock that replaced the dead one — so this fails closed and
+  // names the file. The routine cause (Ctrl-C) is handled by the interrupt
+  // release instead, so it does not reach here.
+  assert.throws(() => localBuild(root), isBuildError(/no longer running/));
+  const message = (() => { try { localBuild(root); return ''; } catch (err) { return err.message; } })();
+  assert.match(message, /delete that file and re-run/);
+  assert.ok(message.includes(lock), 'the message names the lock to delete');
+  assert.ok(fs.existsSync(lock), 'the lock is left for the human to remove');
 });
 
 test('a lock naming this pid is taken over, not treated as a live holder', () => {

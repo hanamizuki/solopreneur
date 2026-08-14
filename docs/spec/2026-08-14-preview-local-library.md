@@ -91,12 +91,18 @@ staging build, with these differences:
   same swap paths and one can publish the other's half-copied staging tree
   while reporting success — a silently incomplete catalog, which is worse
   than either an error or a missing tree. A build that finds a live lock
-  fails with the holder's pid rather than waiting. A lock is taken over only
-  when its holder is demonstrably gone (or is this process, which cannot
-  hold a lock it is acquiring); a lock that names nobody identifiable is
-  reported rather than stolen, because the create-then-write window makes an
-  empty lock indistinguishable from a live one being taken. A build releases
-  only a lock that still names it.
+  fails with the holder's pid rather than waiting. **No foreign lock is ever
+  taken over automatically**: every takeover is inspect-then-remove, and
+  those two steps cannot be fused, so the lock may have been replaced by
+  another builder's live one in between — removing that would reintroduce
+  the overlap the lock exists to prevent, through its own recovery path. A
+  stale or unidentifiable lock is therefore reported, naming the file to
+  delete. The single exception is a lock naming this process, which at
+  acquisition cannot be a real holder and which no other process can claim.
+  A build releases only a lock that still names it. Because the build is
+  synchronous, an interrupt cannot be serviced mid-build — a Ctrl-C run
+  completes and releases normally (measured), so only a hard kill strands a
+  lock.
 - A build first completes any interrupted swap it finds — a backup with no
   library is restored before the new build runs, so a later failure cannot
   strand the root with neither.
