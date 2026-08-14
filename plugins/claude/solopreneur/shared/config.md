@@ -393,6 +393,14 @@ config read through the shell helpers in `config.sh`. This section describes
 `.solopreneur.json` (note the leading dot), a **different file** introduced for
 the preview Library.
 
+Preview's **library** delivery — the default — resolves this file for its
+content root, collections and include set, and writes a `preview.json`
+sidecar per item; the local build renders that same tree under
+`<root>/library/`. The explicit Claude Code Vercel workflow resolves the
+same file and publishes the same tree. Only **ephemeral** delivery (explicit
+temporary intent, or the fallback when no v2 config resolves) neither reads
+nor writes it and creates no sidecar.
+
 **The two coexist and neither reads the other.** Nothing in this section changes
 `solopreneur_repo_key`, `read_solopreneur_config`, `write_solopreneur_config` or
 `write_solopreneur_repo_config`; their cascade, their `| values` semantics and

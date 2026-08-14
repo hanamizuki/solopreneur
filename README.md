@@ -41,12 +41,14 @@ core subset plus the four specialist plugins' knowledge skills — no agents, no
 On Claude Code, installing any sub-plugin auto-pulls `solopreneur`. Requires Claude Code
 **≥ v2.1.110** for plugin dependency resolution.
 
-Codex currently publishes the compatible core subset: `autopilot`,
-`greenlight`, `handoff`, `merge-pr`, `perspective`, `plan-review`,
-`post-mortem`, and `specialist-review`. Unsupported skills stay out of the
-Codex package instead of appearing and failing later. The four specialist
-plugins also publish a Codex package holding their version-anchored knowledge
-skills — that is what `specialist-review` reads there.
+Codex currently publishes the compatible `solopreneur` core subset:
+`autopilot`, `greenlight`, `handoff`, `merge-pr`, `perspective`,
+`plan-review`, `post-mortem`, `preview`, and `specialist-review`; the
+specialist plugins publish their own vendored knowledge skills alongside it,
+which is what `specialist-review` reads there.
+`skills-compatibility.json` is the source of truth for what ships.
+Unsupported skills stay out of the Codex package instead of appearing and
+failing later.
 
 Codex V1 is intentionally a smaller, fail-closed surface:
 
@@ -59,10 +61,11 @@ Codex V1 is intentionally a smaller, fail-closed surface:
 | `$solopreneur:perspective` | Same ten perspectives. Name the one you want up front in `codex exec` — the menu needs a conversational surface. |
 | `$solopreneur:plan-review internal` | Technical and lean findings only; no outside review, adjudication, or write-back. |
 | `$solopreneur:post-mortem` | Same git archaeology and report. In `codex exec`, put the bug description in the prompt; the run stops at the printed report. |
+| `$solopreneur:preview` | Local delivery only — the `file://` Library and the single-file ephemeral mode. An explicit Vercel, online, cross-device, or external-sharing request fails closed before any file, config, network, or deployment action. |
 | `$solopreneur:specialist-review` | Same stack detection and review. No specialist agents exist on Codex yet, so every stack drops to a generic reviewer — reading that stack's knowledge skills when its plugin is installed (`marketer` and `designer` publish none), or reviewing inline when no subagent can be spawned. Every path names its degradation in a banner. |
 
 The skill descriptions below document the full Claude Code surface. Use the
-contracts above when running the eight published skills on Codex.
+contracts above when running these skills on Codex.
 
 > Migrating from a previous version? See [MIGRATION.md](./MIGRATION.md).
 > For per-release, per-plugin notes, see [CHANGELOG.md](./CHANGELOG.md).
@@ -96,7 +99,7 @@ skills: 15 product workflows plus merge and Codex-agent plumbing.
 | [`/plan-review`](./skills/solopreneur/plan-review/SKILL.md) | **Tech Lead.** Vets a spec, plan, or design doc in three stages — latest official docs + platform best practices, a leanness pass that cuts what the plan doesn't need, and an independent outside reviewer challenging it across 5 dimensions — then walks you through every finding. `internal` runs the first two stages only and reports findings without adjudication or write-back |
 | [`/worktree-handoff`](./skills/solopreneur/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
 | [`/handoff`](./skills/solopreneur/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). Also saved under `/tmp/handoff/`. No worktree |
-| [`/preview`](./skills/solopreneur/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into interactive HTML and publishes a **private Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments). Single-item **Share** requests deploy an isolated preview of one entry without changing the Library production URL. Legacy per-page deploy remains for compatibility |
+| [`/preview`](./skills/solopreneur/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into an interactive page in your private **Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments) — built locally by default and opened over `file://`, no deployment. Explicitly temporary work (or a repo with no Library config) gets one self-contained HTML file instead; explicit Vercel, online, cross-device, or external-sharing requests publish the same Library, or an isolated **Share**, on Claude Code. Codex supports both local modes and fails closed on Vercel |
 | [`/specialist-review`](./skills/solopreneur/specialist-review/SKILL.md) | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
 | [`/post-mortem`](./skills/solopreneur/post-mortem/SKILL.md) | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
 | [`/session-retro`](./skills/solopreneur/session-retro/SKILL.md) | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
@@ -135,6 +138,7 @@ Start them and walk away. They loop until the job is done.
 - **`git`**, **`gh`** (GitHub CLI), **`jq`**: required CLIs. Used across `/greenlight`, `/autopilot`, `/post-mortem`, `/todos-babysit`, and `scripts/sync-vendored.sh`; `jq` is also required by `codex-agents-bootstrap`.
 - **[Codex CLI](https://github.com/openai/codex)**: **required** for `codex-agents-bootstrap` and `/greenlight` uncommitted mode (the only path on `main` with uncommitted changes). Also used by `/plan-review` (stage 3, the external reviewer), `/greenlight` PR mode (one reviewer option), and `/naming` (multi-model candidate generation). The custom-agent bootstrap and delegation pilot is validated against Codex CLI 0.147.0.
 - **Python 3.9+**: **required by** `codex-agents-bootstrap` to validate agent TOML before installation. Its fixed Tomli 2.4.1 parser is bundled, so no `pip` install or network access is required. Other workflows may also invoke `python3`, but do not establish this bootstrap-specific minimum version.
+- **Node.js 20+**: **required by** `/preview` to resolve delivery mode and reserve a collision-safe local output path before writing HTML.
 - **[superpowers](https://github.com/obra/superpowers)** plugin: strongly recommended. `/greenlight` and `/specialist-review` use `superpowers:requesting-code-review` and `receiving-code-review` for the review framework. Graceful fallback if absent.
 - **[Ponytail](https://github.com/DietrichGebert/ponytail)** plugin: optional. `/greenlight` uses `ponytail:ponytail-review` for over-engineering, dead-code, YAGNI, and simplification findings. The current runtime skips it when unavailable.
 - **[context7](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/context7)** MCP: strongly recommended. Used by `/plan-review`, `/specialist-review`, and every stack agent (ios-dev, android-dev, ai-engineer, neo4j-dev, designer) for current official docs. Graceful skip if absent.
@@ -144,7 +148,7 @@ Start them and walk away. They loop until the job is done.
 - **[Claude CLI](https://code.claude.com/docs/en/headless)**: optional on Claude Code and required on Codex for Greenlight's independent final gate. Cross-host calls use the Claude profile matching the active Codex config and never guess another profile.
 - **[Gemini Code Assist](https://github.com/apps/gemini-code-assist)**: optional. `/greenlight` PR-mode reviewer (`/gemini review`), offered only when activity detection finds it acting on the repo. Consumer Code Assist stopped GitHub code review on 2026-07-17; **enterprise is unaffected**. For post-commit review, `/greenlight` uses the Antigravity CLI (`agy`) as its Gemini-family reviewer.
 - **[CodeRabbit](https://coderabbit.ai)**: optional. `/greenlight` can trigger it with `@coderabbitai review` and also collects its automatic PR review activity.
-- **[Vercel CLI](https://vercel.com/docs/cli)**: optional. `/preview` publishes a private Library (and optional per-item Share deployments) to a Vercel project when present; first-run setup provisions a single private target. Gracefully degrades to a local `open` of the HTML when absent.
+- **[Vercel CLI](https://vercel.com/docs/cli)**: optional. `/preview` needs it only when a Claude Code user explicitly requests Vercel, online, cross-device, or external-sharing delivery. Local delivery is the default and needs no deployment tooling: the library mode reads the same path-scoped Preview config and builds a `file://` catalog, and the ephemeral single-file mode needs no config at all. The browser opens only when explicitly requested.
 
 ---
 
@@ -293,7 +297,7 @@ Idea
  │   └─ /greenlight ────────── External review loop
  │       triggers: Codex bot · Gemini bot (when active) · CodeRabbit
  │
- ├─ /preview ──────────── Deploy interactive HTML for human review
+ ├─ /preview ──────────── Create local HTML; deploy only when explicit
  │
  ├─ /post-mortem ──────── Trace the root cause when something breaks
  ├─ /session-retro ────── Capture lessons from this session

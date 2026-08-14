@@ -914,6 +914,80 @@
       },
       "optionalEnhancements": []
     },
+    "solopreneur:preview": {
+      "support": {
+        "claude-code": "full",
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
+      },
+      "sharedContract": "skills/solopreneur/preview/SKILL.md",
+      "platformResources": [
+        "skills/solopreneur/preview/SKILL.md",
+        "skills/solopreneur/preview/scripts/resolve-delivery.mjs",
+        "skills/solopreneur/preview/scripts/reserve-local-output.mjs",
+        "skills/solopreneur/preview/scripts/config-resolve.mjs",
+        "skills/solopreneur/preview/scripts/build-library.mjs",
+        "skills/solopreneur/preview/scripts/resolve-provenance.mjs",
+        "skills/solopreneur/preview/scripts/preview-schema.json",
+        "skills/solopreneur/preview/assets/preview-shell.js",
+        "skills/solopreneur/preview/assets/comment-overlay.js",
+        "skills/solopreneur/preview/assets/library-index.html",
+        "src/solopreneur/shared/config.schema.json"
+      ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-08-14-preview-local-library.md",
+        "codex-tui": "docs/spec/2026-08-14-preview-local-library.md",
+        "codex-app": "docs/spec/2026-08-14-preview-local-library.md"
+      },
+      "acceptance": {
+        "claude-code": [
+          "docs/spec/2026-08-14-preview-local-library.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a2-claude-code"
+        ],
+        "codex-exec": [
+          "docs/spec/2026-08-14-preview-local-library.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a3-codex-exec--a5-codex-app-deferred",
+          "docs/spec/2026-08-12-preview-local-first.md#a3-codex-exec"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-08-14-preview-local-library.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a4-codex-tui"
+        ],
+        "codex-app": [
+          "docs/spec/2026-08-14-preview-local-library.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a3-codex-exec--a5-codex-app-deferred",
+          "docs/spec/2026-08-12-preview-local-first.md#a5-codex-app"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "claude-code": [
+          "node>=20",
+          "local-filesystem-write-access"
+        ],
+        "codex-exec": [
+          "node>=20",
+          "local-filesystem-write-access"
+        ],
+        "codex-tui": [
+          "node>=20",
+          "local-filesystem-write-access"
+        ],
+        "codex-app": [
+          "node>=20",
+          "local-filesystem-write-access"
+        ]
+      },
+      "optionalEnhancements": [
+        "browser-open",
+        "vercel-auth",
+        "vercel-cli"
+      ]
+    },
     "solopreneur:specialist-review": {
       "support": {
         "codex-exec": "degraded",
@@ -971,8 +1045,13 @@
   },
   "codexHostGuards": {
     "solopreneur:mvp": "skills/solopreneur/mvp/SKILL.md",
-    "solopreneur:preview": "skills/solopreneur/preview/SKILL.md",
     "solopreneur:todos-babysit": "skills/solopreneur/todos-babysit/SKILL.md",
     "solopreneur:worktree-handoff": "skills/solopreneur/worktree-handoff/SKILL.md"
+  },
+  "codexModeGates": {
+    "solopreneur:preview": {
+      "entrypoint": "skills/solopreneur/preview/SKILL.md",
+      "resolver": "skills/solopreneur/preview/scripts/resolve-delivery.mjs"
+    }
   }
 }

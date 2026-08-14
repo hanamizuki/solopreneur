@@ -76,7 +76,7 @@ generated_skills="$(
   find "$FIXTURE_ROOT/plugins/codex/solopreneur/skills" \
     -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
 )"
-[[ "$generated_skills" == $'autopilot\nfilter-canary\ngreenlight\nhandoff\nmerge-pr\nperspective\nplan-review\npost-mortem\nspecialist-review' ]]
+[[ "$generated_skills" == $'autopilot\nfilter-canary\ngreenlight\nhandoff\nmerge-pr\nperspective\nplan-review\npost-mortem\npreview\nspecialist-review' ]]
 [[ -f "$FIXTURE_ROOT/plugins/codex/solopreneur/skills/autopilot/SKILL.md" ]]
 
 # The four specialist plugins publish a knowledge subset, so each generated tree

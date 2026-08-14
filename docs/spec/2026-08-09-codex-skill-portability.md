@@ -1,7 +1,8 @@
 # Codex Skill Portability Architecture
 
 **Status:** Approved design; rollout rows 3–9 complete; Greenlight, Plan Review,
-Merge PR, and Autopilot V1 are included as degraded on Codex exec, TUI, and App
+Merge PR, Autopilot V1, and Preview are included as degraded on Codex exec,
+TUI, and App
 
 **Date:** 2026-08-09
 
@@ -12,7 +13,8 @@ plugins
 [pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md),
 [Codex Greenlight port](./2026-08-10-codex-greenlight-port.md),
 [Codex Autopilot dependency closure](./2026-08-11-codex-autopilot-dependencies.md),
-and [Codex Autopilot V1](./2026-08-12-codex-autopilot-v1.md)
+[Codex Autopilot V1](./2026-08-12-codex-autopilot-v1.md), and
+[Preview local-first delivery](./2026-08-12-preview-local-first.md)
 
 The related specs remain authoritative for agent-distribution status.
 Final-byte acceptance SHA `c8bae2710051da659afad879c226e202ad3368d4`
@@ -521,11 +523,12 @@ orchestrator uses a generic Codex worker with the same self-contained brief and
 acceptance contract.
 
 The agent-distribution and filtered-publication prerequisites are complete.
-The registry includes degraded Greenlight, Plan Review, Merge PR, and Autopilot
-V1 on exec, TUI, and App; reviewed-head binding remains in the shared backlog
-and does not block Codex publication. Autopilot V1 is accepted, so the next core
-slice is row 10: Greenlight's remaining modes followed by Autopilot multi-PR
-waves.
+The registry includes degraded Greenlight, Plan Review, Merge PR, Autopilot V1,
+and local-only Preview on exec, TUI, and App; reviewed-head binding remains in
+the shared backlog and does not block Codex publication. Preview's explicit
+Vercel mode fails closed on every Codex surface. Autopilot V1 is accepted, so
+the next orchestration slice is row 10: Greenlight's remaining modes followed
+by Autopilot multi-PR waves.
 Marketer portability seams and remaining agent adapters are not on the core
 critical path; when resumed, they still roll out one plugin at a time after
 that plugin's skills have complete registry entries.
