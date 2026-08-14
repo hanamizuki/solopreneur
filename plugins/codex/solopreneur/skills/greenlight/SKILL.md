@@ -1409,12 +1409,13 @@ otherwise. On a halt, report **blocked** and reference the `halts/` payload path
 
 **Dispatch the selected subagents in parallel (`run_in_background: true`), each running a review skill. All report-only — no code changes.**
 
-On Codex, run the selected reviewer skills in this thread instead:
-`run_in_background` is a Claude Code parameter, and at M size `/specialist-review`
-is usually the only row that resolves there, so there is nothing to parallelise.
-The rows that do not resolve still get their unavailable line — skipping the
-attempt does not skip the report. The review still reaches a child thread;
-that skill spawns its own per-stack reviewers.
+On Codex, ignore `run_in_background` — it is a Claude Code parameter. Run the
+selected reviewer skills however that host runs work: in this thread, or one
+`spawn_agent` child per reviewer. At M size `/specialist-review` is usually the
+only row that resolves there, so there is nothing to parallelise either way, and
+the review reaches a child thread regardless because that skill spawns its own
+per-stack reviewers. The rows that do not resolve still get their unavailable
+line — skipping the attempt does not skip the report.
 
 | Subagent | Skill | Source | Focus |
 |----------|-------|--------|-------|
