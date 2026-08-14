@@ -7,7 +7,7 @@ description: Generates, optimizes, and validates Cypher 25 queries for Neo4j 202
   Does NOT handle driver migration or API changes — use neo4j-migration-skill.
   Does NOT cover DB administration or server ops — use neo4j-cli-tools-skill.
 compatibility: Neo4j >= 2025.01 (safe baseline); Cypher 25
-version: 1.0.1
+version: 1.0.19
 ---
 
 ## When to Use
@@ -237,6 +237,14 @@ MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
 RETURN a.name, d.name, count(*) AS collaborations
 ORDER BY collaborations DESC
 ```
+Explicit `GROUP BY` [2026.07, Cypher 25] states grouping keys — GQL-aligned alternative to implicit grouping:
+```cypher
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
+RETURN a.name, d.name, count(*) AS collaborations GROUP BY a.name, d.name
+ORDER BY collaborations DESC
+```
+Subclause expressions (`ORDER BY`/`WHERE`) referencing projection items more complex than a variable or property access are deprecated [2026.07] — alias the expression in `RETURN`/`WITH`, then reference the alias.
+
 `count(n)` counts non-null; `count(*)` counts rows including nulls. `collect(DISTINCT expr)` deduplicates.
 `count()` is faster than `size(collect())` — count() reads the internal store; collect() builds a list first.
 
