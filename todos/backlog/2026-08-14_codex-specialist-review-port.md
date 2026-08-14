@@ -247,3 +247,23 @@ invoke。所以每支要各自判定 `full` / `degraded`，會動遠端或本機
 - ios-dev（1）：`ios-patterns`
 - ai-engineer（1）：`senior-prompt-engineer`
 - neo4j-dev（3）：`neo4j-cypher`、`neo4j-migration`、`neo4j-cli-tools`
+
+## Phase 1 執行結果（2026-08-14）→ PR #188
+
+**實際發出 11 支**，非 13。Codex marketplace 1 個 plugin → 5 個，included 7 → 18。
+spec：`docs/spec/2026-08-14-codex-specialist-skills.md`（A1–A4 全過，
+Codex CLI 0.147.0、拋棄式 CODEX_HOME、受測的是生成包）。
+
+- `r8-analyzer` 的 PR #178 疑慮**已解**：現行 SKILL.md 不引用任何 script，純知識。
+- 少掉的 2 支是 `neo4j-migration` / `neo4j-cli-tools`——**不是判斷改變，是踩到缺陷**：
+  它們裝得上 Codex 但永遠不會被列出（`skills/list` 靜默略過）。根因是 description
+  多行 plain YAML scalar 的續行含 `": "`，嚴格解析當成巢狀 mapping key。Claude
+  loader 寬鬆所以一直沒人發現。全 repo 只有 3 支這樣（第三支 `ai-app-templates`
+  是自家的、沒發 Codex）。詳見 `todos/backlog/2026-08-14_codex-frontmatter-yaml-gate.md`。
+- 已加閘門：validator 現在拒絕發佈 frontmatter 解不開的 skill（stdlib 實作、
+  與 PyYAML 在 103 支上交叉比對一致、做過負向測試）。
+- 新增已知限制：裝上這些 plugin 後 Codex 會截斷 skill description（context
+  budget），全部仍可列出可讀，但這是「發越多、discovery 品質越差」的實際代價——
+  之後要擴大 include set 前值得先秤。
+
+**下一步**：Phase 2（specialist-review 的 Codex profile）現在沒有阻擋了。
