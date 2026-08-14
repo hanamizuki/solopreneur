@@ -1,11 +1,9 @@
 ai-engineer:ai-app-templates
-ai-engineer:langgraph
 ai-engineer:senior-prompt-engineer
 android-dev:accessibility
 android-dev:agp-9-upgrade
 android-dev:android-patterns
 android-dev:architecture
-android-dev:compose-navigation
 android-dev:compose-performance-audit
 android-dev:compose-ui
 android-dev:coroutines
@@ -28,7 +26,6 @@ android-dev:gplay-testers-orchestration
 android-dev:gplay-user-management
 android-dev:gplay-vitals-monitoring
 android-dev:gradle-build-performance
-android-dev:gradle-logic
 android-dev:jetpack-compose
 android-dev:kotlin-concurrency-expert
 android-dev:migrate-xml-views-to-jetpack-compose

@@ -37,4 +37,3 @@ permissions — they do not need to be listed here.
 ## Related skills
 
 - `ai-engineer:ai-engineering` — broader AI system design and provider tradeoffs.
-- `ai-engineer:langgraph` — when the shape needs to become a multi-step graph workflow.

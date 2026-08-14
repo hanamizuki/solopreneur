@@ -16,7 +16,7 @@ CODEX_SURFACES = SURFACES[1:]
 STATUSES = {"full", "degraded", "unsupported", "legacy"}
 SHAPES = {"shared", "shared_with_seams", "native_engines"}
 PUBLICATION = {"include", "exclude"}
-LEGACY_BASELINE_SHA256 = "4e2c8a00de630db33fceae8abe2e41a14da63d4ddb0118bb84e60e7fd777ca61"
+LEGACY_BASELINE_SHA256 = "65f0701418237730a2cd1fbe912b475ea8d83c848ec14ec50d24f58668cf60df"
 REQUIRED_GUARDS = {
     "solopreneur:mvp",
     "solopreneur:preview",
