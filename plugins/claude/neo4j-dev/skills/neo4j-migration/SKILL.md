@@ -9,7 +9,7 @@ description: Migrates Neo4j driver code and Cypher queries from older versions (
   Does NOT cover DB administration or server ops — use neo4j-cli-tools-skill.
   Does NOT provision new Neo4j instances — use neo4j-getting-started-skill.
 allowed-tools: WebFetch Bash
-version: 1.0.1
+version: 1.0.8
 ---
 
 ## When to Use

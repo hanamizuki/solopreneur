@@ -9,7 +9,7 @@ description: Use when working with Neo4j command-line tools — neo4j-cli (moder
   Does NOT cover driver upgrades — use neo4j-migration-skill.
   Does NOT cover full MCP editor configuration — use neo4j-mcp-skill.
 allowed-tools: WebFetch, Bash
-version: 1.0.1
+version: 1.0.12
 ---
 
 # Neo4j CLI Tools skill

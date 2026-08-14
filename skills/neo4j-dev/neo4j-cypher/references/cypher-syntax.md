@@ -271,6 +271,7 @@ NONE(x IN list WHERE x > 0)
 SINGLE(x IN list WHERE x > 0)
 
 size(list)
+cardinality(x)                              // MAP key count / LIST element count / PATH nodes+rels count [2026.07, Cypher 25]
 head(list) / tail(list) / last(list)
 list[0..3]                                  // slice
 list + [newElement]
