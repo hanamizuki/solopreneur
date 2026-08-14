@@ -149,3 +149,85 @@ invoke。所以每支要各自判定 `full` / `degraded`，會動遠端或本機
   stack 偵測表才能完整覆蓋（`*.css` → designer、`docs/gtm/` → marketer）。
 - `r8-analyzer` 引用的 script 曾在 PR #178 出過「upstream 說要跑但沒 vendored」的
   問題，發之前要確認現在是完整的。
+
+## Phase 1 grading 結果（2026-08-14，33 支全數評完）
+
+標準沿用：**模型不可靠回憶的資訊才算數**（版本 pin、新 API 文件、裝置/專案 bug 機制）；
+通用 best-practice 出局。以下是建議清單，正式裁決待 Hana。
+
+### 建議發佈（17 支）
+
+- **android-dev（12）**
+  - Tier B：`agp-9-upgrade`、`navigation-3`、`edge-to-edge`、`viewmodel`、
+    `r8-analyzer`（發前先驗 PR #178 的 script 完整性）、
+    `play-billing-library-version-upgrade`、`migrate-xml-views-to-jetpack-compose`
+  - Tier C：`android-patterns`（逐檔定案見下）
+  - Tier D（程序價值，進不進 V1 待裁決）：`compose-performance-audit`、
+    `kotlin-concurrency-expert`、`gradle-build-performance`、`testing`
+- **ios-dev（1）**：`ios-patterns`（C；iOS 18 keyboard-toolbar 首次 focus bug ＋
+  safeAreaInset workaround、`JSONDecoder .iso8601` 不吃小數秒的 flexible decoder、
+  Form/List 展開 reflow fix、zh-Hant 日期 template 規則）
+- **ai-engineer（1）**：`senior-prompt-engineer`（D；3 支 stdlib scripts 只讀
+  prompt 檔、寫本機 JSON，無網路/DB）
+- **neo4j-dev（3）**：`neo4j-cypher`（B，全場最強：2025.01–2026.06 version gates、
+  DISJOINT BY/SEARCH/ACYCLIC 含 fallback、neo4j#13519）、`neo4j-migration`（B，
+  driver 5→6 五語言 removed-API 表、版本相容矩陣）、`neo4j-cli-tools`（B，
+  neo4j-cli 是 2025/26 新工具鏈；破壞性指令自帶 AGENT GATE）
+
+### 不發（16 支）
+
+- **Tier A 模型已知（9）**：android `compose-ui`、`architecture`、`data-layer`、
+  `accessibility`、`jetpack-compose`、`mobile-android-design`、`coroutines`、
+  `xml-to-compose-migration`；ios `apple-design`（WWDC 原則的 **web 平台**譯本
+  ——CSS/Pointer Events/Framer Motion，對 Swift review 錯域；若要留位置應屬 designer）
+- **有害（3）**：android `gradle-logic`、`compose-navigation`（先前已判）；
+  **新增 ai-engineer `langgraph`**——兩處教「`interrupt()` 不回傳值」，官方 v1 文件
+  明文相反（"The resume payload becomes the return value of the interrupt function"，
+  docs.langchain.com/oss/python/langgraph/interrupts；canonical 範例就是
+  `answer = interrupt(...)`）；「NEVER ADD A CHECKPOINTER」無條件化會弄壞非
+  Platform 部署的 HITL（interrupt 需要 checkpointer，官方範例 compile 時掛
+  InMemorySaver）；model pin 全是 2024 舊款（claude-3-5-sonnet-20241022 / gpt-4o /
+  gemini-1.5-pro）。另 provenance 未追蹤：2026-04-26 PR #11 bundle 進來、無
+  `_VENDOR.md`、不在 manifest。
+- **License 阻擋（1）**：`neo4j-cypher-guide`——upstream tomasonjo/blogs 無 LICENSE
+  （manifest 記 Unspecified），不可再發佈；內容亦被 `neo4j-cypher` 全面涵蓋
+  （elementId/QPP/COLLECT subqueries/null-sort，第 5 組 overlap）
+- **範本/框架類，review 用不到（3）**：`ios-app-templates`、`ai-app-templates`
+  （in-house scaffold catalog，同 asc-*/gplay-* 的排除理由；Claude 端照留）、
+  `iphone-apps`（taches 的 interactive intake 框架＋約 9,500 行 curriculum，19 個
+  ref 有 9 個零版本錨點，iOS 26 內容太稀薄；若之後要 iOS 版本知識，抽 delta 進
+  `ios-patterns` 比整包發划算）
+
+### android-patterns 逐檔定案（9 refs：留 5 砍 4）
+
+- 留：`bottomsheet-scroll`、`date-format-localization`（先前已判）、
+  `swipe-to-dismiss-transparent`（讀 dismissDirection 的誘人錯解首幀閃爍——機制級）、
+  `compose-preview-overview`（Vico 2.1.0+ pin、discussion #795、Paparazzi 下
+  runBlocking deadlock caveat）、`compose-preview-debugging`（quirk 集：
+  LocalWindowInfo=0、Vico 拒空 series、Layoutlib 中 snapshotFlow 永久 suspend）
+- 砍：`compose-ripple-clipping`（先前已判）、`compose-preview-solutions`
+  （internal-implementation 是通用 pattern＋大量專案碼；其 quirk 已在他檔）、
+  `compose-preview-charts`（純通用 preview best practice）、`scaffold-bottom-nav`
+  （inset 消耗是文件化 API 語義；只有「sheet 高度 >~85% 觸發全螢幕動畫」值得
+  救回 SKILL.md 一行）
+- **修正先前判斷**：「9 refs 全無版本錨點」不成立——preview 三檔有 Vico
+  2.1.0/2.2.1 pin 與 issue 連結。真正無錨點的是 bottomsheet-scroll /
+  date-format / scaffold / swipe 四檔，其 Compose/M3 版本仍只有 Hana 能補。
+
+### Side-effect verdicts（handoff 指定要補的）
+
+| skill | scripts | mutating fence | 判定 |
+|---|---|---|---|
+| `neo4j-cypher` | `define_schema.py`/`import_neo4j_schema.py` 離線；`generate_schema.py` 連 live DB 但唯讀（無 CREATE/MERGE/DELETE，單一 `execute_query` 做 introspection） | 教學含寫入語法；SKILL.md 自帶 write gate（EXPLAIN→等確認） | 可發 |
+| `neo4j-cli-tools` | 無 | `neo4j-admin restore`/`load` 破壞性；文內已有 AGENT GATE ＋ `--rw` write gate | 可發，邊界已標 |
+| `senior-prompt-engineer` | 3 支 stdlib，本機讀寫而已 | 無 | 可發 |
+| `iphone-apps` | 無 | xcodebuild/xcrun/simctl（本機 build） | 已不發，moot |
+
+### 附帶事實
+
+- PR #179 只動 `_VENDOR.md` sync metadata，與 skills-compatibility 式發佈不衝突；
+  只有 Claude 端真刪 android skill 目錄才會撞它。
+- 待 Hana 裁決：(1) 4 支 D-tier 進不進 V1（17 vs 13）；(2) 5 組 overlap 正式定案
+  （本 grading 隱含選「一組留一支」）；(3) Claude 端要不要同步清有害 3 支——
+  `gradle-logic`/`compose-navigation`/`langgraph` 現在就在誤導 Claude session；
+  (4) designer/marketer 進不進 Phase 1；(5) PR #182 先合否。
