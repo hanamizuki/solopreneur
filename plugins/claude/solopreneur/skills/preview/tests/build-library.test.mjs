@@ -24,7 +24,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildLibrary, findInjectionPoint, chromeInject, projectDirectory, BuildError } from '../scripts/build-library.mjs';
+import {
+  buildLibrary, buildLocalLibrary, ensureLibraryIgnored,
+  findInjectionPoint, chromeInject, projectDirectory, BuildError,
+} from '../scripts/build-library.mjs';
 
 const SCRIPT = path.join(
   path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'build-library.mjs',
@@ -868,12 +871,24 @@ test('a preview.json rewritten between scan and copy aborts', () => {
 test('a failed build leaves no staging tree behind', () => {
   const root = tmp();
   const itemDir = writeItem(root, 'active', 'a');
-  const count = () => fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('preview-build-')).length;
-  const before = count();
-  assert.throws(() => build(root, ['active'], {
-    hooks: { afterFingerprint: () => fs.writeFileSync(path.join(itemDir, 'index.html'), 'CHANGED') },
-  }), BuildError);
-  assert.equal(count(), before, 'the aborted build must remove its own staging dir');
+  // This counts staging dirs by name, so it needs a temp dir nobody else is
+  // building into: `node --test` runs test FILES in parallel processes that all
+  // stage under the shared os.tmpdir(), and a sibling's dir appearing between
+  // the two counts would fail an otherwise-correct build. os.tmpdir() re-reads
+  // TMPDIR on every call, so pointing it at a private directory is enough.
+  const previousTmpDir = process.env.TMPDIR;
+  process.env.TMPDIR = tmp();
+  try {
+    const count = () => fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('preview-build-')).length;
+    const before = count();
+    assert.throws(() => build(root, ['active'], {
+      hooks: { afterFingerprint: () => fs.writeFileSync(path.join(itemDir, 'index.html'), 'CHANGED') },
+    }), BuildError);
+    assert.equal(count(), before, 'the aborted build must remove its own staging dir');
+  } finally {
+    if (previousTmpDir === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = previousTmpDir;
+  }
 });
 
 // --- collections, size report, document-level fields ------------------------
@@ -1029,4 +1044,299 @@ test('the CLI prints usage for --help and exits 0', () => {
   const res = runCli(['--help']);
   assert.equal(res.status, 0);
   assert.match(res.stdout, /usage:/);
+});
+
+// --- local library (file://) -------------------------------------------------
+
+function localBuild(root, include = ['active', 'archive']) {
+  return buildLocalLibrary({ root, collections: COLLECTIONS, include, gitCommit: () => null });
+}
+const readLocal = (root, ...parts) => fs.readFileSync(path.join(root, 'library', ...parts), 'utf8');
+
+test('buildLocalLibrary swaps a complete file:// tree into <root>/library/', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  writeItem(root, 'archive', 'b');
+
+  const res = localBuild(root);
+
+  assert.equal(res.libraryDir, path.join(root, 'library'));
+  for (const rel of [
+    ['index.html'], ['directory.json'],
+    ['assets', 'preview-shell.js'], ['assets', 'comment-overlay.js'], ['assets', 'directory.js'],
+    ['p', 'a', 'index.html'], ['p', 'b', 'index.html'],
+  ]) assert.ok(fs.existsSync(path.join(res.libraryDir, ...rel)), rel.join('/'));
+  assert.deepEqual(res.directory.items.map((it) => it.id).sort(), ['a', 'b']);
+  assert.ok(!fs.existsSync(path.join(root, 'library.tmp')), 'no swap residue');
+  assert.ok(!fs.existsSync(path.join(root, 'library.bak')), 'backup cleared after the swap');
+});
+
+test('local entry pages carry relative chrome and pre-load the catalog global', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', {
+    files: { 'index.html': '<body>a<script src="./comment-overlay.js"></script></body>' },
+  });
+
+  localBuild(root);
+  const page = readLocal(root, 'p', 'a', 'index.html');
+
+  assert.match(page, /<script src="\.\.\/\.\.\/assets\/comment-overlay\.js" data-preview-id="a">/);
+  assert.match(page, /<script src="\.\.\/\.\.\/assets\/directory\.js"><\/script>/);
+  assert.match(page, /<script src="\.\.\/\.\.\/assets\/preview-shell\.js"><\/script>/);
+  assert.ok(!page.includes('"/assets/'), 'no absolute asset refs under file://');
+  assert.ok(
+    page.indexOf('assets/directory.js') < page.indexOf('assets/preview-shell.js'),
+    'the catalog global must load before the shell reads it',
+  );
+});
+
+test('assets/directory.js carries exactly the directory.json catalog', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', { over: { title: 'Angle <br>ackets & spice' } });
+
+  localBuild(root);
+  const script = readLocal(root, 'assets', 'directory.js');
+
+  const prefix = 'window.__previewDirectory = ';
+  assert.ok(script.startsWith(prefix), 'stable global assignment shape');
+  const parsed = JSON.parse(script.slice(prefix.length).replace(/;\n$/, ''));
+  assert.deepEqual(parsed, JSON.parse(readLocal(root, 'directory.json')));
+  assert.equal(parsed.items[0].title, 'Angle <br>ackets & spice');
+  assert.ok(!script.includes('<'), 'script-context escapes stay applied');
+});
+
+test('the local build appends the two ignore rules once, preserving existing content', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules'); // no trailing newline
+
+  const first = localBuild(root);
+  assert.deepEqual(first.ignoreRulesAdded, ['/library/', '/library.*']);
+  assert.equal(
+    fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
+    'node_modules\n/library/\n/library.*\n',
+  );
+
+  const second = localBuild(root);
+  assert.deepEqual(second.ignoreRulesAdded, []);
+  assert.equal(
+    fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
+    'node_modules\n/library/\n/library.*\n',
+  );
+});
+
+test('ensureLibraryIgnored creates a fresh .gitignore when none exists', () => {
+  const root = tmp();
+  assert.deepEqual(ensureLibraryIgnored(root), ['/library/', '/library.*']);
+  assert.equal(
+    fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
+    '/library/\n/library.*\n',
+  );
+});
+
+test('a rebuild replaces the previous library tree instead of merging into it', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  fs.writeFileSync(path.join(root, 'library', 'stale.txt'), 'stale');
+
+  localBuild(root);
+
+  assert.ok(!fs.existsSync(path.join(root, 'library', 'stale.txt')), 'swap, not merge');
+  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')));
+});
+
+test('a failed rebuild leaves the previous library intact', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  const before = localBuild(root);
+  assert.equal(before.directory.items.length, 1);
+
+  writeItem(root, 'active', 'broken', { rawMeta: '{not json' });
+  assert.throws(() => localBuild(root), isBuildError(/malformed JSON/));
+
+  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')), 'old tree survives');
+  assert.ok(!fs.existsSync(path.join(root, 'library', 'p', 'broken')));
+  assert.ok(!fs.existsSync(path.join(root, 'library.tmp')));
+});
+
+test('two local builds produce identical entry pages and catalog rows', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  const firstPage = readLocal(root, 'p', 'a', 'index.html');
+  const firstItems = JSON.parse(readLocal(root, 'directory.json')).items;
+
+  localBuild(root);
+
+  assert.equal(readLocal(root, 'p', 'a', 'index.html'), firstPage);
+  assert.deepEqual(JSON.parse(readLocal(root, 'directory.json')).items, firstItems);
+});
+
+/**
+ * Run the BUILT library home's inline script against a minimal DOM + a
+ * `location` stub, and return every anchor href it produced.
+ *
+ * The home page's `row()` is the other half of the file:// link contract
+ * (`sidebarRow` is covered in preview-shell-local-boot.test.mjs), and it is the
+ * entry point library delivery hands the user — a regression to an absolute
+ * `/p/<id>/` sends every card to the filesystem root under file://. Executing
+ * the generated page is what catches that; asserting on its source text would
+ * pass on any string that merely mentions the right path.
+ */
+function renderBuiltIndex(root, protocol) {
+  const html = readLocal(root, 'index.html');
+  const open = html.lastIndexOf('<script>');
+  const script = html.slice(open + '<script>'.length, html.indexOf('</script>', open));
+  const island = html.slice(
+    html.indexOf('>', html.indexOf('<script id="directory-data"')) + 1,
+    html.indexOf('</script>', html.indexOf('<script id="directory-data"')),
+  );
+
+  const created = [];
+  const make = () => {
+    const node = {
+      children: [], className: '', textContent: '', href: '', title: '',
+      appendChild(child) { this.children.push(child); return child; },
+      setAttribute() {},
+    };
+    created.push(node);
+    return node;
+  };
+  const byId = new Map([['directory-data', { ...make(), textContent: island }]]);
+  for (const id of ['active-list', 'archive-list', 'active-count', 'archive-count', 'page-footer']) {
+    byId.set(id, make());
+  }
+  const document = { getElementById: (id) => byId.get(id), createElement: () => make() };
+
+  // eslint-disable-next-line no-new-func -- running the shipped page is the point
+  new Function('document', 'location', script)(document, { protocol });
+  return created.filter((n) => n.href).map((n) => n.href);
+}
+
+test('library home cards link relatively under file://, absolutely on a deployed origin', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  writeItem(root, 'archive', 'b');
+  localBuild(root);
+
+  assert.deepEqual(renderBuiltIndex(root, 'file:').sort(), ['p/a/index.html', 'p/b/index.html']);
+  assert.deepEqual(renderBuiltIndex(root, 'https:').sort(), ['/p/a/', '/p/b/']);
+});
+
+/** A pid that is certainly not running: a child spawned and already reaped. */
+function deadPid() {
+  const { pid } = spawnSync(process.execPath, ['-e', '0']);
+  assert.ok(Number.isInteger(pid), 'the probe child must report a pid');
+  return pid;
+}
+
+test('a live lock blocks a second build instead of corrupting the first', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  const before = readLocal(root, 'directory.json');
+
+  // The parent process is alive and is NOT this process, so it stands in for a
+  // concurrent builder. (This process's own pid is deliberately treated as a
+  // recycled-pid takeover instead — see acquireSwapLock.)
+  fs.writeFileSync(path.join(root, 'library.lock'), `${process.ppid}\n`);
+  assert.throws(() => localBuild(root), isBuildError(/another local library build is running/));
+
+  assert.equal(readLocal(root, 'directory.json'), before, 'the live library is untouched');
+  assert.ok(!fs.existsSync(path.join(root, 'library.bak')), 'no half-finished swap');
+  assert.ok(fs.existsSync(path.join(root, 'library.lock')), 'the holder keeps its lock');
+  fs.rmSync(path.join(root, 'library.lock'));
+});
+
+test('a lock naming a dead FOREIGN process is reported, not taken over', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  const lock = path.join(root, 'library.lock');
+  fs.writeFileSync(lock, `${deadPid()}\n`);
+
+  // Automatic takeover cannot be made atomic — inspect-then-remove can always
+  // remove a live lock that replaced the dead one — so this fails closed and
+  // names the file. The routine cause (Ctrl-C) is handled by the interrupt
+  // release instead, so it does not reach here.
+  assert.throws(() => localBuild(root), isBuildError(/no longer running/));
+  const message = (() => { try { localBuild(root); return ''; } catch (err) { return err.message; } })();
+  assert.match(message, /delete that file and re-run/);
+  assert.ok(message.includes(lock), 'the message names the lock to delete');
+  assert.ok(fs.existsSync(lock), 'the lock is left for the human to remove');
+});
+
+test('a lock naming this pid is taken over, not treated as a live holder', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  // Only reachable when the OS recycled a crashed run's pid onto this process:
+  // at acquisition we demonstrably do not hold the lock, so blocking on it
+  // would deadlock the root until someone deleted the file by hand.
+  fs.writeFileSync(path.join(root, 'library.lock'), `${process.pid}\n`);
+
+  localBuild(root);
+
+  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')));
+  assert.ok(!fs.existsSync(path.join(root, 'library.lock')));
+});
+
+test('an unidentifiable lock is reported, never stolen', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  // The create-then-write window leaves exactly this: a lock that exists and
+  // names nobody. Stealing it would let two builds run at once.
+  fs.writeFileSync(path.join(root, 'library.lock'), '');
+
+  assert.throws(() => localBuild(root), isBuildError(/names no identifiable holder/));
+  assert.ok(fs.existsSync(path.join(root, 'library.lock')), 'the other builder keeps its lock');
+  fs.rmSync(path.join(root, 'library.lock'));
+});
+
+test('an interrupted swap is completed by the next build, not discarded', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+
+  // Exactly the state a kill between the two renames leaves: no library, the
+  // only copy sitting in library.bak.
+  fs.renameSync(path.join(root, 'library'), path.join(root, 'library.bak'));
+  // The next build fails on a broken item — the previous tree must still be
+  // restored rather than deleted along the way.
+  writeItem(root, 'active', 'broken', { rawMeta: '{not json' });
+  assert.throws(() => localBuild(root), isBuildError(/malformed JSON/));
+
+  assert.ok(
+    fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')),
+    'the previous library is restored, not lost',
+  );
+  assert.ok(!fs.existsSync(path.join(root, 'library.bak')));
+});
+
+test('a leftover backup from an interrupted swap does not survive the next build', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  fs.mkdirSync(path.join(root, 'library.bak'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'library.bak', 'stale.txt'), 'stale');
+
+  localBuild(root);
+
+  assert.ok(!fs.existsSync(path.join(root, 'library.bak')), 'stale backup cleared');
+  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')));
+});
+
+test('the CLI --local builds into the configured root and reports it', () => {
+  const { base, activeDir } = cliFixture();
+  const res = runCli(['--local', '--from', activeDir]);
+  assert.equal(res.status, 0, res.stderr);
+  assert.match(res.stdout, /library:\s+\S*\/previews\/library/);
+  assert.match(res.stdout, /gitignore: added \/library\/ \/library\.\*/);
+  assert.ok(fs.existsSync(path.join(base, 'previews', 'library', 'p', 'a', 'index.html')));
+
+  const json = runCli(['--local', '--json', '--from', activeDir]);
+  assert.equal(json.status, 0, json.stderr);
+  const out = JSON.parse(json.stdout);
+  assert.equal(out.libraryDir, path.join(base, 'previews', 'library'));
+  assert.deepEqual(out.ignoreRulesAdded, []);
 });

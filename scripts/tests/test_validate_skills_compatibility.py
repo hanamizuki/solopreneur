@@ -24,7 +24,6 @@ CORE_SKILLS = (
 )
 GUARDED_SKILLS = (
     "mvp",
-    "preview",
     "todos-babysit",
     "worktree-handoff",
 )
@@ -44,12 +43,30 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         baseline.write_bytes(LEGACY_BASELINE.read_bytes())
 
         guard_paths = {}
+        mode_gates = {}
         skill_ids = []
         for skill in CORE_SKILLS:
             skill_id = f"solopreneur:{skill}"
             path = self.repo_root / "skills" / "solopreneur" / skill / "SKILL.md"
             path.parent.mkdir(parents=True, exist_ok=True)
-            if skill in GUARDED_SKILLS:
+            if skill == "preview":
+                path.write_text(
+                    "# preview\n\n"
+                    "## Delivery mode gate\n\n"
+                    "`library` is the default. Run "
+                    "`node scripts/resolve-delivery.mjs [--ephemeral | --vercel]`. On "
+                    "`CODEX_THREAD_ID`, Vercel fails closed before any network "
+                    "or state change.\n",
+                    encoding="utf-8",
+                )
+                resolver = path.parent / "scripts" / "resolve-delivery.mjs"
+                resolver.parent.mkdir()
+                resolver.write_text("// fixture\n", encoding="utf-8")
+                mode_gates[skill_id] = {
+                    "entrypoint": str(path.relative_to(self.repo_root)),
+                    "resolver": str(resolver.relative_to(self.repo_root)),
+                }
+            elif skill in GUARDED_SKILLS:
                 path.write_text(
                     "## Codex host guard\n"
                     "Before any other action, check whether `CODEX_THREAD_ID` is set. "
@@ -80,6 +97,7 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
             },
             "skills": {},
             "codexHostGuards": guard_paths,
+            "codexModeGates": mode_gates,
         }
         self.write_registry()
 
@@ -238,7 +256,7 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         self.write_registry()
 
         self.assert_failure_contains(
-            "platformResources must stay inside the skill or use its shared config.sh"
+            "platformResources must stay inside the skill or use its shared config seams"
         )
 
     def test_repository_reference_cannot_escape_root(self) -> None:
@@ -293,6 +311,22 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
 
         self.assert_failure_contains(
             "codexHostGuards.solopreneur:mvp lacks an early fail-closed guard"
+        )
+
+    def test_preview_mode_gate_must_be_early(self) -> None:
+        path = self.repo_root / self.registry["codexModeGates"]["solopreneur:preview"]["entrypoint"]
+        path.write_text("# preview\n\nDo something first.\n\n" + path.read_text(), encoding="utf-8")
+
+        self.assert_failure_contains(
+            "codexModeGates.solopreneur:preview lacks an early mode-specific safety contract"
+        )
+
+    def test_published_preview_must_ship_its_mode_resolver(self) -> None:
+        self.publish("solopreneur:preview")
+        self.write_registry()
+
+        self.assert_failure_contains(
+            "codexModeGates.solopreneur:preview.resolver must be a published platformResource"
         )
 
 

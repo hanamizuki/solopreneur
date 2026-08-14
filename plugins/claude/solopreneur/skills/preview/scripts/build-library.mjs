@@ -731,7 +731,7 @@ function parseAttrs(text) {
  * architecture — the /preview template emits exactly
  * `<script src="./comment-overlay.js"></script>` at the end of `<body>`.
  */
-function rewriteOverlayTag(html, id) {
+function rewriteOverlayTag(html, id, assetBase = '/assets/') {
   const open = /<script\b/gi;
   let out = '';
   let last = 0;
@@ -756,7 +756,7 @@ function rewriteOverlayTag(html, id) {
         const defer = attrs.has('defer') ? ' defer' : '';
         const asyncAttr = attrs.has('async') ? ' async' : '';
         out += html.slice(last, tagStart)
-          + `<script src="/assets/comment-overlay.js" data-preview-id="${id}"${defer}${asyncAttr}></script>`;
+          + `<script src="${assetBase}comment-overlay.js" data-preview-id="${id}"${defer}${asyncAttr}></script>`;
         last = i + 1 + close[0].length;
         open.lastIndex = last;
       }
@@ -774,9 +774,9 @@ function rewriteOverlayTag(html, id) {
  * hash was computed from the source BEFORE this runs, so injected chrome never
  * changes it.
  */
-export function chromeInject(html, item) {
+function chromeInjectWith(html, item, { assetBase, directoryTag = '' }) {
   assertSlug(item.id, item.metaFile); // the id becomes an HTML attribute + route
-  const rewritten = rewriteOverlayTag(html, item.id);
+  const rewritten = rewriteOverlayTag(html, item.id, assetBase);
   const data = {
     id: item.id,
     title: item.meta.title,
@@ -787,9 +787,32 @@ export function chromeInject(html, item) {
     provenance: resolveProvenance(item.meta.provenance),
   };
   const island = `<script id="preview-shell-data" type="application/json">${jsonIsland(data)}</script>`;
-  const shellTag = '<script src="/assets/preview-shell.js"></script>';
+  const shellTag = `<script src="${assetBase}preview-shell.js"></script>`;
   const { index } = findInjectionPoint(rewritten);
-  return `${rewritten.slice(0, index)}${island}\n${shellTag}\n${rewritten.slice(index)}`;
+  return `${rewritten.slice(0, index)}${island}\n${directoryTag}${shellTag}\n${rewritten.slice(index)}`;
+}
+
+export function chromeInject(html, item) {
+  return chromeInjectWith(html, item, { assetBase: '/assets/' });
+}
+
+/**
+ * Chrome injection for the LOCAL library (`file://`). Same chrome, three
+ * `file://`-imposed differences: asset refs are relative (an absolute
+ * `/assets/...` resolves to the filesystem root), every item page loads the
+ * build-emitted `assets/directory.js` before the shell (browsers refuse
+ * `fetch` under `file://` but load classic script subresources, so the
+ * catalog rides in as a `window.__previewDirectory` global), and link
+ * relativization itself is runtime behavior — the shell and index detect
+ * `file:` and build relative hrefs, so injection carries no link mode.
+ * Entry pages sit at a fixed depth (`p/<id>/index.html`), making `../../`
+ * a constant.
+ */
+export function chromeInjectLocal(html, item) {
+  return chromeInjectWith(html, item, {
+    assetBase: '../../assets/',
+    directoryTag: '<script src="../../assets/directory.js"></script>\n',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1064,11 +1087,302 @@ export function buildLibrary({ root, collections, include, gitCommit = defaultGi
 }
 
 // ---------------------------------------------------------------------------
+// Local library (file://)
+// ---------------------------------------------------------------------------
+
+/**
+ * The one write the local build makes inside the content tree is replacing
+ * `<root>/library/`, so both that directory and its swap-in sibling must be
+ * ignored — an untracked build output would make the root dirty and trip the
+ * deploy fetch-guard. Idempotent exact-line append; returns the rules added
+ * (empty when the file already carries them). The `.gitignore` itself is part
+ * of the committed Library contract, so a first-run append is a one-time
+ * migration commit per root.
+ */
+// `/library.*` covers every swap sibling this file creates — `library.tmp`,
+// `library.bak`, `library.lock` — and anything added later, so the rule set
+// never has to grow again. Deliberately a glob and not three exact rules: a
+// content root is a preview library, not a source tree, so shadowing a stray
+// `library.md` there is a better trade than an ignore list that drifts behind
+// the code.
+const LOCAL_IGNORE_RULES = ['/library/', '/library.*'];
+
+export function ensureLibraryIgnored(root) {
+  const file = path.join(root, '.gitignore');
+  let text = '';
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+  const have = new Set(text.split('\n').map((line) => line.trim()));
+  const missing = LOCAL_IGNORE_RULES.filter((rule) => !have.has(rule));
+  if (missing.length === 0) return [];
+  const sep = text && !text.endsWith('\n') ? '\n' : '';
+  fs.writeFileSync(file, `${text}${sep}${missing.join('\n')}\n`);
+  return missing;
+}
+
+/**
+ * Serialize everything that touches `<root>/library*` against another build of
+ * the SAME root. Without this, two builds interleave destructively: both use the
+ * same `library.tmp` / `library.bak` paths, so B's pre-swap cleanup deletes the
+ * tree A just staged (or the only live copy A moved aside), and A can then
+ * rename B's half-copied staging onto `library` and report success — a silently
+ * incomplete catalog, which is worse than either an error or a missing tree.
+ * Concurrency here is not theoretical: every preview run rebuilds the whole
+ * library, and two agent sessions can finish within the same second.
+ *
+ * `wx` is the atomic create-if-absent primitive; the holder's pid goes in the
+ * file so a lock left by a crash can be told from a live one. Liveness is
+ * checked with signal 0 rather than a timeout — same machine by construction
+ * (the library is per-machine, gitignored), so the answer is exact and there is
+ * no staleness window to tune.
+ *
+ * A lock whose body does NOT name a live holder is NOT assumed stale. `wx`
+ * creates the file and writes the pid in two steps, so there is a moment where a
+ * live holder's lock is still empty; reading that as stale and unlinking it
+ * would let both processes believe they hold the lock — reopening the exact
+ * interleaving this function exists to close, and then the loser's release would
+ * delete the winner's lock. An empty body is therefore re-read a few times (the
+ * writer lands within microseconds) and only an unidentifiable lock that
+ * survives that is reported, with the path to remove. The one case that is
+ * genuinely safe to take over is a body naming THIS process: at acquisition we
+ * demonstrably do not hold it, so it is a crashed run whose pid the OS reused.
+ */
+const LOCK_PID_READ_TRIES = 5;
+
+function acquireSwapLock(rootReal) {
+  const lockPath = path.join(rootReal, 'library.lock');
+  const alive = (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (err) {
+      // EPERM means the process exists but belongs to another user.
+      return err.code === 'EPERM';
+    }
+  };
+  // Read the holder pid, tolerating the create-then-write window: `null` means
+  // "no identifiable holder after retrying", not "nobody".
+  const readHolder = () => {
+    for (let attempt = 0; attempt < LOCK_PID_READ_TRIES; attempt += 1) {
+      let body = '';
+      try {
+        body = fs.readFileSync(lockPath, 'utf8').trim();
+      } catch (err) {
+        if (err.code === 'ENOENT') return null; // released while we looked
+        throw err;
+      }
+      const pid = Number.parseInt(body, 10);
+      if (Number.isInteger(pid) && pid > 0) return pid;
+      // Busy-wait deliberately: the gap is a couple of syscalls wide, and a
+      // timer would need this function to become async for no real benefit.
+      const until = Date.now() + 20;
+      while (Date.now() < until) { /* spin briefly, then re-read */ }
+    }
+    return null;
+  };
+
+  // Each pass either acquires, reports a live holder, or claims a dead one and
+  // retries the create. Three is enough for the only loop that exists: claim,
+  // then create (a lost claim race costs one extra pass).
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      fs.writeFileSync(lockPath, `${process.pid}\n`, { flag: 'wx' });
+      return lockPath;
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+      const holder = readHolder();
+      if (holder === null) {
+        // Either the lock vanished (retry immediately) or it names nobody we
+        // can identify. Fail closed on the second: stealing it is what breaks
+        // the guarantee.
+        if (!fs.existsSync(lockPath)) continue;
+        throw new BuildError(
+          `a local library build lock exists but names no identifiable holder\n`
+          + `  lock: ${lockPath}\n`
+          + '  if no build is running, remove that file and re-run.',
+        );
+      }
+      if (holder !== process.pid && alive(holder)) {
+        throw new BuildError(
+          `another local library build is running for this root (pid ${holder})\n`
+          + `  lock: ${lockPath}\n`
+          + '  re-run once it finishes; the two builds would otherwise overwrite each other.',
+        );
+      }
+
+      // A FOREIGN dead holder is reported, never taken over automatically.
+      // Every automatic takeover is inspect-then-remove, and the two steps
+      // cannot be made one: whether the removal is an unlink or a rename, the
+      // lock may have been replaced by another builder's LIVE lock in between,
+      // and removing that is precisely the overlap this lock exists to
+      // prevent — reached through its own recovery path. Failing closed costs
+      // one manual delete after a hard kill, and the message says so; the
+      // routine interruption (Ctrl-C) is handled by releasing on the signal
+      // instead, so it never gets here.
+      if (holder !== process.pid) {
+        throw new BuildError(
+          `a local library build lock names a process that is no longer running (pid ${holder})\n`
+          + `  lock: ${lockPath}\n`
+          + '  a build was killed before it could release it; delete that file and re-run.',
+        );
+      }
+      // This pid, recycled from a crashed run: at acquisition we cannot be the
+      // holder, and no other process can claim our pid, so this is the one
+      // takeover with no second party to race.
+      fs.rmSync(lockPath, { force: true });
+    }
+  }
+  throw new BuildError(`cannot acquire the local build lock: ${lockPath}`);
+}
+
+/**
+ * Release a lock ONLY while it still names this process. A lock that now names
+ * someone else was taken over after this process was presumed dead, and
+ * deleting it would strip a live builder of its protection.
+ */
+function releaseSwapLock(lockPath) {
+  try {
+    if (Number.parseInt(fs.readFileSync(lockPath, 'utf8').trim(), 10) !== process.pid) return;
+  } catch {
+    return; // already gone, or unreadable — not ours to remove
+  }
+  fs.rmSync(lockPath, { force: true });
+}
+
+// ponytail: no SIGINT handler here, deliberately. The obvious reach is to
+// release the lock on Ctrl-C, since a foreign dead holder is never taken over
+// automatically — but this whole build is synchronous, so a signal cannot be
+// serviced until the event loop is free, which is after the build has already
+// finished and `finally` has released the lock. Measured: SIGINT 0.6s into a
+// 1.4s build leaves a COMPLETE library and no lock; the same kill with SIGKILL
+// leaves no library and a stale lock. A handler would therefore add
+// process-global side effects to a library call while changing nothing that
+// actually happens. Only a hard kill strands a lock, which is what the
+// acquire-time message is written for.
+
+/**
+ * Build the browsable local library and swap it into `<root>/library/`.
+ *
+ * Same scan, validation, projection and chrome as the deploy build — only the
+ * chrome seam differs (relative refs + the directory global, see
+ * chromeInjectLocal) and the catalog is additionally emitted as
+ * `assets/directory.js`. The staging tree is assembled in system temp exactly
+ * like the deploy path, so any build failure leaves the existing `library/`
+ * untouched; the swap then copies to `<root>/library.tmp` (a rename from temp
+ * could cross devices) and moves that into place.
+ *
+ * The swap is TWO RENAMES, never a recursive delete of the live tree: POSIX
+ * `rename` cannot replace a non-empty directory, but it can move one aside in a
+ * single metadata operation. So the previous tree goes to `library.bak`, the new
+ * one is renamed onto `library`, and only then is the backup deleted — with the
+ * recursive delete happening after the new tree is already live, where no reader
+ * can observe it. Deleting `library/` in place instead would expose a shrinking,
+ * half-deleted tree for the whole walk (a real library is thousands of files),
+ * and a process killed mid-walk would leave that wreckage as the library.
+ *
+ * ponytail: still not transactional — a kill between the two renames leaves
+ * `library` absent with the previous tree intact at `library.bak`. That is the
+ * accepted ceiling: the window is two metadata operations, the failure is
+ * recoverable by re-running (the canonical items are never touched), and
+ * `library/` is derived and gitignored either way.
+ */
+export function buildLocalLibrary({ root, collections, include, gitCommit = defaultGitCommit }) {
+  const rootReal = fs.realpathSync(root);
+  const dest = path.join(rootReal, 'library');
+  const tmp = path.join(rootReal, 'library.tmp');
+  const bak = path.join(rootReal, 'library.bak');
+
+  // The lock covers the scan too, not just the swap: everything below touches
+  // shared paths under the root — including the .gitignore read-modify-write,
+  // which two concurrent builds would otherwise both find missing and both
+  // append.
+  const lockPath = acquireSwapLock(rootReal);
+  try {
+    // Finish a previous run's interrupted swap FIRST — before this build can
+    // fail for an unrelated reason (a malformed item, say) and leave the root
+    // with no library while the previous one sits right there in the backup.
+    // The lock proves nobody else owns these paths, so the state is
+    // unambiguous: a backup with no library means the previous run died
+    // between its two renames, and that backup is the only copy — restoring it
+    // is what makes "re-run to recover" true, and what keeps the promise of
+    // the failed-restore error, which tells a human that tree is there.
+    // A backup ALONGSIDE a live library is merely superseded, and goes.
+    if (fs.existsSync(dest)) {
+      fs.rmSync(bak, { recursive: true, force: true });
+    } else if (fs.existsSync(bak)) {
+      fs.renameSync(bak, dest);
+    }
+
+    const built = buildLibrary({
+      root, collections, include, gitCommit, injectEntry: chromeInjectLocal,
+    });
+    try {
+      fs.writeFileSync(
+        path.join(built.stagingDir, 'assets', 'directory.js'),
+        `window.__previewDirectory = ${jsonIsland(built.directory)};\n`,
+      );
+      const ignoreRulesAdded = ensureLibraryIgnored(rootReal);
+
+      fs.rmSync(tmp, { recursive: true, force: true });
+      fs.cpSync(built.stagingDir, tmp, { recursive: true });
+
+      let movedAside = false;
+      try {
+        fs.renameSync(dest, bak);
+        movedAside = true;
+      } catch (err) {
+        // No previous library (first build here) is the only tolerable reason
+        // this rename cannot happen.
+        if (err.code !== 'ENOENT') throw err;
+      }
+      try {
+        fs.renameSync(tmp, dest);
+      } catch (err) {
+        // Put the previous library back rather than leave the root with no
+        // library at all; the caller still sees the original failure.
+        if (movedAside) {
+          try {
+            fs.renameSync(bak, dest);
+          } catch (restoreErr) {
+            // Never let the rescue hide what actually failed — and name both
+            // trees, since recovery is now a human decision.
+            throw new BuildError(
+              `local library swap failed and the previous tree could not be restored\n`
+              + `  swap:    ${err.message}\n`
+              + `  restore: ${restoreErr.message}\n`
+              + `  new tree:      ${tmp}\n`
+              + `  previous tree: ${bak}`,
+            );
+          }
+        }
+        throw err;
+      }
+      fs.rmSync(bak, { recursive: true, force: true });
+
+      return {
+        libraryDir: dest,
+        directory: built.directory,
+        sizeReport: built.sizeReport,
+        ignoreRulesAdded,
+      };
+    } finally {
+      fs.rmSync(built.stagingDir, { recursive: true, force: true });
+    }
+  } finally {
+    releaseSwapLock(lockPath);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
-const USAGE = `usage: ${SELF} [--from <path>] [--json]
+const USAGE = `usage: ${SELF} [--local] [--from <path>] [--json]
 
+  --local        build the file:// library and swap it into <root>/library/
   --from <path>  anchor config resolution at <path> instead of the current directory
   --json         print the build result as JSON instead of a human report`;
 
@@ -1079,10 +1393,13 @@ const USAGE = `usage: ${SELF} [--from <path>] [--json]
 function main(argv) {
   let from;
   let asJson = false;
+  let local = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
       asJson = true;
+    } else if (arg === '--local') {
+      local = true;
     } else if (arg.startsWith('--from=')) {
       from = arg.slice('--from='.length);
     } else if (arg === '--from') {
@@ -1105,12 +1422,18 @@ function main(argv) {
     );
   }
 
-  const result = buildLibrary({
-    root: resolved.root,
-    collections: resolved.collections,
-    include: resolved.target.include,
-    injectEntry: chromeInject,
-  });
+  const result = local
+    ? buildLocalLibrary({
+      root: resolved.root,
+      collections: resolved.collections,
+      include: resolved.target.include,
+    })
+    : buildLibrary({
+      root: resolved.root,
+      collections: resolved.collections,
+      include: resolved.target.include,
+      injectEntry: chromeInject,
+    });
 
   if (asJson) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -1119,12 +1442,15 @@ function main(argv) {
 
   const { sizeReport } = result;
   const lines = [
-    `staging: ${result.stagingDir}`,
+    local ? `library: ${result.libraryDir}` : `staging: ${result.stagingDir}`,
     `items:   ${result.directory.items.length}`,
     ...Object.entries(sizeReport.collections).map(
       ([key, s]) => `  ${key}: ${s.files} file(s), ${(s.bytes / 1000).toFixed(1)} kB`,
     ),
     `total:   ${sizeReport.totalFiles} file(s), ${(sizeReport.totalBytes / 1e6).toFixed(2)} MB`,
+    ...(local && result.ignoreRulesAdded.length
+      ? [`gitignore: added ${result.ignoreRulesAdded.join(' ')} (commit it with the content root)`]
+      : []),
     ...sizeReport.warnings.map((w) => `WARNING: ${w}`),
   ];
   process.stdout.write(`${lines.join('\n')}\n`);

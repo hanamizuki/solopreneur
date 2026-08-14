@@ -148,8 +148,9 @@ while IFS= read -r -d '' sidecar; do
 done < <(find "$CLAUDE_PACKAGE_ROOT" -type f -name _VENDOR.md -print0)
 
 # A Codex package carries only the skills the registry includes plus the seams it
-# declares in platformResources — no shared/ and no src/, so the first two
-# candidates in the config-helper resolution block cannot resolve there and the
+# declares in platformResources — no src/, and shared/ holds at most the declared
+# config.schema.json (never config.sh), so the first two candidates in the
+# config-helper resolution block cannot resolve there and the
 # third, scripts/config.sh, only exists when the skill declared the seam. A skill
 # that sources the helpers without declaring them therefore ships a package that
 # HALTs on first use. That is a registry mistake, but it is invisible in the
@@ -168,6 +169,37 @@ while IFS= read -r -d '' skill_md; do
     fail=1
   fi
 done < <(find "$CODEX_PACKAGE_ROOT" -type f -name SKILL.md -print0 2>/dev/null)
+
+# The same class of gap for the OTHER declared seam. A skill whose scripts read
+# `shared/config.schema.json` resolves it package-relative
+# (`scripts/../../../shared/`), and a Codex package has no src/ fallback to catch
+# a miss — so a registry entry that drops the resource, or a generator branch that
+# stops copying it, ships a package whose first config read dies with "cannot load
+# schema". Neither the registry validator nor the publication fixture can see
+# that: one reads declarations, the other counts skills. Check the artifact, and
+# check it matches the source rather than merely existing, so a stale copy is
+# caught too.
+echo "==> Codex packages: declared config.schema.json seam is present and current"
+while IFS= read -r plugin_dir; do
+  plugin="$(basename "$plugin_dir")"
+  jq -e --arg prefix "$plugin:" --arg resource "src/$plugin/shared/config.schema.json" '
+    [.skills | to_entries[]
+     | select(.key | startswith($prefix))
+     | select(.value.publication.codex == "include")
+     | .value.platformResources // []]
+    | flatten | index($resource) != null
+  ' "$REPO_ROOT/skills-compatibility.json" >/dev/null || continue
+  packaged="$plugin_dir/shared/config.schema.json"
+  source_schema="$REPO_ROOT/src/$plugin/shared/config.schema.json"
+  if [[ ! -f "$packaged" ]]; then
+    echo "error: plugins/codex/$plugin declares src/$plugin/shared/config.schema.json but ships none" >&2
+    echo "       its config resolution HALTs on first use — check the generator's seam copy" >&2
+    fail=1
+  elif ! cmp -s "$packaged" "$source_schema"; then
+    echo "error: plugins/codex/$plugin/shared/config.schema.json differs from its canonical source" >&2
+    fail=1
+  fi
+done < <(find "$CODEX_PACKAGE_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
 
 # --- Gate: filtered publication ---------------------------------------------
 echo "==> publication: generated roots match registry includes"
