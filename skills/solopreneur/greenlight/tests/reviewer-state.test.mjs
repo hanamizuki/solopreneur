@@ -1036,6 +1036,42 @@ test('an explicitly requested independent gate keeps the halt retryable', () => 
   assert.equal(out.gateBlock, 'unavailable');
 });
 
+test('grok-cli gates on a Claude host and on a Codex host alike', () => {
+  // The reason the recipe exists: xai is never a host family, so an available
+  // grok-cli is an independent gate under either host — unlike codex-cli and
+  // claude-cli, each filtered on the host of its own family.
+  for (const env of [{}, CODEX_HOST]) {
+    const { stdout } = run([
+      'resolve', '--repo-key', KEY, '--fallback-order', 'grok-cli',
+      '--cli-available', 'grok-cli',
+    ], { stdin: BOTS([]), env });
+    const out = JSON.parse(stdout);
+    assert.equal(out.gate?.recipe, 'grok-cli', `host ${out.hostFamily} must accept the gate`);
+    assert.equal(out.gate.family, 'xai');
+    assert.notEqual(out.gate.family, out.hostFamily);
+    assert.ok(out.available.find((r) => r.recipe === 'grok-cli').canGate);
+  }
+});
+
+test('grok-cli is absent unless --cli-available lists it', () => {
+  // Opt-in like agy: pre-flight never probes it into --cli-available, and
+  // resolve must not invent it either — an implied entry would put a paid
+  // reviewer into every M/L round without the user ever asking for it.
+  const { stdout } = resolve([], { stdin: BOTS([CODEX]) });
+  assert.ok(!JSON.parse(stdout).available.some((r) => r.recipe === 'grok-cli'));
+});
+
+test('--gate grok-cli without its CLI available degrades like any absent CLI', () => {
+  // Same contract as the claude-cli twin above: an explicitly requested gate
+  // whose CLI is not available this run is a retryable outage, never a new
+  // semantic — installing/authenticating the CLI recovers the run.
+  const { stdout } = run(['resolve', '--repo-key', KEY, '--fallback-order', 'codex-bot',
+    '--gate', 'grok-cli'], { stdin: BOTS([]), env: CODEX_HOST });
+  const out = JSON.parse(stdout);
+  assert.equal(out.gate, null);
+  assert.equal(out.gateBlock, 'unavailable');
+});
+
 test('a stale id in the ladder does not veto the host-family verdict', () => {
   // `codex-bot,typo` on a Codex host authorizes no independent gate — the typo
   // names nothing and can never become a reviewer. Reporting `unavailable` here
