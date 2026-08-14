@@ -35,8 +35,6 @@ upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
   in Jetpack Compose.
 - `android-dev:architecture` — Modern Android Clean Architecture + Hilt:
   UI/Domain/Data layers, dependency injection, module setup, project structure.
-- `android-dev:compose-navigation` — Type-safe Navigation Compose: NavHost,
-  argument passing, deep links, nested graphs, adaptive navigation, testing.
 - `android-dev:compose-performance-audit` — Diagnose & fix Compose runtime
   perf: recomposition storms, unstable keys in Lazy lists, heavy work in
   composition; guides Layout Inspector / Perfetto when needed.
@@ -50,8 +48,6 @@ upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
 - `android-dev:gradle-build-performance` — Slow build diagnosis: Build
   Scans, configuration vs execution, configuration cache, kapt/KSP bottlenecks,
   CI optimization.
-- `android-dev:gradle-logic` — Scalable build logic with Convention
-  Plugins + Version Catalogs (Now in Android pattern).
 - `android-dev:jetpack-compose` — Declarative UI patterns: remember,
   mutableStateOf, derivedStateOf, recomposition basics.
 - `android-dev:kotlin-concurrency-expert` — Coroutine review &

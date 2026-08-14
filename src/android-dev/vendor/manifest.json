@@ -20,10 +20,6 @@
           "to": "architecture"
         },
         {
-          "from": ".github/skills/ui/compose-navigation",
-          "to": "compose-navigation"
-        },
-        {
           "from": ".github/skills/performance/compose-performance-audit",
           "to": "compose-performance-audit"
         },
@@ -42,10 +38,6 @@
         {
           "from": ".github/skills/performance/gradle-build-performance",
           "to": "gradle-build-performance"
-        },
-        {
-          "from": ".github/skills/build_and_tooling/android-gradle-logic",
-          "to": "gradle-logic"
         },
         {
           "from": ".github/skills/concurrency_and_networking/kotlin-concurrency-expert",

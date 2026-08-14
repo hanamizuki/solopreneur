@@ -18,20 +18,10 @@ fails — skip it and proceed with context7 + built-in knowledge.
 
 Always available — ships with this plugin. Invoke with `ai-engineer:<name>`.
 
-All four skills below are auto-discoverable (no `disable-model-invocation`
+All skills below are auto-discoverable (no `disable-model-invocation`
 flag), so the model can also fire them on description match. Each entry's
 **Read when** line is the deliberate trigger from this agent's perspective —
 follow it when invoking explicitly via the Skill tool.
-
-In-house:
-
-- `ai-engineer:langgraph` — Deployment-first LangGraph v1.0 patterns:
-  `agent.py` with compiled graph exported as `app`, `langgraph.json` config,
-  `TypedDict` / Pydantic state, prefer `create_react_agent` over hand-built
-  StateGraph, Supervisor / Swarm multi-agent patterns, streaming.
-  **Read when** the project uses LangGraph (`graph.py`, `agent.py`,
-  `app = ...compile()`, `StateGraph`, `create_react_agent`, or any
-  LangGraph imports).
 
 Vendored from third-party sources (see `vendor/manifest.json` for
 upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
