@@ -1056,6 +1056,7 @@ test('buildLocalLibrary swaps a complete file:// tree into <root>/library/', () 
   ]) assert.ok(fs.existsSync(path.join(res.libraryDir, ...rel)), rel.join('/'));
   assert.deepEqual(res.directory.items.map((it) => it.id).sort(), ['a', 'b']);
   assert.ok(!fs.existsSync(path.join(root, 'library.tmp')), 'no swap residue');
+  assert.ok(!fs.existsSync(path.join(root, 'library.bak')), 'backup cleared after the swap');
 });
 
 test('local entry pages carry relative chrome and pre-load the catalog global', () => {
@@ -1098,24 +1099,27 @@ test('the local build appends the two ignore rules once, preserving existing con
   fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules'); // no trailing newline
 
   const first = localBuild(root);
-  assert.deepEqual(first.ignoreRulesAdded, ['/library/', '/library.tmp/']);
+  assert.deepEqual(first.ignoreRulesAdded, ['/library/', '/library.tmp/', '/library.bak/']);
   assert.equal(
     fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
-    'node_modules\n/library/\n/library.tmp/\n',
+    'node_modules\n/library/\n/library.tmp/\n/library.bak/\n',
   );
 
   const second = localBuild(root);
   assert.deepEqual(second.ignoreRulesAdded, []);
   assert.equal(
     fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
-    'node_modules\n/library/\n/library.tmp/\n',
+    'node_modules\n/library/\n/library.tmp/\n/library.bak/\n',
   );
 });
 
 test('ensureLibraryIgnored creates a fresh .gitignore when none exists', () => {
   const root = tmp();
-  assert.deepEqual(ensureLibraryIgnored(root), ['/library/', '/library.tmp/']);
-  assert.equal(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), '/library/\n/library.tmp/\n');
+  assert.deepEqual(ensureLibraryIgnored(root), ['/library/', '/library.tmp/', '/library.bak/']);
+  assert.equal(
+    fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
+    '/library/\n/library.tmp/\n/library.bak/\n',
+  );
 });
 
 test('a rebuild replaces the previous library tree instead of merging into it', () => {
@@ -1155,6 +1159,70 @@ test('two local builds produce identical entry pages and catalog rows', () => {
 
   assert.equal(readLocal(root, 'p', 'a', 'index.html'), firstPage);
   assert.deepEqual(JSON.parse(readLocal(root, 'directory.json')).items, firstItems);
+});
+
+/**
+ * Run the BUILT library home's inline script against a minimal DOM + a
+ * `location` stub, and return every anchor href it produced.
+ *
+ * The home page's `row()` is the other half of the file:// link contract
+ * (`sidebarRow` is covered in preview-shell-local-boot.test.mjs), and it is the
+ * entry point library delivery hands the user — a regression to an absolute
+ * `/p/<id>/` sends every card to the filesystem root under file://. Executing
+ * the generated page is what catches that; asserting on its source text would
+ * pass on any string that merely mentions the right path.
+ */
+function renderBuiltIndex(root, protocol) {
+  const html = readLocal(root, 'index.html');
+  const open = html.lastIndexOf('<script>');
+  const script = html.slice(open + '<script>'.length, html.indexOf('</script>', open));
+  const island = html.slice(
+    html.indexOf('>', html.indexOf('<script id="directory-data"')) + 1,
+    html.indexOf('</script>', html.indexOf('<script id="directory-data"')),
+  );
+
+  const created = [];
+  const make = () => {
+    const node = {
+      children: [], className: '', textContent: '', href: '', title: '',
+      appendChild(child) { this.children.push(child); return child; },
+      setAttribute() {},
+    };
+    created.push(node);
+    return node;
+  };
+  const byId = new Map([['directory-data', { ...make(), textContent: island }]]);
+  for (const id of ['active-list', 'archive-list', 'active-count', 'archive-count', 'page-footer']) {
+    byId.set(id, make());
+  }
+  const document = { getElementById: (id) => byId.get(id), createElement: () => make() };
+
+  // eslint-disable-next-line no-new-func -- running the shipped page is the point
+  new Function('document', 'location', script)(document, { protocol });
+  return created.filter((n) => n.href).map((n) => n.href);
+}
+
+test('library home cards link relatively under file://, absolutely on a deployed origin', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  writeItem(root, 'archive', 'b');
+  localBuild(root);
+
+  assert.deepEqual(renderBuiltIndex(root, 'file:').sort(), ['p/a/index.html', 'p/b/index.html']);
+  assert.deepEqual(renderBuiltIndex(root, 'https:').sort(), ['/p/a/', '/p/b/']);
+});
+
+test('a leftover backup from an interrupted swap does not survive the next build', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  fs.mkdirSync(path.join(root, 'library.bak'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'library.bak', 'stale.txt'), 'stale');
+
+  localBuild(root);
+
+  assert.ok(!fs.existsSync(path.join(root, 'library.bak')), 'stale backup cleared');
+  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')));
 });
 
 test('the CLI --local builds into the configured root and reports it', () => {

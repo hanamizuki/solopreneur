@@ -75,12 +75,16 @@ staging build, with these differences:
   `<root>/library/`. Every failure mode that can produce a partial tree —
   scan, validation, copy, injection — happens before the replacement, so a
   failed build leaves the previous `library/` untouched and no reader ever
-  sees a half-written one. The replacement itself is a remove followed by a
-  rename, so it is not transactional: a process killed inside that window
-  leaves the directory absent rather than stale. That is the accepted
-  ceiling — `library/` is derived, gitignored, and rebuilt by one command,
-  while the canonical items it renders are never touched. This replacement
-  is the only write the build makes inside the content tree.
+  sees a half-written one. The replacement itself is two renames — the
+  previous tree is moved aside to `library.bak`, the new one is renamed onto
+  `library`, and only then is the backup deleted — so a reader sees either
+  the old tree or the new one, never a partially deleted one, and a failed
+  rename restores the previous tree. It is still not transactional: a
+  process killed between the two renames leaves `library` absent with the
+  previous tree at `library.bak`. That is the accepted ceiling — `library/`
+  is derived, gitignored, and rebuilt by one command, while the canonical
+  items it renders are never touched. This replacement is the only write the
+  build makes inside the content tree.
 - All injected references are relative. Item pages reference the staged
   shared assets and the catalog data relative to their own location, and
   every catalog link targets an explicit `index.html` — `file://` has no
@@ -89,9 +93,10 @@ staging build, with these differences:
   directory as a classic-script asset that sets a global the shell reads;
   `fetch` of `directory.json` remains the deployed-origin path. Browsers
   block `fetch`/XHR under `file://` but load classic script subresources.
-- The build ensures the content root's committed `.gitignore` covers
-  `library/` (idempotent). Without that rule the untracked build output
-  would make the root dirty and trip the deploy fetch-guard.
+- The build ensures the content root's committed `.gitignore` covers the
+  build output and its two swap siblings (`library/`, `library.tmp/`,
+  `library.bak/`), idempotently. Without those rules the untracked build
+  output would make the root dirty and trip the deploy fetch-guard.
 
 **The rendered pages keep the full Library UX.** Sidebar catalog with
 active/archive grouping, Manage-mode instruction export, provenance footer,

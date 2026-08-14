@@ -1099,7 +1099,7 @@ export function buildLibrary({ root, collections, include, gitCommit = defaultGi
  * of the committed Library contract, so a first-run append is a one-time
  * migration commit per root.
  */
-const LOCAL_IGNORE_RULES = ['/library/', '/library.tmp/'];
+const LOCAL_IGNORE_RULES = ['/library/', '/library.tmp/', '/library.bak/'];
 
 export function ensureLibraryIgnored(root) {
   const file = path.join(root, '.gitignore');
@@ -1126,19 +1126,22 @@ export function ensureLibraryIgnored(root) {
  * `assets/directory.js`. The staging tree is assembled in system temp exactly
  * like the deploy path, so any build failure leaves the existing `library/`
  * untouched; the swap then copies to `<root>/library.tmp` (a rename from temp
- * could cross devices) and renames over `library/`.
+ * could cross devices) and moves that into place.
  *
- * ponytail: the swap is atomic-enough, not transactional. POSIX `rename` cannot
- * replace a non-empty directory, so the old tree is removed first and there is a
- * window with neither. The window is two metadata operations wide, and the
- * expensive, failure-prone part (the copy) has already completed on the same
- * filesystem by then — so the realistic loss is a process killed inside those
- * microseconds, which leaves the directory absent rather than stale. A
- * keep-a-backup dance would shrink that window without closing it (the same
- * rename restriction applies) and buys recovery of a DERIVED tree: `library/` is
- * gitignored, rebuilt by re-running this command, and the canonical items it
- * renders are never touched. Readers retry; a crash leaves `library.tmp` for the
- * next run to clear.
+ * The swap is TWO RENAMES, never a recursive delete of the live tree: POSIX
+ * `rename` cannot replace a non-empty directory, but it can move one aside in a
+ * single metadata operation. So the previous tree goes to `library.bak`, the new
+ * one is renamed onto `library`, and only then is the backup deleted — with the
+ * recursive delete happening after the new tree is already live, where no reader
+ * can observe it. Deleting `library/` in place instead would expose a shrinking,
+ * half-deleted tree for the whole walk (a real library is thousands of files),
+ * and a process killed mid-walk would leave that wreckage as the library.
+ *
+ * ponytail: still not transactional — a kill between the two renames leaves
+ * `library` absent with the previous tree intact at `library.bak`. That is the
+ * accepted ceiling: the window is two metadata operations, the failure is
+ * recoverable by re-running (the canonical items are never touched), and
+ * `library/` is derived and gitignored either way.
  */
 export function buildLocalLibrary({ root, collections, include, gitCommit = defaultGitCommit }) {
   const rootReal = fs.realpathSync(root);
@@ -1154,10 +1157,31 @@ export function buildLocalLibrary({ root, collections, include, gitCommit = defa
 
     const dest = path.join(rootReal, 'library');
     const tmp = path.join(rootReal, 'library.tmp');
+    const bak = path.join(rootReal, 'library.bak');
+    // Residue from a previous interrupted swap, cleared before it can be
+    // mistaken for this run's backup.
     fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(bak, { recursive: true, force: true });
     fs.cpSync(built.stagingDir, tmp, { recursive: true });
-    fs.rmSync(dest, { recursive: true, force: true });
-    fs.renameSync(tmp, dest);
+
+    let movedAside = false;
+    try {
+      fs.renameSync(dest, bak);
+      movedAside = true;
+    } catch (err) {
+      // No previous library (first build here) is the only tolerable reason
+      // this rename cannot happen.
+      if (err.code !== 'ENOENT') throw err;
+    }
+    try {
+      fs.renameSync(tmp, dest);
+    } catch (err) {
+      // Put the previous library back rather than leave the root with no
+      // library at all; the caller still sees the original failure.
+      if (movedAside) fs.renameSync(bak, dest);
+      throw err;
+    }
+    fs.rmSync(bak, { recursive: true, force: true });
 
     return {
       libraryDir: dest,
