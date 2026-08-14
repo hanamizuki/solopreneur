@@ -55,6 +55,13 @@ Limitation reference: `docs/spec/2026-08-10-codex-greenlight-port.md`. The
 filtered Codex publication includes this degraded surface. Reviewed-head
 binding remains a shared Claude/Codex defect, not a Codex parity gate.
 
+**Phase 1 is verified on Codex exec only**
+(`docs/spec/2026-08-15-codex-greenlight-phase1.md`). TUI and App run the same
+shared body with no surface gate, so Phase 1 is expected to work there and is
+simply unproven; if it does not, the all-reviewers-unavailable rule already
+carries those runs to Phase 3. Phase 3 itself is accepted on all three
+surfaces.
+
 ### Arguments
 
 | Argument | Description | Example |
@@ -657,10 +664,11 @@ In **PR mode** on such a host, Phase 1 runs. Codex creates real child threads,
 and `/specialist-review` (row 4) is published there, so at M size one reviewer is
 available and the existing at-least-one rule carries the run into Phase 2. The
 Claude-only and third-party rows are logged as unavailable, exactly as they are
-on a Claude host that lacks them. Phase 1 and 2 are skipped only when *every*
-selected reviewer turns out unavailable, or when the caller passed `external` —
-which remains the way to state that intent rather than relying on the
-all-reviewers-unavailable degradation.
+on a Claude host that lacks them. Phase 1 and 2 are still skipped on the same
+three conditions as anywhere else — `external_only == true`,
+`EFFECTIVE_SIZE == S`, or *every* selected reviewer turning out unavailable.
+Nothing here loosens the Size S rule; `external` remains the way to state that
+intent rather than relying on the all-reviewers-unavailable degradation.
 
 If `MODE=uncommitted`, skip Steps 2-5 below and Argument Parsing; jump directly to **[Uncommitted Mode](#uncommitted-mode)**.
 
