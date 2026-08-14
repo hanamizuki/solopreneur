@@ -81,10 +81,14 @@ don't invent another one.
 
 Rungs 2 and 3 are degradations, and that stack's section opens with the matching
 banner, substituting `<plugin>` with the agent / plugin name for that stack (the
-agent and plugin share the same name):
+agent and plugin share the same name).
+
+Rung 2:
 
 > ⚠️ Specialist agent `<plugin>` unavailable. Reviewed by a generic reviewer
 > against the installed `<plugin>` skills.
+
+Rung 3:
 
 > ⚠️ Specialist agent `<plugin>` unavailable and no subagent could be spawned.
 > Reviewed inline with generic expertise.
@@ -126,7 +130,10 @@ required — a named agent inheriting full parent history is rejected, and a
 reviewer that inherits your framing is not an independent read. Prefer
 `agent_type="explorer"`, which keeps the reviewer read-only; omitting it spawns
 an unscoped peer that can write, so the read-only sandbox and the "do NOT modify
-any files" line below are what actually hold the boundary.
+any files" line below are what actually hold the boundary. `spawn_agent` takes
+no sandbox argument — the child gets the same tools as its parent — so a session
+started with `--sandbox read-only` is the only way to enforce that boundary
+rather than instruct it.
 
 If context7 is **available** (from Step 2.5), include the `[CONTEXT7 BLOCK]` below.
 If **not available**, omit it entirely.
@@ -163,14 +170,15 @@ You are an expert reviewer. Do NOT modify any files. Only analyze and report.
    - Use the retrieved documentation as an additional reference when reviewing
 [END CONTEXT7 BLOCK]
 
-4. Scan the curated list and extended index for TWO categories of relevant skills:
+4. Scan whatever step 1 gave you — the curated list plus extended index, or the
+   plugin cache listing — for TWO categories of relevant skills:
    a. **Technology-specific skills**: skills matching the APIs/frameworks used
    b. **Cross-cutting skills**: performance, architecture, patterns, guidelines
       skills that apply regardless of specific API (e.g., compose performance
       audit, architecture patterns, accessibility, project conventions)
 
-5. For each relevant skill (both categories), read its SKILL.md using the
-   resolved path from the curated section or extended index.
+5. For each relevant skill (both categories), read its SKILL.md using the path
+   step 1 resolved.
 
 6. Review the diff against each relevant skill's best practices AND context7
    documentation (if queried). For each skill checked, report:
@@ -198,7 +206,12 @@ prompt and discovered skills from the plugin cache — open the section with thi
 line, substituting `<plugin>`. It is the only signal the reader gets that the
 named specialist did not run:
 > ⚠️ Specialist agent `<plugin>` unavailable. Reviewed by a generic reviewer
-> against the installed `<plugin>` skills.]
+> against the installed `<plugin>` skills.
+
+If that discovery turned up nothing — the plugin is not installed — open with
+this instead. Do not claim skills you never read:
+> ⚠️ Specialist agent `<plugin>` unavailable and no installed `<plugin>` skills
+> found. Reviewed with generic expertise.]
 
 #### Skills Checked
 | Skill | Aspect | Status | Finding |

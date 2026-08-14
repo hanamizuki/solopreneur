@@ -59,7 +59,7 @@ Codex V1 is intentionally a smaller, fail-closed surface:
 | `$solopreneur:perspective` | Same ten perspectives. Name the one you want up front in `codex exec` — the menu needs a conversational surface. |
 | `$solopreneur:plan-review internal` | Technical and lean findings only; no outside review, adjudication, or write-back. |
 | `$solopreneur:post-mortem` | Same git archaeology and report. In `codex exec`, put the bug description in the prompt; the run stops at the printed report. |
-| `$solopreneur:specialist-review` | Same stack detection and review. No specialist agents exist on Codex yet, so every stack is reviewed by a generic reviewer against the installed knowledge skills, under a degradation banner. |
+| `$solopreneur:specialist-review` | Same stack detection and review. No specialist agents exist on Codex yet, so every stack drops to a generic reviewer — reading that stack's knowledge skills when its plugin is installed (`marketer` and `designer` publish none), or reviewing inline when no subagent can be spawned. Every path names its degradation in a banner. |
 
 The skill descriptions below document the full Claude Code surface. Use the
 contracts above when running the eight published skills on Codex.

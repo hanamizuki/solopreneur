@@ -934,12 +934,15 @@
       },
       "acceptance": {
         "codex-exec": [
+          "docs/spec/2026-08-14-codex-specialist-review.md#a1-registry-publication-and-generation",
           "docs/spec/2026-08-14-codex-specialist-review.md#a2-codex-exec"
         ],
         "codex-tui": [
+          "docs/spec/2026-08-14-codex-specialist-review.md#a1-registry-publication-and-generation",
           "docs/spec/2026-08-14-codex-specialist-review.md#a3-codex-tui"
         ],
         "codex-app": [
+          "docs/spec/2026-08-14-codex-specialist-review.md#a1-registry-publication-and-generation",
           "docs/spec/2026-08-14-codex-specialist-review.md#a4-codex-app"
         ]
       },

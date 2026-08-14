@@ -17,8 +17,10 @@
 `/specialist-review` runs on Codex. It is the first consumer of the knowledge
 skills published in
 [Codex specialist knowledge skills](./2026-08-14-codex-specialist-skills.md):
-the reviewer that reads them is a spawned generic subagent, and the skills it
-reads come out of the installed plugin cache.
+when the spawn succeeds — as it did in every acceptance run below — the reviewer
+that reads them is a spawned generic subagent, and the skills it reads come out
+of the installed plugin cache. When no subagent can be spawned, the ladder drops
+to inline review under its own banner.
 
 The canonical skill body stays shared with Claude Code. Nothing branches on
 `CODEX_THREAD_ID` — the reviewer ladder is self-selecting, so each host lands on
@@ -64,7 +66,7 @@ picks 3–5 skills matching the diff.
 
 The cache path is globbed, never hardcoded:
 
-```
+```text
 "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/*/<plugin>/*/skills/*/
 ```
 
