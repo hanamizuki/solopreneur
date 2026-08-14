@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/new-silvermoon/awesome-android-agent-skills
 - **Source path**: `.github/skills/migration/xml-to-compose-migration`
 - **Pinned commit**: 82900eacc8dbe13de93c6310af27b9df4b2bd2f6
-- **Synced at**: 2026-08-12T13:15:15Z
+- **Synced at**: 2026-08-14T04:15:48Z
 - **License**: see `../../vendor/LICENSES/awesome-android-agent-skills-LICENSE` (source repo: `src/android-dev/vendor/LICENSES/awesome-android-agent-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
