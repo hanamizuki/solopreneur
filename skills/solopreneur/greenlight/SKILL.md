@@ -1409,10 +1409,12 @@ otherwise. On a halt, report **blocked** and reference the `halts/` payload path
 
 **Dispatch the selected subagents in parallel (`run_in_background: true`), each running a review skill. All report-only — no code changes.**
 
-On Codex, run each available reviewer skill in this thread instead:
+On Codex, run the selected reviewer skills in this thread instead:
 `run_in_background` is a Claude Code parameter, and at M size `/specialist-review`
-is the only row available there, so there is nothing to parallelise. The review
-still reaches a child thread — that skill spawns its own per-stack reviewers.
+is usually the only row that resolves there, so there is nothing to parallelise.
+The rows that do not resolve still get their unavailable line — skipping the
+attempt does not skip the report. The review still reaches a child thread;
+that skill spawns its own per-stack reviewers.
 
 | Subagent | Skill | Source | Focus |
 |----------|-------|--------|-------|
@@ -1422,7 +1424,7 @@ still reaches a child thread — that skill spawns its own per-stack reviewers.
 | 4 | `/specialist-review` | included | Tech-stack expert review — **report findings and specific fix suggestions only** |
 | 5 | `ponytail:ponytail-review` | ponytail plugin | Over-engineering review: dead code, hand-rolled stdlib, unused abstractions, shrinkable logic — **report only (tagged `delete`/`stdlib`/`native`/`yagni`/`shrink`)** |
 
-**All skills are optional.** If any subagent fails (skill not found, invocation error, or subagent error), log which skill was unavailable and why, skip that subagent, and continue waiting for others. For external plugins (e.g. ponytail), print a one-line install suggestion when unavailable.
+**All skills are optional.** If any subagent fails (skill not found, invocation error, or subagent error), log which skill was unavailable and why, skip that subagent, and continue waiting for others. For external plugins (e.g. ponytail), print a one-line install suggestion when unavailable. **A row you never attempt counts as unavailable and gets the same line.** Every row this size selected ends up reported either as run or as skipped-with-reason; a Phase 1 report that names only the reviewers that ran is indistinguishable from one where the others were never selected.
 
 - At least 1 subagent succeeds → proceed to Phase 2 (using completed reports)
 - All fail → notify user "Phase 1: all internal reviewers unavailable", skip Phase 1 + 2, proceed to Phase 3
