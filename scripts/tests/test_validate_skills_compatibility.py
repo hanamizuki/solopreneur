@@ -53,8 +53,8 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
                 path.write_text(
                     "# preview\n\n"
                     "## Delivery mode gate\n\n"
-                    "`local` is the default. Run "
-                    "`node scripts/resolve-delivery.mjs [--vercel]`. On "
+                    "`library` is the default. Run "
+                    "`node scripts/resolve-delivery.mjs [--ephemeral | --vercel]`. On "
                     "`CODEX_THREAD_ID`, Vercel fails closed before any network "
                     "or state change.\n",
                     encoding="utf-8",
@@ -256,7 +256,7 @@ class ValidateSkillsCompatibilityTests(unittest.TestCase):
         self.write_registry()
 
         self.assert_failure_contains(
-            "platformResources must stay inside the skill or use its shared config.sh"
+            "platformResources must stay inside the skill or use its shared config seams"
         )
 
     def test_repository_reference_cannot_escape_root(self) -> None:

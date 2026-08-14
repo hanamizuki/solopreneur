@@ -214,11 +214,16 @@
       });
     }
 
-    // Links ALWAYS target this same deployment's /p/<id>/.
+    // Links ALWAYS target this same tree's /p/<id>/ — absolute on the
+    // deployed origin (robust to trailing-slash handling), relative with an
+    // explicit index.html under file:// (no server, no default document;
+    // this index sits at the library root, one level above p/).
     function row(it) {
       var a = document.createElement("a");
       a.className = "card";
-      a.href = "/p/" + encodeURIComponent(it.id) + "/";
+      a.href = location.protocol === "file:"
+        ? "p/" + encodeURIComponent(it.id) + "/index.html"
+        : "/p/" + encodeURIComponent(it.id) + "/";
       var t = document.createElement("div");
       t.className = "card-title";
       t.textContent = it.title || it.id;

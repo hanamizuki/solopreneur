@@ -1,6 +1,10 @@
 # Preview local-first delivery
 
-**Status:** Accepted for degraded Codex local-only support; A1–A5 passed
+**Status:** Accepted for degraded Codex local-only support; A1–A5 passed.
+Local-default contract superseded by
+[Preview Local Library](./2026-08-14-preview-local-library.md) (2026-08-14):
+the single-file contract below lives on as that spec's ephemeral mode, and
+local delivery now defaults to the built local Library.
 
 **Date:** 2026-08-12
 

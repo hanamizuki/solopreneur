@@ -282,16 +282,23 @@ def main() -> int:
             errors.append(f"skills.{skill_id}.platformResources contains a missing path")
         skill_plugin, skill_name = skill_id.split(":", 1)
         skill_root = (repo / "skills" / skill_plugin / skill_name).resolve()
-        shared_config = (repo / "src" / skill_plugin / "shared" / "config.sh").resolve()
+        # The only resources allowed from outside the skill are the two shared
+        # seams the Codex generator knows how to place into a package: the
+        # config.sh helper (copied to scripts/config.sh) and the preview config
+        # schema (copied to the package-level shared/ the resolver walks to).
+        shared_seams = {
+            (repo / "src" / skill_plugin / "shared" / "config.sh").resolve(),
+            (repo / "src" / skill_plugin / "shared" / "config.schema.json").resolve(),
+        }
         if any(
             path is not None
-            and path != shared_config
+            and path not in shared_seams
             and path != skill_root
             and skill_root not in path.parents
             for path in resource_paths
         ):
             errors.append(
-                f"skills.{skill_id}.platformResources must stay inside the skill or use its shared config.sh"
+                f"skills.{skill_id}.platformResources must stay inside the skill or use its shared config seams"
             )
         if any(support.get(surface) in {"full", "degraded"} for surface in CODEX_SURFACES):
             contract = entry.get("sharedContract")
@@ -479,8 +486,8 @@ def main() -> int:
         )
         gate_text = " ".join(" ".join(body_lines[first_h2[0] + 1 : gate_end]).split()) if first_h2 else ""
         required_gate_text = (
-            "`local` is the default",
-            "node scripts/resolve-delivery.mjs [--vercel]",
+            "`library` is the default",
+            "node scripts/resolve-delivery.mjs [--ephemeral | --vercel]",
             "`CODEX_THREAD_ID`",
             "fails closed before any network or state change",
         )

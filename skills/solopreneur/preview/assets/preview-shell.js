@@ -24,7 +24,10 @@
 // JSON island (<script id="preview-shell-data" type="application/json">).
 // The full catalog for the sidebar is fetched from /directory.json (the
 // same file the Library index is generated from) — a single source, not
-// duplicated into every page.
+// duplicated into every page. Local-library pages (file://, where fetch
+// is blocked) instead pre-load the same catalog as a
+// `window.__previewDirectory` global via the build-emitted
+// assets/directory.js, which loadDirectory prefers over the fetch.
 //
 // Pure client-side, no backend, no build step, no external dependency.
 //
@@ -270,8 +273,11 @@
   // Node unit-test seam: expose the pure helpers when imported as a
   // CommonJS module. Browsers (where `module` is undeclared) skip this;
   // `typeof` on an undeclared identifier is safe (no ReferenceError).
+  // sidebarRow is not pure (it needs a document + optional location stub);
+  // it rides along so the href contract is unit-testable.
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {
+      sidebarRow,
       groupDirectory,
       sortCatalogItems,
       groupArchiveWithSuperseded,
@@ -316,9 +322,11 @@
 
     // The catalog for the sidebar comes from the deployment's
     // /directory.json (the same file the index is generated from), so the
-    // sidebar always reflects what was actually deployed. Failure degrades
+    // sidebar always reflects what was actually deployed. Local-library
+    // pages instead carry the catalog as a build-emitted global
+    // (assets/directory.js) because file:// blocks fetch. Failure degrades
     // to a small note, never a crash.
-    fetchDirectory().then((dir) => {
+    loadDirectory().then((dir) => {
       manage.setDirectory(dir, currentId);
       manage.render();
     });
@@ -332,6 +340,13 @@
     } catch (_) {
       return {};
     }
+  }
+
+  function loadDirectory() {
+    if (window.__previewDirectory && typeof window.__previewDirectory === "object") {
+      return Promise.resolve(window.__previewDirectory);
+    }
+    return fetchDirectory();
   }
 
   function fetchDirectory() {
@@ -741,11 +756,14 @@
     return details;
   }
 
-  // One catalog row. Links ALWAYS target the SAME deployment's /p/<id>/
-  // (never a cross-deployment URL). The current page is clearly marked
-  // with "v<revision> · updated <local date/time>" and aria-current.
-  // When manageMode is on, a checkbox sits before the link (archive =
-  // active→archive, restore = archive→active).
+  // One catalog row. Links ALWAYS target the SAME tree's /p/<id>/ (never a
+  // cross-deployment URL): absolute on the deployed origin (robust to
+  // trailing-slash handling), relative with an explicit index.html under
+  // file:// — no default document there, and the shell only ever runs on
+  // item pages, which sit at the fixed depth p/<id>/index.html. The current
+  // page is clearly marked with "v<revision> · updated <local date/time>"
+  // and aria-current. When manageMode is on, a checkbox sits before the
+  // link (archive = active→archive, restore = archive→active).
   function sidebarRow(it, currentId, manageOpts) {
     const opts = manageOpts && typeof manageOpts === "object" ? manageOpts : {};
     const manageMode = !!opts.manageMode;
@@ -753,7 +771,12 @@
 
     const a = document.createElement("a");
     a.className = "ps-row" + (isCurrent ? " ps-current" : "");
-    a.href = "/p/" + encodeURIComponent(it.id) + "/";
+    // Same guarded-location pattern as resolveLibraryLabel: `location` is
+    // absent in the Node test environment.
+    const isFile = typeof location !== "undefined" && location && location.protocol === "file:";
+    a.href = isFile
+      ? "../" + encodeURIComponent(it.id) + "/index.html"
+      : "/p/" + encodeURIComponent(it.id) + "/";
 
     const title = document.createElement("span");
     title.className = "ps-row-title";

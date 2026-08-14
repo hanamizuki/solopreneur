@@ -731,7 +731,7 @@ function parseAttrs(text) {
  * architecture — the /preview template emits exactly
  * `<script src="./comment-overlay.js"></script>` at the end of `<body>`.
  */
-function rewriteOverlayTag(html, id) {
+function rewriteOverlayTag(html, id, assetBase = '/assets/') {
   const open = /<script\b/gi;
   let out = '';
   let last = 0;
@@ -756,7 +756,7 @@ function rewriteOverlayTag(html, id) {
         const defer = attrs.has('defer') ? ' defer' : '';
         const asyncAttr = attrs.has('async') ? ' async' : '';
         out += html.slice(last, tagStart)
-          + `<script src="/assets/comment-overlay.js" data-preview-id="${id}"${defer}${asyncAttr}></script>`;
+          + `<script src="${assetBase}comment-overlay.js" data-preview-id="${id}"${defer}${asyncAttr}></script>`;
         last = i + 1 + close[0].length;
         open.lastIndex = last;
       }
@@ -774,9 +774,9 @@ function rewriteOverlayTag(html, id) {
  * hash was computed from the source BEFORE this runs, so injected chrome never
  * changes it.
  */
-export function chromeInject(html, item) {
+function chromeInjectWith(html, item, { assetBase, directoryTag = '' }) {
   assertSlug(item.id, item.metaFile); // the id becomes an HTML attribute + route
-  const rewritten = rewriteOverlayTag(html, item.id);
+  const rewritten = rewriteOverlayTag(html, item.id, assetBase);
   const data = {
     id: item.id,
     title: item.meta.title,
@@ -787,9 +787,32 @@ export function chromeInject(html, item) {
     provenance: resolveProvenance(item.meta.provenance),
   };
   const island = `<script id="preview-shell-data" type="application/json">${jsonIsland(data)}</script>`;
-  const shellTag = '<script src="/assets/preview-shell.js"></script>';
+  const shellTag = `<script src="${assetBase}preview-shell.js"></script>`;
   const { index } = findInjectionPoint(rewritten);
-  return `${rewritten.slice(0, index)}${island}\n${shellTag}\n${rewritten.slice(index)}`;
+  return `${rewritten.slice(0, index)}${island}\n${directoryTag}${shellTag}\n${rewritten.slice(index)}`;
+}
+
+export function chromeInject(html, item) {
+  return chromeInjectWith(html, item, { assetBase: '/assets/' });
+}
+
+/**
+ * Chrome injection for the LOCAL library (`file://`). Same chrome, three
+ * `file://`-imposed differences: asset refs are relative (an absolute
+ * `/assets/...` resolves to the filesystem root), every item page loads the
+ * build-emitted `assets/directory.js` before the shell (browsers refuse
+ * `fetch` under `file://` but load classic script subresources, so the
+ * catalog rides in as a `window.__previewDirectory` global), and link
+ * relativization itself is runtime behavior — the shell and index detect
+ * `file:` and build relative hrefs, so injection carries no link mode.
+ * Entry pages sit at a fixed depth (`p/<id>/index.html`), making `../../`
+ * a constant.
+ */
+export function chromeInjectLocal(html, item) {
+  return chromeInjectWith(html, item, {
+    assetBase: '../../assets/',
+    directoryTag: '<script src="../../assets/directory.js"></script>\n',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1064,11 +1087,88 @@ export function buildLibrary({ root, collections, include, gitCommit = defaultGi
 }
 
 // ---------------------------------------------------------------------------
+// Local library (file://)
+// ---------------------------------------------------------------------------
+
+/**
+ * The one write the local build makes inside the content tree is replacing
+ * `<root>/library/`, so both that directory and its swap-in sibling must be
+ * ignored — an untracked build output would make the root dirty and trip the
+ * deploy fetch-guard. Idempotent exact-line append; returns the rules added
+ * (empty when the file already carries them). The `.gitignore` itself is part
+ * of the committed Library contract, so a first-run append is a one-time
+ * migration commit per root.
+ */
+const LOCAL_IGNORE_RULES = ['/library/', '/library.tmp/'];
+
+export function ensureLibraryIgnored(root) {
+  const file = path.join(root, '.gitignore');
+  let text = '';
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+  const have = new Set(text.split('\n').map((line) => line.trim()));
+  const missing = LOCAL_IGNORE_RULES.filter((rule) => !have.has(rule));
+  if (missing.length === 0) return [];
+  const sep = text && !text.endsWith('\n') ? '\n' : '';
+  fs.writeFileSync(file, `${text}${sep}${missing.join('\n')}\n`);
+  return missing;
+}
+
+/**
+ * Build the browsable local library and swap it into `<root>/library/`.
+ *
+ * Same scan, validation, projection and chrome as the deploy build — only the
+ * chrome seam differs (relative refs + the directory global, see
+ * chromeInjectLocal) and the catalog is additionally emitted as
+ * `assets/directory.js`. The staging tree is assembled in system temp exactly
+ * like the deploy path, so any build failure leaves the existing `library/`
+ * untouched; the swap then copies to `<root>/library.tmp` (a rename from temp
+ * could cross devices) and renames over `library/`.
+ *
+ * ponytail: the swap is atomic-enough, not transactional — between removing the
+ * old `library/` and the rename there is a moment with neither. A reader mid-
+ * click can retry; a crash leaves `library.tmp` for the next run to clear.
+ */
+export function buildLocalLibrary({ root, collections, include, gitCommit = defaultGitCommit }) {
+  const rootReal = fs.realpathSync(root);
+  const built = buildLibrary({
+    root, collections, include, gitCommit, injectEntry: chromeInjectLocal,
+  });
+  try {
+    fs.writeFileSync(
+      path.join(built.stagingDir, 'assets', 'directory.js'),
+      `window.__previewDirectory = ${jsonIsland(built.directory)};\n`,
+    );
+    const ignoreRulesAdded = ensureLibraryIgnored(rootReal);
+
+    const dest = path.join(rootReal, 'library');
+    const tmp = path.join(rootReal, 'library.tmp');
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.cpSync(built.stagingDir, tmp, { recursive: true });
+    fs.rmSync(dest, { recursive: true, force: true });
+    fs.renameSync(tmp, dest);
+
+    return {
+      libraryDir: dest,
+      directory: built.directory,
+      sizeReport: built.sizeReport,
+      ignoreRulesAdded,
+    };
+  } finally {
+    fs.rmSync(built.stagingDir, { recursive: true, force: true });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
-const USAGE = `usage: ${SELF} [--from <path>] [--json]
+const USAGE = `usage: ${SELF} [--local] [--from <path>] [--json]
 
+  --local        build the file:// library and swap it into <root>/library/
   --from <path>  anchor config resolution at <path> instead of the current directory
   --json         print the build result as JSON instead of a human report`;
 
@@ -1079,10 +1179,13 @@ const USAGE = `usage: ${SELF} [--from <path>] [--json]
 function main(argv) {
   let from;
   let asJson = false;
+  let local = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
       asJson = true;
+    } else if (arg === '--local') {
+      local = true;
     } else if (arg.startsWith('--from=')) {
       from = arg.slice('--from='.length);
     } else if (arg === '--from') {
@@ -1105,12 +1208,18 @@ function main(argv) {
     );
   }
 
-  const result = buildLibrary({
-    root: resolved.root,
-    collections: resolved.collections,
-    include: resolved.target.include,
-    injectEntry: chromeInject,
-  });
+  const result = local
+    ? buildLocalLibrary({
+      root: resolved.root,
+      collections: resolved.collections,
+      include: resolved.target.include,
+    })
+    : buildLibrary({
+      root: resolved.root,
+      collections: resolved.collections,
+      include: resolved.target.include,
+      injectEntry: chromeInject,
+    });
 
   if (asJson) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -1119,12 +1228,15 @@ function main(argv) {
 
   const { sizeReport } = result;
   const lines = [
-    `staging: ${result.stagingDir}`,
+    local ? `library: ${result.libraryDir}` : `staging: ${result.stagingDir}`,
     `items:   ${result.directory.items.length}`,
     ...Object.entries(sizeReport.collections).map(
       ([key, s]) => `  ${key}: ${s.files} file(s), ${(s.bytes / 1000).toFixed(1)} kB`,
     ),
     `total:   ${sizeReport.totalFiles} file(s), ${(sizeReport.totalBytes / 1e6).toFixed(2)} MB`,
+    ...(local && result.ignoreRulesAdded.length
+      ? [`gitignore: added ${result.ignoreRulesAdded.join(' ')} (commit it with the content root)`]
+      : []),
     ...sizeReport.warnings.map((w) => `WARNING: ${w}`),
   ];
   process.stdout.write(`${lines.join('\n')}\n`);

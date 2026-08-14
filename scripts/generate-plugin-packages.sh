@@ -273,6 +273,22 @@ for name in "${codex_plugins[@]+"${codex_plugins[@]}"}"; do
     | (.key | split(":")[1])
   ' "$COMPATIBILITY_REGISTRY")
 
+  # Second declared seam: a skill that lists the shared preview config schema
+  # gets it at the PACKAGE level (shared/config.schema.json), because that is
+  # where config-resolve.mjs walks to from scripts/ (../../../shared/).
+  if jq -e \
+    --arg prefix "$name:" \
+    --arg resource "src/$name/shared/config.schema.json" '
+      [.skills | to_entries[]
+       | select(.key | startswith($prefix))
+       | select(.value.publication.codex == "include")
+       | .value.platformResources // []]
+      | flatten | index($resource) != null
+    ' "$COMPATIBILITY_REGISTRY" >/dev/null; then
+    mkdir -p "$output/shared"
+    cp "$SOURCE_ROOT/$name/shared/config.schema.json" "$output/shared/config.schema.json"
+  fi
+
   for toml in "$SOURCE_ROOT/$name"/agents/*.toml; do
     [[ -e "$toml" ]] || continue
     mkdir -p "$output/agents"

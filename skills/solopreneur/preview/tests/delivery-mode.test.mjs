@@ -14,13 +14,25 @@ const SCRIPT = path.join(ROOT, 'scripts', 'resolve-delivery.mjs');
 const RESERVE_SCRIPT = path.join(ROOT, 'scripts', 'reserve-local-output.mjs');
 const SKILL = fs.readFileSync(path.join(ROOT, 'SKILL.md'), 'utf8');
 
-test('local is the default on Claude and Codex hosts', () => {
-  assert.equal(resolveDeliveryMode(), 'local');
-  assert.equal(resolveDeliveryMode({ codexThreadId: 'thread' }), 'local');
+test('library is the default on Claude and Codex hosts', () => {
+  assert.equal(resolveDeliveryMode(), 'library');
+  assert.equal(resolveDeliveryMode({ codexThreadId: 'thread' }), 'library');
+});
+
+test('explicit temporary intent resolves to ephemeral on both hosts', () => {
+  assert.equal(resolveDeliveryMode({ ephemeral: true }), 'ephemeral');
+  assert.equal(resolveDeliveryMode({ ephemeral: true, codexThreadId: 'thread' }), 'ephemeral');
 });
 
 test('an explicit Vercel mode remains available on Claude Code', () => {
   assert.equal(resolveDeliveryMode({ vercel: true }), 'vercel');
+});
+
+test('vercel and ephemeral cannot be combined', () => {
+  assert.throws(
+    () => resolveDeliveryMode({ vercel: true, ephemeral: true }),
+    /mutually exclusive/,
+  );
 });
 
 test('an explicit Vercel mode fails closed on Codex before side effects', () => {
@@ -31,14 +43,20 @@ test('an explicit Vercel mode fails closed on Codex before side effects', () => 
 });
 
 test('the shipped CLI exposes the same mode contract', () => {
-  const local = spawnSync(process.execPath, [SCRIPT], { encoding: 'utf8' });
+  const library = spawnSync(process.execPath, [SCRIPT], { encoding: 'utf8' });
+  const ephemeral = spawnSync(process.execPath, [SCRIPT, '--ephemeral'], { encoding: 'utf8' });
+  const combined = spawnSync(process.execPath, [SCRIPT, '--ephemeral', '--vercel'], { encoding: 'utf8' });
   const blocked = spawnSync(process.execPath, [SCRIPT, '--vercel'], {
     encoding: 'utf8',
     env: { ...process.env, CODEX_THREAD_ID: 'thread' },
   });
 
-  assert.equal(local.status, 0);
-  assert.equal(local.stdout.trim(), 'local');
+  assert.equal(library.status, 0);
+  assert.equal(library.stdout.trim(), 'library');
+  assert.equal(ephemeral.status, 0);
+  assert.equal(ephemeral.stdout.trim(), 'ephemeral');
+  assert.equal(combined.status, 2);
+  assert.equal(combined.stdout, '');
   assert.equal(blocked.status, 2);
   assert.equal(blocked.stdout, '');
   assert.match(blocked.stderr, /no files, config, preflight, network, or deployment actions were performed/);
@@ -78,15 +96,18 @@ test('local output reservation rejects empty and relative targets without writes
   }
 });
 
-test('the canonical skill puts the delivery gate before either workflow', () => {
+test('the canonical skill puts the delivery gate before every workflow', () => {
   const body = SKILL.slice(SKILL.indexOf('\n---\n', 4) + 5);
   const gate = body.indexOf('## Delivery mode gate');
-  const local = body.indexOf('## Local workflow');
+  const library = body.indexOf('## Library workflow');
   const vercel = body.indexOf('## Vercel workflow');
+  const ephemeral = body.indexOf('## Ephemeral workflow');
 
   assert.notEqual(gate, -1);
-  assert.notEqual(local, -1);
+  assert.notEqual(library, -1);
   assert.notEqual(vercel, -1);
-  assert.ok(gate < local && local < vercel);
+  assert.notEqual(ephemeral, -1);
+  assert.ok(gate < library && library < vercel && vercel < ephemeral);
   assert.doesNotMatch(body, /## Codex host guard/);
+  assert.doesNotMatch(body, /## Local workflow/);
 });

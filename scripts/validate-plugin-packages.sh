@@ -148,8 +148,9 @@ while IFS= read -r -d '' sidecar; do
 done < <(find "$CLAUDE_PACKAGE_ROOT" -type f -name _VENDOR.md -print0)
 
 # A Codex package carries only the skills the registry includes plus the seams it
-# declares in platformResources — no shared/ and no src/, so the first two
-# candidates in the config-helper resolution block cannot resolve there and the
+# declares in platformResources — no src/, and shared/ holds at most the declared
+# config.schema.json (never config.sh), so the first two candidates in the
+# config-helper resolution block cannot resolve there and the
 # third, scripts/config.sh, only exists when the skill declared the seam. A skill
 # that sources the helpers without declaring them therefore ships a package that
 # HALTs on first use. That is a registry mistake, but it is invisible in the

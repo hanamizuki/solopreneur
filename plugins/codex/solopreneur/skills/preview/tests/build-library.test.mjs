@@ -24,7 +24,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildLibrary, findInjectionPoint, chromeInject, projectDirectory, BuildError } from '../scripts/build-library.mjs';
+import {
+  buildLibrary, buildLocalLibrary, ensureLibraryIgnored,
+  findInjectionPoint, chromeInject, projectDirectory, BuildError,
+} from '../scripts/build-library.mjs';
 
 const SCRIPT = path.join(
   path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'build-library.mjs',
@@ -1029,4 +1032,142 @@ test('the CLI prints usage for --help and exits 0', () => {
   const res = runCli(['--help']);
   assert.equal(res.status, 0);
   assert.match(res.stdout, /usage:/);
+});
+
+// --- local library (file://) -------------------------------------------------
+
+function localBuild(root, include = ['active', 'archive']) {
+  return buildLocalLibrary({ root, collections: COLLECTIONS, include, gitCommit: () => null });
+}
+const readLocal = (root, ...parts) => fs.readFileSync(path.join(root, 'library', ...parts), 'utf8');
+
+test('buildLocalLibrary swaps a complete file:// tree into <root>/library/', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  writeItem(root, 'archive', 'b');
+
+  const res = localBuild(root);
+
+  assert.equal(res.libraryDir, path.join(root, 'library'));
+  for (const rel of [
+    ['index.html'], ['directory.json'],
+    ['assets', 'preview-shell.js'], ['assets', 'comment-overlay.js'], ['assets', 'directory.js'],
+    ['p', 'a', 'index.html'], ['p', 'b', 'index.html'],
+  ]) assert.ok(fs.existsSync(path.join(res.libraryDir, ...rel)), rel.join('/'));
+  assert.deepEqual(res.directory.items.map((it) => it.id).sort(), ['a', 'b']);
+  assert.ok(!fs.existsSync(path.join(root, 'library.tmp')), 'no swap residue');
+});
+
+test('local entry pages carry relative chrome and pre-load the catalog global', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', {
+    files: { 'index.html': '<body>a<script src="./comment-overlay.js"></script></body>' },
+  });
+
+  localBuild(root);
+  const page = readLocal(root, 'p', 'a', 'index.html');
+
+  assert.match(page, /<script src="\.\.\/\.\.\/assets\/comment-overlay\.js" data-preview-id="a">/);
+  assert.match(page, /<script src="\.\.\/\.\.\/assets\/directory\.js"><\/script>/);
+  assert.match(page, /<script src="\.\.\/\.\.\/assets\/preview-shell\.js"><\/script>/);
+  assert.ok(!page.includes('"/assets/'), 'no absolute asset refs under file://');
+  assert.ok(
+    page.indexOf('assets/directory.js') < page.indexOf('assets/preview-shell.js'),
+    'the catalog global must load before the shell reads it',
+  );
+});
+
+test('assets/directory.js carries exactly the directory.json catalog', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a', { over: { title: 'Angle <br>ackets & spice' } });
+
+  localBuild(root);
+  const script = readLocal(root, 'assets', 'directory.js');
+
+  const prefix = 'window.__previewDirectory = ';
+  assert.ok(script.startsWith(prefix), 'stable global assignment shape');
+  const parsed = JSON.parse(script.slice(prefix.length).replace(/;\n$/, ''));
+  assert.deepEqual(parsed, JSON.parse(readLocal(root, 'directory.json')));
+  assert.equal(parsed.items[0].title, 'Angle <br>ackets & spice');
+  assert.ok(!script.includes('<'), 'script-context escapes stay applied');
+});
+
+test('the local build appends the two ignore rules once, preserving existing content', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules'); // no trailing newline
+
+  const first = localBuild(root);
+  assert.deepEqual(first.ignoreRulesAdded, ['/library/', '/library.tmp/']);
+  assert.equal(
+    fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
+    'node_modules\n/library/\n/library.tmp/\n',
+  );
+
+  const second = localBuild(root);
+  assert.deepEqual(second.ignoreRulesAdded, []);
+  assert.equal(
+    fs.readFileSync(path.join(root, '.gitignore'), 'utf8'),
+    'node_modules\n/library/\n/library.tmp/\n',
+  );
+});
+
+test('ensureLibraryIgnored creates a fresh .gitignore when none exists', () => {
+  const root = tmp();
+  assert.deepEqual(ensureLibraryIgnored(root), ['/library/', '/library.tmp/']);
+  assert.equal(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), '/library/\n/library.tmp/\n');
+});
+
+test('a rebuild replaces the previous library tree instead of merging into it', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  fs.writeFileSync(path.join(root, 'library', 'stale.txt'), 'stale');
+
+  localBuild(root);
+
+  assert.ok(!fs.existsSync(path.join(root, 'library', 'stale.txt')), 'swap, not merge');
+  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')));
+});
+
+test('a failed rebuild leaves the previous library intact', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  const before = localBuild(root);
+  assert.equal(before.directory.items.length, 1);
+
+  writeItem(root, 'active', 'broken', { rawMeta: '{not json' });
+  assert.throws(() => localBuild(root), isBuildError(/malformed JSON/));
+
+  assert.ok(fs.existsSync(path.join(root, 'library', 'p', 'a', 'index.html')), 'old tree survives');
+  assert.ok(!fs.existsSync(path.join(root, 'library', 'p', 'broken')));
+  assert.ok(!fs.existsSync(path.join(root, 'library.tmp')));
+});
+
+test('two local builds produce identical entry pages and catalog rows', () => {
+  const root = tmp();
+  writeItem(root, 'active', 'a');
+  localBuild(root);
+  const firstPage = readLocal(root, 'p', 'a', 'index.html');
+  const firstItems = JSON.parse(readLocal(root, 'directory.json')).items;
+
+  localBuild(root);
+
+  assert.equal(readLocal(root, 'p', 'a', 'index.html'), firstPage);
+  assert.deepEqual(JSON.parse(readLocal(root, 'directory.json')).items, firstItems);
+});
+
+test('the CLI --local builds into the configured root and reports it', () => {
+  const { base, activeDir } = cliFixture();
+  const res = runCli(['--local', '--from', activeDir]);
+  assert.equal(res.status, 0, res.stderr);
+  assert.match(res.stdout, /library:\s+\S*\/previews\/library/);
+  assert.match(res.stdout, /gitignore: added \/library\/ \/library\.tmp\//);
+  assert.ok(fs.existsSync(path.join(base, 'previews', 'library', 'p', 'a', 'index.html')));
+
+  const json = runCli(['--local', '--json', '--from', activeDir]);
+  assert.equal(json.status, 0, json.stderr);
+  const out = JSON.parse(json.stdout);
+  assert.equal(out.libraryDir, path.join(base, 'previews', 'library'));
+  assert.deepEqual(out.ignoreRulesAdded, []);
 });
