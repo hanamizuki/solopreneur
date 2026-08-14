@@ -227,7 +227,23 @@ invoke。所以每支要各自判定 `full` / `degraded`，會動遠端或本機
 
 - PR #179 只動 `_VENDOR.md` sync metadata，與 skills-compatibility 式發佈不衝突；
   只有 Claude 端真刪 android skill 目錄才會撞它。
-- 待 Hana 裁決：(1) 4 支 D-tier 進不進 V1（17 vs 13）；(2) 5 組 overlap 正式定案
-  （本 grading 隱含選「一組留一支」）；(3) Claude 端要不要同步清有害 3 支——
-  `gradle-logic`/`compose-navigation`/`langgraph` 現在就在誤導 Claude session；
-  (4) designer/marketer 進不進 Phase 1；(5) PR #182 先合否。
+### 裁決（2026-08-14，Hana）
+
+1. 4 支 android D-tier **先不進** V1。
+2. 5 組 overlap **照建議**（一組留一支）。
+3. Claude 端**同步清**有害 3 支 → **PR #183**（`chore/remove-harmful-skills`：
+   刪 skill 目錄、vendor manifest 去對映、agent md / README / marketplace 掃引用、
+   compatibility registry + frozen baseline 縮集合並重釘 SHA、plugins/ 重生成；
+   validator 103 支、46/46 tests 過）。合併後 **PR #179 會 conflict**（動到已刪
+   兩支的 `_VENDOR.md`）——close 掉讓下輪 sync 對縮小後的 manifest 重跑即可。
+4. designer / marketer **先不進** Phase 1。
+5. PR #182 先合否：未裁決，維持 open。
+
+**Phase 1 發佈清單定案（13 支）**：
+
+- android-dev（8）：`agp-9-upgrade`、`navigation-3`、`edge-to-edge`、`viewmodel`、
+  `r8-analyzer`（發前先驗 PR #178 script 完整性）、`play-billing-library-version-upgrade`、
+  `migrate-xml-views-to-jetpack-compose`、`android-patterns`
+- ios-dev（1）：`ios-patterns`
+- ai-engineer（1）：`senior-prompt-engineer`
+- neo4j-dev（3）：`neo4j-cypher`、`neo4j-migration`、`neo4j-cli-tools`
