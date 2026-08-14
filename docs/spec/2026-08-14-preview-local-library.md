@@ -1,7 +1,7 @@
 # Preview Local Library
 
-**Status:** Design approved and implemented 2026-08-14; A1 passed, A2–A5
-re-runs pending
+**Status:** Design approved and implemented 2026-08-14; A1–A2 passed,
+A3–A5 re-runs pending
 
 **Date:** 2026-08-14
 
@@ -182,12 +182,25 @@ local library with relative chrome and the catalog global, and appended the
 ignore rules; the generated resolver printed `library` / `ephemeral` and
 failed `--vercel` closed (exit 2) under `CODEX_THREAD_ID`.
 
-### A2 Claude Code (pending)
+### A2 Claude Code
 
-Live run: item created under `active/<id>/`, local library built, `file://`
-item link returned; sidebar, catalog links, and comment persistence
-verified in a real browser session on the built tree; content root left
-clean per `git status`.
+Accepted on 2026-08-14, on the real fleet content root rather than a
+fixture. The canonical builder ran `--local` against the production root
+(51 items across active and archive, 5.43 MB, no validation failure) on
+two machines independently — Crystal, and Feathers via a worktree of this
+branch — each producing its own `<root>/library/`. On Feathers the user
+opened the built tree in a real browser over `file://` and verified the
+sidebar catalog (active/archive grouping, cross-item navigation,
+current-item marking) and comment persistence across a reload
+(per-id `localStorage`). After the build, `git status` over the content
+root is clean: the appended ignore rules are committed and the generated
+`library/` is untracked-ignored.
+
+Scope note: this run verified the built tree and the `file://` UX on real
+data; a skill-driven end-to-end pass (new item authored under
+`active/<id>/`, then built and linked in one /preview invocation) was not
+separately staged — its constituent steps are covered by A1 and by the
+item corpus above, and the first production /preview use will exercise it.
 
 ### A3–A5 Codex exec / TUI / App (pending)
 
