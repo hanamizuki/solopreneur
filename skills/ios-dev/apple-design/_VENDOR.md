@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/emilkowalski/skills
 - **Source path**: `skills/apple-design`
-- **Pinned commit**: 70744e3816f1d93eafb697161a8b880a7384c5ff
-- **Synced at**: 2026-07-28T06:16:12Z
+- **Pinned commit**: 78761e1b57f97dce65b983d640c70a68f39e8163
+- **Synced at**: 2026-08-14T04:13:57Z
 - **License**: see `../../vendor/LICENSES/emilkowalski-skills-LICENSE` (source repo: `src/ios-dev/vendor/LICENSES/emilkowalski-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
