@@ -521,10 +521,12 @@ echo "EFFECTIVE_SIZE=$EFFECTIVE_SIZE SIZE_MAX_ROUNDS=$SIZE_MAX_ROUNDS"
 HOST_FAMILY=$([ -n "${CODEX_THREAD_ID:-}" ] && echo openai || echo anthropic)
 echo "HOST_FAMILY=$HOST_FAMILY"
 
-# L-size is Claude-Code-only. A host without subagents processes fixes INLINE (see
-# Step 3), and one incomplete S-size round already measured ~212k tokens — up to 10
-# L-size rounds of inline fix processing does not fit. Halting here is honest scope;
-# running anyway would degrade silently, mid-loop, after paying for reviews.
+# L-size is Claude-Code-only. L wants all five Phase 1 reviewers and three of them
+# are Claude-only or third-party, so a non-anthropic host cannot staff the size it
+# advertises. And wherever fix processing does fall back to inline (see Step 3), one
+# incomplete S-size round already measured ~212k tokens, so ten L-size rounds would
+# not fit either. Halting here is honest scope; running anyway would degrade
+# silently, mid-loop, after paying for reviews.
 if [ "$EFFECTIVE_SIZE" = L ] && [ "$HOST_FAMILY" != anthropic ]; then
   echo "HALT: L-size runs need a Claude Code host (reason_class: authority-boundary)"
   exit 1   # a guard that only prints is not a guard — stop before any reviewer runs
@@ -2792,8 +2794,8 @@ hand-edited config.
 Processing review feedback involves extensive file reading and fixing. To avoid bloating
 the main conversation context, **this must be delegated to a subagent**.
 
-**On a host without subagents, apply the fixes inline in the main context
-instead.** The delegation exists to keep the main context small, not for
+**Where you cannot dispatch a subagent, apply the fixes inline in the main
+context instead.** The delegation exists to keep the main context small, not for
 correctness — so where there is no subagent to dispatch to, everything below
 still applies, just executed in this context. The instruction above is **not**
 weakened on Claude Code: there the subagent is mandatory, because an L-size loop
