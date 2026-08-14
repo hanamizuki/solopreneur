@@ -644,7 +644,9 @@
           "docs/spec/2026-08-10-codex-greenlight-port.md#a6-codex-app"
         ]
       },
-      "dependencies": [],
+      "dependencies": [
+        "solopreneur:specialist-review"
+      ],
       "requiredCapabilities": {
         "codex-exec": [
           "git",

@@ -46,7 +46,7 @@ smaller surface:
 
 | | On Codex |
 |---|---|
-| Modes | PR mode via `external` only. Codex can spawn subagents, but Phase 1 and Phase 2 still depend on reviewer-specific agent definitions and routing coverage that are not shipped. Uncommitted and post-commit modes **halt at pre-flight** — they have no gate and never call `resolve`, so their clean signal would be `codex review` approving its own host's work |
+| Modes | PR mode only. Phase 1 runs there with whichever reviewers exist: `/specialist-review` (row 4) is published on Codex, the other four rows are Claude-only or third-party plugins, so an M-size run reviews with one reviewer and continues into Phase 2 under the existing at-least-one rule. `external` still skips Phase 1 + 2 when that is the intent. Uncommitted and post-commit modes **halt at pre-flight** — they have no gate and never call `resolve`, so their clean signal would be `codex review` approving its own host's work |
 | Gate | `claude-cli` — the gate must be independent of the host's model family (see [Host-family independence](#host-family-independence)) |
 | Sizes | **S and M only**; an L-size run halts at pre-flight |
 | Invocation | the explicit `$greenlight` mention, plus the `unattended` token for any unattended caller — a one-shot exec session has nobody to answer a prompt |
@@ -653,11 +653,14 @@ filter exists to prevent, arriving through a door the filter does not watch.
 that makes the scope real rather than merely documented. Not retryable — the
 fixes are to run the mode on a Claude Code host, or to open a PR and use PR mode.
 
-In **PR mode** on such a host, Phase 1 and Phase 2 are skipped (they need
-subagents the host does not have) and the run goes straight to Phase 3 — the same
-place `external` lands. Passing `external` explicitly is still preferred, because
-it states the intent instead of relying on the all-reviewers-unavailable
-degradation.
+In **PR mode** on such a host, Phase 1 runs. Codex creates real child threads,
+and `/specialist-review` (row 4) is published there, so at M size one reviewer is
+available and the existing at-least-one rule carries the run into Phase 2. The
+Claude-only and third-party rows are logged as unavailable, exactly as they are
+on a Claude host that lacks them. Phase 1 and 2 are skipped only when *every*
+selected reviewer turns out unavailable, or when the caller passed `external` —
+which remains the way to state that intent rather than relying on the
+all-reviewers-unavailable degradation.
 
 If `MODE=uncommitted`, skip Steps 2-5 below and Argument Parsing; jump directly to **[Uncommitted Mode](#uncommitted-mode)**.
 
@@ -1405,6 +1408,11 @@ otherwise. On a halt, report **blocked** and reference the `halts/` payload path
 - **S** → Phase 1 is skipped entirely (handled by the skip above).
 
 **Dispatch the selected subagents in parallel (`run_in_background: true`), each running a review skill. All report-only — no code changes.**
+
+On Codex, run each available reviewer skill in this thread instead:
+`run_in_background` is a Claude Code parameter, and at M size `/specialist-review`
+is the only row available there, so there is nothing to parallelise. The review
+still reaches a child thread — that skill spawns its own per-stack reviewers.
 
 | Subagent | Skill | Source | Focus |
 |----------|-------|--------|-------|
