@@ -20,5 +20,7 @@ diff-clean toggle、`@keyframes cmtFlash`/`cmtSheetUp`、mobile sheet），與�
 
 ## 前置依賴
 
-PR #176（`agent/preview-local-first`，draft）若定案會重構 preview 交付
-機制——先等它裁決，避免對同一區域做兩次結構手術。
+PR #176 已於 2026-08-14 合併：preview 交付改為本機 Library 預設（三態
+delivery gate、`build-library.mjs --local`）。前置依賴已解除，這項可以動了；
+注意 `comment-overlay.js` 現在同時服務 `file://` 本機 library 與 Vercel 發佈，
+抽 CSS 時兩條路徑都要驗。
