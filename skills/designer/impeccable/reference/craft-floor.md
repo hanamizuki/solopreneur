@@ -12,6 +12,7 @@ Each of these is a check on the built result, not an intention. Run them togethe
 - **Type:** body measure 65–75ch, display max 6rem, tracking floor -0.04em, balanced headings, obvious scale and weight steps. Run the real copy at every breakpoint and fix what overflows.
 - **Motion:** one authored moment, not scattered effects and not one identical entrance on every section. Exponential ease-out from an already-visible default. Reach past transform and opacity: blur, backdrop-filter, clip-path, mask, and shadow belong to the palette when they stay smooth.
 - **States:** hover, disabled, loading, error, empty. Plus real content, working controls, responsive composition, keyboard focus.
+- **Browser surfaces:** the parts you did not draw still carry the design. Text selection, the caret, custom scrollbars, focus rings, underline offset, and the numerals in tabular data all ship with browser defaults that belong to no design system. Theme them from the palette. This is the cheapest signal that a page was built rather than assembled, and the one models skip most reliably.
 - **Copy:** the product's own language. Controls name their action; errors name the problem and the recovery.
 - **Coverage:** every brief requirement present and findable within seconds.
 
@@ -32,8 +33,11 @@ Surface habits:
 - Gradient text. Emphasis comes from weight or size.
 - Glass and blur as decoration rather than as a specific effect.
 - A colored `border-left` or `border-right` above 1px on cards, list items, callouts, or alerts.
+- Hard offset shadows (`box-shadow: 4px 4px 0`) outside a world that is actually neobrutalist. The zero-blur block shadow is a costume, not a depth system; a world that did not choose it never earns it as a default.
 - Sparklines, progress rings, and soft-shadowed rounded rectangles standing in for content.
 - Monospace as a costume for "technical" rather than for code, data, or measurement.
+- A system display face (Impact, Arial Black, the platform sans) as the display voice of an own-world page. Source and self-host a face whose character matches the approved lettering; the closest installed font is a failure, not a fallback.
+- Unicode glyphs or emoji standing in for an icon system. Icons are drawn, from a real library or authored SVG, in one consistent stroke and weight.
 - Light or dark picked by category. Pick it from the use scene: who, where, under what ambient light.
 
 The floor holds the mechanics; it never picks the direction. With every check green, spend the page on the committed world, and when torn between refined and committed, commit.
