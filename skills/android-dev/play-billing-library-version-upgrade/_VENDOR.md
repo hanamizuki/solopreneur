@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `play/play-billing-library-version-upgrade`
 - **Pinned commit**: 1e5e7ae6138bebd0835d0d5854b0b9adfeed3181
-- **Synced at**: 2026-08-12T13:15:26Z
+- **Synced at**: 2026-08-14T04:12:21Z
 - **License**: see `../../vendor/LICENSES/android-skills-LICENSE.txt` (source repo: `src/android-dev/vendor/LICENSES/android-skills-LICENSE.txt`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
