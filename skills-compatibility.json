@@ -945,23 +945,21 @@
       },
       "acceptance": {
         "claude-code": [
-          "docs/spec/2026-08-14-preview-local-library.md#acceptance",
-          "docs/spec/2026-08-12-preview-local-first.md#a1-contract-and-regression-suite",
-          "docs/spec/2026-08-12-preview-local-first.md#a2-claude-code"
+          "docs/spec/2026-08-14-preview-local-library.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a2-claude-code"
         ],
         "codex-exec": [
-          "docs/spec/2026-08-14-preview-local-library.md#acceptance",
-          "docs/spec/2026-08-12-preview-local-first.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a3-codex-exec--a5-codex-app-deferred",
           "docs/spec/2026-08-12-preview-local-first.md#a3-codex-exec"
         ],
         "codex-tui": [
-          "docs/spec/2026-08-14-preview-local-library.md#acceptance",
-          "docs/spec/2026-08-12-preview-local-first.md#a1-contract-and-regression-suite",
-          "docs/spec/2026-08-12-preview-local-first.md#a4-codex-tui"
+          "docs/spec/2026-08-14-preview-local-library.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a4-codex-tui"
         ],
         "codex-app": [
-          "docs/spec/2026-08-14-preview-local-library.md#acceptance",
-          "docs/spec/2026-08-12-preview-local-first.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-08-14-preview-local-library.md#a3-codex-exec--a5-codex-app-deferred",
           "docs/spec/2026-08-12-preview-local-first.md#a5-codex-app"
         ]
       },
