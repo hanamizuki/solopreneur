@@ -22,8 +22,9 @@ codex plugin add solopreneur@solopreneur
 ```
 
 Claude Code can also install the role plugins (`marketer`, `designer`,
-`ios-dev`, `android-dev`, `ai-engineer`, `neo4j-dev`). Codex currently ships
-the verified core subset only. See the [full install guide](#install).
+`ios-dev`, `android-dev`, `ai-engineer`, `neo4j-dev`). Codex ships the verified
+core subset plus the four specialist plugins' knowledge skills — no agents, no
+`marketer` / `designer`. See the [full install guide](#install).
 
 ## What's in the box
 
@@ -42,10 +43,12 @@ On Claude Code, installing any sub-plugin auto-pulls `solopreneur`. Requires Cla
 
 Codex currently publishes the compatible `solopreneur` core subset:
 `autopilot`, `greenlight`, `handoff`, `merge-pr`, `perspective`,
-`plan-review`, `post-mortem`, and `preview`; the specialist plugins publish
-their own vendored knowledge skills alongside it. `skills-compatibility.json`
-is the source of truth for what ships. Unsupported skills stay out of the
-Codex package instead of appearing and failing later.
+`plan-review`, `post-mortem`, `preview`, and `specialist-review`; the
+specialist plugins publish their own vendored knowledge skills alongside it,
+which is what `specialist-review` reads there.
+`skills-compatibility.json` is the source of truth for what ships.
+Unsupported skills stay out of the Codex package instead of appearing and
+failing later.
 
 Codex V1 is intentionally a smaller, fail-closed surface:
 
@@ -59,6 +62,7 @@ Codex V1 is intentionally a smaller, fail-closed surface:
 | `$solopreneur:plan-review internal` | Technical and lean findings only; no outside review, adjudication, or write-back. |
 | `$solopreneur:post-mortem` | Same git archaeology and report. In `codex exec`, put the bug description in the prompt; the run stops at the printed report. |
 | `$solopreneur:preview` | Local delivery only — the `file://` Library and the single-file ephemeral mode. An explicit Vercel, online, cross-device, or external-sharing request fails closed before any file, config, network, or deployment action. |
+| `$solopreneur:specialist-review` | Same stack detection and review. No specialist agents exist on Codex yet, so every stack drops to a generic reviewer — reading that stack's knowledge skills when its plugin is installed (`marketer` and `designer` publish none), or reviewing inline when no subagent can be spawned. Every path names its degradation in a banner. |
 
 The skill descriptions below document the full Claude Code surface. Use the
 contracts above when running these skills on Codex.
@@ -393,11 +397,17 @@ claude plugin update marketer@solopreneur
 
 ### Codex
 
-Codex publishes the core plugin only:
-
 ```bash
 codex plugin marketplace add hanamizuki/solopreneur --ref main
 codex plugin add solopreneur@solopreneur
+```
+
+The four specialist plugins also publish a Codex package — a knowledge subset,
+no agents. Add the ones matching your stack so `/specialist-review` has
+something to read:
+
+```bash
+codex plugin add android-dev@solopreneur   # or ios-dev / ai-engineer / neo4j-dev
 ```
 
 To refresh the marketplace and installed plugin later, then start a new session:

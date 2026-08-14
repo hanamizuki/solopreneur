@@ -22,7 +22,8 @@ Detect the review scope automatically, in this priority order:
 1. **User specified a PR number or URL** → use that PR's diff
 2. **Current branch has an open PR** → `gh pr diff`
 3. **Current branch is not main/master** → `git diff main...HEAD`
-4. **Uncommitted changes exist** → `git diff` (staged + unstaged)
+4. **Uncommitted changes exist** → `git diff HEAD` (staged + unstaged; plain
+   `git diff` misses anything already staged)
 5. **None of the above** → ask the user what to review
 
 Run these checks:
@@ -52,41 +53,65 @@ Read the full diff and identify which tech stacks are involved based on file pat
 List all detected stacks and which subagents will be dispatched. If only one stack
 is detected, dispatch one agent. If multiple, dispatch them **in parallel**.
 
+On Codex the last two rows never resolve to their agent — `marketer` and
+`designer` publish no Codex package — and `general-purpose` has no Codex
+equivalent. All three fall through the ladder in Step 2.25 to the built-in
+`explorer`.
+
 Also extract the key libraries/frameworks used in the diff (e.g., `jetpack compose`,
 `swiftui`, `langgraph`, `react`, `room`, `fastapi`). These will be passed to subagents
 for documentation lookup.
 
-## Step 2.25: Check Specialist Agent Availability
+## Step 2.25: Pick a Reviewer for Each Stack
 
 Each specialist agent ships as its own sub-plugin (`ios-dev`,
 `android-dev`, `ai-engineer`, `neo4j-dev`). Users may have
-only installed `solopreneur` (the core plugin).
+only installed `solopreneur` (the core plugin), and on Codex none of the four
+agents exist yet — only their knowledge skills are published.
 
-For each agent you plan to dispatch in Step 3, attempt the Agent dispatch
-directly. Handle the result:
+For each stack detected in Step 2, take the first rung that works. This is the
+ladder [`plan-review`](../plan-review/SKILL.md#host-profiles) already uses;
+don't invent another one.
 
-- **Success** → proceed as normal.
-- **Unknown-subagent-type error** (i.e., Claude Code reports the subagent
-  type doesn't exist) → still perform the review for that stack, but do it
-  **inline** using generic expertise. Prefix that stack's section in the
-  final report with the template below, substituting `<plugin>` with the
-  agent / plugin name for that stack (`ios-dev`, `android-dev`,
-  `ai-engineer`, or `neo4j-dev`; the agent and plugin share the same name):
+1. **The matching specialist agent** — dispatch it directly.
+2. **A generic reviewer subagent** — `general-purpose` on Claude Code, the
+   built-in `explorer` on Codex. The `general-purpose` rows of the Step 2 table
+   start here.
+3. **Inline** — when spawning is unavailable or rejected at the current
+   subagent depth, review that stack yourself in this thread.
 
-  > ⚠️ Plugin `<plugin>` not installed. Review done with generic expertise.
-  > Install it for deeper, skill-index-backed review.
+Rungs 2 and 3 are degradations, and that stack's section opens with the matching
+banner, substituting `<plugin>` with the agent / plugin name for that stack (the
+agent and plugin share the same name).
 
-- **Any other Agent error** (crash, timeout, tool failure) → surface to the
-  user; do not silently fall back.
+Rung 2:
 
-Do **not** pre-check via Glob on the plugin cache path — the cache layout
-depends on the local marketplace name the user chose, and the dispatch
+> ⚠️ Specialist agent `<plugin>` unavailable. Reviewed by a generic reviewer
+> against the installed `<plugin>` skills.
+
+Rung 3:
+
+> ⚠️ Specialist agent `<plugin>` unavailable and no subagent could be spawned.
+> Reviewed inline with generic expertise.
+
+The rung-2 banner is written by the reviewer itself — it is in the Step 3 output
+format — so keep it when you paste the report in. The rung-3 banner is yours to
+write, since nobody else was there to write it.
+
+Report the rung you actually used, and **never narrate a dispatch that did not
+happen**. Any other dispatch error (crash, timeout, tool failure) → surface it
+to the user; do not silently fall back.
+
+Do **not** pre-check the plugin cache path to decide the rung — the cache
+layout depends on the local marketplace name the user chose, and the dispatch
 error is the authoritative signal.
 
 ## Step 2.5: Check context7 Availability
 
-Check if `mcp__context7__resolve-library-id` tool is available (via ToolSearch or by
-checking deferred tools list).
+Check whether this session exposes the context7 MCP tools — `resolve-library-id`
+and `query-docs`. Enumerate tools however this host does it; each host prefixes
+MCP tool names its own way (`mcp__context7__resolve-library-id` on Claude Code).
+A call that fails because the tool does not exist counts as unavailable.
 
 - **Available**: Note this for Step 3. Each subagent will query context7 for the
   technologies it's reviewing.
@@ -98,7 +123,19 @@ checking deferred tools list).
 
 ## Step 3: Dispatch Subagents
 
-For each detected tech stack, spawn a subagent **in parallel** with this prompt template.
+For each detected tech stack, spawn the reviewer Step 2.25 picked, **in
+parallel**, with this prompt template.
+
+On Codex that is one `spawn_agent` call per stack. `fork_turns="none"` is
+required — a named agent inheriting full parent history is rejected, and a
+reviewer that inherits your framing is not an independent read. Set
+`agent_type="explorer"` for its analysis-shaped persona, but do not mistake it
+for a boundary: a child spawned with it records `agent_role: explorer` and still
+writes files. The role selects an instruction set, not a permission profile —
+`spawn_agent` takes no sandbox argument and the child inherits the parent's
+tools. So the "do NOT modify any files" line below is an instruction; the only
+enforcement available is starting the session itself with
+`--sandbox read-only`.
 
 If context7 is **available** (from Step 2.5), include the `[CONTEXT7 BLOCK]` below.
 If **not available**, omit it entirely.
@@ -108,9 +145,22 @@ You are an expert reviewer. Do NOT modify any files. Only analyze and report.
 
 ## Task
 
-1. Your subagent system prompt (`agents/<platform>-dev.md`) lists curated
-   skills and points to the extended skill index. Follow those instructions
-   to discover relevant skills for your domain.
+1. Discover the skills for your domain:
+   - **If you have a specialist system prompt** (`agents/<platform>-dev.md`): it
+     lists curated skills and points to the extended skill index. Follow it.
+   - **If you don't** (you are a generic reviewer): resolve the plugin's
+     *enabled* install, then pick the 3-5 skills whose names match the diff.
+     Ask the host which install is active instead of guessing — on Codex,
+     `codex plugin list --json` reports `marketplaceName` and `version` per
+     enabled plugin, giving one exact path:
+     `"${CODEX_HOME:-$HOME/.codex}"/plugins/cache/<marketplaceName>/<plugin>/<version>/skills/`.
+     With no such listing, glob `.../plugins/cache/*/<plugin>/*/skills/*/` and
+     take the highest semver: both the marketplace name and the version are
+     the user's, several versions of one plugin do coexist in a cache, and
+     reviewing against a stale copy is worse than finding nothing. Nothing
+     there means the plugin is not installed — say so and review with your
+     own expertise.
+   Report the absolute path of every SKILL.md you actually read.
 
 2. From the diff below, identify which specific technologies and APIs are used
    (e.g., "Jetpack Compose remember", "LazyColumn key", "SwiftData @Model",
@@ -128,14 +178,15 @@ You are an expert reviewer. Do NOT modify any files. Only analyze and report.
    - Use the retrieved documentation as an additional reference when reviewing
 [END CONTEXT7 BLOCK]
 
-4. Scan the curated list and extended index for TWO categories of relevant skills:
+4. Scan whatever step 1 gave you — the curated list plus extended index, or the
+   plugin cache listing — for TWO categories of relevant skills:
    a. **Technology-specific skills**: skills matching the APIs/frameworks used
    b. **Cross-cutting skills**: performance, architecture, patterns, guidelines
       skills that apply regardless of specific API (e.g., compose performance
       audit, architecture patterns, accessibility, project conventions)
 
-5. For each relevant skill (both categories), read its SKILL.md using the
-   resolved path from the curated section or extended index.
+5. For each relevant skill (both categories), read its SKILL.md using the path
+   step 1 resolved.
 
 6. Review the diff against each relevant skill's best practices AND context7
    documentation (if queried). For each skill checked, report:
@@ -158,10 +209,25 @@ You are an expert reviewer. Do NOT modify any files. Only analyze and report.
 
 ### Tech Stack: [platform name]
 
+[If you are not this platform's specialist agent — you had no specialist system
+prompt and discovered skills from the plugin cache — open the section with this
+line, substituting `<plugin>`. It is the only signal the reader gets that the
+named specialist did not run:
+> ⚠️ Specialist agent `<plugin>` unavailable. Reviewed by a generic reviewer
+> against the installed `<plugin>` skills.
+
+If that discovery turned up nothing — the plugin is not installed — open with
+this instead. Do not claim skills you never read:
+> ⚠️ Specialist agent `<plugin>` unavailable and no installed `<plugin>` skills
+> found. Reviewed with generic expertise.]
+
 #### Skills Checked
 | Skill | Aspect | Status | Finding |
 |-------|--------|--------|---------|
 | skill-name | what was checked | check/warning | details |
+
+Skills read: one absolute SKILL.md path per line, marketplace and version
+segments included. A bare skill name does not count — the path is the evidence.
 
 #### context7 Documentation Consulted
 | Library | Topic Queried | Key Insight |
@@ -189,7 +255,10 @@ Wait for all subagents to complete, then compile a unified report:
 
 ### Reviews
 
-[paste each subagent's report, grouped by platform]
+[per stack: the Step 2.25 degradation banner whenever rung 2 or 3 ran, then that
+stack's report pasted verbatim — keep its Skills Checked table and its Skills
+read paths; that list is how the user tells a real skill-backed review from a
+plausible one. Saying "a generic reviewer ran" in prose is not the banner]
 
 ### Cross-Cutting Concerns
 [issues that span multiple platforms, if any]
@@ -204,6 +273,8 @@ Wait for all subagents to complete, then compile a unified report:
 - If a skill index doesn't exist for a detected stack, the subagent should use
   its built-in expertise instead
 - Each subagent should read at most 3-5 most relevant skills (not the entire index)
+- On Codex, discovery is the installed plugin cache only — the extended skill
+  index (`/rebuild-skill-index`) is a Claude Code path and is not ported
 - The subagent prompt includes the full diff so it can reference specific lines
 - If the diff is very large (>500 lines), mention this to the user and suggest
   focusing on specific files
