@@ -48,10 +48,20 @@ child is not accepted.
 
 `agent_type="explorer"` is a real, accepted built-in type — a directly
 instructed probe produced a child whose rollout records `agent_role: explorer`.
-It is nonetheless a preference, not a guarantee: across every acceptance run the
-model set `fork_turns="none"` and omitted `agent_type`, spawning an unscoped
-peer instead. The skill says so plainly rather than claiming a read-only agent
-it does not reliably get.
+It is not, however, a read-only boundary. A second probe forced the argument
+through (parent rollout carries `"agent_type":"explorer"` verbatim, child
+rollout carries `agent_role: explorer` and a `parent_thread_id` back to it) and
+that child still wrote the file it was asked to write. The role selects an
+instruction set, not a permission profile: `SpawnAgentArgs` has no sandbox
+field, and the tool description says the spawned agent "will have the same
+tools as you".
+
+Two consequences the skill states outright. The reviewer's read-only character
+rests on the dispatch prompt, and the only mechanical enforcement available is
+running the session itself under `--sandbox read-only`. And the model does not
+reliably set `agent_type` anyway — across every acceptance run it set
+`fork_turns="none"` and omitted the type; one probe parent even asserted the
+field does not exist before being forced to pass it.
 
 Before this change the Codex path went straight from "the agent type does not
 exist" to inline review, which read no skills at all — the knowledge base was
@@ -61,19 +71,30 @@ published and never opened.
 
 A generic reviewer has no specialist system prompt, so the instruction to
 follow one is a no-op on Codex. The dispatch prompt now carries discovery
-itself: a reviewer without a system prompt lists the installed plugin cache and
-picks 3–5 skills matching the diff.
+itself: a reviewer without a system prompt resolves the plugin's enabled
+install and picks 3–5 skills matching the diff.
 
-The cache path is globbed, never hardcoded:
+Neither the marketplace name nor the version can be hardcoded — the first is
+whatever the user chose when adding the marketplace, the second moves with
+every release — but globbing both is wrong too. A cache holds several versions
+of the same plugin at once (a working Claude cache here carries 203 versions of
+one plugin and two of `solopreneur/android-dev`), and the same plugin name can
+appear under two marketplaces (`openai-curated/github` alongside
+`openai-curated-remote/github`). A blind glob lets the reviewer check the diff
+against superseded guidance and report it as current.
+
+So discovery asks the host which install is enabled — the same source
+`install-codex-agents.sh` already uses:
 
 ```text
-"${CODEX_HOME:-$HOME/.codex}"/plugins/cache/*/<plugin>/*/skills/*/
+codex plugin list --json   →   marketplaceName, version, enabled
+"${CODEX_HOME:-$HOME/.codex}"/plugins/cache/<marketplaceName>/<plugin>/<version>/skills/
 ```
 
-The marketplace segment is whatever name the user chose when adding the
-marketplace, and the version segment moves with every plugin release. The
-reviewer reports the absolute path of every `SKILL.md` it read, which is what
-makes "did it really read the knowledge base" checkable rather than narrated.
+The glob stays as the fallback for hosts with no such listing, narrowed to the
+highest semver. Either way the reviewer reports the absolute path of every
+`SKILL.md` it read, which is what makes "did it really read the knowledge base"
+checkable rather than narrated — and now also shows *which version* it read.
 
 ## Limitations
 
@@ -97,9 +118,11 @@ makes "did it really read the knowledge base" checkable rather than narrated.
   Claude-only tool-enumeration mechanism; a call that fails because the tool does
   not exist counts as unavailable.
 - **Read-only by contract, not by agent role.** The skill only reads a diff and
-  reports. Since `agent_type` is omitted in practice, the boundary is held by
-  the sandbox and the prompt's "do NOT modify any files", not by a read-only
-  agent role. Run reviews under `--sandbox read-only`.
+  reports. No agent role can hold that boundary — a child spawned with
+  `agent_type="explorer"` writes files just as a typeless one does — so it rests
+  on the prompt's "do NOT modify any files" plus whatever sandbox the session
+  was started with. Run reviews under `--sandbox read-only` when the boundary
+  needs to be enforced rather than instructed.
 - **The reviewer may want to build.** Under the default approval policy a TUI
   run escalated for `./gradlew :app:compileDebugKotlin` with access to the real
   `~/.gradle`. A compile check is not part of the review contract; decline it,

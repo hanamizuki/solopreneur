@@ -128,13 +128,14 @@ parallel**, with this prompt template.
 
 On Codex that is one `spawn_agent` call per stack. `fork_turns="none"` is
 required — a named agent inheriting full parent history is rejected, and a
-reviewer that inherits your framing is not an independent read. Prefer
-`agent_type="explorer"`, which keeps the reviewer read-only; omitting it spawns
-an unscoped peer that can write, so the read-only sandbox and the "do NOT modify
-any files" line below are what actually hold the boundary. `spawn_agent` takes
-no sandbox argument — the child gets the same tools as its parent — so a session
-started with `--sandbox read-only` is the only way to enforce that boundary
-rather than instruct it.
+reviewer that inherits your framing is not an independent read. Set
+`agent_type="explorer"` for its analysis-shaped persona, but do not mistake it
+for a boundary: a child spawned with it records `agent_role: explorer` and still
+writes files. The role selects an instruction set, not a permission profile —
+`spawn_agent` takes no sandbox argument and the child inherits the parent's
+tools. So the "do NOT modify any files" line below is an instruction; the only
+enforcement available is starting the session itself with
+`--sandbox read-only`.
 
 If context7 is **available** (from Step 2.5), include the `[CONTEXT7 BLOCK]` below.
 If **not available**, omit it entirely.
@@ -147,12 +148,18 @@ You are an expert reviewer. Do NOT modify any files. Only analyze and report.
 1. Discover the skills for your domain:
    - **If you have a specialist system prompt** (`agents/<platform>-dev.md`): it
      lists curated skills and points to the extended skill index. Follow it.
-   - **If you don't** (you are a generic reviewer): list the installed plugin
-     cache yourself and pick the 3-5 skills whose names match the diff, e.g.
-     `ls -d "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/*/<plugin>/*/skills/*/`.
-     The marketplace directory is named whatever the user chose when adding the
-     marketplace, so glob that segment; never hardcode it. Nothing there means
-     the plugin is not installed — say so and review with your own expertise.
+   - **If you don't** (you are a generic reviewer): resolve the plugin's
+     *enabled* install, then pick the 3-5 skills whose names match the diff.
+     Ask the host which install is active instead of guessing — on Codex,
+     `codex plugin list --json` reports `marketplaceName` and `version` per
+     enabled plugin, giving one exact path:
+     `"${CODEX_HOME:-$HOME/.codex}"/plugins/cache/<marketplaceName>/<plugin>/<version>/skills/`.
+     With no such listing, glob `.../plugins/cache/*/<plugin>/*/skills/*/` and
+     take the highest semver: both the marketplace name and the version are
+     the user's, several versions of one plugin do coexist in a cache, and
+     reviewing against a stale copy is worse than finding nothing. Nothing
+     there means the plugin is not installed — say so and review with your
+     own expertise.
    Report the absolute path of every SKILL.md you actually read.
 
 2. From the diff below, identify which specific technologies and APIs are used
