@@ -53,6 +53,45 @@ def reference_is_file(repo: Path, value: object) -> bool:
     return path is not None and path.is_file()
 
 
+def plain_scalar_frontmatter_break(path: Path) -> Optional[str]:
+    """Return a message when SKILL.md frontmatter cannot parse as strict YAML.
+
+    Claude Code's loader is lenient, but Codex parses frontmatter strictly and
+    drops a skill whose frontmatter is malformed — silently, with the skill
+    installed but invisible. The failure this catches is the one seen in
+    practice: a multi-line *plain* (unquoted) scalar whose continuation line
+    contains ": ", which strict YAML reads as a nested mapping key.
+    Quoted values and block scalars (| and >) are exempt because a colon is
+    legal inside them.
+    """
+    try:
+        text = path.read_text()
+    except OSError as error:
+        return f"unreadable ({error})"
+    if not text.startswith("---\n"):
+        return "missing frontmatter"
+    body = text[4:]
+    end = body.find("\n---")
+    if end == -1:
+        return "unterminated frontmatter"
+
+    in_plain_scalar = False
+    for number, line in enumerate(body[:end].split("\n"), start=2):
+        if not line.strip():
+            continue
+        if line[0].isspace():
+            if in_plain_scalar and ": " in line:
+                return f"line {number}: ': ' inside a multi-line plain scalar"
+            continue
+        key, separator, value = line.partition(":")
+        if not separator or not key.replace("-", "").replace("_", "").isalnum():
+            in_plain_scalar = False
+            continue
+        stripped = value.strip()
+        in_plain_scalar = bool(stripped) and stripped[0] not in "|>'\"" and not stripped.startswith("[")
+    return None
+
+
 def main() -> int:
     repo = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
     registry_path = repo / "skills-compatibility.json"
@@ -283,6 +322,13 @@ def main() -> int:
             ]
             if not supported:
                 errors.append(f"skills.{skill_id} is included on Codex without a supported surface")
+            contract = repo / "skills" / skill_plugin / skill_name / "SKILL.md"
+            break_reason = plain_scalar_frontmatter_break(contract)
+            if break_reason:
+                errors.append(
+                    f"skills.{skill_id} cannot publish to Codex: frontmatter fails strict "
+                    f"YAML parsing ({break_reason}); Codex would install it but never list it"
+                )
             unsupported = [
                 surface for surface in CODEX_SURFACES if support.get(surface) == "unsupported"
             ]

@@ -63,7 +63,13 @@ marketplace="$FIXTURE_ROOT/.claude-plugin/marketplace.json"
 marketplace_next="$marketplace.next"
 jq -e '
   [.plugins[] | {name, path: .source.path}]
-  == [{name: "solopreneur", path: "./plugins/codex/solopreneur"}]
+  == [
+       {name: "solopreneur",  path: "./plugins/codex/solopreneur"},
+       {name: "ios-dev",      path: "./plugins/codex/ios-dev"},
+       {name: "android-dev",  path: "./plugins/codex/android-dev"},
+       {name: "ai-engineer",  path: "./plugins/codex/ai-engineer"},
+       {name: "neo4j-dev",    path: "./plugins/codex/neo4j-dev"}
+     ]
 ' "$FIXTURE_ROOT/.agents/plugins/marketplace.json" >/dev/null
 
 generated_skills="$(
@@ -72,6 +78,25 @@ generated_skills="$(
 )"
 [[ "$generated_skills" == $'autopilot\nfilter-canary\ngreenlight\nhandoff\nmerge-pr\nperspective\nplan-review\npost-mortem' ]]
 [[ -f "$FIXTURE_ROOT/plugins/codex/solopreneur/skills/autopilot/SKILL.md" ]]
+
+# The four specialist plugins publish a knowledge subset, so each generated tree
+# must hold exactly its include set — an over-broad filter would ship the
+# release-automation families (asc-*, gplay-*) that were never accepted.
+assert_codex_skills() {
+  local plugin="$1" expected="$2" actual
+  actual="$(
+    find "$FIXTURE_ROOT/plugins/codex/$plugin/skills" \
+      -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | tr '\n' ' '
+  )"
+  if [[ "$actual" != "$expected" ]]; then
+    echo "error: codex/$plugin skills are '$actual', expected '$expected'" >&2
+    exit 1
+  fi
+}
+assert_codex_skills ios-dev "ios-patterns "
+assert_codex_skills ai-engineer "senior-prompt-engineer "
+assert_codex_skills neo4j-dev "neo4j-cypher "
+assert_codex_skills android-dev "agp-9-upgrade android-patterns edge-to-edge migrate-xml-views-to-jetpack-compose navigation-3 play-billing-library-version-upgrade r8-analyzer viewmodel "
 [[ -f "$FIXTURE_ROOT/plugins/claude/solopreneur/.claude-plugin/plugin.json" ]]
 [[ -f "$FIXTURE_ROOT/plugins/codex/solopreneur/.codex-plugin/plugin.json" ]]
 

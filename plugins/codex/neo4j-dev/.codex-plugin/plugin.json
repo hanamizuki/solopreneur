@@ -1,0 +1,25 @@
+{
+  "name": "neo4j-dev",
+  "version": "0.0.9",
+  "description": "Neo4j graph database expertise. Ships the neo4j-dev agent and 4 vendored third-party skills (cypher / cypher-guide / migration / cli-tools).",
+  "license": "MIT",
+  "author": {
+    "name": "Hana Chang"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Neo4j Dev",
+    "shortDescription": "Neo4j graph database expertise. Ships the neo4j-dev agent and 4 vendored third-party skills (cypher / cypher-guide / migration / cli-tools).",
+    "longDescription": "Neo4j graph database expertise. Ships the neo4j-dev agent and 4 vendored third-party skills (cypher / cypher-guide / migration / cli-tools).",
+    "developerName": "Hana Chang",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Help me use Neo4j Dev."
+    ]
+  }
+}

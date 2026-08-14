@@ -15,6 +15,54 @@
         "authentication": "ON_INSTALL"
       },
       "category": "Developer Tools"
+    },
+    {
+      "name": "ios-dev",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex/ios-dev"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "android-dev",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex/android-dev"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "ai-engineer",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex/ai-engineer"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "neo4j-dev",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex/neo4j-dev"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
     }
   ]
 }
