@@ -5,8 +5,8 @@
       "name": "app-store-connect-cli-skills",
       "repo": "https://github.com/rudrankriyam/app-store-connect-cli-skills",
       "branch": "main",
-      "rev": "27f7dc50286389059c5c6351cd41ddead6892240",
-      "synced_at": "2026-08-14T04:13:54Z",
+      "rev": "fa40a3c466501367f373e92d59c9bc81a8d10891",
+      "synced_at": "2026-08-15T18:42:24Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/app-store-connect-cli-skills-LICENSE",
@@ -106,7 +106,7 @@
       "repo": "https://github.com/glittercowboy/taches-cc-resources",
       "branch": "main",
       "rev": "1757615b99ab789a72ff2d02e9f6112af2a15c04",
-      "synced_at": "2026-08-14T04:13:56Z",
+      "synced_at": "2026-08-15T18:42:24Z",
       "license": "MIT",
       "license_path": "LICENSE",
       "license_file": "LICENSES/taches-cc-resources-LICENSE",
@@ -131,7 +131,7 @@
           "to": "apple-design"
         }
       ],
-      "synced_at": "2026-08-14T04:13:57Z"
+      "synced_at": "2026-08-15T18:42:26Z"
     }
   ]
 }
