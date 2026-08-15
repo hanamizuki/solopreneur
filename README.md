@@ -72,7 +72,7 @@ contracts above when running these skills on Codex.
 
 ### Repository layout
 
-- [`skills/`](./skills/) is the single source for all 106 skills, grouped by
+- [`skills/`](./skills/) is the single source for all 103 skills, grouped by
   plugin so each skill is directly browsable.
 - [`src/`](./src/) holds manifests, agents, shared helpers, vendor metadata,
   and maintainer scripts.
@@ -219,7 +219,7 @@ build/debug/ship.
 ### `android-dev`
 
 The `android-dev` agent (Jetpack Compose / Kotlin / Play Console / build /
-performance) plus the in-house `android-patterns` skill and 37 vendored skills
+performance) plus the in-house `android-patterns` skill and 35 vendored skills
 from 5 different upstream repos.
 
 #### Bundled skills
@@ -240,7 +240,8 @@ from 5 different upstream repos.
 ### `ai-engineer`
 
 The `ai-engineer` agent for LangGraph / LangChain / streaming / tool calling /
-structured output, plus 2 in-house skills and 1 vendored skill.
+structured output, plus the in-house `ai-app-templates` skill and 1 vendored
+skill.
 
 #### Bundled skills
 
