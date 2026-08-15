@@ -7,7 +7,7 @@ description: Generates, optimizes, and validates Cypher 25 queries for Neo4j 202
   Does NOT handle driver migration or API changes — use neo4j-migration-skill.
   Does NOT cover DB administration or server ops — use neo4j-cli-tools-skill.
 compatibility: Neo4j >= 2025.01 (safe baseline); Cypher 25
-version: 1.0.19
+version: 1.0.21
 ---
 
 ## When to Use
@@ -246,7 +246,12 @@ ORDER BY collaborations DESC
 Subclause expressions (`ORDER BY`/`WHERE`) referencing projection items more complex than a variable or property access are deprecated [2026.07] — alias the expression in `RETURN`/`WITH`, then reference the alias.
 
 `count(n)` counts non-null; `count(*)` counts rows including nulls. `collect(DISTINCT expr)` deduplicates.
+`GROUP BY` subclause [2026.07] states grouping keys explicitly on `WITH`/`RETURN`; implicit grouping stays valid.
 `count()` is faster than `size(collect())` — count() reads the internal store; collect() builds a list first.
+
+`GROUP BY` subclause on `WITH`/`RETURN` [2026.07, Cypher 25] states grouping keys explicitly (GQL alignment); implicit grouping still valid.
+
+`ORDER BY`/`WHERE` subclause expressions referencing a projection item more complex than a variable or `var.prop` are deprecated [2026.07] — alias the expression in the projection and order by the alias. Same for names that shadow an incoming variable. `ORDER BY`/`WHERE` may now call aggregation functions absent from the projection list when the projection clause already aggregates.
 
 ---
 
@@ -326,7 +331,10 @@ Default to 2025.01-safe features when version unknown.
 | `ACYCLIC` path mode (no repeated nodes in path) | 2026.03 | post-filter with `size(nodes(p)) = size(apoc.coll.toSet(nodes(p)))` |
 | `string.indexOf()`, `string.join()`, `string.regexReplace()` | 2026.05 | `apoc.text.*` or app-side |
 | GQL aliases: `FOR`=`UNWIND`, `PROPERTY_EXISTS`=`IS NOT NULL`, `IS [NOT] LABELED`=`n:Label`; function aliases (`local_time`, `zoned_datetime`, `duration_between`, `collect_list`, etc.) | 2026.02–04 | GQL compliance only — use Cypher equivalents; full list → [references/cypher-syntax.md](references/cypher-syntax.md) |
-| **GRAPH TYPE** schema DDL (`ALTER CURRENT GRAPH TYPE SET`, `EXTEND GRAPH TYPE WITH`, `DROP GRAPH TYPE ELEMENTS`, `SHOW CURRENT GRAPH TYPE`) | **2026.02 — PREVIEW** | Use individual `CREATE CONSTRAINT` / `CREATE INDEX` |
+| **GRAPH TYPE** schema DDL (`ALTER CURRENT GRAPH TYPE SET/ADD/ALTER/DROP`, `SHOW CURRENT GRAPH TYPE`) | 2026.02 (preview), **GA 2026.06** | Use individual `CREATE CONSTRAINT` / `CREATE INDEX` |
+| `GROUP BY` subclause on `WITH`/`RETURN` (explicit grouping keys, GQL alignment) | 2026.07 | Implicit grouping — list non-aggregating expressions in the projection |
+| `cardinality()` — keys in a MAP, elements in a LIST, nodes+rels in a PATH | 2026.07 | `size()` for LIST/MAP keys, `length()` for PATH |
+| Aggregation functions in `ORDER BY`/`WHERE` that are not projection items (aggregating projection only) | 2026.07 | Project the aggregate as an alias, then order/filter on the alias |
 
 ---
 
@@ -380,7 +388,7 @@ Load on demand:
 - [references/performance.md](references/performance.md) — anti-patterns, text vs fulltext indexes, Eager (3 fix strategies), label inference, batching best practices, parallel runtime
 - [references/advanced-patterns.md](references/advanced-patterns.md) — REPEATABLE ELEMENTS patterns, allReduce stateful traversal, multi-stop QPE, route planning simulation, DAG critical path, temporal fraud detection component graph, cycle detection, OPTIONAL CALL
 - [references/apoc.md](references/apoc.md) — APOC Core: refactoring, virtual graph, merge helpers, path expanders, triggers, collections, conditional execution
-- [references/graph-type.md](references/graph-type.md) — **PREVIEW (2026.02+)** GRAPH TYPE DDL: `ALTER CURRENT GRAPH TYPE SET`, `EXTEND GRAPH TYPE WITH`, `DROP GRAPH TYPE ELEMENTS`, property types, constraints, label implications, relationship type enforcement
+- [references/graph-type.md](references/graph-type.md) — GRAPH TYPE DDL (GA 2026.06): `ALTER CURRENT GRAPH TYPE SET/ADD/ALTER/DROP`, `SHOW CURRENT GRAPH TYPE [AS GRAPH]`, element type syntax, property types, constraints, label implications, relationship type enforcement, required privileges
 
 ## WebFetch
 
