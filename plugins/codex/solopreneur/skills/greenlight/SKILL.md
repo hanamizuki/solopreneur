@@ -46,7 +46,7 @@ smaller surface:
 
 | | On Codex |
 |---|---|
-| Modes | PR mode via `external` only. Codex can spawn subagents, but Phase 1 and Phase 2 still depend on reviewer-specific agent definitions and routing coverage that are not shipped. Uncommitted and post-commit modes **halt at pre-flight** — they have no gate and never call `resolve`, so their clean signal would be `codex review` approving its own host's work |
+| Modes | PR mode only. Phase 1 runs there with whichever reviewers exist: `/specialist-review` (row 4) is published on Codex, the other four rows are Claude-only or third-party plugins, so an M-size run reviews with one reviewer and continues into Phase 2 under the existing at-least-one rule. `external` still skips Phase 1 + 2 when that is the intent. Uncommitted and post-commit modes **halt at pre-flight** — they have no gate and never call `resolve`, so their clean signal would be `codex review` approving its own host's work |
 | Gate | `claude-cli` — the gate must be independent of the host's model family (see [Host-family independence](#host-family-independence)) |
 | Sizes | **S and M only**; an L-size run halts at pre-flight |
 | Invocation | the explicit `$greenlight` mention, plus the `unattended` token for any unattended caller — a one-shot exec session has nobody to answer a prompt |
@@ -54,6 +54,13 @@ smaller surface:
 Limitation reference: `docs/spec/2026-08-10-codex-greenlight-port.md`. The
 filtered Codex publication includes this degraded surface. Reviewed-head
 binding remains a shared Claude/Codex defect, not a Codex parity gate.
+
+**Phase 1 is verified on Codex exec only**
+(`docs/spec/2026-08-15-codex-greenlight-phase1.md`). TUI and App run the same
+shared body with no surface gate, so Phase 1 is expected to work there and is
+simply unproven; if it does not, the all-reviewers-unavailable rule already
+carries those runs to Phase 3. Phase 3 itself is accepted on all three
+surfaces.
 
 ### Arguments
 
@@ -514,10 +521,12 @@ echo "EFFECTIVE_SIZE=$EFFECTIVE_SIZE SIZE_MAX_ROUNDS=$SIZE_MAX_ROUNDS"
 HOST_FAMILY=$([ -n "${CODEX_THREAD_ID:-}" ] && echo openai || echo anthropic)
 echo "HOST_FAMILY=$HOST_FAMILY"
 
-# L-size is Claude-Code-only. A host without subagents processes fixes INLINE (see
-# Step 3), and one incomplete S-size round already measured ~212k tokens — up to 10
-# L-size rounds of inline fix processing does not fit. Halting here is honest scope;
-# running anyway would degrade silently, mid-loop, after paying for reviews.
+# L-size is Claude-Code-only. L wants all five Phase 1 reviewers and three of them
+# are Claude-only or third-party, so a non-anthropic host cannot staff the size it
+# advertises. And wherever fix processing does fall back to inline (see Step 3), one
+# incomplete S-size round already measured ~212k tokens, so ten L-size rounds would
+# not fit either. Halting here is honest scope; running anyway would degrade
+# silently, mid-loop, after paying for reviews.
 if [ "$EFFECTIVE_SIZE" = L ] && [ "$HOST_FAMILY" != anthropic ]; then
   echo "HALT: L-size runs need a Claude Code host (reason_class: authority-boundary)"
   exit 1   # a guard that only prints is not a guard — stop before any reviewer runs
@@ -653,11 +662,15 @@ filter exists to prevent, arriving through a door the filter does not watch.
 that makes the scope real rather than merely documented. Not retryable — the
 fixes are to run the mode on a Claude Code host, or to open a PR and use PR mode.
 
-In **PR mode** on such a host, Phase 1 and Phase 2 are skipped (they need
-subagents the host does not have) and the run goes straight to Phase 3 — the same
-place `external` lands. Passing `external` explicitly is still preferred, because
-it states the intent instead of relying on the all-reviewers-unavailable
-degradation.
+In **PR mode** on such a host, Phase 1 runs. Codex creates real child threads,
+and `/specialist-review` (row 4) is published there, so at M size one reviewer is
+available and the existing at-least-one rule carries the run into Phase 2. The
+Claude-only and third-party rows are logged as unavailable, exactly as they are
+on a Claude host that lacks them. Phase 1 and 2 are still skipped on the same
+three conditions as anywhere else — `external_only == true`,
+`EFFECTIVE_SIZE == S`, or *every* selected reviewer turning out unavailable.
+Nothing here loosens the Size S rule; `external` remains the way to state that
+intent rather than relying on the all-reviewers-unavailable degradation.
 
 If `MODE=uncommitted`, skip Steps 2-5 below and Argument Parsing; jump directly to **[Uncommitted Mode](#uncommitted-mode)**.
 
@@ -1406,6 +1419,14 @@ otherwise. On a halt, report **blocked** and reference the `halts/` payload path
 
 **Dispatch the selected subagents in parallel (`run_in_background: true`), each running a review skill. All report-only — no code changes.**
 
+On Codex, ignore `run_in_background` — it is a Claude Code parameter. Run the
+selected reviewer skills however that host runs work: in this thread, or one
+`spawn_agent` child per reviewer. At M size `/specialist-review` is usually the
+only row that resolves there, so there is nothing to parallelise either way, and
+the review reaches a child thread regardless because that skill spawns its own
+per-stack reviewers. The rows that do not resolve still get their unavailable
+line — skipping the attempt does not skip the report.
+
 | Subagent | Skill | Source | Focus |
 |----------|-------|--------|-------|
 | 1 | `/simplify` | Anthropic official | Check simplicity, reuse, quality, efficiency — **report issues and specific fix suggestions only, do not modify files** |
@@ -1414,7 +1435,7 @@ otherwise. On a halt, report **blocked** and reference the `halts/` payload path
 | 4 | `/specialist-review` | included | Tech-stack expert review — **report findings and specific fix suggestions only** |
 | 5 | `ponytail:ponytail-review` | ponytail plugin | Over-engineering review: dead code, hand-rolled stdlib, unused abstractions, shrinkable logic — **report only (tagged `delete`/`stdlib`/`native`/`yagni`/`shrink`)** |
 
-**All skills are optional.** If any subagent fails (skill not found, invocation error, or subagent error), log which skill was unavailable and why, skip that subagent, and continue waiting for others. For external plugins (e.g. ponytail), print a one-line install suggestion when unavailable.
+**All skills are optional.** If any subagent fails (skill not found, invocation error, or subagent error), log which skill was unavailable and why, skip that subagent, and continue waiting for others. For external plugins (e.g. ponytail), print a one-line install suggestion when unavailable. **A row you never attempt counts as unavailable and gets the same line.** Every row this size selected ends up reported either as run or as skipped-with-reason; a Phase 1 report that names only the reviewers that ran is indistinguishable from one where the others were never selected.
 
 - At least 1 subagent succeeds → proceed to Phase 2 (using completed reports)
 - All fail → notify user "Phase 1: all internal reviewers unavailable", skip Phase 1 + 2, proceed to Phase 3
@@ -2773,8 +2794,8 @@ hand-edited config.
 Processing review feedback involves extensive file reading and fixing. To avoid bloating
 the main conversation context, **this must be delegated to a subagent**.
 
-**On a host without subagents, apply the fixes inline in the main context
-instead.** The delegation exists to keep the main context small, not for
+**Where you cannot dispatch a subagent, apply the fixes inline in the main
+context instead.** The delegation exists to keep the main context small, not for
 correctness — so where there is no subagent to dispatch to, everything below
 still applies, just executed in this context. The instruction above is **not**
 weakened on Claude Code: there the subagent is mandatory, because an L-size loop

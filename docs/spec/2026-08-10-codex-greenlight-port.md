@@ -12,6 +12,16 @@ defect, not a Codex parity or publication gate
 **Related:** [Codex skill portability](./2026-08-09-codex-skill-portability.md),
 [dual-publish pilot findings](./2026-07-15-codex-dual-publish-pilot-findings.md)
 
+> **Superseded in part (2026-08-15).** This spec describes a Codex surface that
+> ran Phase 3 only, because Phase 1 and 2 were held to need subagents the host
+> did not have. That premise was wrong — Codex creates real child threads, and
+> `/specialist-review` is now published there. Phase 1 runs on Codex as of
+> [Codex Greenlight Phase 1](./2026-08-15-codex-greenlight-phase1.md), verified
+> on **codex-exec only**; TUI and App inherit it unverified. Everything else
+> here — the Phase 3 loop, gate independence, the S/M boundary, the measured
+> facts — still stands. The registry's `limitations` field takes one path per
+> surface and keeps pointing here, so follow this note for the Phase 1 caveat.
+
 ## Goal
 
 Run the shipped `/greenlight` PR review loop on Codex. One skill body, no fork.

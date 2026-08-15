@@ -635,7 +635,10 @@
       },
       "acceptance": {
         "codex-exec": [
-          "docs/spec/2026-08-10-codex-greenlight-port.md#acceptance"
+          "docs/spec/2026-08-10-codex-greenlight-port.md#acceptance",
+          "docs/spec/2026-08-15-codex-greenlight-phase1.md#a1-registry-and-generation",
+          "docs/spec/2026-08-15-codex-greenlight-phase1.md#a2-codex-exec-phase-1-dispatch",
+          "docs/spec/2026-08-15-codex-greenlight-phase1.md#a3-the-absent-reviewer-is-reported"
         ],
         "codex-tui": [
           "docs/spec/2026-08-10-codex-greenlight-port.md#a5-codex-tui"
@@ -644,7 +647,9 @@
           "docs/spec/2026-08-10-codex-greenlight-port.md#a6-codex-app"
         ]
       },
-      "dependencies": [],
+      "dependencies": [
+        "solopreneur:specialist-review"
+      ],
       "requiredCapabilities": {
         "codex-exec": [
           "git",

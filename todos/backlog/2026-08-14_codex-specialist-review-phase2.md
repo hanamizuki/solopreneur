@@ -125,6 +125,34 @@ greenlight 已發 Codex，但 profile 表（`greenlight/SKILL.md:49`）寫死：
 - ponytail 缺席時，log 有記錄「哪支不可用、為什麼」，流程不中斷。
 - 全部 reviewer 都不可用時，仍照原規則跳到 Phase 3，不會假裝跑過。
 
+### B 的結果（2026-08-15，Codex exec 已驗收）
+
+改動比預估小：Phase 1 的降級規則本來就 host-neutral（每支 reviewer 都
+optional、≥1 成功就進 Phase 2），所以是**拿掉一刀切的 skip**，不是加機制。
+證據與環境細節在 `docs/spec/2026-08-15-codex-greenlight-phase1.md`。
+
+三條驗收裡兩條一次過、一條第一次沒過：
+
+- **Phase 1 真的派出 specialist-review** ✅ child `01a0016e-fc15`，
+  `agent_path: /root/phase1_specialist`、`depth: 1`、`parent_thread_id` 反指
+  greenlight root，回報後 root 記「Phase 1 is clean」。
+- **ponytail 缺席要有記錄** ❌→✅ 第一次跑整份 rollout 搜 `ponytail` **0 次
+  命中**（只有展開的 skill 原文有）——流程沒斷，但缺席是靜默的。肇因是我寫的
+  seam 說「run each **available** reviewer skill」，模型於是在派工前先過濾，
+  而「記錄哪支不可用」那條規則是寫給**失敗**用的，從沒被嘗試的 row 觸發不到。
+  共用規則與 seam 兩邊都補（`aefba26b`），第二次跑就報了兩次。
+- **全掛時跳 Phase 3** ⏸ 未單獨驗——本次環境永遠有 specialist-review 可用。
+
+順帶推翻／補充兩件事：
+
+- **`agent_type` 這次模型自己設了**（child `agent_role: explorer`），是六次
+  run 裡第一次沒被直接命令就設。仍不改變 A 段的結論——explorer 不是權限邊界。
+- **驗收環境不能沿用 A 段那個乾淨盒子**：read-only sandbox 連網路一起擋，`gh`
+  連不到 GitHub；拋棄式 HOME 拿不到 `claude auth status`，而 Codex host 的獨立
+  gate 硬性要求它過，否則 `authority-boundary` 直接 halt。兩者各花掉一次 run。
+
+TUI / App 未跑，spec 的 Limitations 有寫明不宣稱。
+
 ---
 
 ## 共通紀律（Phase 1 踩過的坑，不要重踩）
