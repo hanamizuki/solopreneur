@@ -8,6 +8,71 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-08-16
+
+### solopreneur 0.6.0 → 0.6.1
+
+`/preview` now delivers to a local Library by default: it builds a browsable
+catalog on your machine and returns a `file://` link instead of deploying.
+Vercel publishing is opt-in — ask for an online or shareable link explicitly —
+and one-off throwaway previews still write a single ephemeral file. The
+preview toolchain also works when running under Codex. (#176)
+
+Review tooling reaches Codex: `/specialist-review` runs there via a reviewer
+ladder that reads the specialist plugins' published knowledge skills (#190),
+and `/greenlight` can drive its Phase 1 review round on Codex too (#191).
+`/greenlight` also gains Grok CLI as an opt-in local reviewer (#186). The
+Codex core package grows from four skills to nine: `handoff`, `perspective`,
+`post-mortem`, `preview`, and `specialist-review` join `autopilot`,
+`greenlight`, `merge-pr`, and `plan-review` (#182).
+
+### designer 0.1.10 → 0.1.11
+
+Re-syncs the vendored `impeccable` skill across a large upstream cycle
+(4.0.3 → 4.1.1): a comp-driven design workflow ("comps are shipped screens",
+comp-fidelity review discipline, hero-first building), a richer decision page
+(full-fidelity comps, IMPECCABLE'S PICK, Safer/Bolder registers, build-path
+toggle), Antigravity and Hermes Agent provider support, raster-provenance
+auditing through the fix loop (`embed-prompt.mjs --scan`), and a batch of
+detector false-positive and performance fixes. (#149, #185)
+
+### ios-dev 0.4.12 → 0.4.13
+
+Re-syncs the `asc-*` App Store Connect skills to the current `asc` CLI.
+Signing setup covers App Groups provisioning, private-identity sync with
+file-based passwords (inline `--password` / `ASC_MATCH_PASSWORD` deprecated),
+an experimental device/profile reconcile workflow, and one-shot signing with
+an isolated temporary keychain. Xcode export documents the `release-testing`
+method that replaces the deprecated `ad-hoc` spelling. Release staging
+validates build ownership and gates metadata deletes behind `--allow-deletes`;
+workflows gain bounded per-step retry and timeout; localization picks up
+Apple's expanded locale list; Apple Ads commands are split between Platform
+API v1 and the deprecated v5. (#154, #189)
+
+### android-dev 0.4.12 → 0.4.13
+
+Removes two vendored skills that had aged into bad guidance: `gradle-logic`
+(pinned late-2023 AGP/Kotlin versions, contradicting the bundled
+`agp-9-upgrade`) and `compose-navigation` (a community Navigation 3 retelling
+superseded by the official `navigation-3` skill bundled here). Their upstream
+mappings are dropped so future syncs cannot resurrect them. (#183, #184)
+
+### ai-engineer 0.3.15 → 0.3.16
+
+Removes the in-house `langgraph` skill: it taught an incorrect `interrupt()`
+contract and an unconditional "never add a checkpointer" rule that breaks
+human-in-the-loop flows, with 2024-era model pins. Use the `ai-engineer`
+agent with current LangGraph docs instead. The plugin description now lists
+`ai-app-templates` as the sole in-house skill. (#183)
+
+### neo4j-dev 0.0.9 → 0.0.10
+
+Re-syncs the vendored Neo4j skills: `neo4j-cypher` now documents GRAPH TYPE
+schema DDL as GA (2026.06) — the `ALTER CURRENT GRAPH TYPE ADD/ALTER/DROP`
+forms, element-type syntax, and required privileges — plus the 2026.07
+Cypher 25 additions (`GROUP BY` subclause, `cardinality()`, aggregates in
+`ORDER BY`/`WHERE`). (#153, #187)
+
 ## 2026-08-12 — Codex milestone
 
 ### solopreneur 0.5.38 → 0.6.0
