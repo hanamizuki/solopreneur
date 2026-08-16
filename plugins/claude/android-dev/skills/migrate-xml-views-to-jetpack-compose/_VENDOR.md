@@ -6,7 +6,7 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 - **Source repo**: https://github.com/android/skills
 - **Source path**: `jetpack-compose/migration/migrate-xml-views-to-jetpack-compose`
 - **Pinned commit**: 1e5e7ae6138bebd0835d0d5854b0b9adfeed3181
-- **Synced at**: 2026-08-14T04:15:56Z
+- **Synced at**: 2026-08-16T03:31:53Z
 - **License**: see `../../vendor/LICENSES/android-skills-LICENSE.txt` (source repo: `src/android-dev/vendor/LICENSES/android-skills-LICENSE.txt`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
