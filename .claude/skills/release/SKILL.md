@@ -9,7 +9,9 @@ description: |
   release, user-reviewed), commits the bumps + changelog in a single commit,
   creates double-dash git tags, and pushes commit + tags atomically.
   Optionally creates one GitHub Release on `solopreneur--v<new>` for
-  user-visible milestones (skip for routine bumps).
+  user-visible milestones (skip for routine bumps), and offers
+  build-in-public social drafts (X English + Threads 正體中文) composed
+  from the release's CHANGELOG section.
 
   Use when the user says "release", "ship release", "/release", "tag and
   release", or wants to publish bumped plugins after merging changes to main.
@@ -414,12 +416,59 @@ If the user says yes:
    )
    ```
 
+## Step 7: Build-in-public drafts (optional)
+
+Ask the user: **"Want social post drafts for this release?"** One X post
+(English) and one Threads post (正體中文). Offer it every release; the user
+skips freely on routine bumps.
+
+If yes, the source material is this release's CHANGELOG section — already
+user-reviewed in Step 2.5. Do not re-research the diff, and do not post
+anything anywhere: deliver draft text only, publishing is manual.
+
+**Shared rules**
+
+- Pick ONE angle for the main post — the most build-in-public-honest item
+  (a deletion, a default flip, a milestone number). Everything else goes to
+  a self-reply. Never enumerate the whole changelog in the main post.
+- Put one concrete number in the hook (lines deleted, skill count, version).
+- Leave some details out on purpose. Questions in the replies are the goal
+  (an author reply-back weighs ~150× a like on X), so keep an answer or two
+  in reserve instead of pre-empting everything.
+
+**X draft (English)** — release-announcement skeleton:
+
+- Main tweet ≤ 280 chars: `<name> <version> is out!` + the angle with its
+  number + a short closer (≤ 1 emoji). No external link and no hashtags in
+  the main tweet — the repo link rides in the self-reply.
+- Self-reply: remaining highlights in plain prose, then the repo URL.
+- @mention an upstream author only when the release genuinely touches their
+  work and they plausibly engage; never orphan-mention.
+- If the `marketer:x-writing` skill is available, run its quality checklist
+  on the draft before delivering.
+
+**Threads draft (正體中文)**
+
+- Same two-post shape, ≤ 500 chars per post. The link may sit in the reply;
+  Threads does not throttle external links the way X does.
+- Rewrite the angle natively in Traditional Chinese — do not translate the
+  English tweet sentence by sentence. Short lines, no em-dashes, no AI-tell
+  connectors (然而/因此/總而言之).
+- Drop X-only @handles unless the person's Threads handle is known; refer to
+  upstream work by name instead.
+- If a personal Chinese-voice skill is available (e.g. `hana-writing`),
+  apply it on top of these rules.
+
+Present both drafts together for edit/approve. This step changes no files
+and happens after the push, so aborting it never affects the release.
+
 ## Final report
 
 ```
 Released: <list of <plugin>@<version> shipped>
 Tags pushed: <list>
 GitHub Release: <URL or "skipped">
+Social drafts: <"X + Threads delivered" or "skipped">
 Commit: <SHA>
 ```
 

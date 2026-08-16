@@ -74,6 +74,9 @@ The skill:
    note for the release (what installing/updating that plugin gets the
    user — not a commit-log restatement).
 6. Pushes commit + tags atomically with `git push --follow-tags`.
+7. Offers build-in-public social drafts (X English + Threads 正體中文)
+   composed from the release's CHANGELOG section — draft text only,
+   publishing stays manual.
 
 Atomic push is mandatory — if the bump commit lands on `origin/main` before
 its matching tags, users installing in the gap hit `no-matching-tag` errors
