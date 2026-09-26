@@ -7,7 +7,7 @@ description: Generates, optimizes, and validates Cypher 25 queries for Neo4j 202
   Does NOT handle driver migration or API changes — use neo4j-migration-skill.
   Does NOT cover DB administration or server ops — use neo4j-cli-tools-skill.
 compatibility: Neo4j >= 2025.01 (safe baseline); Cypher 25
-version: 1.0.21
+version: 1.0.24
 ---
 
 ## When to Use
@@ -50,7 +50,7 @@ Never fill guessed names — realistic guesses get copied blindly.
 5. `LIMIT 25` default on all exploratory reads; push `WITH n LIMIT` before high-cardinality operations (variable-length traversals, fan-out MATCH, Cartesian products)
 6. Comments: `//` only — `--` is SQL, invalid
 7. `REPEATABLE ELEMENTS` / `DIFFERENT RELATIONSHIPS` go after `MATCH`, not end of pattern
-8. `SHOW` commands: `YIELD` before `WHERE`; combinable with general Cypher clauses incl. `UNION`/`RETURN` [2026.05] — `SHOW DATABASES` still requires system db (use `USE system`)
+8. `SHOW` commands: `YIELD` before `WHERE`; combinable with general Cypher clauses incl. `UNION`/`RETURN` [2026.05] — `SHOW DATABASES` still requires system db (use `USE system`). `CALL` on `system` db: `YIELD` then `WHERE` [2026.07]
 9. Inline node predicates `(:Label WHERE p=x)` — valid in `MATCH` only
 10. `WHERE` cannot follow bare `UNWIND` — use `WITH x WHERE`
 11. `(a)-[:R]-(b)` — undirected matches both directions, double-counts; use directed unless unknown
@@ -210,6 +210,29 @@ CYPHER 25 CREATE (a:Node)-[:$($relType)]->(b:Node)
 CYPHER 25 MATCH  (a:Node)-[:$($relType)]->(b:Node) RETURN a.name, b.name
 ```
 
+### String interpolation [2026.08, Cypher 25]
+```cypher
+CYPHER 25
+MATCH (p:Person {id: $id})
+RETURN s"Hello, {p.name}, age {p.age}" AS greeting   // S"..." and s'...' equivalent
+```
+- Each `{expr}` converts with `toString()`
+- `MAP`, `LIST`, `NODE`, `PATH`, `RELATIONSHIP` rejected
+- Escape literal braces with `\{` and `\}`
+- Interpolated strings can nest
+- Never interpolate untrusted values into Cypher text passed to `apoc.cypher.run*()`; pass `$parameters` instead
+
+### UUID type [2026.08, Cypher 25]
+```cypher
+CYPHER 25
+CREATE (sess:Session {sessionId: uuid()});            // random UUID value
+
+CYPHER 25
+MATCH (sess:Session {sessionId: uuid($uuidString)})   // STRING 8-4-4-4-12 → UUID
+RETURN toString(sess.sessionId) AS sessionId, uuid.mostSignificantBits(sess.sessionId) AS msb
+```
+`UUID` properties require Neo4j 2026.08+. Older drivers may return a placeholder `MAP` plus warning `03N95 Neo.ClientNotification.UnknownType` — check the per-driver skill for exact support (`neo4j-driver-python-skill` needs >= 6.3); otherwise keep `randomUUID()` STRING ids.
+
 ### Spatial / Point
 ```cypher
 // WGS84 geographic point
@@ -230,26 +253,28 @@ RETURN b.name, point.distance(b.coords, $origin) AS distM
 Create POINT index: `CREATE POINT INDEX name IF NOT EXISTS FOR (n:Place) ON (n.coords)`
 
 ### Aggregation grouping keys
-Non-aggregating expressions in `RETURN`/`WITH` are implicit grouping keys — no `GROUP BY` needed:
+Non-aggregating expressions in `RETURN`/`WITH` are implicit grouping keys — `GROUP BY` optional:
 ```cypher
 // actor + director are grouping keys; count(*) is the aggregate
 MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
 RETURN a.name, d.name, count(*) AS collaborations
 ORDER BY collaborations DESC
+
+// GROUP BY states keys explicitly [2026.07, Cypher 25]
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+RETURN p.name AS actor, m.genre AS genre, avg(m.rating) AS avgRating
+GROUP BY actor, genre
 ```
-Explicit `GROUP BY` [2026.07, Cypher 25] states grouping keys — GQL-aligned alternative to implicit grouping:
+Explicit `GROUP BY` subclause on `WITH`/`RETURN` [2026.07, Cypher 25] states grouping keys explicitly — GQL-aligned alternative to implicit grouping; implicit grouping stays valid:
 ```cypher
 MATCH (a:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person)
 RETURN a.name, d.name, count(*) AS collaborations GROUP BY a.name, d.name
 ORDER BY collaborations DESC
 ```
-Subclause expressions (`ORDER BY`/`WHERE`) referencing projection items more complex than a variable or property access are deprecated [2026.07] — alias the expression in `RETURN`/`WITH`, then reference the alias.
+`GROUP BY ()` = no grouping keys (one row); `GROUP BY ALL` = every non-aggregating return item is a key. Grouping keys absent from the projection are not returned. Rules → [references/cypher-syntax.md](references/cypher-syntax.md).
 
 `count(n)` counts non-null; `count(*)` counts rows including nulls. `collect(DISTINCT expr)` deduplicates.
-`GROUP BY` subclause [2026.07] states grouping keys explicitly on `WITH`/`RETURN`; implicit grouping stays valid.
 `count()` is faster than `size(collect())` — count() reads the internal store; collect() builds a list first.
-
-`GROUP BY` subclause on `WITH`/`RETURN` [2026.07, Cypher 25] states grouping keys explicitly (GQL alignment); implicit grouping still valid.
 
 `ORDER BY`/`WHERE` subclause expressions referencing a projection item more complex than a variable or `var.prop` are deprecated [2026.07] — alias the expression in the projection and order by the alias. Same for names that shadow an incoming variable. `ORDER BY`/`WHERE` may now call aggregation functions absent from the projection list when the projection clause already aggregates.
 
@@ -330,11 +355,19 @@ Default to 2025.01-safe features when version unknown.
 | `SEARCH` clause (vector/fulltext) | 2026.01 | `CALL db.index.vector.queryNodes(...)` (deprecated 2026.04) |
 | `ACYCLIC` path mode (no repeated nodes in path) | 2026.03 | post-filter with `size(nodes(p)) = size(apoc.coll.toSet(nodes(p)))` |
 | `string.indexOf()`, `string.join()`, `string.regexReplace()` | 2026.05 | `apoc.text.*` or app-side |
+| `GROUP BY` subclause on `WITH`/`RETURN`, `cardinality()` | 2026.07 | implicit grouping keys; `size()` / `size(keys(map))` |
+| `WHERE` on procedure calls run against the `system` database | 2026.07 | filter rows client-side |
 | GQL aliases: `FOR`=`UNWIND`, `PROPERTY_EXISTS`=`IS NOT NULL`, `IS [NOT] LABELED`=`n:Label`; function aliases (`local_time`, `zoned_datetime`, `duration_between`, `collect_list`, etc.) | 2026.02–04 | GQL compliance only — use Cypher equivalents; full list → [references/cypher-syntax.md](references/cypher-syntax.md) |
 | **GRAPH TYPE** schema DDL (`ALTER CURRENT GRAPH TYPE SET/ADD/ALTER/DROP`, `SHOW CURRENT GRAPH TYPE`) | 2026.02 (preview), **GA 2026.06** | Use individual `CREATE CONSTRAINT` / `CREATE INDEX` |
 | `GROUP BY` subclause on `WITH`/`RETURN` (explicit grouping keys, GQL alignment) | 2026.07 | Implicit grouping — list non-aggregating expressions in the projection |
 | `cardinality()` — keys in a MAP, elements in a LIST, nodes+rels in a PATH | 2026.07 | `size()` for LIST/MAP keys, `length()` for PATH |
 | Aggregation functions in `ORDER BY`/`WHERE` that are not projection items (aggregating projection only) | 2026.07 | Project the aggregate as an alias, then order/filter on the alias |
+| `WHERE` after `YIELD` in procedure calls on the `system` database | 2026.07 | `YIELD` + `RETURN`, filter client-side |
+| String interpolation `s"...{expr}..."` / `S"…"` | 2026.08 | `+` concatenation with `toString()` or `string.join()` |
+| `UUID` type; `uuid()`, `uuid(name)`, `uuid(mostSigBits, leastSigBits)`, `uuid.mostSignificantBits()`, `uuid.leastSignificantBits()` | 2026.08 | `randomUUID()` STRING property |
+| `null / 0` returns `null` instead of raising division-by-zero | 2026.08 | `CASE WHEN d = 0 THEN null ELSE n / d END` |
+| Map comprehension `{k: v IN map \| keyExpr: valueExpr}` | 2026.09 | `apoc.map.fromPairs([k IN keys(m) \| [k, m[k]]])` |
+| `toString()`, `toStringList()`, `toStringOrNull()` on `LIST`, `MAP`, `NODE`, `RELATIONSHIP`, `PATH` | 2026.09 | convert scalar components individually, then `string.join()` |
 
 ---
 
@@ -383,7 +416,7 @@ Full anti-patterns → [references/performance.md](references/performance.md)
 
 Load on demand:
 - [references/indexes.md](references/indexes.md) — index types (RANGE/TEXT/FULLTEXT/POINT/COMPOSITE/LOOKUP), constraints, MERGE lock semantics, fulltext Lucene syntax, import pre-flight
-- [references/cypher-syntax.md](references/cypher-syntax.md) — full syntax reference: WITH, DELETE, ORDER BY, CASE, null, lists, strings, dates, spatial/point, LOAD CSV, subqueries, QPEs, dynamic labels, SEARCH; conditional CALL (WHEN/THEN/ELSE); label pattern expressions; allReduce; NEXT clause; compact CASE WHEN; normalize(); index/constraint types table; functions annotated with version introduced
+- [references/cypher-syntax.md](references/cypher-syntax.md) — full syntax reference: WITH, DELETE, ORDER BY, CASE, null, lists, strings, dates, spatial/point, LOAD CSV, subqueries, QPEs, dynamic labels, SEARCH; conditional CALL (WHEN/THEN/ELSE); label pattern expressions; allReduce; NEXT clause; compact CASE WHEN; normalize(); string interpolation; UUID type + `uuid()` functions [2026.08]; map comprehension [2026.09]; index/constraint types table; functions annotated with version introduced
 - [references/syntax-traps.md](references/syntax-traps.md) — 40+ syntax trap table
 - [references/performance.md](references/performance.md) — anti-patterns, text vs fulltext indexes, Eager (3 fix strategies), label inference, batching best practices, parallel runtime
 - [references/advanced-patterns.md](references/advanced-patterns.md) — REPEATABLE ELEMENTS patterns, allReduce stateful traversal, multi-stop QPE, route planning simulation, DAG critical path, temporal fraud detection component graph, cycle detection, OPTIONAL CALL

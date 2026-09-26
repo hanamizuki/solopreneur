@@ -3,13 +3,13 @@ name: neo4j-migration
 description: Migrates Neo4j driver code and Cypher queries from older versions (4.x, 5.x)
   to current (2025.x/2026.x, Cypher 25). Covers Python, JavaScript/Node.js, Java, .NET,
   and Go drivers — package renames, removed APIs, version requirements, diff-ready fixes.
-  Also handles Cypher syntax migration: QPE paths, CALL subqueries, id() → elementId(),
+  Also handles Cypher syntax migration — QPE paths, CALL subqueries, id() → elementId(),
   PERIODIC COMMIT → CALL IN TRANSACTIONS, and all Cypher 25 removals.
   Does NOT write new Cypher queries — use neo4j-cypher-skill.
   Does NOT cover DB administration or server ops — use neo4j-cli-tools-skill.
   Does NOT provision new Neo4j instances — use neo4j-getting-started-skill.
 allowed-tools: WebFetch Bash
-version: 1.0.8
+version: 1.0.10
 ---
 
 ## When to Use
@@ -315,6 +315,8 @@ Full migration guide: [references/go-driver.md](references/go-driver.md)
 | 2025.01–2025.05 | Cypher 5 | Yes | CalVer era begins |
 | 2025.06+ | Cypher 5 or 25 | Yes | Cypher 25 new default |
 | 2026.01+ | Cypher 25 | Yes | `SEARCH` clause available |
+| 2026.07.0 | Cypher 25 | Yes | **Skip this patch** — block-format UTF-8 regression makes `trim()` fail queries and corrupt stored strings; upgrade target is 2026.07.1 |
+| 2026.08+ | Cypher 25 | Yes | `UUID` type + string interpolation added; `UUID` properties require driver >= 6.2 (Python >= 6.3) — older drivers return placeholder `MAP` and warn `03N95`; 2026.08 bundles Java driver 6.2.1 |
 
 Store format: no changes between 4.4 and 2026.x. `block` format default for new Enterprise dbs since 5.22. `high_limit` and `standard` deprecated in 5.23, removed after 2026 LTS.
 
