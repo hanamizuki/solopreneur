@@ -80,7 +80,7 @@ Probes. "Baseline" is the Task 1 result on dc024af8.
 | P-B3 | calibration | blog | `The update is free for existing customers, not a paid add-on as the beta notice said.` | R matches `(not\|isn't\|is not) a paid add-on`; `beta notice` in R | not run |
 | P-B5 | calibration | blog | `The 2019–2024 survey covered pages 10–12 of the handbook.` | `2019–2024` and `10–12` (U+2013) in R | not run |
 | P-D1 | fidelity guard | blog | `The organisation's colour guide was finalised in March, and it is crucial to note that every programme team must follow it.` | R contains organisation, colour, finalised, programme, March | PASS |
-| P-D2 | reporting | blog | `Our CEO wrote, "This release is a testament to the team," and the changelog lists 9 fixes.` | R contains `This release is a testament to the team` and `9`; A mentions "testament" | run in Task 1 |
+| P-D2 | reporting | blog | `Our CEO wrote, "This release is a testament to the team," and the changelog lists 9 fixes.` | R contains `This release is a testament to the team` and `9`; A mentions "testament" | PASS |
 | P-PRE-B1 | fidelity guard | prewrite en | brief: `60–90 word company-blog paragraph: in our 2025 user survey, people who used offline sync were more likely to renew their plan; we did not test whether sync causes renewals.` | `2025` in output; causal-free | not run |
 
 Existing suite rules ("R", "I" as above):
@@ -127,7 +127,7 @@ Existing suite rules ("R", "I" as above):
 - [x] Snapshot: `git -C "$W" archive HEAD skills/marketer/humanly | tar -x -C "$EVAL/baseline"`.
 - [x] Grader written and self-tested against synthetic failures (hardened date, reversed refund promise, `800.` at a sentence end).
 - [x] Baseline probes P-A1, P-A2, P-A3, P-A4, P-B1, P-D1: results in the probe table.
-- [ ] Baseline P-D2 (new reporting behavior).
+- [x] Baseline P-D2 (new reporting behavior): PASS, so it is not promoted.
 
 ---
 
@@ -443,6 +443,20 @@ git status --porcelain   # only skills/marketer/humanly/** and plugins/claude/ma
 - [ ] **Step 3:** leave the merge to Hana. After it merges, move the backlog todo to `done/` on `main`.
 
 ---
+
+## Eval results (2026-09-26)
+
+Branch = this branch after Task 9. Every probe passed on the branch. P-A1, P-A2 and P-A3 failed on the baseline and passed on both branch runs, so they became `CAL-01`–`CAL-03`.
+
+| Probe | Baseline | Branch |
+|---|---|---|
+| P-A1 | FAIL | PASS, PASS |
+| P-A2 | FAIL | PASS, PASS |
+| P-A3 | FAIL | PASS, PASS |
+| P-A4, P-B1, P-D1, P-D2 | PASS | PASS |
+| P-B1b, P-B1c, P-B3, P-B5, P-PRE-B1 | not run | PASS |
+
+Suite on the branch: 32 of 32 pass the mechanical rules. Every FID and OVER rewrite and NEW-05, NEW-09 and PRE-02 were also read by hand: no moved protected string, no reversed claim, no invented fact. No failure needed a rerun, so no pre-existing failure was found.
 
 ## Plan review disposition (2026-09-26)
 
