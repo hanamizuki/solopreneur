@@ -84,7 +84,7 @@ A second pair, community-post register:
 
 Quick pass after writing:
 
-- **Em dashes** (— and --): replace with commas, periods, or parentheses. Target: zero.
+- **Em dashes** (— and --): replace with commas, periods, or parentheses. Target: zero. When you remove one, rewrite the sentence instead of swapping in an en dash (–) or a spaced hyphen, which keeps the same aside. Ranges (9:00–17:00, pages 4–7) are not dashes.
 - **Bold**: for scanning, not emphasis on every third phrase.
 - **Emoji in headers**: remove entirely.
 - **Excessive bullets**: if a list has 3+ items that flow naturally, convert to prose.
@@ -235,9 +235,11 @@ Summary: swap high-frequency AI words (additionally, crucial, pivotal...); full 
 
 Summary: prefer plain "is/has" over "serves as / boasts / features"
 
-**Words to watch:** serves as/stands as/marks/represents [a], boasts/features/offers [a]
+**Words to watch:** serves as/stands as/marks/functions as/operates as/represents [a], boasts/features/maintains/offers [a], refers to
 
 **Problem:** LLMs substitute elaborate constructions for simple copulas.
+
+Newer output takes longer detours around the same verb. "Ventured into local politics as a candidate for the council" says no more than "ran for the council". Simplify only when nothing is lost: "began her career as a nurse before founding the clinic" keeps "began", because the order is the point.
 
 **Before:**
 > Gallery 825 serves as LAAA's exhibition space for contemporary art. The gallery features four separate spaces and boasts over 3,000 square feet.
@@ -251,7 +253,9 @@ Summary: prefer plain "is/has" over "serves as / boasts / features"
 
 Summary: "it's not X, it's Y" is a crutch; usually just state Y | prewrite
 
-**Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts.
+**Words to watch:** "not only … but (also)" / "it's not just X, it's Y" / "it's not X, it's Y" / "no X, no Y, just Z"
+
+**Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts. The contrast reads as correcting a misconception nobody raised. Keep one only when a reader would really assume the opposite. The reversed form, "Y rather than X", is common in Grok output. One in a piece is normal.
 
 **Before:**
 > It's not just about the beat riding under the vocals; it's part of the aggression and atmosphere. It's not merely a song, it's a statement.
@@ -310,6 +314,8 @@ Summary: "from X to Y" needs a meaningful scale; otherwise just list the items
 Summary: em dashes are an AI tell; target zero, use commas or periods
 
 **Problem:** LLMs use em dashes (—) more than humans, mimicking "punchy" sales writing.
+
+Newer models have cut back on em dashes, but Claude has not. A July 2026 comparison reported by The Economist found it was the one contemporary model that still used them more than professional writers.
 
 **Before:**
 > The term is primarily promoted by Dutch institutions—not by the people themselves. You don't say "Netherlands, Europe" as an address—yet this mislabeling continues—even in official documents.
@@ -381,15 +387,17 @@ Summary: don't decorate headings or bullets with emojis
 
 ### 18. Curly Quotation Marks
 
-Summary: use straight quotes, not curly quotes
+Summary: mixed curly and straight quotes in one piece is the tell; consistent curly quotes are typography, keep them
 
-**Problem:** ChatGPT uses curly quotes ("\u201c...\u201d") instead of straight quotes ("...").
+**Problem:** ChatGPT and DeepSeek tend to emit curly quotes (“…”) and curly apostrophes (’), sometimes mixed with straight ones in the same text. Curly quotes on their own prove nothing. Word, macOS and iOS smart punctuation, and professional typesetting all produce them, and Claude and Gemini rarely use them.
 
-**Before:**
-> He said \u201cthe project is on track\u201d but others disagreed.
+**Action:** Flag only a piece that mixes curly and straight quotes or apostrophes, then normalize to the convention the rest of the text (or the house style) already uses. Never convert consistently curly text to straight quotes as an AI fix.
+
+**Before** (curly quotes, straight apostrophe):
+> The team called it “a small release,” but the changelog's first line says otherwise.
 
 **After:**
-> He said "the project is on track" but others disagreed.
+> The team called it “a small release,” but the changelog’s first line says otherwise.
 
 ---
 
@@ -411,19 +419,26 @@ Summary: "I hope this helps!" is chatbot correspondence, not content; delete
 
 ---
 
-### 20. Knowledge-Cutoff Disclaimers
+### 20. Knowledge-Cutoff Disclaimers and Gap Speculation
 
-Summary: delete cutoff disclaimers ("as of my last update"); state the fact
+Summary: delete "as of my last update" and "not widely documented" disclaimers; keep the hedge on the guess that follows and mark it for the author, never harden it into a fact
 
-**Words to watch:** as of [date], Up to my last training update, While specific details are limited/scarce..., based on available information...
+**Words to watch:** as of my last update, up to my last training update, while specific details are limited/scarce..., based on available information..., not widely available/documented/disclosed, in the provided/available sources, in the search results. About a person, "maintains a low profile" and "keeps personal details private" count only when they stand in for missing information. A real deadline ("prices valid as of June") is not this pattern.
 
-**Problem:** AI disclaimers about incomplete information get left in text.
+**Problem:** AI disclaimers about incomplete information get left in text. Models that search the web add a second move: they announce that a detail "isn't documented", then guess what it "likely" is. Both halves are unverified. The disclaimer may be false, and the guess is speculation dressed as a finding.
 
 **Before:**
-> While specific details about the company's founding are not extensively documented in readily available sources, it appears to have been established sometime in the 1990s.
+> Although the studio's early history is not widely documented in available sources, it appears to have released its first game sometime around 2010.
 
 **After:**
-> The company was founded in 1994, according to its registration documents.
+> The studio likely released its first game around 2010 (needs author input: confirm the year, or cut the sentence).
+
+**Rules:**
+- Drop the disclaimer shell ("not widely documented", "based on available information"). It carries no information.
+- Keep the hedge on the claim that follows. "Appears to have released" may become "likely released", never "released".
+- Mark a hedged claim that reads like the model's guess, and let the author decide whether to confirm it, keep the hedge or cut it. Don't make that call for them.
+- Uncertainty the author states as their own ("we think the first shop opened in spring") is their judgment. Keep it as written.
+- If the reader needs to know about a real gap, say it once, plainly. An action for the reader must come from the author. If they gave none, mark it: "Parking details aren't published yet (needs author input: where should readers check?)."
 
 ---
 
@@ -446,8 +461,6 @@ Summary: cut sycophantic openers ("Great question! You're absolutely right")
 Summary: openers, announcements, and restatements are filler; if cutting it changes nothing, cut it | prewrite
 
 **Before → After:**
-- "In order to achieve this goal" → "To achieve this"
-- "Due to the fact that it was raining" → "Because it was raining"
 - "At this point in time" → "Now"
 - "In the event that you need help" → "If you need help"
 - "The system has the ability to process" → "The system can process"
@@ -613,9 +626,14 @@ Summary: "let's explore..." is a false-collaborative opener; start with the poin
 
 ### 34. Excessive Structure
 
-Summary: don't pack short text with headers; 3+ under 300 words is too many
+Summary: don't pack short text with headers, tiny tables or --- dividers; 3+ headers under 300 words is too many
 
 **Problem:** Too many headers in short text (3+ in under 300 words). Formulaic headers like "Overview," "Key Points," "Summary."
+
+**Also watch:**
+- A two- or three-row table that would read better as one sentence.
+- `---` between every section when the format doesn't need dividers.
+- Paired "X and Y" headings built to sound complete ("Awards and recognition", "Challenges and opportunities"). Keep a heading only if the section needs it.
 
 **Before:**
 > ## Overview\n## Key Features\n## Benefits\n## Summary\n(in a 200-word section)
@@ -771,6 +789,29 @@ Summary: `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the aut
 
 ---
 
+### 42. Vague Association
+
+Summary: "associated with" or "connected to" standing in for a person's or organization's role hides the fact; ask the author for the role, and leave technical links and research correlations alone
+
+**Words to watch** (about a person's or organization's role): associated with, closely/widely associated with, in connection with, connected to/with, in association with
+
+**Problem:** Instead of saying what someone did ("she ran the program", "he taught there"), AI text says the two are "associated" or "connected". The reader learns that a link exists and nothing about what it is. Wikipedia's editors keep finding it in 2025 and 2026 output, often next to promotional wording. One instance proves nothing. Several, or one next to other tells, is the signal.
+
+**Before:**
+> The foundation is closely associated with three coastal restoration projects, and its director has been connected to the 2022 wetlands bill.
+
+**After** (the default: the draft never says what the roles were):
+> The foundation is associated with three coastal restoration projects (needs author input: does it fund, run or advise them?), and its director has been connected to the 2022 wetlands bill (needs author input: the director's role).
+
+**After** (only once the author has supplied the roles):
+> The foundation funds three coastal restoration projects, and its director helped draft the 2022 wetlands bill.
+
+**Leave these alone:**
+- Technical links: "the email associated with your account", "the files associated with this project".
+- Correlations in research and statistics writing: "longer commutes were associated with lower job satisfaction". Rewriting that as "causes" or "leads to" changes the finding.
+
+---
+
 ## Full Example
 
 **Before (AI-sounding):**
@@ -796,5 +837,7 @@ Summary: `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the aut
 This guide is based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup. The patterns documented there come from observations of thousands of instances of AI-generated text on Wikipedia.
 
 Patterns #39–#41 are adapted from [speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw) (MIT License).
+
+Pattern #42 and the September 2026 additions to #8, #9, #13, #18, #20 and #34 follow the Wikipedia page as of revision 1376815715 (2026-09-26), including its "Signs of human writing" and "Ineffective indicators" sections, which back the matching rows in `protected-list.md`.
 
 Sources: [blader/humanizer](https://github.com/blader/humanizer), [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop)

@@ -1,11 +1,12 @@
 # Humanly Benchmark
 
-32 cases guarding the parts of the skill that are easy to break. Run per
+35 cases guarding the parts of the skill that are easy to break. Run per
 [run-eval.md](run-eval.md) after changing any source file under `references/`, or
 `scripts/build-prewrite.py`.
 
-Five groups. The first two ask whether the skill *catches* things; the last three
-ask whether it *breaks* things, and those matter more.
+Six groups. The first two ask whether the skill *catches* things. The next three
+ask whether it *breaks* things, and those matter more. The last, `CAL-*`, asks
+whether it leaves alone what the evidence says is not a tell.
 
 | Group | Asks | Fails when |
 |---|---|---|
@@ -14,6 +15,7 @@ ask whether it *breaks* things, and those matter more.
 | `FID-*` (10) | is the protected list held — and not over-reaching? | a fact, price, name, quoted speech, commitment or code string moved (FID-01…08, FID-10), **or** the protected list shielded something it shouldn't (FID-09) |
 | `OVER-*` (5) | did the rewrite add its own slop? | fake candor, staccato drama, aphorisms, or an **invented** number, source or memory appears |
 | `PRE-*` (2) | does prewrite mode compose correctly? | the model writes mainland vocabulary or half-width punctuation (zh), or Tier 1 slop (en), *from scratch* |
+| `CAL-*` (3) | does it leave ordinary writing alone? | an ordinary construction ("in order to", a lone "However", consistent curly quotes) is reported as a tell or changed |
 
 A skill that scores 10/10 on `NEW-*` and fails one `FID-*` or `OVER-*` is worse
 than useless: it produces confident, human-sounding text that says something the
@@ -313,6 +315,36 @@ table and the principles chapters reach the en prewrite path the same way, and a
 build-script change that silently drops a section from either bundle would
 otherwise pass `--check` (it regenerates *consistently*, just wrongly) and every
 rewrite-mode case.
+
+---
+
+## CAL — calibration (scored, not pass/fail)
+
+The evidence says these are not AI tells, and the skill used to treat them as
+tells. Each case failed on the skill as of commit dc024af8 and passes after the
+September 2026 refresh. A miss means the skill is flagging or "fixing" ordinary
+writing again.
+
+**CAL-01 · "in order to" is not a tell** · profile `blog`
+> We moved the backup job to 2 a.m. in order to keep the database quiet during office hours.
+
+Must NOT report "in order to" as a P0/P1 issue or a Tier 1 word. Tightening it for
+length is allowed. `2 a.m.` survives verbatim. Wikipedia's *Signs of AI writing*
+finds "in order to" more often in human text than in AI text.
+
+**CAL-02 · Consistent curly quotes stay curly** · profile `blog`
+> The release notes call it “the quiet update,” and the team’s tracker lists 14 closed bugs.
+
+The rewritten version contains no straight `"` or `'` and keeps the curly marks.
+`14` survives. Mixing curly and straight quotes is the tell (#18). Consistent
+typography is not.
+
+**CAL-03 · A lone "However" stays** · profile `blog`
+> The pilot cut support tickets by a third. However, two of the five stores saw no change.
+
+"However" survives in the rewritten version. Swapping it for "But" is the failure:
+it treats an ordinary transition as an AI tell (see the transition row in
+`protected-list.md`).
 
 ---
 

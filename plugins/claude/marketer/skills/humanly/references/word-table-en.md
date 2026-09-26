@@ -60,8 +60,6 @@ Three tiers based on how reliably they signal AI-generated text.
 | interplay | relationship, connection, interaction |
 | additionally / moreover / furthermore | also, and, plus (or just start the sentence) |
 | garner | get, earn, attract |
-| in order to | to |
-| due to the fact that | because |
 | serves as | is |
 | features (verb) | has, includes |
 | boasts | has |

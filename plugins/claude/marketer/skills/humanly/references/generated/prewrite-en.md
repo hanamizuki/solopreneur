@@ -79,7 +79,7 @@ A second pair, community-post register:
 
 Quick pass after writing:
 
-- **Em dashes** (— and --): replace with commas, periods, or parentheses. Target: zero.
+- **Em dashes** (— and --): replace with commas, periods, or parentheses. Target: zero. When you remove one, rewrite the sentence instead of swapping in an en dash (–) or a spaced hyphen, which keeps the same aside. Ranges (9:00–17:00, pages 4–7) are not dashes.
 - **Bold**: for scanning, not emphasis on every third phrase.
 - **Emoji in headers**: remove entirely.
 - **Excessive bullets**: if a list has 3+ items that flow naturally, convert to prose.
@@ -126,7 +126,9 @@ Never Invent in `../protected-list.md`.
 
 ### 9. Negative Parallelisms
 
-**Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts.
+**Words to watch:** "not only … but (also)" / "it's not just X, it's Y" / "it's not X, it's Y" / "no X, no Y, just Z"
+
+**Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts. The contrast reads as correcting a misconception nobody raised. Keep one only when a reader would really assume the opposite. The reversed form, "Y rather than X", is common in Grok output. One in a piece is normal.
 
 **Before:**
 > It's not just about the beat riding under the vocals; it's part of the aggression and atmosphere. It's not merely a song, it's a statement.
@@ -137,8 +139,6 @@ Never Invent in `../protected-list.md`.
 ### 22. Filler Phrases
 
 **Before → After:**
-- "In order to achieve this goal" → "To achieve this"
-- "Due to the fact that it was raining" → "Because it was raining"
 - "At this point in time" → "Now"
 - "In the event that you need help" → "If you need help"
 - "The system has the ability to process" → "The system can process"
@@ -277,8 +277,6 @@ Never Invent in `../protected-list.md`.
 | interplay | relationship, connection, interaction |
 | additionally / moreover / furthermore | also, and, plus (or just start the sentence) |
 | garner | get, earn, attract |
-| in order to | to |
-| due to the fact that | because |
 | serves as | is |
 | features (verb) | has, includes |
 | boasts | has |
@@ -316,9 +314,9 @@ Full definitions and before/after examples: `../patterns-en.md`.
 - #15 Inline-Header Vertical Lists — don't write "**Header:** explanation" bullet lists; fold into prose
 - #16 Title Case in Headings — use sentence case in headings, not Title Case
 - #17 Emojis — don't decorate headings or bullets with emojis
-- #18 Curly Quotation Marks — use straight quotes, not curly quotes
+- #18 Curly Quotation Marks — mixed curly and straight quotes in one piece is the tell; consistent curly quotes are typography, keep them
 - #19 Collaborative Communication Artifacts — "I hope this helps!" is chatbot correspondence, not content; delete
-- #20 Knowledge-Cutoff Disclaimers — delete cutoff disclaimers ("as of my last update"); state the fact
+- #20 Knowledge-Cutoff Disclaimers and Gap Speculation — delete "as of my last update" and "not widely documented" disclaimers; keep the hedge on the guess that follows and mark it for the author, never harden it into a fact
 - #21 Sycophantic/Servile Tone — cut sycophantic openers ("Great question! You're absolutely right")
 - #22 Filler Phrases — openers, announcements, and restatements are filler; if cutting it changes nothing, cut it
 - #23 Excessive Hedging — don't stack qualifiers ("could potentially possibly"); keep one
@@ -332,7 +330,7 @@ Full definitions and before/after examples: `../patterns-en.md`.
 - #31 Reasoning Chain Artifacts — "let me break this down" is reasoning scaffolding; keep it out of prose
 - #32 Acknowledgment Loops — don't restate the question before answering; just answer
 - #33 "Let's" Constructions — "let's explore..." is a false-collaborative opener; start with the point
-- #34 Excessive Structure — don't pack short text with headers; 3+ under 300 words is too many
+- #34 Excessive Structure — don't pack short text with headers, tiny tables or --- dividers; 3+ headers under 300 words is too many
 - #35 Rhythm and Uniformity — uniform sentence and paragraph length is the #1 AI signal; break the meter
 - #36 Rewrite-vs-Patch Threshold — 5+ word flags, 3+ pattern categories, uniform rhythm → rewrite, don't patch
 - #37 Therapy-Speak (Emotional Validation) — don't certify feelings ("your anxiety is valid" → "of course you're anxious"); cut absolving lines
@@ -340,3 +338,4 @@ Full definitions and before/after examples: `../patterns-en.md`.
 - #39 Hallucinated Citations — a decimal-precise study that doesn't exist, a quote pinned on the wrong person — mark `[source unverified]` and hand it back, never verify or invent for the author
 - #40 AI Tool Residue — `utm_source=chatgpt.com` and `turn0search0` are hard proof of unproofread AI output; grep before publishing
 - #41 Unfilled Template Placeholders — `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the author, never fill them in
+- #42 Vague Association — "associated with" or "connected to" standing in for a person's or organization's role hides the fact; ask the author for the role, and leave technical links and research correlations alone
