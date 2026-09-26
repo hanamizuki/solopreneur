@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/alirezarezvani/claude-skills
 - **Source path**: `engineering-team/skills/senior-prompt-engineer`
-- **Pinned commit**: aa8d778811a557a2c28ccadda4cf3d0bd028a4cc
-- **Synced at**: 2026-07-27T19:06:02Z
+- **Pinned commit**: 19392f7a08264ed00486a251f5b2098321771f94
+- **Synced at**: 2026-09-26T13:39:40Z
 - **License**: see `../../vendor/LICENSES/claude-skills-LICENSE` (source repo: `src/ai-engineer/vendor/LICENSES/claude-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
