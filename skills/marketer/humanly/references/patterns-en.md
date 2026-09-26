@@ -446,8 +446,6 @@ Summary: cut sycophantic openers ("Great question! You're absolutely right")
 Summary: openers, announcements, and restatements are filler; if cutting it changes nothing, cut it | prewrite
 
 **Before → After:**
-- "In order to achieve this goal" → "To achieve this"
-- "Due to the fact that it was raining" → "Because it was raining"
 - "At this point in time" → "Now"
 - "In the event that you need help" → "If you need help"
 - "The system has the ability to process" → "The system can process"

@@ -152,6 +152,7 @@ The rule fires, the judgment is wrong, the text gets worse. Let these through.
 | Repeated sentence shape | Deliberate rhythm in long-form | Is the repetition advancing the narrative? Then it is design |
 | AI vocabulary | The word being discussed, not used | 「我戒掉了『賦能』這個詞」 is a mention. Do not touch |
 | Stiff officialese | The correct register for a notice | A maintenance announcement is supposed to sound formal |
+| Plain or wordy phrasing: "in order to", "the fact that", "very", "perhaps", "tends to", "is the only" | Ordinary human writing. Wikipedia's *Signs of AI writing* finds these more often in human text than in AI text | Tighten them for length if the piece needs it, never as an AI tell. A definite claim ("was the first") stays whenever the source supports it |
 | Vague 「優化」 | Attached to a concrete action and metric | If it is followed by what changed and by how much, keep it |
 | Promotional urgency | A working CTA | Deadlines, seat counts and imperatives are function, not slop. The promotional-language rule targets the hype *around* the offer, never the call to action itself. Make a CTA *more* concrete, never weaker |
 | Colloquial fragments, unfinished sentences | The human texture you are trying to preserve | Do not touch a word |
