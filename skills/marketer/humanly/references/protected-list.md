@@ -177,6 +177,7 @@ any automation mode.
 4. Confirm the author's position did not flip or soften (「我反對」 may not become
    「我持保留態度」)
 5. Confirm the register held (a notice still reads as a notice, a post as a post)
+6. Confirm the conventions held: person, English spelling variety, markup syntax, and length for length-limited fields. Several models default to American English, so a UK text that comes back with American spellings has gained an AI tell
 
 Any check fails → fix it. Do not ship.
 

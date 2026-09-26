@@ -167,6 +167,7 @@ Not optional. Run it even in automated pipelines.
 2. Confirm no fact, number or source appears that was not in the source text
 3. Confirm the author's position did not flip or soften
 4. Confirm the register held — a notice still reads as a notice
+5. Confirm the conventions held: person (I / we / you), English spelling variety (UK stays UK, US stays US), and markup syntax (Markdown, HTML or plain text is not switched, though a pattern may still remove bold or bullets inside it). For a length-limited field (a title tag, a meta description, a store field, or a limit the author gave), the rewrite comes back no longer than the original, and protected items are never cut to fit
 
 Any check fails: fix it, don't ship it.
 
@@ -176,7 +177,7 @@ Any check fails: fix it, don't ship it.
 1. **Issues found**: every AI-ism identified, quoted, with severity (P0/P1/P2)
 2. **Rewritten version**: clean version
 3. **What changed**: brief summary of major edits
-4. **Second-pass audit**: surviving tells fixed, or "clean"
+4. **Second-pass audit**: surviving tells fixed, or "clean". Name any tell you kept on purpose (a quotation, a proper noun, a word used literally) and why
 
 **Review mode** — return 2 sections:
 1. **Issues found**: grouped by severity (P0/P1/P2)
