@@ -10,6 +10,8 @@ still *behaves*.
   catch a change making the skill *actively harmful* (rewriting a price, inventing
   the author's past) rather than merely incomplete. They are pass/fail.
 - **`NEW-*`** — when the pattern catalog changed.
+- **`CAL-*`** — when the pattern catalog, a word table, the protected list or the
+  `SKILL.md` checklist changed. These guard against flagging ordinary writing.
 - **`TW-*`** — when anything on the zh side changed (`patterns-zh.md`,
   `word-table-zh.md`, `taiwan-localization.md`).
 - **`PRE-*`** — whenever `references/generated/prewrite-{lang}.md` changes. **Don't
@@ -37,7 +39,7 @@ Run each case in a **fresh subagent** — one case per agent, no shared context.
 agent running the whole suite in a single session will pattern-match on the
 earlier cases and score better than the skill deserves.
 
-**Rewrite-mode prompt** (`NEW-*`, `TW-*`, `FID-*`, `OVER-*`):
+**Rewrite-mode prompt** (`NEW-*`, `TW-*`, `FID-*`, `OVER-*`, `CAL-*`):
 
 > Apply the humanly skill in rewrite mode to the text below.
 > Context profile: `<profile>`.
@@ -63,6 +65,7 @@ Score against the case's expectation:
 | `FID-*` | the protected string appears **verbatim** in the rewritten version (FID-09 inverts this: the *unprotected* quoted terms must be gone) |
 | `OVER-*` | the rewrite introduced no hook, aphorism, staccato run, invented fact, or invented source |
 | `PRE-*` | the composed text carries no mainland term and no half-width Chinese sentence punctuation |
+| `CAL-*` | the ordinary construction survives, and is not reported as a P0/P1 tell |
 
 Grade `FID-*`, `OVER-*` and `PRE-*` **mechanically** — substring and codepoint
 checks in a script, not by eye. "Looks fine" is how a drifted price gets shipped.

@@ -147,11 +147,13 @@ The rule fires, the judgment is wrong, the text gets worse. Let these through.
 |---|---|---|
 | Rule of three | Real contrast carrying real content | Is there a concrete fact under each item? Then keep it |
 | Vague attribution | A sourced claim | 「根據我們後台的數據」 has a source. Keep it |
-| "Not X, but Y" | The one genuine pivot in the piece | The rule is *at most once*, not zero |
+| "Not X, but Y" | The one genuine pivot in the piece | Would a reader actually assume X? Then the contrast carries information. Keep it, once. If nobody would, it corrects a misconception nobody raised, so just say Y |
 | Canned support tone | Required payment / legal boilerplate | Anything touching money, law or liability stays |
 | Repeated sentence shape | Deliberate rhythm in long-form | Is the repetition advancing the narrative? Then it is design |
 | AI vocabulary | The word being discussed, not used | 「我戒掉了『賦能』這個詞」 is a mention. Do not touch |
 | Stiff officialese | The correct register for a notice | A maintenance announcement is supposed to sound formal |
+| Plain or wordy phrasing: "in order to", "the fact that", "very", "perhaps", "tends to", "is the only" | Ordinary human writing. Wikipedia's *Signs of AI writing* finds these more often in human text than in AI text | Tighten them for length if the piece needs it, never as an AI tell. A definite claim ("was the first") stays whenever the source supports it |
+| A single transition word (However, Therefore, Also) | Ordinary connective tissue | Wikipedia lists transition words in isolation as an ineffective indicator. Only a few are AI-overused, mainly sentence-initial "Additionally", "Notably" and "Consequently". Leave the rest |
 | Vague 「優化」 | Attached to a concrete action and metric | If it is followed by what changed and by how much, keep it |
 | Promotional urgency | A working CTA | Deadlines, seat counts and imperatives are function, not slop. The promotional-language rule targets the hype *around* the offer, never the call to action itself. Make a CTA *more* concrete, never weaker |
 | Colloquial fragments, unfinished sentences | The human texture you are trying to preserve | Do not touch a word |
@@ -175,6 +177,7 @@ any automation mode.
 4. Confirm the author's position did not flip or soften (「我反對」 may not become
    「我持保留態度」)
 5. Confirm the register held (a notice still reads as a notice, a post as a post)
+6. Confirm the conventions held: person, English spelling variety, markup syntax, and length for length-limited fields. Several models default to American English, so a UK text that comes back with American spellings has gained an AI tell
 
 Any check fails → fix it. Do not ship.
 
