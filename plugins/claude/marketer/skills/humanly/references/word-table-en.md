@@ -6,11 +6,11 @@
 
 Three tiers based on how reliably they signal AI-generated text.
 
-- **Tier 1 — Always flag.** 5-20x more frequent in AI text. Replace on sight.
-- **Tier 2 — Flag in clusters.** Fine alone; 2+ in the same paragraph = AI signal.
-- **Tier 3 — Flag by density.** Normal words AI overuses. Flag at ~3%+ density.
+- **Tier 1 (always flag).** 5-20x more frequent in AI text. Replace on sight.
+- **Tier 2 (flag in clusters).** Fine alone; 2+ in the same paragraph = AI signal.
+- **Tier 3 (flag by density).** Normal words AI overuses. Flag at ~3%+ density.
 
-## Tier 1 — Always Replace
+## Tier 1 (Always Replace)
 
 | Replace | With |
 |---|---|
@@ -34,8 +34,8 @@ Three tiers based on how reliably they signal AI-generated text.
 | utilize | use |
 | watershed moment | turning point, shift (or describe what changed) |
 | marking a pivotal moment | (state what happened) |
-| the future looks bright | (cut — say something specific or nothing) |
-| only time will tell | (cut — say something specific or nothing) |
+| the future looks bright | (cut, or say something specific instead) |
+| only time will tell | (cut, or say something specific instead) |
 | nestled | is located, sits, is in |
 | vibrant | (describe what makes it active, or cut) |
 | thriving | growing, active (or cite a number) |
@@ -55,7 +55,7 @@ Three tiers based on how reliably they signal AI-generated text.
 | learnings | lessons, findings, takeaways |
 | thought leader / thought leadership | expert, authority (or describe their actual contribution) |
 | best practices | what works, proven methods, standard approach |
-| at its core | (cut — just state the thing) |
+| at its core | (cut it and just state the thing) |
 | synergy / synergies | (describe the actual combined effect) |
 | interplay | relationship, connection, interaction |
 | additionally / moreover / furthermore | also, and, plus (or just start the sentence) |
@@ -74,7 +74,7 @@ Three tiers based on how reliably they signal AI-generated text.
 | it's not your fault / don't blame yourself | (cut, or "anyone would react that way") |
 | you deserve to be seen / your feelings matter | (cut, or state what you actually see) |
 
-## Tier 2 — Flag When 2+ in Same Paragraph
+## Tier 2 (Flag When 2+ in Same Paragraph)
 
 | Replace | With |
 |---|---|
@@ -122,7 +122,7 @@ Three tiers based on how reliably they signal AI-generated text.
 | emphasize / emphasizing | stress, point out (or cut the trailing clause) |
 | highlight (verb) | show, point to, call out |
 
-## Tier 3 — Flag Only at High Density
+## Tier 3 (Flag Only at High Density)
 
 | Word | What to do |
 |---|---|
