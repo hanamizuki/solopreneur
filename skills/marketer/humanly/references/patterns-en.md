@@ -838,4 +838,6 @@ This guide is based on [Wikipedia:Signs of AI writing](https://en.wikipedia.org/
 
 Patterns #39–#41 are adapted from [speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw) (MIT License).
 
+Pattern #42 and the September 2026 additions to #8, #9, #13, #18, #20 and #34 follow the Wikipedia page as of revision 1376815715 (2026-09-26), including its "Signs of human writing" and "Ineffective indicators" sections, which back the matching rows in `protected-list.md`.
+
 Sources: [blader/humanizer](https://github.com/blader/humanizer), [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop)
