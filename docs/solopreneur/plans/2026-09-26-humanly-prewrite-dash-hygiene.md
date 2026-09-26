@@ -14,18 +14,18 @@ Plan-Branch: feat/humanly-prewrite-dash-hygiene
 
 ## What the evidence says before starting
 
-The three prewrite-mode outputs from the #195 eval (PRE-01 zh, PRE-02 en, P-PRE-B1 en) were composed from the current dash-heavy bundles and contain **zero** em dashes, en dashes or Chinese 「——」. The bundles' explicit "target zero" rule already suppresses them. So this change is not expected to move PRE results, and no before/after output experiment is planned: at a base rate of zero it could not show an effect. The value is consistency. A skill that breaks its own punctuation rule in every index line invites the critique the Reddit thread made, and it would confuse the next maintainer.
+The three prewrite-mode outputs from the #195 eval (PRE-01 zh, PRE-02 en, P-PRE-B1 en) were composed from the current dash-heavy bundles. Counted directly, they contain no em dash, no en dash and no Chinese 「——」. Three samples cannot prove a base rate, but they give no sign that the bundles' own dashes leak into output, and a small before/after run could not show an effect either. So this PR claims consistency, not a behavior change. A skill that breaks its own punctuation rule in every index line invites the critique the Reddit thread made, and it would confuse the next maintainer.
 
 ## Scope
 
-In: every em dash in text that reaches `references/generated/prewrite-{en,zh}.md`, except where the dash is the subject being discussed.
+In: every em dash in text that reaches `references/generated/prewrite-{en,zh}.md`, except where the dash is the subject being discussed. That includes five summary lines whose own text carries a dash (en #39, #41, zh #44, #47, #49), not only the builder's separator. The word tables' Tier 2/3 headings and tier intro bullets do not reach the bundles; they change only so each file stays consistent with its renamed Tier 1 heading.
 Kept on purpose (mentions, not uses): the en rhythm bullet's "(— and --)" and "(–)", the zh rhythm bullet's 「破折號（——／—）」「–、－」, `taiwan-localization.md`'s 「破折號在中文裡本來就該是全形「——」」, and en dash ranges such as "9:00–17:00".
 Out: semicolons (the zh bundle also bans 「；」, but the en summary lines use ";" by convention across all 42 entries, so fixing one language alone would be inconsistent; recorded as a follow-up), dashes in files that do not reach the bundles (`SKILL.md`, the rest of the pattern catalogs, `protected-list.md`), the word-table re-tiering.
 
 ## Global Constraints
 
 - `references/generated/**` and `plugins/claude/**` change only through `build-prewrite.py` and `scripts/generate-plugin-packages.sh`.
-- No meaning changes. Each rewrite swaps the dash for a period, comma or parentheses and keeps every other word. zh keeps full-width punctuation.
+- Meaning, strength and scope stay the same. A rewrite may make the smallest grammatical change a dash-free sentence needs (a period, a comma, a joining word). zh keeps full-width punctuation.
 - No new semicolons or announcement colons in rewritten sentences.
 - No version bump.
 - Code comments in English (the repo has a LICENSE).
@@ -46,7 +46,7 @@ Out: semicolons (the zh bundle also bans 「；」, but the en summary lines use
 **Files:** `skills/marketer/humanly/scripts/build-prewrite.py`
 
 - [ ] **Step 1:** `CONFIGS["zh"]["word_sections"]` becomes `["## Tier 1（必換）", "## 禁用句型（看到就刪）"]`; `CONFIGS["en"]["word_sections"]` becomes `["## Tier 1 (Always Replace)"]`.
-- [ ] **Step 2:** add `"appendix_table_header": "| # | Pattern | 摘要 |"` to the zh config and `"appendix_table_header": "| # | Pattern | Summary |"` to the en config.
+- [ ] **Step 2:** (removed in plan review: one shared table header, no per-language config key.)
 - [ ] **Step 3:** `BANNER` first line becomes `"<!-- AUTO-GENERATED. DO NOT EDIT.\n"`.
 - [ ] **Step 4:** replace the index loop
 
@@ -61,12 +61,12 @@ with
     # A table, not "- #N Title — summary": the bundles tell the model never to
     # use an em dash, and a "Label: text" list would be the inline-header
     # pattern (#15). Pipes inside a cell are escaped so a summary cannot split it.
-    out.append(cfg["appendix_table_header"])
+    out.append("| # | Pattern | Summary |")
     out.append("|---|---|---|")
     for entry in entries:
         title = entry["title"].replace("|", "\\|")
         summary = entry["summary"].replace("|", "\\|")
-        out.append(f"| {entry['num']} | {title} | {summary} |")
+        out.append(f"| #{entry['num']} | {title} | {summary} |")
 ```
 
 - [ ] **Step 5:** the build is verified in Task 3, after the headings it reads have been renamed.
@@ -87,7 +87,7 @@ Each row: exact text to replace → replacement.
 | `## Tier 1 — Always Replace` | `## Tier 1 (Always Replace)` |
 | `## Tier 2 — Flag When 2+ in Same Paragraph` | `## Tier 2 (Flag When 2+ in Same Paragraph)` |
 | `## Tier 3 — Flag Only at High Density` | `## Tier 3 (Flag Only at High Density)` |
-| `(cut — say something specific or nothing)` (2 rows) | `(cut it, then say something specific or nothing)` |
+| `(cut — say something specific or nothing)` (2 rows) | `(cut, or say something specific instead)` |
 | `(cut — just state the thing)` | `(cut it and just state the thing)` |
 
 **word-table-zh.md**
@@ -120,10 +120,20 @@ Each row: exact text to replace → replacement.
 | `比原本那句空話糟糕得多——空話只是無聊，假故事是說謊。` | `比原本那句空話糟糕得多。空話只是無聊，假故事是說謊。` |
 | `「這堂課 4,800」）——那是為了讓你看見` | `「這堂課 4,800」）。那是為了讓你看見` |
 | `AI 文本像節拍器——句子長度均勻` | `AI 文本像節拍器，句子長度均勻` |
-| `你就不准替他寫——那是捏造經歷，` | `你就不准替他寫，那是捏造經歷，` |
+| `你就不准替他寫——那是捏造經歷，` | `你就不准替他寫。那是捏造經歷，` |
 | `#33「讓我們」句型不同——那兩種是廣播` | `#33「讓我們」句型不同。那兩種是廣播` |
 | `講起？）」——**不要為了滿足` | `講起？）」。**不要為了滿足` |
-| `我就直說了——當成獨立的開場鉤子用` | `我就直說了（當成獨立的開場鉤子用時）` |
+| `**需要注意的詞彙：** 說真的、老實說、講白了、其實吧、不騙你、跟你說個秘密、我就直說了——當成獨立的開場鉤子用` | `**需要注意的詞彙（當成獨立的開場鉤子用時）：** 說真的、老實說、講白了、其實吧、不騙你、跟你說個秘密、我就直說了` |
+
+**Summary lines** (reach the bundle through the appendix index)
+
+| File | Old | New |
+|---|---|---|
+| patterns-en.md #39 | `Summary: a decimal-precise study that doesn't exist, a quote pinned on the wrong person — mark` … | `Summary: for a decimal-precise study that doesn't exist or a quote pinned on the wrong person, mark` … (rest unchanged) |
+| patterns-en.md #41 | ``Summary: `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the author, never fill them in`` | ``Summary: flag each `[Product Name]`, `[Company]` or `{{name}}` for the author, never fill them in`` |
+| patterns-zh.md #44 | `後面卻只接一句普通的話——去 AI 味時` | `後面卻只接一句普通的話，這是去 AI 味時` (the `｜prewrite` flag stays) |
+| patterns-zh.md #47 | `摘要：精確到小數點卻查無此研究、張冠李戴的語錄——標「〔需查證來源〕」交回作者` | `摘要：遇到精確到小數點卻查無此研究、張冠李戴的語錄，就標「〔需查證來源〕」交回作者` |
+| patterns-zh.md #49 | `摘要：（此處填入品牌名）、[產品名稱]、XX 公司——逐一標出請作者填` | `摘要：（此處填入品牌名）、[產品名稱]、XX 公司這類空位，逐一標出請作者填` |
 
 **taiwan-localization.md**
 
@@ -138,15 +148,34 @@ Each row: exact text to replace → replacement.
 
 ### Task 3: Rebuild and verify
 
-- [ ] **Step 1:** `python3 skills/marketer/humanly/scripts/build-prewrite.py`, then `--check` (two OK lines, 42 en and 50 zh patterns).
+- [ ] **Step 1:** `python3 skills/marketer/humanly/scripts/build-prewrite.py`, then `--check`. Expect `prewrite-zh.md (50 patterns, 11 prewrite)` and `prewrite-en.md (42 patterns, 7 prewrite)`. A drop in the prewrite count means a `｜prewrite` flag was damaged (zh #44 carries one).
 - [ ] **Step 2:** mechanical check: in both bundles, every remaining `—` or `–` sits on one of the kept mention lines listed in Scope. Print any other line and fail.
-- [ ] **Step 3:** the appendix table has exactly one row per pattern, numbered 1..N in order.
+- [ ] **Step 3:** compare the appendix table with the builder's own parse: import `parse_patterns` from the script, and assert that the table rows equal `(#num, title, summary)` for every entry, in order. Also render one synthetic entry whose summary contains `|` and assert the cell round-trips (escaped in the file, intact when unescaped).
 - [ ] **Step 4:** commit the script, sources and bundles together (`refactor(humanly): drop em dashes from the prewrite bundles`), since the headings and the keys must change in one commit.
 
 ### Task 4: Benchmark run
 
-Per `evals/run-eval.md`: FID and OVER always; NEW, TW and CAL because catalog and word-table text changed; PRE because both bundles moved. That is all 35 cases, one fresh subagent each, graded with the rules in the #195 plan (`docs/solopreneur/plans/2026-09-26-humanly-wikipedia-signs-refresh.md` § Shared eval harness), with FID and OVER rewrites read by hand. Same pass and block rules as #195.
+Subagents read `/Users/Hana/Agents/nana/repos/solopreneur-humanly-dash-hygiene/skills/marketer/humanly`. The baseline for any failure comparison is `f43f0011` (after #195, before this cleanup), snapshotted with `git archive`. Per `evals/run-eval.md`: FID and OVER always; NEW, TW and CAL because catalog and word-table text changed; PRE because both bundles moved. That is all 35 cases, one fresh subagent each, graded with the rules in the #195 plan (`docs/solopreneur/plans/2026-09-26-humanly-wikipedia-signs-refresh.md` § Shared eval harness), with FID and OVER rewrites read by hand. Same pass and block rules as #195.
 
 ### Task 5: Package, push, PR
 
 - [ ] `scripts/generate-plugin-packages.sh`, confirm `git status --porcelain` shows only `plugins/claude/marketer/skills/humanly/**`, commit, push, open the PR with the evidence note above and the benchmark result.
+
+---
+
+## Plan review disposition (2026-09-26)
+
+Reviewers: Codex CLI (read-only), a `marketer` subagent, and an inline lean pass. No user was available for R3, so the author adjudicated as the caller.
+
+| Finding | Source | Severity | Disposition |
+|---|---|---|---|
+| Five summary lines carry their own dash (en #39, #41, zh #44, #47, #49) | Codex, marketer (independently) | Critical | Adopted: five rows added |
+| Eval harness must name this worktree and baseline `f43f0011` | Codex | Important | Adopted |
+| "Keep every other word" contradicts rows that add a joining word | Codex, marketer | Important | Adopted: minimal rewrites allowed, meaning and scope fixed |
+| #44 word list: the condition must cover the whole list | Codex, marketer | Important | Adopted: condition moved into the label |
+| Check the prewrite count, not only the pattern count | marketer | Important | Adopted |
+| Verify table content against the parse, including a `\|` case | Codex | Suggestion | Adopted |
+| Tier 2/3 edits do not reach the bundles | Codex | Suggestion | Kept, with the reason stated in Scope |
+| "Base rate of zero" overclaims from three samples | Codex | Suggestion | Adopted: reworded |
+| zh row 6 period, en "cut" row wording, `#N` in the table | marketer | Suggestion | Adopted |
+| Per-language table header config | lean | Suggestion | Adopted: one shared header |
