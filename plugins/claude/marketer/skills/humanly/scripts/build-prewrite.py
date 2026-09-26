@@ -49,7 +49,7 @@ CONFIGS = {
         "out": "generated/prewrite-zh.md",
         "principles_start": "## 核心規則",
         "principles_end": "## 內容模式",
-        "word_sections": ["## Tier 1 — 必換", "## 禁用句型 — 看到就刪"],
+        "word_sections": ["## Tier 1（必換）", "## 禁用句型（看到就刪）"],
         # Locale rules that bite at composition time, not just at rewrite time:
         # the model's Chinese training data is mostly simplified, so it reaches
         # for 視頻 / 質量 / half-width punctuation while *writing* Traditional
@@ -86,7 +86,7 @@ CONFIGS = {
         "out": "generated/prewrite-en.md",
         "principles_start": "## Core Rules",
         "principles_end": "## Content Patterns",
-        "word_sections": ["## Tier 1 — Always Replace"],
+        "word_sections": ["## Tier 1 (Always Replace)"],
         "title": "# English Prewrite (read before writing)",
         "intro": (
             "Read this one file before writing. The principles and examples are "
@@ -101,7 +101,7 @@ CONFIGS = {
 }
 
 BANNER = (
-    "<!-- AUTO-GENERATED — DO NOT EDIT.\n"
+    "<!-- AUTO-GENERATED. DO NOT EDIT.\n"
     "     Sources: {sources}\n"
     "     Regenerate: python3 skills/marketer/humanly/scripts/build-prewrite.py -->\n"
 )
@@ -294,8 +294,15 @@ def build(lang):
     out.append("")
     out.append(cfg["appendix_note"])
     out.append("")
+    # A table, not "- #N Title — summary": the bundles tell the model never to
+    # use an em dash, and a "Label: text" list would be the inline-header
+    # pattern (#15). Pipes inside a cell are escaped so a summary cannot split it.
+    out.append("| # | Pattern | Summary |")
+    out.append("|---|---|---|")
     for entry in entries:
-        out.append(f"- #{entry['num']} {entry['title']} — {entry['summary']}")
+        title = entry["title"].replace("|", "\\|")
+        summary = entry["summary"].replace("|", "\\|")
+        out.append(f"| #{entry['num']} | {title} | {summary} |")
     out.append("")
     return reanchor_links("\n".join(out)), len(entries), len(picked)
 
