@@ -163,6 +163,10 @@ Subagents read `/Users/Hana/Agents/nana/repos/solopreneur-humanly-dash-hygiene/s
 
 ---
 
+## Eval results (2026-09-26)
+
+All 35 benchmark cases (NEW 10, TW 5, FID 10, OVER 5, PRE 2, CAL 3) pass the mechanical rules on this branch; no rerun was needed. Every FID and OVER rewrite, NEW-05, NEW-09 and both PRE compositions were read by hand: no moved protected string, no invented fact. The 35 outputs contain zero em or en dashes, the same as the three #195 prewrite samples, so the result confirms no regression rather than a behavior change. One quality note unrelated to this change: the FID-10 rewrite softened the "卓越品質" claim instead of cutting it, which the case text prefers; the protected quotes and names survived, so it passes.
+
 ## Plan review disposition (2026-09-26)
 
 Reviewers: Codex CLI (read-only), a `marketer` subagent, and an inline lean pass. No user was available for R3, so the author adjudicated as the caller.
