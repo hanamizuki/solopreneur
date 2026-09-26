@@ -84,7 +84,7 @@ A second pair, community-post register:
 
 Quick pass after writing:
 
-- **Em dashes** (— and --): replace with commas, periods, or parentheses. Target: zero.
+- **Em dashes** (— and --): replace with commas, periods, or parentheses. Target: zero. When you remove one, rewrite the sentence instead of swapping in an en dash (–) or a spaced hyphen, which keeps the same aside. Ranges (9:00–17:00, pages 4–7) are not dashes.
 - **Bold**: for scanning, not emphasis on every third phrase.
 - **Emoji in headers**: remove entirely.
 - **Excessive bullets**: if a list has 3+ items that flow naturally, convert to prose.
@@ -235,9 +235,11 @@ Summary: swap high-frequency AI words (additionally, crucial, pivotal...); full 
 
 Summary: prefer plain "is/has" over "serves as / boasts / features"
 
-**Words to watch:** serves as/stands as/marks/represents [a], boasts/features/offers [a]
+**Words to watch:** serves as/stands as/marks/functions as/operates as/represents [a], boasts/features/maintains/offers [a], refers to
 
 **Problem:** LLMs substitute elaborate constructions for simple copulas.
+
+Newer output takes longer detours around the same verb. "Ventured into local politics as a candidate for the council" says no more than "ran for the council". Simplify only when nothing is lost: "began her career as a nurse before founding the clinic" keeps "began", because the order is the point.
 
 **Before:**
 > Gallery 825 serves as LAAA's exhibition space for contemporary art. The gallery features four separate spaces and boasts over 3,000 square feet.
@@ -251,7 +253,9 @@ Summary: prefer plain "is/has" over "serves as / boasts / features"
 
 Summary: "it's not X, it's Y" is a crutch; usually just state Y | prewrite
 
-**Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts.
+**Words to watch:** "not only … but (also)" / "it's not just X, it's Y" / "it's not X, it's Y" / "no X, no Y, just Z"
+
+**Problem:** Constructions like "Not only...but..." or "It's not just about..., it's..." are overused. AI also tends to write symmetrical slogans and balanced contrasts. The contrast reads as correcting a misconception nobody raised. Keep one only when a reader would really assume the opposite. The reversed form, "Y rather than X", is common in Grok output. One in a piece is normal.
 
 **Before:**
 > It's not just about the beat riding under the vocals; it's part of the aggression and atmosphere. It's not merely a song, it's a statement.
@@ -310,6 +314,8 @@ Summary: "from X to Y" needs a meaningful scale; otherwise just list the items
 Summary: em dashes are an AI tell; target zero, use commas or periods
 
 **Problem:** LLMs use em dashes (—) more than humans, mimicking "punchy" sales writing.
+
+Newer models have cut back on em dashes, but Claude has not. A July 2026 comparison reported by The Economist found it was the one contemporary model that still used them more than professional writers.
 
 **Before:**
 > The term is primarily promoted by Dutch institutions—not by the people themselves. You don't say "Netherlands, Europe" as an address—yet this mislabeling continues—even in official documents.
@@ -620,9 +626,14 @@ Summary: "let's explore..." is a false-collaborative opener; start with the poin
 
 ### 34. Excessive Structure
 
-Summary: don't pack short text with headers; 3+ under 300 words is too many
+Summary: don't pack short text with headers, tiny tables or --- dividers; 3+ headers under 300 words is too many
 
 **Problem:** Too many headers in short text (3+ in under 300 words). Formulaic headers like "Overview," "Key Points," "Summary."
+
+**Also watch:**
+- A two- or three-row table that would read better as one sentence.
+- `---` between every section when the format doesn't need dividers.
+- Paired "X and Y" headings built to sound complete ("Awards and recognition", "Challenges and opportunities"). Keep a heading only if the section needs it.
 
 **Before:**
 > ## Overview\n## Key Features\n## Benefits\n## Summary\n(in a 200-word section)

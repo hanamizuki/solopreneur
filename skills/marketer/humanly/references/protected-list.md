@@ -147,7 +147,7 @@ The rule fires, the judgment is wrong, the text gets worse. Let these through.
 |---|---|---|
 | Rule of three | Real contrast carrying real content | Is there a concrete fact under each item? Then keep it |
 | Vague attribution | A sourced claim | 「根據我們後台的數據」 has a source. Keep it |
-| "Not X, but Y" | The one genuine pivot in the piece | The rule is *at most once*, not zero |
+| "Not X, but Y" | The one genuine pivot in the piece | Would a reader actually assume X? Then the contrast carries information. Keep it, once. If nobody would, it corrects a misconception nobody raised, so just say Y |
 | Canned support tone | Required payment / legal boilerplate | Anything touching money, law or liability stays |
 | Repeated sentence shape | Deliberate rhythm in long-form | Is the repetition advancing the narrative? Then it is design |
 | AI vocabulary | The word being discussed, not used | 「我戒掉了『賦能』這個詞」 is a mention. Do not touch |
