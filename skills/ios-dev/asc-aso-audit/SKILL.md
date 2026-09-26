@@ -64,6 +64,33 @@ Use tags as context only:
 - If tags point to an unintended category or use case, recommend metadata/category changes that may improve future classification.
 - Do not promise that changing metadata will immediately change Apple-generated tags.
 
+### Optional: Official Apple Search Plan
+
+When both App Store Connect and Apple Ads credentials are configured, use the
+experimental, read-only plan to join the selected metadata with official paid
+search evidence:
+
+```bash
+asc optimize search plan \
+  --app "APP_ID" \
+  --version "1.2.3" \
+  --ad-account "AD_ACCOUNT_ID" \
+  --country "US" \
+  --genre "PRODUCTIVITY_UTILITIES" \
+  --locale "en-US" \
+  --out-dir ".asc/optimization/1.2.3" \
+  --output markdown
+```
+
+- Authenticate App Store Connect with `asc auth` and Apple Ads separately with
+  `asc ads auth login`; the two credential sets are independent.
+- Treat the generated CSV and JSON files as review artifacts. The command does
+  not apply metadata, exact keywords, or negative keywords, and partial Apple
+  Ads source failures stay visible in the report.
+- Keep Apple's popularity, app-specific paid reach, paid search outcomes, and
+  metadata coverage distinct. Do not infer organic rank or keyword difficulty
+  from this plan.
+
 ### 2. Underutilized Fields
 
 Flag fields using less than their recommended minimum:
@@ -139,7 +166,7 @@ If Astro MCP is available and the app is tracked, run keyword gap analysis. **Ru
 
 1. **Get current keywords**: Call `get_app_keywords` with the app ID to retrieve tracked keywords and their current rankings.
 
-2. **Ensure multi-store tracking**: For each locale with a corresponding App Store territory (e.g., `ar-SA` → Saudi Arabia, `fr-FR` → France, `tr` → Turkey), use `add_keywords` to add keyword tracking in that store. Without this, `search_rankings` returns empty for non-US stores.
+2. **Check multi-store tracking**: Query existing tracking for each locale's App Store territory. Report untracked stores as unavailable and continue the audit. Use `add_keywords` only when the user separately authorizes tracking setup; empty rankings for an untracked store do not prove poor performance.
 
 3. **Extract competitor keywords**: Call `extract_competitors_keywords` with 3-5 top competitor app IDs to find keyword gaps. This is the highest-value Astro tool — it reveals keywords competitors rank for that you don't. Run this per store when possible.
 
@@ -163,7 +190,7 @@ Flag high-value combos in recommendations.
 
 - Astro MCP not connected → skip with note: "Connect Astro MCP for keyword gap analysis"
 - App not tracked in Astro → skip with note: "Add app to Astro with `mcp__astro__add_app` for gap analysis"
-- Store not tracked for a locale → add tracking with `add_keywords` before querying
+- Store not tracked for a locale → report the gap and skip its rankings; tracking setup requires separate authorization
 
 ## Output Format
 
