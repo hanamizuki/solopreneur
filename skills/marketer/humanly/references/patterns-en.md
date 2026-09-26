@@ -381,15 +381,17 @@ Summary: don't decorate headings or bullets with emojis
 
 ### 18. Curly Quotation Marks
 
-Summary: use straight quotes, not curly quotes
+Summary: mixed curly and straight quotes in one piece is the tell; consistent curly quotes are typography, keep them
 
-**Problem:** ChatGPT uses curly quotes ("\u201c...\u201d") instead of straight quotes ("...").
+**Problem:** ChatGPT and DeepSeek tend to emit curly quotes (“…”) and curly apostrophes (’), sometimes mixed with straight ones in the same text. Curly quotes on their own prove nothing. Word, macOS and iOS smart punctuation, and professional typesetting all produce them, and Claude and Gemini rarely use them.
 
-**Before:**
-> He said \u201cthe project is on track\u201d but others disagreed.
+**Action:** Flag only a piece that mixes curly and straight quotes or apostrophes, then normalize to the convention the rest of the text (or the house style) already uses. Never convert consistently curly text to straight quotes as an AI fix.
+
+**Before** (curly quotes, straight apostrophe):
+> The team called it “a small release,” but the changelog's first line says otherwise.
 
 **After:**
-> He said "the project is on track" but others disagreed.
+> The team called it “a small release,” but the changelog’s first line says otherwise.
 
 ---
 
