@@ -413,19 +413,26 @@ Summary: "I hope this helps!" is chatbot correspondence, not content; delete
 
 ---
 
-### 20. Knowledge-Cutoff Disclaimers
+### 20. Knowledge-Cutoff Disclaimers and Gap Speculation
 
-Summary: delete cutoff disclaimers ("as of my last update"); state the fact
+Summary: delete "as of my last update" and "not widely documented" disclaimers; keep the hedge on the guess that follows and mark it for the author, never harden it into a fact
 
-**Words to watch:** as of [date], Up to my last training update, While specific details are limited/scarce..., based on available information...
+**Words to watch:** as of my last update, up to my last training update, while specific details are limited/scarce..., based on available information..., not widely available/documented/disclosed, in the provided/available sources, in the search results. About a person, "maintains a low profile" and "keeps personal details private" count only when they stand in for missing information. A real deadline ("prices valid as of June") is not this pattern.
 
-**Problem:** AI disclaimers about incomplete information get left in text.
+**Problem:** AI disclaimers about incomplete information get left in text. Models that search the web add a second move: they announce that a detail "isn't documented", then guess what it "likely" is. Both halves are unverified. The disclaimer may be false, and the guess is speculation dressed as a finding.
 
 **Before:**
-> While specific details about the company's founding are not extensively documented in readily available sources, it appears to have been established sometime in the 1990s.
+> Although the studio's early history is not widely documented in available sources, it appears to have released its first game sometime around 2010.
 
 **After:**
-> The company was founded in 1994, according to its registration documents.
+> The studio likely released its first game around 2010 (needs author input: confirm the year, or cut the sentence).
+
+**Rules:**
+- Drop the disclaimer shell ("not widely documented", "based on available information"). It carries no information.
+- Keep the hedge on the claim that follows. "Appears to have released" may become "likely released", never "released".
+- Mark a hedged claim that reads like the model's guess, and let the author decide whether to confirm it, keep the hedge or cut it. Don't make that call for them.
+- Uncertainty the author states as their own ("we think the first shop opened in spring") is their judgment. Keep it as written.
+- If the reader needs to know about a real gap, say it once, plainly. An action for the reader must come from the author. If they gave none, mark it: "Parking details aren't published yet (needs author input: where should readers check?)."
 
 ---
 

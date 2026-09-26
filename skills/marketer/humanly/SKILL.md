@@ -94,7 +94,7 @@ Full definitions, the false-positive table, and the never-invent rule:
 ### Step 5: First Pass — Scan by Severity
 
 **P0 — Credibility killers (fix immediately):**
-- Cutoff disclaimers ("As of my last update")
+- Cutoff disclaimers and gap speculation ("As of my last update", "not widely documented… it likely…")
 - Chatbot artifacts ("I hope this helps!", "Great question!")
 - Vague attributions without sources ("Experts believe")
 - Significance inflation on routine events
