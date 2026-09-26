@@ -130,7 +130,7 @@ Run through these checks regardless of language:
 - Explaining a metaphor? Trust the reader
 - Sentence-initial "Additionally," "Notably," or "Consequently," stacked down a paragraph? Cut them. A lone However, Therefore or Also is ordinary writing, so leave it
 - Rule of three? Use two items or four
-- Symmetrical slogans ("Not X, but Y")? Just say Y
+- Symmetrical slogans ("Not X, but Y")? Just say Y, unless a reader would really assume X. Then the contrast carries information, so keep it once
 - Contrast adds no new information (surface/deeper, "the real problem is")? Cut the frame, state the point with evidence
 - Ends with a life lesson or quotable line? Delete or replace with a concrete fact
 - More than 1 quoted *term*? Keep only the most essential one. This means emphasis and scare quotes — **attributed speech is exempt** and never gets compressed away, however many quotations the piece carries (see `protected-list.md` §4)
