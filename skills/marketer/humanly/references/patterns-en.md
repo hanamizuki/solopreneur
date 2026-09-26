@@ -778,6 +778,29 @@ Summary: `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the aut
 
 ---
 
+### 42. Vague Association
+
+Summary: "associated with" or "connected to" standing in for a person's or organization's role hides the fact; ask the author for the role, and leave technical links and research correlations alone
+
+**Words to watch** (about a person's or organization's role): associated with, closely/widely associated with, in connection with, connected to/with, in association with
+
+**Problem:** Instead of saying what someone did ("she ran the program", "he taught there"), AI text says the two are "associated" or "connected". The reader learns that a link exists and nothing about what it is. Wikipedia's editors keep finding it in 2025 and 2026 output, often next to promotional wording. One instance proves nothing. Several, or one next to other tells, is the signal.
+
+**Before:**
+> The foundation is closely associated with three coastal restoration projects, and its director has been connected to the 2022 wetlands bill.
+
+**After** (the default: the draft never says what the roles were):
+> The foundation is associated with three coastal restoration projects (needs author input: does it fund, run or advise them?), and its director has been connected to the 2022 wetlands bill (needs author input: the director's role).
+
+**After** (only once the author has supplied the roles):
+> The foundation funds three coastal restoration projects, and its director helped draft the 2022 wetlands bill.
+
+**Leave these alone:**
+- Technical links: "the email associated with your account", "the files associated with this project".
+- Correlations in research and statistics writing: "longer commutes were associated with lower job satisfaction". Rewriting that as "causes" or "leads to" changes the finding.
+
+---
+
 ## Full Example
 
 **Before (AI-sounding):**
