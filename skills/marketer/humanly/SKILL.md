@@ -115,7 +115,7 @@ Full definitions, the false-positive table, and the never-invent rule:
 - Rule of three
 - Uniform paragraph length
 - Copula avoidance
-- Transition phrases
+- Stacked sentence-initial transitions (Additionally, Notably, Consequently)
 
 ### Step 6: Cross-Language Checklist
 
@@ -128,7 +128,7 @@ Run through these checks regardless of language:
 - Paragraph ends with a tidy one-liner? Vary the ending
 - Em dash before a reveal? Remove it
 - Explaining a metaphor? Trust the reader
-- Conjunctive adverbs (Additionally, However)? Consider removing
+- Sentence-initial "Additionally," "Notably," or "Consequently," stacked down a paragraph? Cut them. A lone However, Therefore or Also is ordinary writing, so leave it
 - Rule of three? Use two items or four
 - Symmetrical slogans ("Not X, but Y")? Just say Y
 - Contrast adds no new information (surface/deeper, "the real problem is")? Cut the frame, state the point with evidence
