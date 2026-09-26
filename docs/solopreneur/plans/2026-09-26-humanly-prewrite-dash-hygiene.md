@@ -45,10 +45,10 @@ Out: semicolons (the zh bundle also bans 「；」, but the en summary lines use
 
 **Files:** `skills/marketer/humanly/scripts/build-prewrite.py`
 
-- [ ] **Step 1:** `CONFIGS["zh"]["word_sections"]` becomes `["## Tier 1（必換）", "## 禁用句型（看到就刪）"]`; `CONFIGS["en"]["word_sections"]` becomes `["## Tier 1 (Always Replace)"]`.
-- [ ] **Step 2:** (removed in plan review: one shared table header, no per-language config key.)
-- [ ] **Step 3:** `BANNER` first line becomes `"<!-- AUTO-GENERATED. DO NOT EDIT.\n"`.
-- [ ] **Step 4:** replace the index loop
+- [x] **Step 1:** `CONFIGS["zh"]["word_sections"]` becomes `["## Tier 1（必換）", "## 禁用句型（看到就刪）"]`; `CONFIGS["en"]["word_sections"]` becomes `["## Tier 1 (Always Replace)"]`.
+- **Step 2:** removed in plan review (one shared table header, no per-language config key).
+- [x] **Step 3:** `BANNER` first line becomes `"<!-- AUTO-GENERATED. DO NOT EDIT.\n"`.
+- [x] **Step 4:** replace the index loop
 
 ```python
     for entry in entries:
@@ -69,7 +69,7 @@ with
         out.append(f"| #{entry['num']} | {title} | {summary} |")
 ```
 
-- [ ] **Step 5:** the build is verified in Task 3, after the headings it reads have been renamed.
+- [x] **Step 5:** the build is verified in Task 3, after the headings it reads have been renamed.
 
 ### Task 2: Source prose
 
@@ -143,15 +143,15 @@ Each row: exact text to replace → replacement.
 | `這類詞不在表上就是放行——要禁請改這個檔` | `這類詞不在表上就是放行。要禁請改這個檔` |
 | `引句冒號不在其列——規則寫在` | `引句冒號不在其列。規則寫在` |
 
-- [ ] **Step 1:** apply every row with an exact-match edit that asserts one match per row (two for the duplicated en Tier 1 row).
-- [ ] **Step 2:** the todo that cites the old headings (`todos/backlog/2026-09-26_humanly-wikipedia-signs-refresh.md`) is not edited on this branch; its status note is updated on `main` after merge.
+- [x] **Step 1:** apply every row with an exact-match edit that asserts one match per row (two for the duplicated en Tier 1 row).
+- [x] **Step 2:** the todo that cites the old headings (`todos/backlog/2026-09-26_humanly-wikipedia-signs-refresh.md`) is not edited on this branch; its status note is updated on `main` after merge.
 
 ### Task 3: Rebuild and verify
 
-- [ ] **Step 1:** `python3 skills/marketer/humanly/scripts/build-prewrite.py`, then `--check`. Expect `prewrite-zh.md (50 patterns, 11 prewrite)` and `prewrite-en.md (42 patterns, 7 prewrite)`. A drop in the prewrite count means a `｜prewrite` flag was damaged (zh #44 carries one).
-- [ ] **Step 2:** mechanical check: in both bundles, every remaining `—` or `–` sits on one of the kept mention lines listed in Scope. Print any other line and fail.
-- [ ] **Step 3:** compare the appendix table with the builder's own parse: import `parse_patterns` from the script, and assert that the table rows equal `(#num, title, summary)` for every entry, in order. Also render one synthetic entry whose summary contains `|` and assert the cell round-trips (escaped in the file, intact when unescaped).
-- [ ] **Step 4:** commit the script, sources and bundles together (`refactor(humanly): drop em dashes from the prewrite bundles`), since the headings and the keys must change in one commit.
+- [x] **Step 1:** `python3 skills/marketer/humanly/scripts/build-prewrite.py`, then `--check`. Expect `prewrite-zh.md (50 patterns, 11 prewrite)` and `prewrite-en.md (42 patterns, 7 prewrite)`. A drop in the prewrite count means a `｜prewrite` flag was damaged (zh #44 carries one).
+- [x] **Step 2:** mechanical check: in both bundles, every remaining `—` or `–` sits on one of the kept mention lines listed in Scope. Print any other line and fail.
+- [x] **Step 3:** compare the appendix table with the builder's own parse: import `parse_patterns` from the script, and assert that the table rows equal `(#num, title, summary)` for every entry, in order. Also render one synthetic entry whose summary contains `|` and assert the cell round-trips (escaped in the file, intact when unescaped).
+- [x] **Step 4:** commit the script, sources and bundles together (`refactor(humanly): drop em dashes from the prewrite bundles`), since the headings and the keys must change in one commit.
 
 ### Task 4: Benchmark run
 
@@ -159,7 +159,7 @@ Subagents read `/Users/Hana/Agents/nana/repos/solopreneur-humanly-dash-hygiene/s
 
 ### Task 5: Package, push, PR
 
-- [ ] `scripts/generate-plugin-packages.sh`, confirm `git status --porcelain` shows only `plugins/claude/marketer/skills/humanly/**`, commit, push, open the PR with the evidence note above and the benchmark result.
+- [x] `scripts/generate-plugin-packages.sh`, confirm `git status --porcelain` shows only `plugins/claude/marketer/skills/humanly/**`, commit, push, open the PR with the evidence note above and the benchmark result.
 
 ---
 
