@@ -160,6 +160,33 @@ RETURN p.name, f.name
 
 **Aggregation grouping keys**: every non-aggregating expression in `RETURN`/`WITH` is implicitly a grouping key.
 
+### GROUP BY subclause [2026.07, Cypher 25]
+
+```cypher
+RETURN <projection items>
+  GROUP BY { <grouping key> [, <grouping key>]... | () | ALL }
+  [ORDER BY ...] [SKIP/LIMIT]
+
+WITH <projection items>
+  GROUP BY { <grouping key> [, <grouping key>]... | () | ALL }
+  [ORDER BY ...] [SKIP/LIMIT] [WHERE ...]
+```
+
+```cypher
+CYPHER 25
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+RETURN p.name AS actor, m.genre AS genre, avg(m.rating) AS avgRating
+GROUP BY actor, genre
+```
+
+| Form | Effect |
+|---|---|
+| `GROUP BY k1, k2` | Explicit keys; each projection item must be an aggregation, constant, parameter, local variable, grouping-key expression, or sub-expression built from those |
+| `GROUP BY ()` | No grouping keys — one row; no entity/variable projections, aggregations still work |
+| `GROUP BY ALL` | Every non-aggregating projection item becomes a key (matches implicit grouping) |
+
+Grouping keys that are not projection items are not returned.
+
 ---
 
 ## ORDER BY
@@ -167,6 +194,21 @@ RETURN p.name, f.name
 - No `AS alias` in ORDER BY items — `ORDER BY n.prop DESC` not `ORDER BY n.prop AS p DESC`
 - No `NULLS LAST` / `NULLS FIRST` — SQL syntax; nulls sort last ascending / first descending by default
 - After aggregation, sort by the RETURN alias, not the pre-aggregation variable
+- `ORDER BY` / `WHERE` accept aggregation functions absent from the projection when the projection clause already aggregates [2026.07]
+
+```cypher
+// Deprecated 2026.07 — subclause rebuilds a complex projection expression
+MATCH (a:Movie)
+RETURN a.rating + 0 AS score, count(*) AS c ORDER BY a.rating + 0 + 1
+// Reference the alias
+MATCH (a:Movie)
+RETURN a.rating + 0 AS score, count(*) AS c ORDER BY score + 1
+
+// Deprecated 2026.07 — 'a' ambiguous between incoming variable and new alias
+MATCH (a:Movie)-->(b:Person) RETURN a.title AS a, count(*) AS c ORDER BY a.title
+// Alias to a distinct name
+MATCH (a:Movie)-->(b:Person) RETURN a.title AS title, count(*) AS c ORDER BY title
+```
 
 ```cypher
 // DO:
@@ -223,6 +265,8 @@ RETURN coalesce(n.nickname, n.name) AS displayName
 ```
 
 `collect()` and aggregation functions ignore null values. `null = null` is `null` (not `true`). `WHERE` treats `null` as `false`.
+
+`null / 0` returns `null` [fixed 2026.08; earlier releases raised division-by-zero]. Guard divisors before 2026.08: `CASE WHEN d = 0 THEN null ELSE n / d END`.
 
 ---
 
@@ -289,6 +333,12 @@ RETURN [(n)-[:KNOWS]->(f:Person) | f.name] AS friends,
 
 Use pattern comprehensions for simple one-hop inline collections; for multi-step traversals use `COLLECT { MATCH ... RETURN ... }`.
 
+**Map comprehension** [2026.09, Cypher 25] — builds a `MAP` by iterating a `MAP` or `LIST`; form per 2026.09 changelog, reference docs pending:
+```cypher
+{k: v IN map | keyExpression: valueExpression}
+```
+Pre-2026.09: `apoc.map.fromPairs([k IN keys(m) | [k, m[k]]])`.
+
 ---
 
 ## String Functions
@@ -299,16 +349,77 @@ trim(s) / ltrim(s) / rtrim(s)             // strip whitespace; btrim(s, 'xy') st
 split(s, delimiter)                         // returns LIST<STRING>
 substring(s, start, length)                // 0-indexed; length optional
 left(s, n) / right(s, n)                   // first/last n characters
-replace(s, search, replacement)            // replace all occurrences
+replace(s, search, replacement[, limit])   // replace all occurrences; limit caps replacements [limit: Cypher 25]
 size(s)                                     // character count (same as char_length)
 reverse(s)                                  // reverse string
-toString(x) / toStringOrNull(x)            // convert any type to STRING
+toString(x) / toStringOrNull(x)            // convert any type to STRING; LIST, MAP, NODE, RELATIONSHIP, PATH accepted [2026.09]
+toStringList(list)                          // element-wise STRING conversion; same extended types [2026.09]
 string.indexOf(input, value)                // index of first match, -1 if absent [2026.05, Cypher 25]
 string.join(list, delimiter)                // join LIST<STRING> with delimiter [2026.05, Cypher 25]
 string.regexReplace(original, regex, repl)  // regex replace all matches [2026.05, Cypher 25]
 ```
 
 All string functions return `null` when any argument is `null`.
+
+### String interpolation [2026.08, Cypher 25]
+
+`s"…"` / `S"…"` STRING literal embeds expressions wrapped in `{}`:
+
+```cypher
+WITH 'Keanu' AS firstName, 'Reeves' AS lastName
+RETURN s"{firstName} {lastName}" AS fullName          // "Keanu Reeves"
+
+WITH 42 AS age
+RETURN s'Age: {age}' AS result                        // toString() applied automatically
+
+RETURN s"Use \{curly\} braces" AS escaped             // literal braces
+WITH 'World' AS name
+RETURN s"Outer: {s'Inner, {name}!'}" AS nested        // "Outer: Inner, World!"
+```
+
+| Rule | Detail |
+|---|---|
+| Prefix | `s` or `S` before a single- or double-quoted literal |
+| Placeholder | `{expression}`, any number per literal |
+| Conversion | `toString()` on every embedded expression |
+| Rejected types | `MAP`, `LIST`, `NODE`, `PATH`, `RELATIONSHIP` (no `toString()` support) |
+| Escaping | `\{` and `\}` for literal braces |
+
+Injection risk: if query text itself is built with interpolation and passed to `apoc.cypher.run()` or similar dynamic-Cypher procedures, `$parameters` only protect data values. Keep labels, relationship types, and clauses static or whitelist them before interpolation.
+
+Pre-2026.08: `p.firstName + ' ' + p.lastName`, `+ toString(expr)`, or `string.join(...)`.
+
+---
+
+## UUID Type and Functions [2026.08, Cypher 25]
+
+```cypher
+uuid()                                                  // random UUID value
+uuid(name :: STRING)                                    // UUID from STRING input
+uuid(mostSigBits :: INTEGER, leastSigBits :: INTEGER)   // UUID from two 64-bit halves
+uuid.mostSignificantBits(u :: UUID)                     // INTEGER high half
+uuid.leastSignificantBits(u :: UUID)                    // INTEGER low half
+
+RETURN uuid() AS randomUUID                                    // random UUID value
+RETURN uuid('550e8400-e29b-41d4-a716-446655440000') AS fromStr // STRING input
+RETURN uuid(42, 42) AS fromInts                                // (mostSigBits, leastSigBits)
+
+WITH uuid('550e8400-e29b-41d4-a716-446655440000') AS id
+RETURN uuid.mostSignificantBits(id)  AS msb,                   // INTEGER, upper 64 bits
+       uuid.leastSignificantBits(id) AS lsb,                   // INTEGER, lower 64 bits
+       toString(id) AS asString
+
+CREATE (n:Session {sessionId: uuid($uuidString)})              // store as property
+```
+
+`UUID` is a distinct value type — not a `STRING`. `randomUUID()` still returns a `STRING`; keep it for keys that must stay STRING-typed or must work on < 2026.08.
+
+| Constraint | Detail |
+|---|---|
+| Storage | `UUID` is a property type in Neo4j 2026.08+; Community and Enterprise can store `UUID` properties |
+| Null args | Any null argument yields `null`: `uuid(null)`, `uuid(null, 42)`, `uuid(42, null)`, `uuid.mostSignificantBits(null)` |
+| Drivers | Mapped to native client types from driver 6.2 (Python 6.3); older drivers return placeholder `MAP` + `03N95 Neo.ClientNotification.UnknownType` |
+| STRING ids | `randomUUID()` still returns a STRING — use it when the server version or driver cannot handle `UUID` |
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: neo4j-cli-tools
 description: Use when working with Neo4j command-line tools — neo4j-cli (modern unified
-  CLI: Cypher via Bolt, schema inspection, Aura management, Docker containers, credential
+  CLI — Cypher via Bolt, schema inspection, Aura management, Docker containers, credential
   management, agent skill catalog install; install with curl -sSfL https://neo4j.sh/install.sh | bash),
   neo4j-admin (backup, restore, import, memory sizing), cypher-shell (ad-hoc queries,
   scripting, CI/CD), or neo4j-mcp (quick MCP server install).
@@ -9,7 +9,7 @@ description: Use when working with Neo4j command-line tools — neo4j-cli (moder
   Does NOT cover driver upgrades — use neo4j-migration-skill.
   Does NOT cover full MCP editor configuration — use neo4j-mcp-skill.
 allowed-tools: WebFetch, Bash
-version: 1.0.12
+version: 1.0.13
 ---
 
 # Neo4j CLI Tools skill

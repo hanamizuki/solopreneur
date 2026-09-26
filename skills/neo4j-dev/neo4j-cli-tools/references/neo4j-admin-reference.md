@@ -98,6 +98,7 @@ neo4j-admin database backup neo4j --to-path=/backups/$(date +%Y%m%d)
 - `--type=<type>` - Backup type: `full` or `differential`
 - `--keep-failed` - Keep failed backup attempts
 - `--verbose` - Print detailed progress
+- `--split-archive-part-size=<size>` - Split the backup artifact into multiple parts of this size [2026.09]; config default `server.split_archive.part_size`
 
 #### restore
 
@@ -119,7 +120,14 @@ neo4j-admin database dump <database-name> --to-path=<dump-file>
 
 ```bash
 neo4j-admin database dump mydb --to-path=/exports/mydb.dump
+
+# Split a large dump into 5 GB parts [2026.09]
+neo4j-admin database dump mydb --to-path=/exports --split-archive-part-size=5G
 ```
+
+**Options**:
+- `--to-path=<path>` - Destination file or directory (required)
+- `--split-archive-part-size=<size>` - Split the dump into multiple parts of this size [2026.09]; config default `server.split_archive.part_size`
 
 #### load
 
