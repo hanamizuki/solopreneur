@@ -55,14 +55,14 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### The four don'ts (guardrails on the above)
 
-The six moves above are **directions, not material**. These four exist because "add voice" is the instruction models most often over-execute — performing humanity is just a different flavor of slop:
+The six moves above are **directions, not material**. These four exist because "add voice" is the instruction models most often over-execute, and performing humanity is just a different flavor of slop:
 
 - **Don't manufacture aphorisms.** Rhythm comes from cutting filler and keeping the point, not from squeezing a quotable line out of every paragraph ending (core rule 5).
 - **Don't perform casualness.** Sprinkling "honestly," "look," and "I mean" into every sentence is as fake as mechanical parallelism. Colloquial fragments are the author's to keep, not yours to add.
-- **Don't perform uncertainty.** Bolting on "I still haven't figured this out" as an ending is the same move as bolting on "In conclusion" — just aimed the other way. Write uncertainty only where it's real; write a change of mind only where one happened.
+- **Don't perform uncertainty.** Bolting on "I still haven't figured this out" as an ending is the same move as bolting on "In conclusion", just aimed the other way. Write uncertainty only where it's real; write a change of mind only where one happened.
 - **Don't sacrifice accuracy to sound human.** Technical writing gets to be technical. Precise terms, formal clauses and complete explanations don't need more voice. The target is templated and performative writing, not professionalism.
 
-**The line: the voice belongs to the author, not to you.** When a passage needs a concrete example, a position, or a turning point and the author never gave you one, leave `(needs author input: what did you actually do here?)` — **do not invent one**. A fabricated "I was wrong about this for two years" is far worse than the empty sentence it replaced: empty is boring, invented is a lie told in someone else's name. Full rules in `protected-list.md`.
+**The line: the voice belongs to the author, not to you.** When a passage needs a concrete example, a position, or a turning point and the author never gave you one, leave `(needs author input: what did you actually do here?)`. **Do not invent one.** A fabricated "I was wrong about this for two years" is far worse than the empty sentence it replaced: empty is boring, invented is a lie told in someone else's name. Full rules in `protected-list.md`.
 
 ### Before (clean but soulless):
 > The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.
@@ -99,7 +99,7 @@ Quick pass after writing:
 Every "After" below shows what a sentence looks like **once the author has
 supplied the material**. They routinely carry specifics the "Before" never had
 ("80 people showed up", "three new IT parks", "a 2019 survey by the Chinese
-Academy of Sciences"). That is there to show you the **target shape** — it is
+Academy of Sciences"). That is there to show you the **target shape**. It is
 **not permission to manufacture one**.
 
 When writing or rewriting, if cutting the filler leaves a hole and the author
@@ -738,7 +738,7 @@ Summary: "on the surface X, deeper down Y" / "the real problem is" fakes insight
 
 ### 39. Hallucinated Citations
 
-Summary: a decimal-precise study that doesn't exist, a quote pinned on the wrong person — mark `[source unverified]` and hand it back, never verify or invent for the author
+Summary: for a decimal-precise study that doesn't exist or a quote pinned on the wrong person, mark `[source unverified]` and hand it back, never verify or invent for the author
 
 **Watch for:** decimal-precise research figures with no traceable study ("productivity rose 47.3%"), famous quotes attributed to the wrong person, book citations with no page number, dead links, institution names that sound real but have no source
 
@@ -774,7 +774,7 @@ Summary: `utm_source=chatgpt.com` and `turn0search0` are hard proof of unproofre
 
 ### 41. Unfilled Template Placeholders
 
-Summary: `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the author, never fill them in
+Summary: flag each `[Product Name]`, `[Company]` or `{{name}}` for the author, never fill them in
 
 **Watch for:** `[Product Name]`, `[insert case study here]`, `[Company]`, `XX Corp`, `{{name}}`, `<your name>`
 
