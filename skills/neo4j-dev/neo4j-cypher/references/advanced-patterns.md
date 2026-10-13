@@ -207,10 +207,10 @@ RETURN count(path) AS validPaths
 ```cypher
 // k-shortest paths with cost
 CYPHER 25
-MATCH SHORTEST 3 (a:City {name: $from})(()-[r:ROAD]->()){1,}(b:City {name: $to})
-WITH *, reduce(c=0, r IN relationships(*) | c + r.cost) AS totalCost
+MATCH p = SHORTEST 3 (a:City {name: $from})(()-[:ROAD]->()){1,}(b:City {name: $to})
+WITH *, reduce(c=0, r IN relationships(p) | c + r.cost) AS totalCost
 ORDER BY totalCost
-RETURN totalCost, [n IN nodes(*) | n.name] AS route
+RETURN totalCost, [n IN nodes(p) | n.name] AS route
 ```
 
 ---

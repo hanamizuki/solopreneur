@@ -1,7 +1,7 @@
 ---
 name: neo4j-cli-tools
 description: Use when working with Neo4j command-line tools — neo4j-cli (modern unified
-  CLI: Cypher via Bolt, schema inspection, Aura management, Docker containers, credential
+  CLI — Cypher via Bolt, schema inspection, Aura management, Docker containers, credential
   management, agent skill catalog install; install with curl -sSfL https://neo4j.sh/install.sh | bash),
   neo4j-admin (backup, restore, import, memory sizing), cypher-shell (ad-hoc queries,
   scripting, CI/CD), or neo4j-mcp (quick MCP server install).
@@ -9,7 +9,7 @@ description: Use when working with Neo4j command-line tools — neo4j-cli (moder
   Does NOT cover driver upgrades — use neo4j-migration-skill.
   Does NOT cover full MCP editor configuration — use neo4j-mcp-skill.
 allowed-tools: WebFetch, Bash
-version: 1.0.12
+version: 1.0.15
 ---
 
 # Neo4j CLI Tools skill
@@ -100,7 +100,7 @@ neo4j-cli skill check                            # detect drift after upgrades
 
 **Credentials precedence:** flag > OS env (`NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`) > `.env` walk-up > stored credential.
 
-**Supported agents:** Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Cline, Codex, OpenCode, Junie, and more.
+**Supported agents:** Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Antigravity CLI, Cline, Codex, OpenCode, Junie, and more. Antigravity: skills land in `~/.gemini/antigravity/skills`.
 
 Full reference: `neo4j-cli skill install` keeps an always-in-sync skill in your agent.
 
