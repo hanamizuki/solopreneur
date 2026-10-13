@@ -11,13 +11,15 @@
 ## Outcome
 
 Autopilot Codex V1 needs two internal dependencies beyond Greenlight. This
-slice publishes only the contracts Autopilot's run-now, single-PR engine will
-call:
+slice provides the contracts Autopilot's run-now, single-PR engine calls:
 
 - `plan-review internal` performs pre-implementation technical and lean review
   without external-model review, adjudication, or write-back.
 - `merge-pr` uses a mutation-free merge-only profile after Greenlight. It gates
   the exact head through CI and uses GitHub's atomic head precondition.
+
+Attended Plan Review also supports the complete flow on Codex, using Claude CLI
+for the outside opinion. Autopilot continues to request only `internal`.
 
 The canonical skill bodies remain shared with Claude Code. Host routing is
 selected through `CODEX_THREAD_ID`; Claude's existing full flows remain the
@@ -25,11 +27,26 @@ default when it is unset.
 
 ## Plan Review Codex profile
 
-Codex accepts only the whole-token `internal` mode. A full attended invocation
-fails closed with the required Verdict line before reviewer dispatch or writes.
-The internal path runs document resolution, technical vetting, the lean check,
-and findings merge through R2. Stage 3, user adjudication, and write-back are
-not available.
+The whole-token `internal` mode runs document resolution, technical vetting,
+the lean check, and findings merge through R2. It never invokes Stage 3,
+user adjudication, or write-back. Full mode adds a Claude CLI outside opinion,
+then lets the user adjudicate each finding before the host writes adopted
+changes back to the original document. Without an interactive user it skips
+Stage 3 and stops at R2; a conversational plan has no file to write back to.
+
+The Claude reviewer uses the matching configured profile and subscription
+authentication, never a metered API fallback. The host supplies the full plan
+and relevant repository file contents with original line numbers, validating
+paths and disclosing omissions. Provider, files, and approximate input size
+must be approved before dispatch; explicit approval for the same material is
+reused. The child has no parent conversation history, built-in tools, MCP tools,
+or skills. Normal CLI configuration may still add context; this is not an OS
+sandbox. Only the host can collect more evidence or write approved revisions.
+
+Unavailable Claude or declined approval skips Stage 3. A timeout, nonzero exit,
+empty response, or missing verdict marks it failed, never a clean review. Both
+paths preserve the Stage 1–2 findings and allow attended adjudication. Temporary
+prompt and plan copies are removed on every exit path.
 
 For each detected platform, reviewer selection is:
 
@@ -71,7 +88,9 @@ the order Greenlight → CI → merge-pr.
 
 ## Limitations
 
-- Full attended Plan Review remains Claude-only.
+- Full Codex Plan Review requires an interactive user for adjudication and
+  write-back, and a subscription-authenticated Claude CLI for Stage 3.
+- Claude can cross-check only supplied evidence; omissions must be disclosed.
 - Codex Plan Review may use a generic explorer or inline vetting instead of a
   platform-specific reviewer.
 - Live acceptance exercised the built-in explorer path. Custom-agent and
