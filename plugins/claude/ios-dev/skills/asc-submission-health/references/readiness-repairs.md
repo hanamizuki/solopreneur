@@ -41,7 +41,7 @@ asc encryption declarations create \
 Assign the declaration to the resolved build:
 
 ```bash
-asc encryption declarations assign-builds --id "DECLARATION_ID" --build "BUILD_ID"
+asc encryption declarations assign-builds --id "DECLARATION_ID" --build-id "BUILD_ID"
 ```
 
 If the app truly uses only exempt transport encryption, update the local plist and rebuild instead of making a false declaration:
@@ -184,7 +184,7 @@ asc review details-create \
   --contact-first-name "Dev" \
   --contact-last-name "Support" \
   --contact-email "dev@example.com" \
-  --contact-phone "+1 555 0100" \
+  --contact-phone "+1 408 555 0100" \
   --notes "Explain the reviewer access path here."
 ```
 

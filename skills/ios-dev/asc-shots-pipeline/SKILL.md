@@ -11,7 +11,7 @@ Use this skill for agent-driven screenshot workflows where the app is built and 
 - Implemented now: build/run, AXe plan capture, frame composition, and upload.
 - Device discovery is built-in via `asc screenshots list-frame-devices`.
 - Local screenshot automation commands are experimental in asc cli.
-- Framing is pinned to Koubou `0.18.1` for deterministic output.
+- Framing is pinned to Koubou `0.20.0` for deterministic output.
 - Feedback/issues: https://github.com/rorkai/App-Store-Connect-CLI/issues/new/choose
 
 ## Defaults
@@ -113,13 +113,14 @@ Minimal `.asc/screenshots.json` example:
 
 ## 4) Frame screenshots with `asc screenshots frame`
 
-The asc CLI pins framing to Koubou `0.18.1`.
+The asc CLI pins framing to Koubou `0.20.0`.
 Install and verify before running framing steps:
 
 ```bash
-pip install koubou==0.18.1
-kou --version  # expect 0.18.1
-# If Koubou reports missing device frames, run once with network access:
+pip install koubou==0.20.0
+kou --version  # expect 0.20.0
+# After upgrading from 0.18.x, or if Koubou reports missing device frames,
+# run once with network access:
 kou setup-frames
 ```
 
@@ -140,12 +141,9 @@ asc screenshots frame \
 ```
 
 Supported `--device` values:
-- `iphone-air` (default)
-- `iphone-17-pro`
-- `iphone-17-pro-max`
-- `iphone-16e`
-- `iphone-17`
-- `mac`
+- iPhone: `iphone-air` (default), `iphone-17-pro`, `iphone-17-pro-max`, `iphone-16e`, `iphone-17`
+- iPad: `ipad-pro-13`, `ipad-pro-11`, `ipad-air-13`, `ipad-air-11`, `ipad-mini`
+- Other: `mac`, `watch-series-11`, `watch-ultra-3`, `apple-tv`
 
 ## 5) Upload screenshots with asc
 
@@ -190,7 +188,7 @@ asc screenshots list --version-localization "LOC_ID" --output table
 - Use explicit long flags (`--app`, `--output`, `--version-localization`, etc.).
 - Treat screenshot-local automation as experimental and call it out in user-facing handoff notes.
 - Use `asc screenshots plan` / `asc screenshots apply` for reviewed batches when you need append-limit guardrails across existing remote screenshots.
-- If framing fails with a version error, re-install pinned Koubou: `pip install koubou==0.18.1`.
+- If framing fails with a version error, re-install pinned Koubou: `pip install koubou==0.20.0`.
 - If framing fails because device frames are missing, run `kou setup-frames` once with network access.
 
 ## 6) Multi-locale capture (optional)

@@ -21,6 +21,8 @@ Use this skill to map names to IDs needed by other commands.
   - `asc builds info --app "APP_ID" --latest --version "1.2.3" --platform IOS`
 - Recent builds:
   - `asc builds list --app "APP_ID" --sort -uploadedDate --limit 5`
+- Skip the lookup when attaching or submitting: `asc versions attach-build` and
+  `asc review submit` accept `--app`, `--version`, and `--build-number "45"`.
 
 ## Version ID
 - `asc versions list --app "APP_ID" --paginate`

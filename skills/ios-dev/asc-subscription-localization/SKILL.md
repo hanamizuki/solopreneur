@@ -65,6 +65,22 @@ ja, ko, ms, nl-NL, no, pl, pt-BR, pt-PT, ro, ru, sk,
 sv, th, tr, uk, vi, zh-Hans, zh-Hant
 ```
 
+## Import many locales from one file
+
+For bulk writes, map each locale to its fields in one JSON file and import it
+into the resolved version ID. Import creates missing locales, updates only
+differing fields, never clears or deletes, and reports per-locale failures.
+
+```bash
+asc subscriptions versions localizations import --version-id "VERSION_ID" --file "./localizations.json" --dry-run
+asc subscriptions versions localizations import --version-id "VERSION_ID" --file "./localizations.json" --confirm
+```
+
+`asc iap versions localizations import` takes the same `name` and
+`description` fields. `asc subscriptions groups versions localizations import`
+takes `name` and `customAppName`. Give every new subscription or IAP locale a
+non-empty `description`; see the create rules below.
+
 ## Workflow: Bulk-localize a subscription version (v2)
 
 List existing localizations, create only missing locales, then verify:
@@ -186,6 +202,6 @@ matches are returned.
 - Subscription display names are what users see on the subscription management sheet and in purchase dialogs.
 - Creating a localization for a locale that already exists will fail; list
   first and update the resolved ID when a change is needed.
-- There is no bulk API; each locale requires a separate create call.
+- Apple has no bulk localization endpoint; `... localizations import` validates the whole file, then writes one locale at a time.
 - Use `--paginate` on list commands to ensure all existing localizations are returned.
 - Use the `asc-id-resolver` skill if you only have app names instead of IDs.
