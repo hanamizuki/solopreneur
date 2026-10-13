@@ -136,7 +136,7 @@ CREATE LOOKUP INDEX rel_type_lookup  FOR ()-[r]-() ON EACH type(r)
 
 Enforce data integrity AND create an implicit **RANGE index** (UNIQUE, NODE KEY). Prefer constraint over bare index when uniqueness is required.
 
-**Edition notes**: UNIQUE and NOT NULL available in all editions. NODE KEY, RELATIONSHIP KEY, RELATIONSHIP UNIQUE, property type (`IS ::`) require **Enterprise Edition**.
+**Edition notes**: UNIQUE (node/relationship, single/composite) in all editions. NOT NULL (existence), NODE KEY, RELATIONSHIP KEY, property type (`IS ::`) require **Enterprise Edition** (Community: `Property existence constraint is not supported in community edition`).
 
 ```cypher
 // UNIQUE node — creates implicit RANGE index; MERGE acquires lock
@@ -147,7 +147,7 @@ CREATE CONSTRAINT person_email_unique IF NOT EXISTS
 CREATE CONSTRAINT book_title_year IF NOT EXISTS
   FOR (n:Book) REQUIRE (n.title, n.publicationYear) IS UNIQUE
 
-// UNIQUE relationship (Enterprise)
+// UNIQUE relationship
 CREATE CONSTRAINT sequel_order IF NOT EXISTS
   FOR ()-[r:SEQUEL_OF]-() REQUIRE r.order IS UNIQUE
 
@@ -159,11 +159,11 @@ CREATE CONSTRAINT person_key IF NOT EXISTS
 CREATE CONSTRAINT owns_key IF NOT EXISTS
   FOR ()-[r:OWNS]-() REQUIRE r.ownershipId IS RELATIONSHIP KEY
 
-// NOT NULL node (existence only — no index created)
+// NOT NULL node (Enterprise) — existence only, no index created
 CREATE CONSTRAINT person_name_exists IF NOT EXISTS
   FOR (n:Person) REQUIRE n.name IS NOT NULL
 
-// NOT NULL relationship
+// NOT NULL relationship (Enterprise)
 CREATE CONSTRAINT wrote_year_exists IF NOT EXISTS
   FOR ()-[r:WROTE]-() REQUIRE r.year IS NOT NULL
 
@@ -214,7 +214,13 @@ Lucene — tokenized, scored, not a filter index. Result nodes must be joined ba
 CREATE FULLTEXT INDEX article_search IF NOT EXISTS
   FOR (n:Article|BlogPost) ON EACH [n.title, n.body]
 
-// Query nodes — returns node + score (descending)
+// Query nodes via SEARCH clause [2026.09, Cypher 25] — preferred
+MATCH (node)
+SEARCH node IN (FULLTEXT INDEX article_search FOR 'graph database' LIMIT 10)
+SCORE AS score
+RETURN node.title, score
+
+// Query nodes via procedure (pre-2026.09) — returns node + score (descending)
 CALL db.index.fulltext.queryNodes('article_search', 'graph database')
 YIELD node, score
 WHERE score > 0.5
@@ -237,7 +243,7 @@ RETURN relationship, score
 //   'team:"Operations"'      field + exact phrase
 ```
 
-Fulltext index does NOT participate in WHERE predicate planning. Use `CALL db.index.fulltext.queryNodes` / `queryRelationships` explicitly.
+Fulltext index does NOT participate in WHERE predicate planning. Query explicitly: `SEARCH ... FULLTEXT INDEX` [2026.09] or `CALL db.index.fulltext.queryNodes` / `queryRelationships`. Full SEARCH syntax → [cypher-syntax.md](cypher-syntax.md).
 
 ---
 
@@ -287,7 +293,7 @@ Rules:
 - Typed hints (`USING RANGE INDEX`, `USING TEXT INDEX`) only valid when the planner can guarantee the type doesn't change results.
 - Hints do NOT guarantee improvement — PROFILE before/after; measure elapsed ms (not db-hits for TEXT).
 - Index **not used** when predicate compares two node properties (`WHERE p.name = p2.name`) — no anchor.
-- FULLTEXT has no `USING INDEX` hint — call `db.index.fulltext.queryNodes` explicitly.
+- FULLTEXT has no `USING INDEX` hint — use `SEARCH ... FULLTEXT INDEX` [2026.09] or `db.index.fulltext.queryNodes` explicitly.
 - Check query stats first (`CALL db.stats.retrieve('GRAPH COUNTS')`) before adding hints.
 
 ---
