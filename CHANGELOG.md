@@ -8,6 +8,21 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-10-13
+
+### solopreneur 0.6.1 → 0.6.2
+
+Codex can now run the full `/plan-review` workflow: a fresh Claude CLI session
+provides an independent second opinion, then you choose which findings to adopt
+before Codex updates the plan. The reviewer uses your Claude subscription and
+receives the plan and selected file contents with its tools disabled, after
+the destination and subscription authentication are verified and automatically
+loaded context is disclosed. A five-minute deadline ends stalled reviews and
+cleans up the temporary prompt;
+unavailable or failed reviews are clearly reported. `internal` still returns
+technical and lean findings only, so existing Autopilot runs keep their behavior.
+(#200)
+
 ## 2026-08-16
 
 ### solopreneur 0.6.0 → 0.6.1
