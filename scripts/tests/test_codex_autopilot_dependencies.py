@@ -120,9 +120,12 @@ raise SystemExit(0)
             REPO_ROOT / "skills/solopreneur/merge-pr/SKILL.md"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("Codex V1 supports only /plan-review internal", plan_review)
+        self.assertIn("**Either host, `internal`:**", plan_review)
         self.assertIn("never run Stage 3, R3, or R4", plan_review)
         self.assertIn("never modify the reviewed document", plan_review)
+        self.assertIn("Stage 3 uses Claude CLI (Path C)", plan_review)
+        self.assertIn("user adjudication and approved write-back", plan_review)
+        self.assertNotIn("Codex V1 supports only", plan_review)
         self.assertIn('fork_turns="none"', plan_review)
 
         self.assertIn("Skip Steps 0 and 3 entirely", merge_pr)
@@ -132,6 +135,62 @@ raise SystemExit(0)
             merge_pr.index('STATE=$(gh pr view "$PR_NUMBER"'),
             merge_pr.index('git push origin --delete "$BRANCH"'),
         )
+
+    def test_claude_review_command_passes_inert_input_and_preserves_failure(self) -> None:
+        skill = (REPO_ROOT / "skills/solopreneur/plan-review/SKILL.md").read_text()
+        heading_at = skill.index("**Path C — Claude CLI:**")
+        start = skill.index("```bash\n", heading_at) + len("```bash\n")
+        command = skill[start : skill.index("\n```", start)]
+        self.assertIn("timeout=300", command)
+        with tempfile.TemporaryDirectory(prefix="plan-review-contract-") as temp:
+            root = Path(temp)
+            prompt = root / "prompt $(touch injected) with spaces.txt"
+            content = "UNTRUSTED PLAN\n$(touch injected)\n`touch injected`\n"
+            fake = root / "claude"
+            fake.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys, time\n"
+                "from pathlib import Path\n"
+                "Path('captured.json').write_text(json.dumps({\n"
+                "    'args': sys.argv[1:], 'stdin': sys.stdin.read(),\n"
+                "    'profile': os.environ['CLAUDE_CONFIG_DIR'], 'pid': os.getpid()}))\n"
+                "if os.environ['REVIEW_EXIT'] == 'timeout':\n"
+                "    time.sleep(5)\n"
+                "    sys.exit(0)\n"
+                "sys.exit(int(os.environ['REVIEW_EXIT']))\n"
+            )
+            fake.chmod(0o755)
+            for exit_code in (0, 7, "timeout"):
+                prompt.write_text(content)
+                result = subprocess.run(
+                    ["/bin/bash", "-c", command.replace("timeout=300", "timeout=1")],
+                    cwd=root, capture_output=True, timeout=10,
+                    env=os.environ | {
+                        "PATH": f"{root}:{os.environ['PATH']}",
+                        "PROMPT_FILE": str(prompt),
+                        "CLAUDE_CONFIG_DIR": str(root / "profile"),
+                        "REVIEW_EXIT": str(exit_code),
+                    },
+                )
+                self.assertEqual(result.returncode, 124 if exit_code == "timeout" else exit_code, result.stderr)
+                self.assertFalse(prompt.exists())
+                captured = json.loads((root / "captured.json").read_text())
+                if exit_code == "timeout":
+                    self.assertIn(b"timed out", result.stderr)
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(captured["pid"], 0)
+                self.assertEqual(captured["stdin"], content)
+                self.assertEqual(captured["profile"], str(root / "profile"))
+                args = captured["args"]
+                self.assertIn("-p", args)
+                self.assertEqual(args[args.index("--tools") + 1], "")
+                self.assertIn("--strict-mcp-config", args)
+                self.assertEqual(json.loads(args[args.index("--mcp-config") + 1]), {"mcpServers": {}})
+                for flag in ("--disable-slash-commands", "--no-session-persistence"):
+                    self.assertIn(flag, args)
+                for flag in ("--dangerously-skip-permissions", "--resume", "--continue"):
+                    self.assertNotIn(flag, args)
+                self.assertFalse((root / "injected").exists())
 
     def test_autopilot_v1_contract_and_real_worktree_preflight(self) -> None:
         registry = json.loads((REPO_ROOT / "skills-compatibility.json").read_text())

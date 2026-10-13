@@ -1,5 +1,9 @@
 # humanly: refresh against the current Wikipedia "Signs of AI writing"
 
+> **Status (2026-09-26):** A, B and D shipped in PR #195. Still open: C (the
+> prewrite bundles' own dashes, next PR) and the word-table re-tiering. Plan,
+> review disposition and eval log: `docs/solopreneur/plans/2026-09-26-humanly-wikipedia-signs-refresh.md`.
+
 Trigger: the r/claudeskills post "A free claude skill to de-ai your written
 content" (2026-09-24). It ships a `de-ai-writing` skill: a SKILL.md, a
 27-sign `references/signs.md` condensed from Wikipedia's *Signs of AI writing*

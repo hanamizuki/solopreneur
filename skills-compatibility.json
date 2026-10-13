@@ -870,7 +870,8 @@
       "optionalEnhancements": [
         "context7",
         "custom-specialist-agents",
-        "official-docs-network"
+        "official-docs-network",
+        "claude-cli-subscription"
       ]
     },
     "solopreneur:post-mortem": {
