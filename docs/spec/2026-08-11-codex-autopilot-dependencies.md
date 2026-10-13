@@ -35,13 +35,17 @@ changes back to the original document. Without an interactive user it skips
 Stage 3 and stops at R2; a conversational plan has no file to write back to.
 
 The Claude reviewer uses the matching configured profile and subscription
-authentication, never a metered API fallback. The host supplies the full plan
-and relevant repository file contents with original line numbers, validating
-paths and disclosing omissions. Provider, files, and approximate input size
-must be approved before dispatch; explicit approval for the same material is
-reused. The child has no parent conversation history, built-in tools, MCP tools,
-or skills. Normal CLI configuration may still add context; this is not an OS
-sandbox. Only the host can collect more evidence or write approved revisions.
+authentication, never a metered API fallback. Before dispatch, the host verifies
+the effective provider, endpoint, and subscription authentication from inherited
+environment and active settings using documented CLI precedence; login status
+alone is insufficient. An unconfirmed or unapproved endpoint skips Stage 3.
+The host supplies the full plan and relevant repository file contents with
+original line numbers, validating paths and disclosing omissions. Provider,
+endpoint, files, and approximate input size must be approved before dispatch;
+explicit approval for the same material, provider, and endpoint is reused. The
+child has no parent conversation history, built-in tools, MCP tools, or skills.
+Normal CLI configuration may still add context; this is not an OS sandbox.
+Only the host can collect more evidence or write approved revisions.
 
 Unavailable Claude or Python, or declined approval skips Stage 3. The wrapper
 enforces a 300-second deadline, terminates and reaps a timed-out reviewer, and

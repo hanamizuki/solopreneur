@@ -213,6 +213,12 @@ the workspace's profile mapping; use that same `CLAUDE_CONFIG_DIR` for both the
 check and review. Otherwise inherit the operator's configured Claude profile.
 Check `claude auth status` for an authenticated subscription (`claude.ai`);
 never switch to a metered API credential or provider to make this review work.
+Before sending material, verify the effective provider and endpoint from the
+inherited environment (including `ANTHROPIC_BASE_URL`) and active CLI settings,
+using the installed CLI's documented precedence. Subscription login alone does
+not establish the destination or effective authentication; do not guess either.
+If the endpoint or subscription-only authentication cannot be confirmed, skip
+Stage 3. The verified provider and endpoint require approval in 3c.
 Check `command -v python3` for the deadline wrapper before creating temp files.
 Missing Python or CLI, unsupported required flags, or no subscription login → label
 Stage 3 `skipped` with the reason and continue to Resolution. Do not call Codex
@@ -238,13 +244,14 @@ cross-checking.
 their contents in the prompt with filenames and original line numbers. Include
 the full plan; disclose any omitted files or excerpts. A read failure is not an
 empty file: report it and resolve the missing evidence or explicitly omit it.
-Never include credentials or unrelated private files. Show the file list and
-approximate input size before asking to send this material to Claude (Anthropic)
-using the subscription. Claude receives no parent conversation history and has
-no tools to fetch missing evidence. This is not an OS sandbox: normal CLI
+Never include credentials or unrelated private files. Show the verified provider
+and endpoint, file list, and approximate input size before asking to send this
+material using the subscription. Claude receives no parent conversation history
+and has no tools to fetch missing evidence. This is not an OS sandbox: normal CLI
 configuration may still add context. Reuse explicit approval already given for
-this material and provider; otherwise ask before invoking it. Declined or no
-interactive user → skip Stage 3 and continue to Resolution.
+this material, provider, and endpoint; otherwise ask before invoking it.
+Unconfirmed or unapproved endpoint, declined approval, or no interactive user →
+skip Stage 3 and continue to Resolution.
 
 **Paths A/B:**
 
