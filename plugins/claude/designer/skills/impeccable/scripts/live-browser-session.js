@@ -44,6 +44,10 @@
 
     function saveSession(session) {
       if (!session || !session.id) return;
+      // Adopt a revision another tab stored so this write does not lower it.
+      // localStorage has no compare-and-set, so a save from another tab that
+      // lands between this read and the write below can still be overwritten.
+      loadSession();
       const payload = {
         ...session,
         checkpointRevision,
@@ -56,8 +60,8 @@
     }
 
     function nextCheckpointRevision() {
-      checkpointRevision += 1;
       const existing = loadSession();
+      checkpointRevision += 1;
       if (existing?.id) saveSession(existing);
       return checkpointRevision;
     }
@@ -71,17 +75,38 @@
       return checkpointRevision;
     }
 
+    function readHandledIds() {
+      const raw = safeRead(handledKey);
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(id => typeof id === 'string' && id);
+        }
+        if (typeof parsed === 'string' && parsed) return [parsed];
+      } catch { /* legacy values were stored as a plain session id */ }
+      return [raw];
+    }
+
     function markHandled(id) {
       if (!id) return;
-      safeWrite(handledKey, id);
+      const ids = readHandledIds().filter(existing => existing !== id);
+      ids.push(id);
+      safeWrite(handledKey, JSON.stringify(ids.slice(-8)));
     }
 
     function isHandled(id) {
-      return !!id && safeRead(handledKey) === id;
+      return !!id && readHandledIds().includes(id);
     }
 
-    function clearHandled() {
-      safeRemove(handledKey);
+    function clearHandled(id) {
+      if (!id) {
+        safeRemove(handledKey);
+        return;
+      }
+      const remaining = readHandledIds().filter(existing => existing !== id);
+      if (remaining.length > 0) safeWrite(handledKey, JSON.stringify(remaining));
+      else safeRemove(handledKey);
     }
 
     function writeScrollY(y) {
