@@ -213,7 +213,8 @@ the workspace's profile mapping; use that same `CLAUDE_CONFIG_DIR` for both the
 check and review. Otherwise inherit the operator's configured Claude profile.
 Check `claude auth status` for an authenticated subscription (`claude.ai`);
 never switch to a metered API credential or provider to make this review work.
-Missing CLI, unsupported required flags, or no subscription login → label
+Check `command -v python3` for the deadline wrapper before creating temp files.
+Missing Python or CLI, unsupported required flags, or no subscription login → label
 Stage 3 `skipped` with the reason and continue to Resolution. Do not call Codex
 again and describe it as a cross-model opinion.
 
@@ -340,11 +341,30 @@ Invoke a new session (no `--resume` or `--continue`), using the profile checked
 in 3a. Disable built-in tools, MCP tools, and skills; never add permission bypass:
 
 ```bash
-claude -p --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
-  --disable-slash-commands --no-session-persistence < "$PROMPT_FILE"
+python3 - "$PROMPT_FILE" <<'PY'
+import pathlib
+import subprocess
+import sys
+
+prompt = pathlib.Path(sys.argv[1])
+try:
+    with prompt.open("rb") as source:
+        result = subprocess.run([
+            "claude", "-p", "--tools", "", "--strict-mcp-config",
+            "--mcp-config", '{"mcpServers":{}}', "--disable-slash-commands",
+            "--no-session-persistence",
+        ], stdin=source, timeout=300)
+    sys.exit(result.returncode)
+except subprocess.TimeoutExpired:
+    print("Claude review timed out after 300 seconds", file=sys.stderr)
+    sys.exit(124)
+finally:
+    prompt.unlink(missing_ok=True)
+PY
 ```
 
-Allow up to 5 minutes. A nonzero exit, timeout, empty response, or response
+The wrapper terminates and reaps Claude after 5 minutes and removes its prompt.
+A nonzero exit, timeout (124), empty response, or response
 without a review verdict is a failed review, never a clean pass. Report Stage 3
 as `failed` with the reason, then continue with Stage 1–2 findings; retry only
 when requested. Delete all temporary prompt/plan files on success, failure,

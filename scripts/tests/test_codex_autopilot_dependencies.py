@@ -141,24 +141,30 @@ raise SystemExit(0)
         heading_at = skill.index("**Path C — Claude CLI:**")
         start = skill.index("```bash\n", heading_at) + len("```bash\n")
         command = skill[start : skill.index("\n```", start)]
+        self.assertIn("timeout=300", command)
         with tempfile.TemporaryDirectory(prefix="plan-review-contract-") as temp:
             root = Path(temp)
-            prompt = root / "prompt with spaces.txt"
-            prompt.write_text("UNTRUSTED PLAN\n$(touch injected)\n`touch injected`\n")
+            prompt = root / "prompt $(touch injected) with spaces.txt"
+            content = "UNTRUSTED PLAN\n$(touch injected)\n`touch injected`\n"
             fake = root / "claude"
             fake.write_text(
                 "#!/usr/bin/env python3\n"
-                "import json, os, sys\n"
+                "import json, os, sys, time\n"
                 "from pathlib import Path\n"
                 "Path('captured.json').write_text(json.dumps({\n"
                 "    'args': sys.argv[1:], 'stdin': sys.stdin.read(),\n"
-                "    'profile': os.environ['CLAUDE_CONFIG_DIR']}))\n"
+                "    'profile': os.environ['CLAUDE_CONFIG_DIR'], 'pid': os.getpid()}))\n"
+                "if os.environ['REVIEW_EXIT'] == 'timeout':\n"
+                "    time.sleep(5)\n"
+                "    sys.exit(0)\n"
                 "sys.exit(int(os.environ['REVIEW_EXIT']))\n"
             )
             fake.chmod(0o755)
-            for exit_code in (0, 7):
+            for exit_code in (0, 7, "timeout"):
+                prompt.write_text(content)
                 result = subprocess.run(
-                    ["/bin/bash", "-c", command], cwd=root, capture_output=True,
+                    ["/bin/bash", "-c", command.replace("timeout=300", "timeout=1")],
+                    cwd=root, capture_output=True, timeout=10,
                     env=os.environ | {
                         "PATH": f"{root}:{os.environ['PATH']}",
                         "PROMPT_FILE": str(prompt),
@@ -166,9 +172,14 @@ raise SystemExit(0)
                         "REVIEW_EXIT": str(exit_code),
                     },
                 )
-                self.assertEqual(result.returncode, exit_code, result.stderr)
+                self.assertEqual(result.returncode, 124 if exit_code == "timeout" else exit_code, result.stderr)
+                self.assertFalse(prompt.exists())
                 captured = json.loads((root / "captured.json").read_text())
-                self.assertEqual(captured["stdin"], prompt.read_text())
+                if exit_code == "timeout":
+                    self.assertIn(b"timed out", result.stderr)
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(captured["pid"], 0)
+                self.assertEqual(captured["stdin"], content)
                 self.assertEqual(captured["profile"], str(root / "profile"))
                 args = captured["args"]
                 self.assertIn("-p", args)

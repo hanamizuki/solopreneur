@@ -43,7 +43,9 @@ reused. The child has no parent conversation history, built-in tools, MCP tools,
 or skills. Normal CLI configuration may still add context; this is not an OS
 sandbox. Only the host can collect more evidence or write approved revisions.
 
-Unavailable Claude or declined approval skips Stage 3. A timeout, nonzero exit,
+Unavailable Claude or Python, or declined approval skips Stage 3. The wrapper
+enforces a 300-second deadline, terminates and reaps a timed-out reviewer, and
+removes its prompt even on failure. A timeout, nonzero exit,
 empty response, or missing verdict marks it failed, never a clean review. Both
 paths preserve the Stage 1–2 findings and allow attended adjudication. Temporary
 prompt and plan copies are removed on every exit path.
