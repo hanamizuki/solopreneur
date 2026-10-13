@@ -40,11 +40,15 @@ the effective provider, endpoint, and subscription authentication from inherited
 environment and active settings using documented CLI precedence; login status
 alone is insufficient. An unconfirmed or unapproved endpoint skips Stage 3.
 The host supplies the full plan and relevant repository file contents with
-original line numbers, validating paths and disclosing omissions. Provider,
-endpoint, files, and approximate input size must be approved before dispatch;
-explicit approval for the same material, provider, and endpoint is reused. The
-child has no parent conversation history, built-in tools, MCP tools, or skills.
-Normal CLI configuration may still add context; this is not an OS sandbox.
+original line numbers, validating paths and disclosing omissions. It also
+inventories and inspects automatically loaded context for the selected profile
+and working directory: `CLAUDE.md`, recursive imports, rules, and auto-memory.
+Sensitive or incompletely established context skips Stage 3 without sending.
+Provider, endpoint, all content sources, and approximate total input size,
+including added context, must be approved before dispatch; reused approval must
+cover the same material, added context, provider, and endpoint. The child has no
+parent conversation history, built-in tools, MCP tools, or skills; disabling
+these does not disable automatically loaded context. This is not an OS sandbox.
 Only the host can collect more evidence or write approved revisions.
 
 Unavailable Claude or Python, or declined approval skips Stage 3. The wrapper

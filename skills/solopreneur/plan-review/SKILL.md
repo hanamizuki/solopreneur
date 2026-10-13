@@ -244,12 +244,18 @@ cross-checking.
 their contents in the prompt with filenames and original line numbers. Include
 the full plan; disclose any omitted files or excerpts. A read failure is not an
 empty file: report it and resolve the missing evidence or explicitly omit it.
-Never include credentials or unrelated private files. Show the verified provider
-and endpoint, file list, and approximate input size before asking to send this
-material using the subscription. Claude receives no parent conversation history
-and has no tools to fetch missing evidence. This is not an OS sandbox: normal CLI
-configuration may still add context. Reuse explicit approval already given for
-this material, provider, and endpoint; otherwise ask before invoking it.
+Never include credentials or unrelated private files. Before dispatch, inventory
+and inspect all automatically loaded context for the selected profile and working
+directory using the installed CLI's loading rules: `CLAUDE.md`, recursive imports,
+rules, and auto-memory. Disabling tools, MCP, and skills does not disable these
+sources. If any added context is sensitive or its full contents cannot be
+established, skip Stage 3 without sending material.
+Show the verified provider and endpoint, the prompt's file list and all added
+context sources, and the approximate total input size including that context
+before asking to send this material using the subscription. Claude receives no
+parent conversation history and has no tools to fetch missing evidence. This is
+not an OS sandbox. Reuse explicit approval only when it covers the same material,
+including all added context, provider, and endpoint; otherwise ask before invoking it.
 Unconfirmed or unapproved endpoint, declined approval, or no interactive user →
 skip Stage 3 and continue to Resolution.
 
