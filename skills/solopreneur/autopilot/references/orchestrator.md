@@ -215,9 +215,11 @@ For each completed subagent:
    ⏭️ #84 docs — skipped (depends on #83)
    ```
 
-3. If the repo's own instructions (`CLAUDE.md` / `AGENTS.md`) define a
-   post-merge acceptance step (for example a manual end-to-end pass to run once
-   all PRs of a feature are merged), append one line to the report:
+3. Only when **every** PR in the plan is `merged` (Status: done — a plan with
+   a blocked or skipped PR is incomplete, so emit nothing): if the repo's own
+   instructions (`CLAUDE.md` / `AGENTS.md`) define a post-merge acceptance
+   step (for example a manual end-to-end pass to run once all PRs of a feature
+   are merged), append one line to the report:
    `post-merge acceptance: <the step the repo defines> — all PRs of this plan
    are merged; consider running it now`. Remind only — the Orchestrator never
    runs that step itself.
