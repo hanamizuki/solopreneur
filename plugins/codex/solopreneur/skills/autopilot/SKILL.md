@@ -626,6 +626,19 @@ Autopilot Single-PR done
    spec: docs/loops/<YYYY-MM-DD>_<short-name>/pr1-<short>.md
 ```
 
+**Post-merge acceptance reminder.** Before printing the success report, check
+whether the repo's own instructions (`CLAUDE.md` / `AGENTS.md`) define a
+post-merge acceptance step — for example a manual end-to-end pass that is run
+once the last PR of a multi-PR feature has landed, rather than per PR. If they
+do, append one line to the report:
+
+```text
+   post-merge acceptance: <the step the repo defines> — last PR of the feature? consider running it now
+```
+
+Autopilot only reminds. It never runs that step itself, and it does not fold it
+into greenlight or CI — those stay fast and per-PR by design.
+
 On block:
 
 ```text
