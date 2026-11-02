@@ -497,7 +497,8 @@ CODEX_EXIT=$?
 # Antigravity CLI (agy) — Gemini-family model. Print mode reads no stdin,
 # so embed the brief in the prompt argument via double-quoted "$(cat ...)"
 # (safe — see Step 4). Pin the Gemini model for family diversity vs Claude
-# (main loop) and Codex (GPT-family). No --dangerously-skip-permissions:
+# (main loop) and Codex (GPT-family); `--model` takes the ID column of
+# `agy models`, not the display name. No --dangerously-skip-permissions:
 # candidate generation is text-only and needs no tools, and the brief is
 # user-controlled — auto-approving tool use would turn a prompt injection in
 # the brief into real file/command execution. Headless --print with default
@@ -505,7 +506,7 @@ CODEX_EXIT=$?
 # stalls until --print-timeout and degrades, which is the safe outcome.
 # --print-timeout explicit (matches the default) so a stalled model can't
 # block generation indefinitely — don't rely on an implicit default.
-agy --model "Gemini 3.1 Pro (High)" --print-timeout 5m --print \
+agy --model gemini-4-argon-high --print-timeout 5m --print \
   "Generate the target number of brand-name candidates from the brief below.
 Output one candidate per line, no numbering or commentary.
 
