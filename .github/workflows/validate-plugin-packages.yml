@@ -43,7 +43,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          # setup-python ships no 3.9 build for Ubuntu 26.04 (today's ubuntu-latest);
+          # keep the 3.9 floor on the last image that has one.
+          - os: ubuntu-24.04
             python: '3.9'
           - os: ubuntu-latest
             python: '3.14'
@@ -80,7 +82,7 @@ jobs:
         run: node --test skills/solopreneur/codex-agents-bootstrap/tests/*.test.mjs
 
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned for Python 3.9, see bootstrap-tests matrix
     timeout-minutes: 10
     concurrency:
       group: validate-plugin-packages-${{ github.ref }}
