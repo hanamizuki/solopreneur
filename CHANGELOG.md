@@ -8,6 +8,35 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-11-03
+
+### solopreneur 0.6.2 → 0.6.3
+
+`/greenlight` post-commit mode gets its Gemini-family reviewer back. agy was
+rejecting the pinned model name, so that review failed every round and Codex
+was the only external reviewer left. It now passes the model ID from
+`agy models`, and when the primary model's quota runs out it falls back to the
+Flash series instead of sitting out until the reset. `/autopilot` completion
+reports now remind you to run the post-merge acceptance step your repo's
+`CLAUDE.md` / `AGENTS.md` defines, once every PR in the plan has merged. It
+only reminds; it never runs the step. (#201, #202)
+
+### marketer 0.0.11 → 0.0.12
+
+`/humanly` is refreshed against the current Wikipedia "Signs of AI writing"
+guide. Fewer false positives: "in order to", a lone However or Therefore, and
+consistently curly quotes now count as ordinary writing (mixing curly and
+straight quotes is the tell), and a "Not X, but Y" contrast stays when a
+reader would really assume X. More catches: vague "associated with" /
+"connected to" roles (new pattern #42), wordier detours around "serves as",
+"not widely documented… it likely…" speculation (the hedge stays and is
+marked for the author, never turned into a fact), em dashes merely swapped
+for an en dash or spaced hyphen, and tiny tables or `---` dividers in short
+pieces. The speculation, dash and divider rules cover the Traditional Chinese
+catalog too. The final read-back also checks that person, UK/US spelling,
+markup and length limits survived. `/naming` gets the same `agy` model-ID
+fix, so its Gemini-family candidates no longer drop out. (#195, #202)
+
 ## 2026-10-13
 
 ### solopreneur 0.6.1 → 0.6.2
