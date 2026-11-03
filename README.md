@@ -173,7 +173,7 @@ in-house skills: 7 domain workflows and one agent router.
 
 - **[frontend-slides](https://github.com/zarazhangrui/frontend-slides)** plugin: single-HTML, animation-rich slide engine. Used by `/slide-design` (recommended).
 - **[revealjs-skill](https://github.com/ryanbbrown/revealjs-skill)** plugin: reveal.js scaffolding (fragments, vertical stacks, speaker notes, Chart.js). Alternative engine for `/slide-design`. Wraps the underlying [reveal.js](https://github.com/hakimel/reveal.js) library.
-- **Gemini CLI**: optional. Used by `/naming` for parallel multi-model candidate generation. Without it, `/naming` runs Claude + (optional) Codex CLI only.
+- **Antigravity CLI (`agy`)**: optional. Used by `/naming` for parallel multi-model candidate generation (the Gemini-family slot). Without it, `/naming` runs Claude + (optional) Codex CLI only.
 
 ---
 
