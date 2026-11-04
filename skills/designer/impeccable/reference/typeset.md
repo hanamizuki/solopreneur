@@ -24,7 +24,7 @@ When a sub-agent tool is available and permitted, run these independently; other
 2. **Mechanical scan:** run:
 
 ```bash
-node "${CLAUDE_SKILL_DIR}/"scripts/detect.mjs --json --scope type [target files or dirs]
+"${CLAUDE_SKILL_DIR}/"scripts/impeccable detect --json --scope type [target files or dirs]
 ```
 
 Also inspect dynamic or arbitrary font values the detector cannot interpret. Synthesize both assessments before editing, noting what each caught alone. A clean scan is a floor, not proof of good typography.
