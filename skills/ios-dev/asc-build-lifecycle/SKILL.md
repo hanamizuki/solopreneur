@@ -18,6 +18,7 @@ Use this skill to manage build state, processing, and retention.
 
 ## Inspect processing state
 - `asc builds info --build-id "BUILD_ID"`
+- TestFlight state in one call: `asc builds info --build-id "BUILD_ID" --include buildBetaDetail,betaAppReviewSubmission,betaGroups --output json`. A build never submitted for beta review has no `betaAppReviewSubmissions` entry in `included`.
 
 ## Distribution flows
 - Prefer end-to-end:
@@ -33,5 +34,6 @@ Use this skill to manage build state, processing, and retention.
   - `asc builds expire --build-id "BUILD_ID" --confirm`
 
 ## Notes
-- `asc builds upload` prepares upload operations only; use `asc publish` for end-to-end flows.
+- `asc builds upload` uploads and commits an IPA or PKG. Use `asc publish` when
+  the workflow must also distribute to TestFlight or stage an App Store release.
 - For long processing times, use `--wait`, `--poll-interval`, and `--timeout` where supported.

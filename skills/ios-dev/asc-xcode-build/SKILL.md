@@ -1,6 +1,6 @@
 ---
 name: asc-xcode-build
-description: Build, archive, generate export options, export, upload, and manage Xcode version/build numbers with the current asc xcode helpers. Use when creating an IPA or PKG for App Store Connect, TestFlight, or registered-device release testing.
+description: Build, archive, export, and manage Xcode version/build numbers with asc, including portable iOS compilation and packaging. Use when creating an IPA or PKG for App Store Connect, TestFlight, or registered-device release testing.
 ---
 
 # Xcode build and export
@@ -8,6 +8,9 @@ description: Build, archive, generate export options, export, upload, and manage
 Use this skill when you need to build an app from source and prepare it for App Store Connect. Prefer `asc xcode archive` and `asc xcode export` over raw `xcodebuild` recipes when they fit the project.
 
 ## Preconditions
+
+For a prepared xtool package on Linux, use [portable iOS builds](references/portable-ios.md)
+instead of the Xcode commands below. That workflow has a narrower project and signing contract.
 
 - Xcode and command line tools are installed.
 - Signing identity and provisioning profiles are available, or automatic signing is enabled.
@@ -172,24 +175,24 @@ asc xcode archive \
   --output json
 ```
 
-If your macOS export produces a `.pkg`, use Xcode export with your `ExportOptions.plist`, then upload the package:
+If your macOS export produces a `.pkg`, export it with the helper, then upload the package:
 
 ```bash
-xcodebuild -exportArchive \
-  -archivePath ".asc/artifacts/MacApp.xcarchive" \
-  -exportPath ".asc/artifacts/MacAppExport" \
-  -exportOptionsPlist "ExportOptions.plist" \
-  -allowProvisioningUpdates
+asc xcode export \
+  --archive-path ".asc/artifacts/MacApp.xcarchive" \
+  --pkg-path ".asc/artifacts/MacApp.pkg" \
+  --xcodebuild-flag=-allowProvisioningUpdates \
+  --output json
 
 asc builds upload \
   --app "APP_ID" \
-  --pkg ".asc/artifacts/MacAppExport/MacApp.pkg" \
+  --pkg ".asc/artifacts/MacApp.pkg" \
   --version "1.0.0" \
   --build-number "123" \
   --wait
 ```
 
-For `.pkg` uploads, `--version` and `--build-number` are required because they are not auto-extracted like IPA metadata.
+For `.pkg` uploads, `--version` and `--build-number` are required because they are not auto-extracted like IPA metadata. Add `--export-options "ExportOptions.plist"` when the project needs a custom export configuration.
 
 ## Raw xcodebuild fallback
 
