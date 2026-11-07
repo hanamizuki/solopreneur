@@ -12,7 +12,7 @@ Generates, optimizes, and validates Cypher 25 queries for Neo4j 2025.x and 2026.
 
 **Path expressions** — Quantified Path Expressions (QPEs), match modes (`DIFFERENT RELATIONSHIPS`, `REPEATABLE ELEMENTS`), path selectors (`SHORTEST 1`, `ALL SHORTEST`)
 
-**Search** — vector search (`SEARCH` clause 2026.01+, procedure fallback for 2025.x), fulltext (`db.index.fulltext`)
+**Search** — vector and fulltext search with the native `SEARCH` clause, plus procedure compatibility for earlier Neo4j versions
 
 **Schema** — `db.schema.visualization`, `SHOW INDEXES/CONSTRAINTS/PROCEDURES`, `apoc.meta.schema()` (preferred when APOC available)
 

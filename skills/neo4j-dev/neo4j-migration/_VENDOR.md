@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/neo4j-contrib/neo4j-skills
 - **Source path**: `neo4j-migration-skill`
-- **Pinned commit**: bac9eff53a0cadc08b8422b3891bde186a40d0b8
-- **Synced at**: 2026-08-15T18:39:20Z
+- **Pinned commit**: 004c7823fc05d352647f2e9e5106d9ae2a4080e5
+- **Synced at**: 2026-11-07T17:57:09Z
 - **License**: see `../../vendor/LICENSES/neo4j-skills-LICENSE` (source repo: `src/neo4j-dev/vendor/LICENSES/neo4j-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
