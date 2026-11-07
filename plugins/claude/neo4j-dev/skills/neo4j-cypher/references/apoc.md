@@ -244,7 +244,7 @@ RETURN apoc.coll.union([1,2,3], [2,3,4])           // [1,2,3,4]
 RETURN apoc.coll.toSet([1,2,2,3])                  // [1,2,3]
 ```
 
-`flatten` and `toSet` deprecated in Cypher 25 — use `apoc.coll.flatten` only for deeply nested lists where the native `[x IN list | ...]` flattening is insufficient.
+`flatten` and `toSet` deprecated in Cypher 25 — use native `coll.flatten(list[, depth])` to remove nesting; list comprehension `[x IN list | ...]` only maps/filters, keeps nesting.
 
 ---
 
@@ -363,7 +363,7 @@ CALL apoc.export.cypher.query(
 |---|---|
 | `apoc.trigger.add` / `.remove` / `.pause` | `apoc.trigger.install` / `.drop` / `.pause` (system db) |
 | `apoc.do.when` / `apoc.do.case` | Native `CASE` + conditional `CALL {}` |
-| `apoc.coll.flatten` (simple) | `[x IN nested | x]` list comprehension |
+| `apoc.coll.flatten` (simple) | `coll.flatten(list[, depth])` — native Cypher 25; removes nesting. `[x IN list \| ...]` maps/filters, keeps nesting |
 | `apoc.coll.toSet` | `apoc.coll.toSet` still works; or `DISTINCT` in collect |
 | `apoc.date.parse` / `.format` / `.convert` | `datetime()`, `date()`, `duration()` native functions |
 | `apoc.periodic.iterate` | `CALL { ... } IN TRANSACTIONS OF N ROWS` |
