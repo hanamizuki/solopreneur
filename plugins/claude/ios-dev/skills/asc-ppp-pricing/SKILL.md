@@ -13,6 +13,10 @@ Prefer the current high-level flows:
 - `asc subscriptions pricing ...` for subscription pricing changes
 - `asc iap pricing summary` and `asc iap pricing schedules ...` for IAP pricing changes
 
+Prefer native `asc` commands. Use `asc api` only when no native command covers
+the task; the `--resolved` reads below already return territory, currency,
+customer price, proceeds, and price point ID for every territory.
+
 ## Preconditions
 - Ensure credentials are set (`asc auth login` or `ASC_*` env vars).
 - Prefer `ASC_APP_ID` or pass `--app` explicitly.
@@ -75,12 +79,8 @@ asc subscriptions versions localizations list --version-id "SUBSCRIPTION_VERSION
 asc validate subscriptions --app "APP_ID" --output table
 ```
 
-For each version list, reuse its single `PREPARE_FOR_SUBMISSION` result. Create
-only when the result is empty; if more than one result is returned, stop and
-require an explicit version ID instead of creating another non-deletable
-version. Each localization create/update pair is also conditional: create for
-a missing locale, update the resolved localization only when values differ,
-and do nothing when it already matches.
+Follow the conditions in the comments exactly: versions cannot be deleted, so
+never create a second `PREPARE_FOR_SUBMISSION` version.
 
 Notes:
 - `setup` materializes Apple's complete equalized price matrix from the selected
@@ -97,10 +97,62 @@ Use the summary view first when you want a compact current-state snapshot.
 ```bash
 asc subscriptions pricing summary --subscription-id "SUB_ID" --territory "USA"
 asc subscriptions pricing summary --subscription-id "SUB_ID" --territory "IND"
-asc subscriptions pricing prices list --subscription-id "SUB_ID" --paginate
+asc subscriptions pricing prices list --subscription-id "SUB_ID" --resolved
 ```
 
-Use `summary` for quick before/after spot checks and `prices list` when you need raw price records.
+Use `summary` for quick before/after spot checks. `prices list --resolved`
+returns the current effective price for every territory (customer price,
+currency, proceeds, price point ID). It excludes future-dated prices; use
+`prices list --paginate` for raw records when checking scheduled changes.
+
+### Derive one subscription's localized prices from another
+Use `derive` when a target subscription should stay near a fixed multiple of a
+source subscription in every territory, such as yearly pricing near 10 times
+monthly pricing. Apple ladders scale unevenly across territories, so preview
+the selected target points and achieved multiples before applying them.
+
+```bash
+asc subscriptions pricing derive \
+  --source-subscription-id "MONTHLY_SUB_ID" \
+  --target-subscription-id "YEARLY_SUB_ID" \
+  --multiplier "10" \
+  --round nearest \
+  --dry-run \
+  --output table
+```
+
+Choose how a desired price resolves when Apple does not offer it:
+
+- `exact` fails unless the calculated amount exists on the target ladder.
+- `nearest` chooses the closest amount; an exact tie chooses the lower one.
+- `up` chooses the smallest available amount at or above the calculation.
+- `down` chooses the largest available amount at or below the calculation.
+
+The confirmed command fetches current prices and builds a fresh plan; it does
+not reuse the preceding dry-run result. When the applied values must match the
+reviewed values, rerun `--dry-run` immediately before confirming, then apply:
+
+```bash
+asc subscriptions pricing derive \
+  --source-subscription-id "MONTHLY_SUB_ID" \
+  --target-subscription-id "YEARLY_SUB_ID" \
+  --multiplier "10" \
+  --round nearest \
+  --confirm \
+  --output table
+```
+
+The source and target must be distinct subscriptions with existing standard
+`UPFRONT` prices. The operation is a one-time snapshot, not a persistent link.
+It fails closed before mutation when any territory cannot resolve, skips target
+prices that already match, and verifies applied prices by reading them back.
+Use `--territory "SWE"` for a focused preview or staged one-territory update;
+omit it to derive every current source territory.
+Approved or live targets are scheduled for tomorrow by default when no
+`--start-date` is supplied because `--auto-start-date` defaults to true. Pass
+`--auto-start-date=false` to apply immediately, or use an explicit date when
+coordinating a rollout.
+The command does not change subscription sale availability.
 
 ### Preferred bulk PPP update: import a CSV with dry run
 For broad PPP rollouts, prefer the subscription pricing import command instead of manually adding territory prices one by one.
@@ -182,6 +234,7 @@ Re-run the summary and raw list views after changes.
 ```bash
 asc subscriptions pricing summary --subscription-id "SUB_ID" --territory "IND"
 asc subscriptions pricing summary --subscription-id "SUB_ID" --territory "BRA"
+asc subscriptions pricing prices list --subscription-id "SUB_ID" --resolved
 asc subscriptions pricing prices list --subscription-id "SUB_ID" --paginate
 ```
 
@@ -230,11 +283,6 @@ asc iap versions localizations update --localization-id "IAP_LOC_ID" --name "Pro
 # Otherwise, do nothing.
 ```
 
-Reuse the single `PREPARE_FOR_SUBMISSION` version. Create only when the list is
-empty, and stop for an explicit version ID if multiple matches are returned.
-Create the localization only when `en-US` is absent, update its resolved ID only
-when values differ, and otherwise do nothing.
-
 Notes:
 - `setup` verifies the created IAP and price schedule by default; verify the
   version localization with its version-scoped list command.
@@ -251,12 +299,37 @@ asc iap pricing summary --iap-id "IAP_ID" --territory "IND"
 
 This returns the base territory, current price, estimated proceeds, and scheduled changes for the requested territory.
 
-### Discover candidate IAP price points
-Use price-point lookup when you want to inspect or pin exact price point IDs.
+For a snapshot of every territory, read the price schedule with `--resolved`.
+Take the schedule ID from `.data.id` of `schedules view`; it usually equals the
+IAP ID, but read it instead of assuming.
 
 ```bash
-asc iap pricing price-points list --iap-id "IAP_ID" --territory "USA" --paginate --price "9.99"
-asc iap pricing price-points equalizations --id "PRICE_POINT_ID"
+asc iap pricing schedules view --iap-id "IAP_ID"
+asc iap pricing schedules manual-prices --schedule-id "SCHEDULE_ID" --resolved --output table
+```
+
+`--resolved` returns one row per territory with territory, customer price,
+currency, proceeds, price point ID, and whether the price is manual.
+Both `manual-prices --resolved` and `automatic-prices --resolved` combine manual
+and automatic prices active today. They exclude future-dated entries. Without
+`--resolved`, these commands return raw schedule records; use `--paginate` to
+include every page when checking scheduled changes.
+
+### Discover candidate IAP price points
+Look up one territory's ladder with `price-points list`, one territory per call.
+`--price` filters each fetched page, so always pair it with `--paginate`.
+
+```bash
+asc iap pricing price-points list --iap-id "IAP_ID" --territory "IND" --paginate
+asc iap pricing price-points list --iap-id "IAP_ID" --territory "IND" --paginate --price "299"
+```
+
+Use `equalizations` only to see what Apple's equalized ladder gives for a base
+price point. Its rows carry price point ID, customer price, and proceeds but no
+territory or currency, so do not use it to look up a specific country's price.
+
+```bash
+asc iap pricing price-points equalizations --id "PRICE_POINT_ID" --paginate
 ```
 
 ### Create or update an IAP price schedule
@@ -282,9 +355,14 @@ Use the summary command again after scheduling or applying pricing changes.
 ```bash
 asc iap pricing summary --iap-id "IAP_ID" --territory "USA"
 asc iap pricing summary --iap-id "IAP_ID" --territory "IND"
+asc iap pricing schedules manual-prices --schedule-id "SCHEDULE_ID" --resolved --output table
+asc iap pricing schedules manual-prices --schedule-id "SCHEDULE_ID" --paginate
+asc iap pricing schedules automatic-prices --schedule-id "SCHEDULE_ID" --paginate
 ```
 
-For future-dated schedules, expect scheduled changes rather than an immediately updated current price.
+For future-dated schedules, run `summary` for every changed territory to verify
+scheduled price-point IDs and dates; keep the raw paginated reads for the full
+schedule inventory. The resolved snapshot excludes prices until they take effect.
 
 ## Common PPP strategy patterns
 
@@ -306,10 +384,8 @@ For future-dated schedules, expect scheduled changes rather than an immediately 
 - Re-run summary checks for the most important territories.
 
 ## Notes
-- Prefer canonical commands in docs and automation: `asc subscriptions pricing ...`
-- `asc subscriptions pricing ...` is the supported subscription pricing family; do not use the removed `asc subscriptions prices ...` path.
-- Prefer canonical IAP commands in docs and automation: `asc iap pricing ...`
+- Use `asc subscriptions pricing ...` and `asc iap pricing ...` in docs and automation; do not use the removed `asc subscriptions prices ...` path.
 - `asc subscriptions pricing prices import --dry-run` is the safest subscription batch PPP path today.
 - `asc subscriptions setup` and `asc iap setup` already provide built-in post-create verification.
-- There is not yet a single first-class before/after PPP diff command; use the current summary commands before and after apply.
+- There is not yet a single first-class before/after PPP diff command; compare `--resolved` reads for current prices and raw paginated records for scheduled changes.
 - Price changes may take time to propagate in App Store Connect and storefronts.

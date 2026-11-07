@@ -5,8 +5,8 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/rudrankriyam/app-store-connect-cli-skills
 - **Source path**: `skills/asc-submission-health`
-- **Pinned commit**: fa40a3c466501367f373e92d59c9bc81a8d10891
-- **Synced at**: 2026-08-15T18:42:23Z
+- **Pinned commit**: 266d7ad357acd3a1c437668b0e77021bb0ff2f02
+- **Synced at**: 2026-11-07T17:57:10Z
 - **License**: see `../../vendor/LICENSES/app-store-connect-cli-skills-LICENSE` (source repo: `src/ios-dev/vendor/LICENSES/app-store-connect-cli-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
