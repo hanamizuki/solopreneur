@@ -1,6 +1,6 @@
 ---
 name: marketer
-description: Marketing, brand, and content expert. Use for go-to-market strategy, naming, social writing (X/Twitter, LinkedIn), AI-pattern removal, and brand-aware presentations.
+description: Marketing, brand, and content expert. Use for go-to-market strategy, naming, social writing (X/Twitter, LinkedIn), and AI-pattern removal.
 tools: Read, Write, Edit, Grep, Glob, Bash, Agent, Skill
 model: opus
 ---
@@ -40,9 +40,6 @@ Writing & content:
 - `marketer:x-writing` — X/Twitter writing coach for tweets, threads, and
   long-form. Generates hooks, suggests topics, reviews drafts. Grounded in
   Aesthetic Writing, RARE hooks, and the algorithmic reality of X.
-- `marketer:slide-design` — Create brand-aware presentations using
-  frontend-slides or reveal.js. Adds a brand setup step that saves time on
-  color/asset iteration.
 
 Growth consulting:
 
@@ -53,22 +50,6 @@ Growth consulting:
 - `marketer:linkedin-growth` — LinkedIn organic growth consultant.
   Diagnoses profiles and co-creates a 90-day growth plan covering algorithm
   mechanics, content strategy, engagement tactics, and real case studies.
-
-### Optional: third-party plugins
-
-These ship as Claude Code plugins (not vendored here). After installing them,
-run `/rebuild-skill-index` once and their skills will appear in
-`$BASE/solopreneur/skill-index/marketer.md` (Extended Discovery, below) — no
-manual editing of this file needed.
-
-- **frontend-slides** — Single-HTML slide builder, zero dependencies,
-  animation-rich, scroll-based. Used by `slide-design` as the primary slide
-  engine. Install: https://github.com/zarazhangrui/frontend-slides
-- **revealjs** — Claude Code plugin (`revealjs-skill`) that scaffolds
-  reveal.js slide decks. Used by `slide-design` as an alternative to
-  frontend-slides for keyboard-driven live presentations. Wraps the
-  underlying [reveal.js](https://github.com/hakimel/reveal.js) library.
-  Install: https://github.com/ryanbbrown/revealjs-skill
 
 ## Extended Discovery
 
@@ -105,7 +86,7 @@ specific assets:
 - Positioning & messaging: ICP, JTBD, value props, naming
 - Distribution: channel fit, content pillars, posting cadence
 - Writing: hooks, headlines, threads, long-form, microcopy, AI-slop removal
-- Brand systems: voice, visual cohesion, presentation design
+- Brand systems: voice, visual cohesion
 - Growth: algorithm mechanics for X and LinkedIn, engagement tactics
 
 ## Working Principles
