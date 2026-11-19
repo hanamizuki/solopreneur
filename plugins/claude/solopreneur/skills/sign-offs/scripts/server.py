@@ -70,13 +70,18 @@ RESERVED = ("meta.json", "meta.js")
 SOURCE_KEYS = ("machine", "config", "tmux", "repo")
 INDEX_KEYS = ("indexTitle", "indexSubtitle", "indexEmpty", "indexRow", "sep")
 TTL_DEFAULT, TTL_MAX = 7, 365
+TITLE_MAX, REPLY_TO_MAX, SOURCE_MAX = 120, 200, 80  # characters, after runs of whitespace become one space
 MAX_REQUEST = 40 * 1024 * 1024   # whole tar, request.json included
 MAX_PAYLOAD = 30 * 1024 * 1024   # page files together
 INCOMING_MAX_AGE = 86400         # seconds before an upload leftover is cleared
 PRUNE_INTERVAL = 3600            # seconds between `serve` sweeps (expired pages already answer 410)
 GENERATOR = '<meta name="generator" content="solopreneur sign-offs">'
 LOOPBACK = ("127.0.0.1", "::1", "localhost")
-BIND_LOOPBACK = ("127.0.0.1", "localhost")  # Server is an AF_INET socket
+BIND = "127.0.0.1"  # loopback only: https comes from Tailscale Serve or a reverse proxy
+# The store's own entries. Through a link, the upload sweep would delete and the index
+# rewrite would overwrite files outside the store, and a local root can sit in a
+# cloned repository that commits such a link.
+OWN_ENTRIES = (".incoming", ".lock", ".index.html.tmp")
 TEXT_TYPES = ("text/", "application/javascript", "application/json", "image/svg+xml")
 LAUNCHD_LABEL = "solopreneur.sign-offs"
 SYSTEMD_UNIT = "solopreneur-sign-offs.service"
@@ -148,6 +153,13 @@ def page_meta(root, name):
     return meta if meta is not None and meta.get("id") == name else None
 
 
+def check_own_entries(root):
+    for name in OWN_ENTRIES:
+        p = os.path.join(root, name)
+        if os.path.islink(p):
+            raise StoreError("%s is a symlink" % p, "remove it; sign-offs keeps its own files there")
+
+
 def is_expired(meta, at=None):
     return (at or utcnow()) >= parse_time(meta["expiresAt"])
 
@@ -196,8 +208,11 @@ def _prune_locked(root, at):
     if os.path.isdir(incoming):
         for name in sorted(os.listdir(incoming)):
             p = os.path.join(incoming, name)
-            if at.timestamp() - os.lstat(p).st_mtime < INCOMING_MAX_AGE:
-                continue
+            try:
+                if at.timestamp() - os.lstat(p).st_mtime < INCOMING_MAX_AGE:
+                    continue
+            except FileNotFoundError:
+                continue  # an upload just removed itself: store() stages outside the lock
             if os.path.isdir(p) and not os.path.islink(p):
                 if inside(p, incoming):
                     shutil.rmtree(p)
@@ -210,6 +225,7 @@ def _prune_locked(root, at):
 def prune(root, at=None, log=None):
     """Delete expired pages and day-old upload leftovers. Returns the removed paths."""
     os.makedirs(root, exist_ok=True)
+    check_own_entries(root)
     with Lock(root):
         removed = _prune_locked(root, at or utcnow())
     for p in removed:
@@ -419,6 +435,7 @@ def store(root, data, at=None):
     raises StoreError when the request is refused."""
     if len(data) > MAX_REQUEST:
         raise StoreError("the request is larger than %d MB" % (MAX_REQUEST >> 20))
+    check_own_entries(root)
     os.makedirs(incoming_dir(root), exist_ok=True)
     work = tempfile.mkdtemp(prefix="rx-", dir=incoming_dir(root))
     try:
@@ -440,12 +457,12 @@ def store(root, data, at=None):
                 warning = _after_write(root, index, now)
             return {"ok": True, "id": page_id, "removed": True, "warning": warning}
 
-        title = _clean_text(req.get("title"), 120, "title", required=(mode == "new"))
-        reply_to = _clean_text(req.get("replyTo"), 200, "replyTo")
+        title = _clean_text(req.get("title"), TITLE_MAX, "title", required=(mode == "new"))
+        reply_to = _clean_text(req.get("replyTo"), REPLY_TO_MAX, "replyTo")
         source = req.get("source") or {}
         if not isinstance(source, dict):
             raise StoreError("source must be an object")
-        source = {k: _clean_text(v, 80, "source." + k) for k, v in source.items() if k in SOURCE_KEYS and v}
+        source = {k: _clean_text(v, SOURCE_MAX, "source." + k) for k, v in source.items() if k in SOURCE_KEYS and v}
         content_id = req.get("contentId") or ""
         if content_id and (not isinstance(content_id, str) or not CONTENT_ID_RE.match(content_id)):
             raise StoreError("malformed contentId")
@@ -522,6 +539,8 @@ def handle_store(root, data, at=None):
         return store(os.path.abspath(os.path.expanduser(root)), data, at)
     except StoreError as e:
         return {"ok": False, "error": str(e), "hint": e.hint}
+    except tarfile.TarError as e:  # a request cut short in transit fails while it is read, not when it is opened
+        return {"ok": False, "error": "the request is damaged: %s" % e, "hint": "the transfer may have been cut short; publish again"}
     except OSError as e:
         return {"ok": False, "error": "%s" % e, "hint": "check that the folder exists, is writable, and has free space"}
 
@@ -599,8 +618,6 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 class Server(ThreadingHTTPServer):
-    allow_reuse_address = True
-    daemon_threads = True
     # socketserver queues only 5 pending connections by default. A browser behind an
     # HTTP/2 proxy (Tailscale Serve) asks for every image at once and the proxy opens
     # a dozen connections; the overflow is reset and shows up as broken images (502).
@@ -612,10 +629,6 @@ class Server(ThreadingHTTPServer):
         # reverse DNS query measured stalling for 35 s; server_name is never used here.
         socketserver.TCPServer.server_bind(self)
         self.server_name, self.server_port = self.server_address[:2]
-
-
-def make_server(root, bind, port, lang, strings, days):
-    return Server((bind, port), functools.partial(Handler, root=root, lang=lang, strings=strings, days=days))
 
 
 def prune_loop(root, interval):
@@ -644,20 +657,13 @@ def load_strings(lang):
     return table[lang]
 
 
-def check_bind(bind):
-    if bind not in BIND_LOOPBACK:
-        raise StoreError("--bind must be 127.0.0.1 or localhost, not %s" % bind,
-                         "put Tailscale Serve or a reverse proxy in front for https")
-
-
 def cmd_serve(args):
-    check_bind(args.bind)
     root = os.path.abspath(os.path.expanduser(args.dir))
     os.makedirs(root, exist_ok=True)
     strings = load_strings(args.lang)
     threading.Thread(target=prune_loop, args=(root, PRUNE_INTERVAL), daemon=True).start()
-    httpd = make_server(root, args.bind, args.port, args.lang, strings, args.ttl_days)
-    print("sign-offs serving %s on http://%s:%d/" % (root, args.bind, args.port), flush=True)
+    httpd = Server((BIND, args.port), functools.partial(Handler, root=root, lang=args.lang, strings=strings, days=args.ttl_days))
+    print("sign-offs serving %s on http://%s:%d/" % (root, BIND, args.port), flush=True)
     httpd.serve_forever()
     return 0
 
@@ -672,15 +678,13 @@ def _systemd_arg(arg):
     return arg
 
 
-def _port_in_use(bind, port):
-    host = "127.0.0.1" if bind == "localhost" else bind
-    with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET) as s:
+def _port_in_use(port):
+    with socket.socket() as s:
         s.settimeout(1)
-        return s.connect_ex((host, port)) == 0
+        return s.connect_ex((BIND, port)) == 0
 
 
 def cmd_install(args):
-    check_bind(args.bind)
     root = os.path.abspath(os.path.expanduser(args.dir))
     os.makedirs(root, exist_ok=True)
     load_strings(args.lang)  # fail before writing anything when the language is unknown
@@ -688,13 +692,13 @@ def cmd_install(args):
         dest = os.path.join(root, name)
         if not (os.path.exists(dest) and os.path.samefile(src, dest)):
             shutil.copyfile(src, dest)
-    python = args.python or sys.executable
+    python = sys.executable
     if sys.platform == "darwin" and python.startswith(("/Applications/Xcode", "/Library/Developer/CommandLineTools/")):
         # /usr/bin/python3 is a shim that re-executes the developer tools' copy and
         # reports that path; keep the shim, which survives Xcode moves and updates.
         python = "/usr/bin/python3"
     argv = [python, os.path.join(root, "server.py"), "serve", "--dir", root, "--port", str(args.port),
-            "--lang", args.lang, "--ttl-days", str(args.ttl_days), "--bind", args.bind]
+            "--lang", args.lang, "--ttl-days", str(args.ttl_days)]
     log = os.path.join(root, "server.log")
     home = os.path.expanduser("~")
     if sys.platform == "darwin":
@@ -713,7 +717,9 @@ def cmd_install(args):
             f.write("[Unit]\nDescription=sign-offs review pages\n\n[Service]\nExecStart=%s\n"
                     "Restart=on-failure\n\n[Install]\nWantedBy=default.target\n"
                     % " ".join(_systemd_arg(a) for a in argv))
-        start = ["systemctl --user daemon-reload", "systemctl --user enable --now %s" % SYSTEMD_UNIT]
+        # restart, not enable --now: after a re-install the running service must pick up the new copy.
+        start = ["systemctl --user daemon-reload", "systemctl --user enable %s" % SYSTEMD_UNIT,
+                 "systemctl --user restart %s" % SYSTEMD_UNIT]
         note = 'Run `loginctl enable-linger "$USER"` once, or the service stops when you log out and does not start at boot.'
     else:
         raise StoreError("install supports macOS (launchd) and Linux (systemd), not %s" % sys.platform)
@@ -723,8 +729,9 @@ def cmd_install(args):
     for line in start:
         print("  " + line)
     print(note)
-    if _port_in_use(args.bind, args.port):
-        print("⚠️ %s:%d is already in use: stop whatever listens there before starting this service." % (args.bind, args.port))
+    if _port_in_use(args.port):
+        print("⚠️ %s:%d is already in use: unless that is this service from an earlier install (the commands above "
+              "restart it), stop whatever listens there first." % (BIND, args.port))
     print("Then serve it over https at the root of a host name, for example:")
     print("  tailscale serve --bg --https=443 http://127.0.0.1:%d" % args.port)
     print("or point any reverse proxy at http://127.0.0.1:%d (a sub-path works too)." % args.port)
@@ -748,9 +755,6 @@ def main(argv=None):
         p.add_argument("--port", type=int, default=DEFAULT_PORT)
         p.add_argument("--lang", default="en", help="language of the index and expired pages")
         p.add_argument("--ttl-days", type=int, default=TTL_DEFAULT, help="lifetime quoted on the index page")
-        p.add_argument("--bind", default="127.0.0.1")
-        if name == "install":
-            p.add_argument("--python", help="interpreter for the service (default: the one running install)")
     args = ap.parse_args(argv)
     if args.cmd == "store":
         result = handle_store(args.dir, sys.stdin.buffer.read(MAX_REQUEST + 1))

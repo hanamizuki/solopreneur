@@ -292,13 +292,6 @@ function readJsonIfPresent(file) {
 }
 
 /**
- * Top-level blocks of other features. A layer-3 file that carries one of these
- * and no `preview` block configures that feature — it is not a broken preview
- * config. Keep in step with the blocks config.schema.json declares.
- */
-const OTHER_FEATURE_BLOCKS = ['signoffs'];
-
-/**
  * The schema no longer requires `preview` (a file may configure only another
  * feature), so the layers that name one specific file enforce it here.
  */
@@ -546,10 +539,14 @@ export function resolveConfig({ from } = {}) {
   const globalConfig = readJsonIfPresent(globalFile);
   if (globalConfig !== undefined) {
     assertConfigObject(globalConfig, globalFile);
-    validateV2(globalConfig, globalFile);
+    // A file with no `preview` block that carries another feature's block (any
+    // top-level block the schema declares) configures that feature: step over it
+    // unvalidated, as the walk-up does. That feature reports its own errors.
     const otherFeatureOnly = !Object.hasOwn(globalConfig, 'preview')
-      && OTHER_FEATURE_BLOCKS.some((key) => Object.hasOwn(globalConfig, key));
+      && Object.keys(loadSchema().properties)
+        .some((key) => key !== 'schemaVersion' && key !== 'preview' && Object.hasOwn(globalConfig, key));
     if (!otherFeatureOnly) {
+      validateV2(globalConfig, globalFile);
       requirePreviewBlock(globalConfig, globalFile);
       return decide(resolveV2(globalFile, globalConfig));
     }
