@@ -207,6 +207,8 @@ def _prune_locked(root, at):
     incoming = incoming_dir(root)
     if os.path.isdir(incoming):
         for name in sorted(os.listdir(incoming)):
+            if not name.startswith("rx-"):
+                continue  # store() stages in rx-* folders; anything else is not this store's to delete
             p = os.path.join(incoming, name)
             try:
                 if at.timestamp() - os.lstat(p).st_mtime < INCOMING_MAX_AGE:

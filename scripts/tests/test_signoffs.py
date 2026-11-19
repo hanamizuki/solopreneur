@@ -185,9 +185,19 @@ class PageChecks(Base):
         files, _ = signoff.collect(d)
         self.assertEqual(sorted(files), ["index.html", "s.css", "shots/a.png"])
 
+    def test_srcset_urls_may_hold_commas(self):
+        # A srcset candidate's URL runs to the next whitespace, commas included (the HTML spec).
+        shots = {"shots/a,b.png": b"png", "shots/c.png": b"png"}
+        for name, srcset in (("comma", "shots/a,b.png 1x, shots/c.png 2x"),
+                             ("data", "data:image/png;base64,AAAA 1x, shots/c.png 2x"),
+                             ("bare", "shots/c.png, shots/a,b.png 2x")):  # a comma ending a URL ends the candidate
+            with self.subTest(name):
+                signoff.collect(self.page(name, '<img srcset="%s">' % srcset, shots))
+
     def test_broken_references_and_unsafe_files_are_refused(self):
         cases = [
             ("missing", '<img src="shots/none.png">', None, "not in the page folder"),
+            ("srcset", '<img srcset="shots/a.png 1x, shots/none.png 2x">', {"shots/a.png": b"png"}, "links shots/none.png"),
             ("unquoted", "<img src=missing.png>", None, "not in the page folder"),
             ("absolute", '<img src="/x.png">', None, "root-absolute"),
             ("fileurl", '<img src="file:///tmp/x.png">', None, "local file"),
@@ -208,6 +218,13 @@ class PageChecks(Base):
         d = self.page("fifo")
         os.mkfifo(os.path.join(d, "pipe"))  # reading or hashing it would block forever
         self.expect_error("not a regular file", signoff.collect, d)
+
+    def test_a_page_over_the_cap_is_refused_before_it_is_read(self):
+        d = self.page("big", "<p>%s</p>" % ("x" * 2048))
+        with mock.patch.object(server, "MAX_PAYLOAD", signoff.UI_HEADROOM + 1024), \
+                mock.patch.object(signoff, "_refs") as refs:
+            self.expect_error("MB limit: compress the screenshots", signoff.collect, d)
+        refs.assert_not_called()
 
     def test_a_raw_page_may_load_the_files_written_at_publish_time(self):
         d = self.page("raw", '<!doctype html><script src="meta.js"></script><a href="meta.json">m</a>')
@@ -369,6 +386,8 @@ class Settings(Base):
             ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "box;touch pwned"}}}, "SSH destination"),
             # every target, not only the one in use: preview validates the whole file
             ({"targets": {"old": {"provider": "vercel"}}}, "targets.old.provider"),
+            ({"targets": {"old": {"provider": "static", "url": "https://x/"}}}, "targets.old.dir"),
+            ({"targets": {"old": {"provider": "server", "url": "https://x/r?a"}}}, "targets.old.url"),
             ({"defaultTarget": ["p"], "targets": {"p": {"provider": "local"}}}, "defaultTarget"),
             ({"replyTo": "x" * 201}, "signoffs.replyTo"),
             # null is a value, not "use the default": the schema types every key, so preview would refuse it too
@@ -628,6 +647,10 @@ class Providers(Base):
         write_text(os.path.join(root, ".gitignore"), "*\n!*/\n!*.png\n")
         self.publish(self.page("p"), "--slug", "gi", "--title", "Ignore")
         self.assertEqual(read_text(os.path.join(root, ".gitignore")), "*\n!*/\n!*.png\n*\n")
+        # git drops trailing spaces only: `*` and a tab matches just names ending in a tab
+        write_text(os.path.join(root, ".gitignore"), "*\t\n")
+        self.publish(self.page("p"), "--slug", "gi", "--title", "Ignore")
+        self.assertEqual(read_text(os.path.join(root, ".gitignore")), "*\t\n*\n")
 
     def test_a_symlinked_gitignore_is_refused(self):
         root = self.mkdir("work", "docs", "solopreneur", "sign-offs")
@@ -781,6 +804,16 @@ class Store(Base):
         for t in threads:
             t.join()
         self.assertEqual(sorted(r.get("revision") for r in results), [2, 3], results)
+
+    def test_the_sweep_removes_only_its_own_upload_leftovers(self):
+        incoming = server.incoming_dir(self.root)
+        mine, other = os.path.join(incoming, "rx-old"), os.path.join(incoming, "other.txt")
+        os.makedirs(mine)
+        write_text(other, "x")
+        for p in (mine, other):
+            os.utime(p, (time.time() - 2 * 86400,) * 2)
+        self.assertEqual(server.prune(self.root, log=lambda *_: None), [mine])
+        self.assertTrue(os.path.isfile(other))
 
     def test_ttl_sets_the_expiry(self):
         server.store(self.root, make_request(self.PAGE, mode="update", id=self.id, ttlDays=2))
