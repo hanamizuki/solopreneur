@@ -1397,8 +1397,9 @@ Every key is optional:
 The `static` and `server` index lists every page that has not expired: serve
 them on a network that only the readers and the publishing machine can reach,
 such as a tailnet or a VPN; serve a `static` folder without long-lived caching,
-so an update's images are fetched again. A login page does not work: the
-read-back fetches every file from `url` without credentials.
+so an update's images are fetched again. The web server must allow the page's
+inline script: no Content-Security-Policy that blocks it. A login page does not
+work: the read-back fetches every file from `url` without credentials.
 
 ## Resolution
 
@@ -1414,6 +1415,10 @@ nothing about the project):
 
 The block found is used whole: blocks at different levels never merge, so a
 project's own `signoffs` block replaces the user-level one, targets included.
+Preview from a plugin version before sign-offs reports a user-level file without
+a `preview` block as broken, so until every installed copy is updated, a
+`signoffs` block meant for every project belongs in a `.solopreneur.json` in a
+parent directory of them, which preview's walk-up skips.
 
 The same failures stop the lookup as in preview: malformed JSON, a top level
 that is not an object, a file that is not a regular file, and a broken symlink.

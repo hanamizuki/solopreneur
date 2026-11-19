@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import email.message
 import functools
 import hashlib
 import io
@@ -248,6 +249,16 @@ class PageChecks(Base):
     def test_a_raw_page_may_load_the_files_written_at_publish_time(self):
         d = self.page("raw", '<!doctype html><script src="meta.js"></script><a href="meta.json">m</a>')
         self.assertEqual(list(signoff.collect(d)[0]), ["index.html"])
+
+    def test_a_base_href_may_not_move_where_links_resolve(self):
+        # <base> is no link: every relative URL resolves against it, meta.json included,
+        # while the read-back checks the page's own folder.
+        d = self.page("base", '<!doctype html><base href="./"><script src="meta.js"></script>')
+        self.assertEqual(list(signoff.collect(d, True)[0]), ["index.html"])
+        for name, href in (("abs", "https://x/"), ("sub", "sub/")):
+            with self.subTest(href):
+                self.expect_error('<base href="%s"> changes where relative links resolve: remove it' % href,
+                                  signoff.collect, self.page("base-" + name, '<base href="%s"><p>x</p>' % href))
 
     def test_css_is_read_from_style_elements_and_attributes_not_prose(self):
         d = self.page("prose", "<p>Check the URL(s) and the url(x) helper.</p>")
@@ -662,6 +673,8 @@ class Providers(Base):
             self.target_config("server", url=url, dir=store)
             page_id, out, _ = self.publish(self.page("p"), "--slug", "sv", "--title", "Served")
             self.assertIn("%s%s/" % (url, page_id), out)
+            # Published through defaultTarget: the update names it, or a changed default would look elsewhere.
+            self.assertIn("--update %s --target t\n" % page_id, out)
             self.assertFalse(os.path.exists(os.path.join(store, "index.html")))  # rendered per request instead
             status, _, body = get(url)
             self.assertEqual(status, 200)
@@ -688,7 +701,8 @@ class Providers(Base):
         self.assertIn("do not hand out the link", err)
         # The page is stored all the same: another --slug publish would leave it behind as a second page.
         [page_id] = [n for n in os.listdir(store) if server.page_meta(store, n)]
-        self.assertIn("--update %s" % page_id, err)
+        self.assertIn("--update %s --target t," % page_id, err)  # the default target, named
+        self.assertIn("signoff.py rm %s --target t`" % page_id, err)
 
     def test_a_link_the_web_server_refuses_exits_3(self):
         # Every file reads back, but the printed link is a folder address and this
@@ -861,6 +875,49 @@ class Providers(Base):
                 self.assertEqual(code, 3, out + err)
                 self.assertNotIn("Published", out)
                 self.assertIn("text/html, inline", err)
+
+    def test_a_policy_that_blocks_the_inline_script_exits_3(self):
+        # The review UI is one inline <script>: under script-src 'self' the page never leaves "Loading…".
+        class Policy(SimpleHTTPRequestHandler):
+            policy = None
+
+            def end_headers(self):
+                self.send_header("Content-Security-Policy", self.policy)
+                super().end_headers()
+
+        for policy, expected in (("script-src 'self'", 3), ("script-src 'self' 'unsafe-inline'", 0)):
+            with self.subTest(policy):
+                Policy.policy = policy
+                store = self.mkdir("store-%d" % expected)
+                with http_dir(store, Policy) as url:
+                    self.target_config("static", url=url, dir=store)
+                    code, out, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
+                self.assertEqual(code, expected, out + err)
+                if expected:
+                    self.assertNotIn("Published", out)
+                    self.assertIn("must allow inline scripts", err)
+
+    def test_which_policies_block_the_inline_script(self):
+        # CSP3: script-src-elem, else script-src, else default-src decides, and a nonce, a hash
+        # or 'strict-dynamic' makes browsers ignore 'unsafe-inline'. Every policy must allow it.
+        cases = [([], False),
+                 (["img-src 'self'"], False),  # scripts unrestricted
+                 (["default-src 'self'"], True),
+                 (["Default-Src 'self' 'UNSAFE-INLINE'"], False),
+                 (["script-src-elem 'self'; script-src 'unsafe-inline'"], True),
+                 (["script-src 'unsafe-inline' 'nonce-abc'"], True),
+                 (["script-src 'unsafe-inline' 'sha256-abc='"], True),
+                 (["script-src 'unsafe-inline' 'strict-dynamic'"], True),
+                 (["script-src 'unsafe-inline'; script-src 'none'"], False),  # a repeated directive is ignored
+                 (["script-src 'unsafe-inline'", "default-src 'none'"], True),  # two headers
+                 (["script-src 'unsafe-inline', default-src 'none'"], True)]  # two policies in one header
+        for values, blocked in cases:
+            with self.subTest(values):
+                headers = email.message.Message()
+                for value in values:
+                    headers["Content-Security-Policy"] = value
+                headers["Content-Security-Policy-Report-Only"] = "script-src 'none'"  # reports, never blocks
+                self.assertEqual(signoff._blocking_policy(headers) is not None, blocked)
 
     def test_an_existing_gitignore_still_ignores_the_pages(self):
         root = self.mkdir("work", "docs", "solopreneur", "sign-offs")
