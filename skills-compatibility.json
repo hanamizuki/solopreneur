@@ -91,7 +91,8 @@
       "neo4j-dev:neo4j-cypher-guide",
       "neo4j-dev:neo4j-migration",
       "solopreneur:perspective",
-      "solopreneur:post-mortem"
+      "solopreneur:post-mortem",
+      "solopreneur:sign-offs"
     ],
     "shared_with_seams": [
       "designer:impeccable",
@@ -983,6 +984,41 @@
         "browser-open",
         "vercel-auth",
         "vercel-cli"
+      ]
+    },
+    "solopreneur:sign-offs": {
+      "support": {
+        "claude-code": "full"
+      },
+      "sharedContract": "skills/solopreneur/sign-offs/SKILL.md",
+      "platformResources": [
+        "skills/solopreneur/sign-offs/SKILL.md",
+        "skills/solopreneur/sign-offs/scripts/signoff.py",
+        "skills/solopreneur/sign-offs/scripts/server.py",
+        "skills/solopreneur/sign-offs/assets/page.html",
+        "skills/solopreneur/sign-offs/assets/strings.json",
+        "src/solopreneur/shared/config.schema.json"
+      ],
+      "acceptance": {
+        "claude-code": [
+          "docs/spec/2026-11-19-sign-offs.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-11-19-sign-offs.md#a2-claude-code",
+          "scripts/tests/test_signoffs.py"
+        ]
+      },
+      "dependencies": [],
+      "requiredCapabilities": {
+        "claude-code": [
+          "python>=3.9",
+          "local-filesystem-write-access"
+        ]
+      },
+      "optionalEnhancements": [
+        "ssh",
+        "tailscale-serve",
+        "reverse-proxy",
+        "launchd",
+        "systemd-user"
       ]
     },
     "solopreneur:specialist-review": {
