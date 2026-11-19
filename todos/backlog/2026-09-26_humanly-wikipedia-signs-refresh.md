@@ -1,8 +1,12 @@
 # humanly: refresh against the current Wikipedia "Signs of AI writing"
 
-> **Status (2026-09-26):** A, B and D shipped in PR #195. Still open: C (the
-> prewrite bundles' own dashes, next PR) and the word-table re-tiering. Plan,
-> review disposition and eval log: `docs/solopreneur/plans/2026-09-26-humanly-wikipedia-signs-refresh.md`.
+> **Status (2026-11-19):** A, B and D shipped in PR #195; C (the prewrite
+> bundles' own dashes) shipped in PR #199. Still open: the word-table
+> re-tiering. Heading names and line numbers in section C predate #199 (the
+> dash headings are now `## Tier 1 (Always Replace)`, `## Tier 1（必換）` and
+> so on). Plans, review disposition and eval logs:
+> `docs/solopreneur/plans/2026-09-26-humanly-wikipedia-signs-refresh.md` and
+> `docs/solopreneur/plans/2026-09-26-humanly-prewrite-dash-hygiene.md`.
 
 Trigger: the r/claudeskills post "A free claude skill to de-ai your written
 content" (2026-09-24). It ships a `de-ai-writing` skill: a SKILL.md, a
