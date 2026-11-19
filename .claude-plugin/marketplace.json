@@ -16,7 +16,7 @@
     {
       "name": "designer",
       "source": "./plugins/claude/designer",
-      "description": "UI/UX design expertise. Ships the designer agent and 10 vendored third-party design skills (taste-* archetype family + impeccable).",
+      "description": "UI/UX design expertise. Ships the designer agent and 2 vendored third-party design skills (impeccable + taste-skill).",
       "license": "MIT"
     },
     {

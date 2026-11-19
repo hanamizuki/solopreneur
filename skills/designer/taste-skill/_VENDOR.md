@@ -5,9 +5,9 @@ edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
 - **Source repo**: https://github.com/Leonxlnx/taste-skill
 - **Source path**: `skills/taste-skill`
-- **Pinned commit**: e988add20dab0fa97d7a76781c48961c8184288e
-- **Synced at**: 2026-08-15T02:12:17Z
-- **License**: (none — upstream has no LICENSE file as of sync)
+- **Pinned commit**: f6b76575f949707b4e3c37cd86cb44b0b98643e8
+- **Synced at**: 2026-11-19T11:52:42Z
+- **License**: see `../../vendor/LICENSES/taste-skill-LICENSE` (source repo: `src/designer/vendor/LICENSES/taste-skill-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
 files so they work as part of a plugin: the frontmatter `name:` is

@@ -21,6 +21,10 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+# Vendored skill docs can mirror upstream doc paths (android-dev/agp-9-upgrade
+# ships references/android/build/); keep those and their package copies tracked.
+!/skills/**/build/
+!/plugins/**/build/
 target/
 .gradle/
 

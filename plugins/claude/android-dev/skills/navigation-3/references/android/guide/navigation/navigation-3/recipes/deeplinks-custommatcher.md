@@ -11,9 +11,11 @@ This recipe consists of two activities:
 
 ## Key Concepts
 
-1. **Custom `RequestExtrasKey`** : `JsonDeepLinkMatcherKey` defines a custom extra key implementing `RequestExtrasKey<String>` to type-safely store and read serialized JSON payloads in `DeepLinkRequest.extras`.
+1. **Custom `RequestExtrasKey`** :
+   `JsonDeepLinkMatcherKey` defines a custom extra key implementing `RequestExtrasKey<String>` to type-safely store and read serialized JSON payloads in `DeepLinkRequest.extras`.
 
-2. **Custom `DeepLinkMatcher`** : `JsonDeepLinkMatcher<T>` extends `DeepLinkMatcher<T, MatchResult<T>>` and implements `matchRequest(request)` to extract `request.extras[JsonDeepLinkMatcherKey]` and decode it into a strongly typed `NavKey` using Kotlinx Serialization.
+2. **Custom `DeepLinkMatcher`** :
+   `JsonDeepLinkMatcher<T>` extends `DeepLinkMatcher<T, MatchResult<T>>` and implements `matchRequest(request)` to extract `request.extras[JsonDeepLinkMatcherKey]` and decode it into a strongly typed `NavKey` using Kotlinx Serialization.
 
 [![](https://developer.android.com/static/images/picto-icons/code.svg) Explore View the full recipe on GitHub.](https://github.com/android/nav3-recipes/tree/main/app/src/main/java/com/example/nav3recipes/deeplink/usecases/matcher)
 
@@ -42,7 +44,6 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.deeplink.DeepLinkMatcher
 import androidx.navigation3.runtime.deeplink.DeepLinkRequest
 import androidx.navigation3.runtime.deeplink.RequestExtrasKey
-import androidx.navigation3.runtime.deeplink.get
 import com.example.nav3recipes.common.deeplink.EntryScreen
 import com.example.nav3recipes.ui.setEdgeToEdgeConfig
 import kotlinx.serialization.KSerializer
@@ -102,8 +103,6 @@ internal class JsonDeepLinkMatcher<T: NavKey>(val serializer: KSerializer<T>): D
         }
     }
 }
-
-   
 ```
 
 ```
@@ -173,6 +172,4 @@ private inline fun <reified T : NavKey> createJsonDeepLinkMatcher(): JsonDeepLin
     val serializer = serializer<T>()
     return JsonDeepLinkMatcher(serializer)
 }
-
-   
 ```
