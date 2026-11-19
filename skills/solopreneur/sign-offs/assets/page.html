@@ -107,9 +107,7 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
     document.title = title;
     var lines = [fmt(S.revisionLine, { revision: meta.revision, when: when(meta.expiresAt) })];
     if (meta.replyTo) lines.push(fmt(S.replyToLine, { replyTo: meta.replyTo }));
-    var html = '<b>' + esc(title) + '</b>' + lines.map(esc).join('<br>');
-    if (dups.length) html += '<div class="err">' + esc(fmt(S.duplicateIds, { ids: dups.join(S.listSep) })) + '</div>';
-    head.innerHTML = html;
+    head.innerHTML = '<b>' + esc(title) + '</b>' + lines.map(esc).join('<br>');
   }
 
   // Item ids come from the page, so they live apart from the overall comment and
@@ -221,6 +219,8 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
     if (contentId && m.contentId && m.contentId !== contentId) { block(S.stale, m.title); return; }
     // The only expiry guard for local and static pages, which have no server to answer 410.
     if (!(Date.parse(m.expiresAt) > Date.now())) { block(fmt(S.expired, { when: when(m.expiresAt) }), m.title); return; }
+    // A reply naming a repeated id could not say which item it means.
+    if (dups.length) { block(fmt(S.duplicateIds, { ids: dups.join(S.listSep) }), m.title); return; }
     meta = m;
     key = 'signoff:' + m.id + ':r' + m.revision;
     load(); renderHead(); build();

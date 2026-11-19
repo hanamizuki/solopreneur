@@ -1430,9 +1430,10 @@ file.
   directory has no working tree as its parent.
 - With no config, `root` is `docs/solopreneur/sign-offs` under the main working
   tree of the current repository (the current directory outside git).
-- `root` must be a folder dedicated to sign-offs: the publisher drops a
-  `.gitignore` of `*` into it and refuses a repository root, the home directory,
-  `/`, and a folder that already holds other files.
+- `root` must be a folder dedicated to sign-offs: the publisher keeps `*` as the
+  last rule of its `.gitignore` (git applies the last matching rule, so no
+  earlier exception brings a file back) and refuses a repository root, the home
+  directory, `/`, and a folder that already holds other files.
 - `dir` must be absolute or start with `~/`; `~` expands on the host that holds
   the pages.
 - `host` is an SSH destination of letters, digits and `. _ - @ :`, not starting

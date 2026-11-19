@@ -76,9 +76,9 @@ def read_text(path):
 
 
 @contextlib.contextmanager
-def http_dir(directory):
+def http_dir(directory, handler=SimpleHTTPRequestHandler):
     """A plain static web server over `directory`, standing in for a user's portal."""
-    httpd = QuickServer(("127.0.0.1", 0), functools.partial(quiet(SimpleHTTPRequestHandler), directory=directory))
+    httpd = QuickServer(("127.0.0.1", 0), functools.partial(quiet(handler), directory=directory))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     try:
         yield "http://127.0.0.1:%d/" % httpd.server_address[1]
@@ -188,6 +188,7 @@ class PageChecks(Base):
     def test_broken_references_and_unsafe_files_are_refused(self):
         cases = [
             ("missing", '<img src="shots/none.png">', None, "not in the page folder"),
+            ("unquoted", "<img src=missing.png>", None, "not in the page folder"),
             ("absolute", '<img src="/x.png">', None, "root-absolute"),
             ("fileurl", '<img src="file:///tmp/x.png">', None, "local file"),
             ("outside", '<img src="../good/a.png">', None, "outside the page folder"),
@@ -221,9 +222,19 @@ class PageChecks(Base):
 
     def test_item_ids_must_be_present_and_unique(self):
         self.expect_error("repeat: 1", signoff.check_content, b'<section data-item="1"></section><section data-item=" 1 "></section>', False)
+        self.expect_error("repeat", signoff.check_content, b"<section data-item=1></section><section data-item=1></section>", False)
         self.expect_error("empty id", signoff.check_content, b'<section data-item=""></section>', False)
         # The page builds controls for sections only: a div item would silently drop out of the reply.
         self.expect_error("not on <div>", signoff.check_content, b'<section data-item="1"></section><div data-item="2"></div>', False)
+
+    def test_unparsable_markup_is_reported_not_raised(self):
+        # Python 3.9-3.12 stop at an unknown "<![" keyword; 3.13 and later read it as a comment.
+        for check in (lambda: signoff.collect(self.page("decl", "<![foo]><p>x</p>")),
+                      lambda: signoff.check_content(b"<![foo]><section data-item='1'></section>", False)):
+            try:
+                check()
+            except signoff.PublishError:
+                pass
 
 
 class PageBuilding(Base):
@@ -351,6 +362,13 @@ class Settings(Base):
             ({"targets": {"old": {"provider": "vercel"}}}, "targets.old.provider"),
             ({"defaultTarget": ["p"], "targets": {"p": {"provider": "local"}}}, "defaultTarget"),
             ({"replyTo": "x" * 201}, "signoffs.replyTo"),
+            # null is a value, not "use the default": the schema types every key, so preview would refuse it too
+            ({"root": None}, "signoffs.root"),
+            ({"replyTo": None}, "signoffs.replyTo"),
+            ({"defaultTarget": None}, "signoffs.defaultTarget"),
+            ({"lang": None}, "signoffs.lang"),
+            ({"ttlDays": None}, "signoffs.ttlDays"),
+            ({"targets": None}, "signoffs.targets"),
         ]
         for block, needle in cases:
             with self.subTest(block):
@@ -421,6 +439,15 @@ class HostDetection(unittest.TestCase):
             with self.subTest(resolved), \
                     mock.patch.object(signoff, "_run", lambda cmd, cwd=None, timeout=10, out=resolved: out if cmd[0] == "ssh" else None):
                 self.assertEqual(signoff.is_local_host("vm"), local)
+
+    def test_ssh_s_host_name_decides_not_the_alias(self):
+        # An alias named after this machine whose HostName is another machine connects there.
+        with mock.patch.object(signoff, "_local_names", return_value={"localhost", "alias"}), \
+                mock.patch.object(signoff, "_is_local_address", return_value=False):
+            with mock.patch.object(signoff, "_run", lambda cmd, cwd=None, timeout=10: "hostname elsewhere.example\nport 22\n"):
+                self.assertFalse(signoff.is_local_host("alias"))
+            with mock.patch.object(signoff, "_run", lambda cmd, cwd=None, timeout=10: None):  # no ssh: the alias is all there is
+                self.assertTrue(signoff.is_local_host("alias"))
 
     def test_ssh_options_end_before_the_host(self):
         argv = signoff.ssh_argv("me@box", "true")
@@ -539,6 +566,23 @@ class Providers(Base):
         self.assertEqual(code, 3)
         self.assertIn("do not hand out the link", err)
 
+    def test_a_link_the_web_server_refuses_exits_3(self):
+        # Every file reads back, but the printed link is a folder address and this
+        # web server has directory indexes turned off.
+        class NoIndex(SimpleHTTPRequestHandler):
+            def do_GET(self):
+                if self.path.endswith("/"):
+                    return self.send_error(403)
+                return super().do_GET()
+
+        store = self.mkdir("store")
+        with http_dir(store, NoIndex) as url:
+            self.target_config("static", url=url, dir=store)
+            code, out, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
+        self.assertEqual(code, 3)
+        self.assertNotIn("Published", out)
+        self.assertIn("do not hand out the link", err)
+
     def test_an_unreadable_meta_json_exits_3(self):
         store = self.mkdir("store")
 
@@ -571,6 +615,10 @@ class Providers(Base):
         self.assertEqual(read_text(os.path.join(root, ".gitignore")), "# mine\n*\n")
         self.publish(self.page("p"), "--slug", "gi", "--title", "Ignore")
         self.assertEqual(read_text(os.path.join(root, ".gitignore")), "# mine\n*\n")
+        # git applies the last matching rule: a `*` followed by exceptions ignores nothing they name
+        write_text(os.path.join(root, ".gitignore"), "*\n!*/\n!*.png\n")
+        self.publish(self.page("p"), "--slug", "gi", "--title", "Ignore")
+        self.assertEqual(read_text(os.path.join(root, ".gitignore")), "*\n!*/\n!*.png\n*\n")
 
     def test_a_symlinked_gitignore_is_refused(self):
         root = self.mkdir("work", "docs", "solopreneur", "sign-offs")
