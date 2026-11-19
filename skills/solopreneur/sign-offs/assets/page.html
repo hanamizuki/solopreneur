@@ -2,12 +2,14 @@
 <html lang="{{lang}}">
 <head>
 <meta charset="utf-8">
+<meta name="signoff-content" content="{{contentId}}">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{title}}</title>
 <!--
   sign-offs review UI: the single source every published page is wrapped in.
   signoff.py fills the double-brace tokens from assets/strings.json at publish
-  time and puts the agent's content in place of the content token, so a
+  time (with this publish's content id) and puts the agent's content in place
+  of the content token, so a
   published page always carries the UI of the plugin version that published it,
   never a stale copy.
   Reply format, first line: "sign-off <id> r<revision>". The id and revision
@@ -151,7 +153,11 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
       note.addEventListener('input', function () { entry(k).n = note.value; save(); });
       function paint() {
         var st = state.items[k] || {};
-        buttons.forEach(function (b) { b.classList.toggle('on', b.textContent === st.c); });
+        buttons.forEach(function (b) {
+          var on = b.textContent === st.c;
+          b.classList.toggle('on', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');  // the choice, for screen readers too
+        });
         note.value = st.n || '';
       }
       s.appendChild(ctl); s.appendChild(note); paint();

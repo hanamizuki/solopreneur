@@ -24,8 +24,8 @@ import argparse
 import getpass
 import hashlib
 import html
+import http.client
 import io
-import ipaddress
 import json
 import os
 import pathlib
@@ -40,7 +40,6 @@ import sys
 import tarfile
 import tempfile
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -50,7 +49,6 @@ import server  # noqa: E402  (sibling module: the store, also shipped over SSH)
 
 SKILL_DIR = os.path.dirname(HERE)
 PAGE_TEMPLATE = os.path.join(SKILL_DIR, "assets", "page.html")
-STRINGS_FILE = os.path.join(SKILL_DIR, "assets", "strings.json")
 SERVER_SOURCE = os.path.join(HERE, "server.py")
 CONFIG_NAME = ".solopreneur.json"
 GLOBAL_CONFIG = os.path.join("~", ".config", "solopreneur", "config.json")
@@ -59,7 +57,14 @@ LANGS = ("en", "zh-Hant")
 PROVIDERS = ("local", "static", "server")
 BLOCK_KEYS = ("root", "lang", "ttlDays", "replyTo", "defaultTarget", "targets")
 TARGET_KEYS = ("provider", "host", "url", "dir")
-SSH_OPTIONS = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
+# The store needs no agent, X11 or port forwarding: never hand them to a host that a
+# repository's own config may have chosen.
+SSH_OPTIONS = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+               "-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "ClearAllForwardings=yes"]
+# A repository can ship its own .solopreneur.json: a host such as "-oProxyCommand=…"
+# would reach ssh as an option, and shell syntax would reach any ProxyCommand that
+# expands %h. Plain destinations only.
+HOST_RE = re.compile(r"^[A-Za-z0-9_.@:][A-Za-z0-9_.@:-]*$")
 # Runs on the host: read "<length>\n<server.py source>", execute it, and leave the
 # request tar that follows on stdin for its `store` command.
 # No single quotes inside, so shlex.quote() yields one plain '…' word for any login shell.
@@ -70,14 +75,13 @@ UI_HEADROOM = 64 * 1024  # the wrapped UI adds about 15 KB to index.html; the st
 JUNK = {".DS_Store", "Thumbs.db"}
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic")
 REF_FILES = (".html", ".htm", ".css")
-EXTERNAL_SCHEMES = ("http:", "https:", "data:", "mailto:", "tel:", "blob:", "about:", "javascript:")
 ATTR_RE = re.compile(r"""(?i)\b(?:src|href|poster|data-src)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
 SRCSET_RE = re.compile(r"""(?i)\bsrcset\s*=\s*(?:"([^"]*)"|'([^']*)')""")
 CSS_URL_RE = re.compile(r"""url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)""")
 FULL_DOC_RE = re.compile(rb"<\s*(?:!doctype|html|head|body)\b", re.I)
 ITEM_RE = re.compile(r"""(?i)\bdata-item\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+ITEM_TAG_RE = re.compile(r"(?is)<([a-z][a-z0-9-]*)\b[^>]*\bdata-item\s*=")
 TOKEN_RE = re.compile(r"\{\{(\w+)\}\}")
-CONTENT_META_RE = re.compile(rb"""<meta\s+name=["']signoff-content["'][^>]*>\s*""", re.I)
 
 
 class PublishError(Exception):
@@ -97,6 +101,11 @@ def _run(cmd, cwd=None, timeout=10):
 
 def _git(cwd, *args):
     return _run(["git", *args], cwd=cwd)
+
+
+def _too_long(text, limit):
+    """Measured the way the store measures: runs of whitespace count as one space."""
+    return len(" ".join(text.split())) > limit
 
 
 # ---------- settings ----------
@@ -218,40 +227,43 @@ def resolve(cwd, target_name=None):
     if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= server.TTL_MAX:
         raise bad("ttlDays", "must be a whole number from 1 to %d" % server.TTL_MAX)
     reply_to = block.get("replyTo")
-    if reply_to is not None and not isinstance(reply_to, str):
-        raise bad("replyTo", "must be text")
+    if reply_to is not None and (not isinstance(reply_to, str) or _too_long(reply_to, server.REPLY_TO_MAX)):
+        raise bad("replyTo", "must be text of at most %d characters" % server.REPLY_TO_MAX)
     root = block.get("root")
     if root is not None and (not isinstance(root, str) or not root):
         raise bad("root", "must be a non-empty path")
     targets = block.get("targets", {})
     if not isinstance(targets, dict):
         raise bad("targets", "must be an object")
+    # Every target, not only the one in use: preview validates the whole file
+    # against the schema, so a value let through here would break preview there.
+    for tname, t in targets.items():
+        if not isinstance(t, dict):
+            raise bad("targets.%s" % tname, "must be an object")
+        warnings += ["%s: signoffs.targets.%s.%s is not a known setting and is ignored" % (path, tname, k)
+                     for k in t if k not in TARGET_KEYS]
+        if t.get("provider") not in PROVIDERS:
+            raise bad("targets.%s.provider" % tname, "must be one of: %s" % ", ".join(PROVIDERS))
+        for key in ("host", "url", "dir"):
+            if key in t and (not isinstance(t[key], str) or not t[key]):
+                raise bad("targets.%s.%s" % (tname, key), "must be a non-empty string")
+        if "host" in t and not HOST_RE.match(t["host"]):
+            raise bad("targets.%s.host" % tname, "must be an SSH destination such as me@box")
     name = target_name or block.get("defaultTarget")
+    if name is not None and (not isinstance(name, str) or not name):
+        raise bad("defaultTarget", "must be the name of a target")
     if name is None:
-        name, target = None, {"provider": "local"}
+        target = {"provider": "local"}
     elif name not in targets:
         where = "--target %s" % name if target_name else "signoffs.defaultTarget %r" % name
         raise PublishError("%s: no such target (have: %s)" % (where, ", ".join(sorted(targets)) or "none"),
                            "add it under signoffs.targets in %s" % (path or "a .solopreneur.json"))
     else:
         target = targets[name]
-        if not isinstance(target, dict):
-            raise bad("targets.%s" % name, "must be an object")
-        warnings += ["%s: signoffs.targets.%s.%s is not a known setting and is ignored" % (path, name, k)
-                     for k in target if k not in TARGET_KEYS]
 
-    provider = target.get("provider")
-    if provider not in PROVIDERS:
-        raise bad("targets.%s.provider" % name, "must be one of: %s" % ", ".join(PROVIDERS))
-    for key in ("host", "url", "dir"):
-        if key in target and (not isinstance(target[key], str) or not target[key]):
-            raise bad("targets.%s.%s" % (name, key), "must be a non-empty string")
-    # A repository can ship its own .solopreneur.json: a host such as
-    # "-oProxyCommand=…" would otherwise reach ssh as an option and run a command.
-    if "host" in target and (target["host"].startswith("-") or re.search(r"\s", target["host"])):
-        raise bad("targets.%s.host" % name, "must be an SSH destination such as me@box")
+    provider = target["provider"]
     settings = {"configPath": path, "target": name, "provider": provider, "lang": lang, "ttlDays": ttl,
-                "replyTo": reply_to if reply_to is not None else load_strings(lang)["defaultReplyTo"]}
+                "replyTo": reply_to if reply_to is not None else server.load_strings(lang)["defaultReplyTo"]}
 
     if provider == "local":
         if "host" in target or "url" in target or "dir" in target:
@@ -322,22 +334,18 @@ def is_local_host(host):
     resolved = _run(["ssh", "-G", "--", host], timeout=5) or ""
     for line in resolved.splitlines():
         key, _, value = line.partition(" ")
+        value = value.strip()
         if key == "hostname" and value:
-            names.add(value.strip().lower())
+            names.add(value.lower())
         elif key == "user" and value and not user:
-            user = value.strip()
+            user = value
+        elif (key == "port" and value != "22") or (key in ("proxyjump", "proxycommand") and value.lower() != "none"):
+            return False  # reached through another port or a jump host: a VM or a tunnel, whatever the name
     if user and user != getpass.getuser():
         return False
     mine = _local_names()
-    for n in names:
-        try:
-            ipaddress.ip_address(n)
-        except ValueError:
-            if n in mine:  # whole names only: build.home is not build.office
-                return True
-        if _is_local_address(n):
-            return True
-    return False
+    # Whole names only (build.home is not build.office), or an address this machine holds.
+    return any(n in mine or _is_local_address(n) for n in names)
 
 
 # ---------- page checks ----------
@@ -362,7 +370,7 @@ def check_ref(ref, from_rel, files):
     low = ref.lower()
     if low.startswith("file:"):
         return "%s links a local file %s: readers cannot open it; copy the file into the page folder and use a relative path" % (from_rel, ref)
-    if low.startswith(EXTERNAL_SCHEMES) or re.match(r"^[a-z][a-z0-9+.-]*:", low):
+    if re.match(r"[a-z][a-z0-9+.-]*:", low):  # http:, data:, mailto: and every other scheme
         return None
     if ref.startswith("/"):
         return "%s uses a root-absolute path %s: on the published site it points elsewhere; use a relative path" % (from_rel, ref)
@@ -374,7 +382,7 @@ def check_ref(ref, from_rel, files):
         return "%s links %s outside the page folder: move the file into the folder" % (from_rel, ref)
     if path.endswith("/"):
         target = (target + "/index.html").lstrip("./")
-    if target not in files:
+    if target not in files and target not in server.RESERVED:  # meta.json and meta.js are written at publish time
         return "%s links %s, which is not in the page folder (looked for %s)" % (from_rel, ref, target)
     return None
 
@@ -453,6 +461,11 @@ def check_content(index, raw):
         text = index.decode("utf-8")
     except UnicodeDecodeError:
         raise PublishError("index.html is not UTF-8")
+    others = sorted({m.group(1).lower() for m in ITEM_TAG_RE.finditer(text)} - {"section"})
+    if others:
+        # The page builds controls for section[data-item] only: any other element would drop out of the reply.
+        raise PublishError("data-item is only read on <section> elements, not on <%s>" % ">, <".join(others),
+                           'wrap each item in <section data-item="id">')
     ids = [(m.group(1) if m.group(1) is not None else m.group(2)).strip() for m in ITEM_RE.finditer(text)]
     if any(not i for i in ids):
         raise PublishError("a <section data-item> has an empty id", "give every item a short unique id, such as 1, 2, A3")
@@ -463,74 +476,25 @@ def check_content(index, raw):
 
 # ---------- building the page ----------
 
-def load_strings(lang):
-    with open(STRINGS_FILE, encoding="utf-8") as f:
-        return json.load(f)[lang]
-
-
-def wrap_page(content, lang, title, strings):
-    """The content inside the shared review UI (assets/page.html)."""
+def wrap_page(content, lang, title, strings, content_id):
+    """The content inside the shared review UI (assets/page.html). One pass, so
+    tokens written inside the content or the title stay as written. The content
+    id lands in <meta name="signoff-content">, which the page compares with
+    meta.json's contentId: a reload during an update must not pair the old
+    questions with the new revision."""
     with open(PAGE_TEMPLATE, encoding="utf-8") as f:
         template = f.read()
-
-    def fill(m):
-        name = m.group(1)
-        if name == "content":
-            return m.group(0)
-        if name == "strings":
-            return server.script_json(strings)
-        if name == "lang":
-            return lang
-        if name == "title":
-            return html.escape(title)
-        return html.escape(strings[name])
-
-    parts = TOKEN_RE.sub(fill, template).split("{{content}}")
-    if len(parts) != 2:
-        raise RuntimeError("page.html must contain exactly one content token")
-    return (parts[0] + content.decode("utf-8") + parts[1]).encode("utf-8")
-
-
-def doctype_end(page):
-    """Offset just past a leading doctype (after a BOM, whitespace and comments), or None.
-    A linear scan: a regex for "any number of comments" backtracks exponentially."""
-    i, n = (3 if page.startswith(b"\xef\xbb\xbf") else 0), len(page)
-    while True:
-        while i < n and page[i:i + 1].isspace():
-            i += 1
-        if not page.startswith(b"<!--", i):
-            break
-        j = page.find(b"-->", i + 4)
-        if j < 0:
-            return None
-        i = j + 3
-    if page[i:i + 9].lower() != b"<!doctype":
-        return None
-    j = page.find(b">", i)
-    return j + 1 if j >= 0 else None
-
-
-def inject_content_id(page, content_id):
-    """Put <meta name="signoff-content"> first in <head>. The page compares it with
-    meta.json's contentId and refuses review when they differ (a reload during an
-    update can pair old questions with the new revision). Replaces an old tag."""
-    page = CONTENT_META_RE.sub(b"", page)
-    tag = ('<meta name="signoff-content" content="%s">' % content_id).encode()
-    for pattern in (rb"<head\b[^>]*>", rb"<html\b[^>]*>"):
-        m = re.search(pattern, page, re.I)
-        if m:
-            return page[:m.end()] + tag + page[m.end():]
-    # A page without <html> and <head>: after the doctype, or the browser falls into quirks mode.
-    end = doctype_end(page)
-    if end is not None:
-        return page[:end] + tag + page[end:]
-    return tag + page
+    values = {"content": content.decode("utf-8"), "strings": server.script_json(strings), "lang": lang,
+              "title": html.escape(title), "contentId": content_id}
+    return TOKEN_RE.sub(lambda m: values[m.group(1)] if m.group(1) in values else html.escape(strings[m.group(1)]),
+                        template).encode("utf-8")
 
 
 # ---------- sending and reading back ----------
 
 def detect_source():
-    """Who published, recorded in meta.json and shown on the index: never typed by the model."""
+    """Who published, recorded in meta.json (the index shows machine, config and
+    tmux): never typed by the model, so clipped to what the store accepts."""
     src = {}
     name = _run(["scutil", "--get", "LocalHostName"]) if sys.platform == "darwin" else None
     src["machine"] = (name or socket.gethostname().split(".")[0]).lower()
@@ -545,7 +509,7 @@ def detect_source():
     top = _git(os.getcwd(), "rev-parse", "--show-toplevel")
     if top:
         src["repo"] = os.path.basename(top)
-    return src
+    return {k: " ".join(v.split())[:server.SOURCE_MAX] for k, v in src.items() if v}
 
 
 def build_request(files, request):
@@ -554,7 +518,6 @@ def build_request(files, request):
         data = json.dumps(request, ensure_ascii=False).encode("utf-8")
         ti = tarfile.TarInfo("request.json")
         ti.size = len(data)
-        ti.mtime = int(time.time())
         tf.addfile(ti, io.BytesIO(data))
         for rel in sorted(files):
             tf.add(files[rel], arcname="payload/" + rel, recursive=False)
@@ -569,7 +532,8 @@ def ssh_argv(host, command):
 def remote_store(host, directory, data):
     with open(SERVER_SOURCE, "rb") as f:
         code = f.read()
-    command = "python3 -c %s store --dir %s" % (shlex.quote(REMOTE_LOADER), shlex.quote(directory))
+    # -I: neither the login directory nor PYTHONPATH can shadow a standard module there.
+    command = "python3 -I -c %s store --dir %s" % (shlex.quote(REMOTE_LOADER), shlex.quote(directory))
     try:
         r = subprocess.run(ssh_argv(host, command), input=b"%d\n" % len(code) + code + data,
                            capture_output=True, timeout=180)
@@ -608,7 +572,7 @@ def fetch(url, tries=3):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={"Cache-Control": "no-cache"}), timeout=20) as r:
                 return r.read()
-        except (urllib.error.URLError, OSError) as e:
+        except (OSError, http.client.HTTPException) as e:  # URLError is an OSError; a cut response is neither
             last = e
             if i + 1 < tries:
                 time.sleep(1 + i)
@@ -671,6 +635,13 @@ def prepare_local_root(directory):
     except FileNotFoundError:
         rules = None
     if rules is None or "*" not in rules.splitlines():
+        # About to claim the folder: `*` would hide every new file in it from git,
+        # and would stay behind even when the store then refuses the publish.
+        others = sorted(set(os.listdir(directory)) - {".gitignore"} - JUNK)
+        if others and ".lock" not in others:  # .lock: sign-offs already writes here
+            raise PublishError("%s already holds other files (%s): it cannot be the sign-offs folder"
+                               % (directory, ", ".join(others[:3])),
+                               "set signoffs.root to a folder of its own, such as docs/solopreneur/sign-offs")
         with open(ignore, "a", encoding="utf-8") as f:
             f.write(("" if not rules or rules.endswith("\n") else "\n") + "*\n")
 
@@ -678,6 +649,8 @@ def prepare_local_root(directory):
 # ---------- commands ----------
 
 def cmd_publish(args):
+    if not args.src.strip():
+        raise PublishError("no page folder given", "pass the folder that holds index.html (is a shell variable empty?)")
     if bool(args.slug) == bool(args.update):
         raise PublishError("pass either --slug (a new page) or --update <id> (a new revision)")
     if args.slug and (not server.SLUG_RE.match(args.slug) or len(args.slug) > server.SLUG_MAX):
@@ -687,8 +660,12 @@ def cmd_publish(args):
         raise PublishError("malformed id: %r" % args.update, "use the id printed when the page was published, e.g. e2e-sync-k3f")
     if args.slug and not (args.title or "").strip():
         raise PublishError("a new page needs --title", "it heads the page and the index; write it for the reader")
+    if args.title and _too_long(args.title, server.TITLE_MAX):
+        raise PublishError("--title is longer than %d characters" % server.TITLE_MAX, "shorten it; the page holds the detail")
+    if args.reply_to and _too_long(args.reply_to, server.REPLY_TO_MAX):
+        raise PublishError("--reply-to is longer than %d characters" % server.REPLY_TO_MAX)
     settings = resolve(os.getcwd(), args.target)
-    strings = load_strings(settings["lang"])
+    strings = server.load_strings(settings["lang"])
     files, warnings = collect(args.src)
     with open(files["index.html"], "rb") as f:
         index = f.read()
@@ -703,12 +680,13 @@ def cmd_publish(args):
     if settings["provider"] == "local":
         prepare_local_root(settings["dir"])
     content_id = secrets.token_hex(8)
-    page = index if args.raw else wrap_page(index, settings["lang"], args.title or strings["defaultTitle"], strings)
+    # --raw goes out untouched: the page brings its own UI and protocol.
+    page = index if args.raw else wrap_page(index, settings["lang"], args.title or strings["defaultTitle"], strings, content_id)
     workdir = tempfile.mkdtemp(prefix="signoff-publish-")
     try:
         staged = os.path.join(workdir, "index.html")
         with open(staged, "wb") as f:
-            f.write(inject_content_id(page, content_id))
+            f.write(page)
         files = dict(files, **{"index.html": staged})
         request = {
             "mode": "update" if args.update else "new",
@@ -738,7 +716,7 @@ def cmd_rm(args):
     if not server.ID_RE.match(args.id):
         raise PublishError("malformed id: %r" % args.id)
     settings = resolve(os.getcwd(), args.target)
-    call_store(settings, {"mode": "rm", "id": args.id, "index": index_request(settings, load_strings(settings["lang"]))})
+    call_store(settings, {"mode": "rm", "id": args.id, "index": index_request(settings, server.load_strings(settings["lang"]))})
     print("Removed %s" % args.id)
     return 0
 

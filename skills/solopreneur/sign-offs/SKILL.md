@@ -57,21 +57,25 @@ they need the page elsewhere (a phone, another machine), look before asking:
 Offer the options you found, each with what it needs (see Providers), and
 recommend `local` when nothing fits or the user is unsure. Save the choice in a
 `signoffs` block of `.solopreneur.json`, merged into the file if it exists (keep
-its other top-level keys and `"schemaVersion": 2`):
-
-- user level, `~/.config/solopreneur/config.json`: the right place for targets,
-  because host names and URLs are personal and stay out of commits;
-- project level, `<repo>/.solopreneur.json`: only settings a team shares, such as
-  `lang` or `ttlDays`.
+its other top-level keys and `"schemaVersion": 2`). Usually that is the user-level
+file, `~/.config/solopreneur/config.json`: host names and URLs are personal and
+stay out of commits. The nearest `signoffs` block is used whole — blocks never
+merge — so a project's own block (`<repo>/.solopreneur.json`) replaces the
+user-level one there, targets included; add one only when that project needs
+settings of its own.
 
 Never start services, change Tailscale, or open ports without the user's
-explicit go-ahead. Full key reference: `shared/config.md`, "The `signoffs` block".
+explicit go-ahead. Full key reference: `../../shared/config.md` relative to this
+skill inside an installed package (canonical source:
+`src/solopreneur/shared/config.md`), "The `signoffs` block".
 
 ## Write the page
 
 ```bash
-W="$(mktemp -d)/page" && mkdir -p "$W/shots"
+W="$(mktemp -d)/page" && mkdir -p "$W/shots" && echo "$W"
 ```
+
+Use the printed path in later calls: `$W` is gone by the next Bash call.
 
 `$W/index.html` holds **content only** — no `<html>`, `<head>` or `<body>`;
 the publisher adds the header, buttons, reply builder and styles:
@@ -100,8 +104,10 @@ the publisher adds the header, buttons, reply builder and styles:
   `sips -Z 1600 -s format jpeg -s formatOptions 80 in.png --out "$W/shots/1-ios.jpg"`).
 - `.shots` (an image grid) and plain tables are already styled; a `<style>`
   element in the content works for anything else.
-- No secrets, passwords or personal data: anyone who gets the link can read it.
-- A page with its own complete UI can go out with `--raw`. Its reply must still
+- No secrets, passwords or personal data: anyone who can open the target's
+  `url` can read the page, and the `static` and `server` index lists every page
+  that has not expired.
+- A page with its own complete UI can go out with `--raw`, untouched. Its reply must still
   start with `sign-off <id> r<revision>`, read from `meta.json` over http(s) or
   from `window.SIGNOFF_META` (loaded by `<script src="meta.js">`) under `file://`.
 
@@ -113,8 +119,9 @@ python3 "$SIGNOFF" publish "$W" --slug e2e-sync --title "Cloud Sync e2e, round 2
 ```
 
 The dry run only checks: missing files, `file://` and root-absolute links,
-links leaving the folder, symlinks, dot files, the 30 MB cap, heavy images, and
-duplicate item ids. The slug is lowercase letters, digits and hyphens, at most
+links leaving the folder, symlinks, dot files, the 30 MB cap, heavy images,
+duplicate item ids, `data-item` outside a `<section>`, and the title length (120
+characters). The slug is lowercase letters, digits and hyphens, at most
 12 characters; the page id adds a random suffix (`e2e-sync-k3f`).
 
 | Exit | Meaning |
@@ -164,8 +171,8 @@ revision N". The reply's first line shows which revision they saw.
 | Provider | For | Needs |
 |---|---|---|
 | `local` (default) | the reader is at this computer | nothing |
-| `static` | the user already serves a folder as a website | a folder used only for sign-offs, served at `url` (https, so the copy button works); for a remote `host`, SSH and `python3` 3.9+ there |
-| `server` | the user wants a dedicated service, e.g. behind Tailscale Serve | the bundled server installed on `host` |
+| `static` | the user already serves a folder as a website | a folder used only for sign-offs, served at `url` (https, so the copy button works) where only the readers can reach it (a tailnet, or behind a login); for a remote `host`, SSH and `python3` 3.9+ there |
+| `server` | the user wants a dedicated service, e.g. behind Tailscale Serve | the bundled server installed on `host`, reachable only by the readers (Tailscale Serve, or a proxy with a login) |
 
 ```jsonc
 // ~/.config/solopreneur/config.json

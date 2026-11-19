@@ -562,10 +562,11 @@ test('a global config that configures only sign-offs is stepped over', () => {
   const home = tmp();
   writeJson(
     path.join(home, '.config', 'solopreneur', 'config.json'),
-    { schemaVersion: 2, signoffs: { lang: 'en' } },
+    { schemaVersion: 2, signoffs: { lang: 'en', ttlDays: 0 } },
   );
   // Sign-offs' first run offers to save its settings at user level. That file
-  // configures another feature, so preview carries on to the legacy layers.
+  // configures another feature, so preview carries on to the legacy layers —
+  // even past an invalid value there, which sign-offs reports itself.
   const out = runJson(['--from', mkdirp(tmp(), 'work')], { home });
   assert.equal(out.mode, 'none');
 });

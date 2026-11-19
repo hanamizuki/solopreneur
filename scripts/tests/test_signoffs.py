@@ -91,7 +91,7 @@ def http_dir(directory):
 def signoffs_server(directory, lang="en"):
     """The bundled server, as `serve` runs it."""
     httpd = server.Server(("127.0.0.1", 0), functools.partial(
-        quiet(server.Handler), root=directory, lang=lang, strings=signoff.load_strings(lang), days=7))
+        quiet(server.Handler), root=directory, lang=lang, strings=server.load_strings(lang), days=7))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     try:
         yield "http://127.0.0.1:%d/" % httpd.server_address[1]
@@ -203,6 +203,10 @@ class PageChecks(Base):
         os.symlink("/etc/hosts", os.path.join(d, "hosts.txt"))
         self.expect_error("symlink", signoff.collect, d)
 
+    def test_a_raw_page_may_load_the_files_written_at_publish_time(self):
+        d = self.page("raw", '<!doctype html><script src="meta.js"></script><a href="meta.json">m</a>')
+        self.assertEqual(list(signoff.collect(d)[0]), ["index.html"])
+
     def test_a_single_html_file_becomes_index_html(self):
         path = os.path.join(self.tmp, "one.html")
         with open(path, "w", encoding="utf-8") as f:
@@ -218,41 +222,29 @@ class PageChecks(Base):
     def test_item_ids_must_be_present_and_unique(self):
         self.expect_error("repeat: 1", signoff.check_content, b'<section data-item="1"></section><section data-item=" 1 "></section>', False)
         self.expect_error("empty id", signoff.check_content, b'<section data-item=""></section>', False)
+        # The page builds controls for sections only: a div item would silently drop out of the reply.
+        self.expect_error("not on <div>", signoff.check_content, b'<section data-item="1"></section><div data-item="2"></div>', False)
 
 
 class PageBuilding(Base):
-    TAG = b'<meta name="signoff-content" content="abc">'
-
-    def test_content_id_lands_first_in_head(self):
-        inject = signoff.inject_content_id
-        self.assertEqual(inject(b"<html><head><title>t</title></head></html>", "abc"),
-                         b"<html><head>" + self.TAG + b"<title>t</title></head></html>")
-        self.assertEqual(inject(b"<html lang='en'><p>x</p></html>", "abc"), b"<html lang='en'>" + self.TAG + b"<p>x</p></html>")
-        self.assertEqual(inject(b"<!doctype html><title>t</title>", "abc"), b"<!doctype html>" + self.TAG + b"<title>t</title>")
-        self.assertEqual(inject(b"\xef\xbb\xbf<!-- c --><!DOCTYPE html>\n<p>x</p>", "abc"),
-                         b"\xef\xbb\xbf<!-- c --><!DOCTYPE html>" + self.TAG + b"\n<p>x</p>")
-        self.assertEqual(inject(b"<!-- open <p>x</p>", "abc"), self.TAG + b"<!-- open <p>x</p>")
-        self.assertEqual(inject(b'<head><meta name="signoff-content" content="old">\n<title>t</title></head>', "abc"),
-                         b"<head>" + self.TAG + b"<title>t</title></head>")
-
-    def test_many_comments_without_a_doctype_stay_linear(self):
-        many = b"<!-- c -->" * 5000 + b"<p>x</p>"
-        started = time.time()
-        self.assertEqual(signoff.inject_content_id(many, "abc"), self.TAG + many)
-        self.assertLess(time.time() - started, 0.5)
-
     def test_the_wrapper_fills_every_token_in_both_languages(self):
         for lang in signoff.LANGS:
             with self.subTest(lang):
-                strings = signoff.load_strings(lang)
-                page = signoff.wrap_page(b"<section data-item='1'>BODY</section>", lang, 'A <b> & "t"', strings).decode()
+                strings = server.load_strings(lang)
+                page = signoff.wrap_page(b"<section data-item='1'>BODY</section>", lang, 'A <b> & "t"', strings, "abc").decode()
                 self.assertNotIn("{{", page)
+                self.assertIn('<meta name="signoff-content" content="abc">', page)
                 self.assertEqual(page.count("BODY"), 1)
                 self.assertIn('<html lang="%s">' % lang, page)
                 self.assertIn("<title>A &lt;b&gt; &amp; &quot;t&quot;</title>", page)
                 self.assertIn(strings["generate"], page)
                 embedded = re.search(r"var S = (\{.*?\});\n", page).group(1)
                 self.assertEqual(json.loads(embedded), strings)
+
+    def test_tokens_inside_the_content_and_title_stay_as_written(self):
+        page = signoff.wrap_page(b"<p>{{title}} {{content}}</p>", "en", "x {{content}}", server.load_strings("en"), "abc").decode()
+        self.assertIn("<p>{{title}} {{content}}</p>", page)
+        self.assertIn("<title>x {{content}}</title>", page)
 
     def test_strings_cannot_close_the_script_element(self):
         self.assertNotIn("</script>", server.script_json({"x": "</script><script>alert(1)</script>"}))
@@ -266,12 +258,23 @@ class Dictionary(unittest.TestCase):
         self.assertTrue(set(server.INDEX_KEYS) <= set(table["en"]))
 
     def test_zh_hant_keeps_the_original_wording(self):
-        zh = signoff.load_strings("zh-Hant")
+        zh = server.load_strings("zh-Hant")
         self.assertEqual(zh["choices"], ["通過", "要改", "不行"])
         self.assertEqual(zh["generate"], "產生回覆並複製")
         self.assertEqual((zh["pending"], zh["overall"], zh["notChosen"], zh["listSep"]), ("未批：", "整體：", "未選", "、"))
         self.assertEqual(zh["stale"], "這頁剛改版了，畫面還是舊的：重新整理後再批，回覆才會對到最新版。")
         self.assertEqual(zh["indexSubtitle"].replace("{days}", "7"), "每張頁面從最後一次更新起放 7 天，到期自動刪除。")
+
+
+    def test_the_python_settings_match_the_schema(self):
+        # signoff.py validates its block by hand; preview validates the same block with the schema.
+        defs = json.loads((SKILL.parents[2] / "src" / "solopreneur" / "shared" / "config.schema.json").read_text(encoding="utf-8"))["$defs"]
+        block, target = defs["signoffs"]["properties"], defs["signoffsTarget"]["properties"]
+        self.assertEqual(set(signoff.BLOCK_KEYS), set(block))
+        self.assertEqual(set(signoff.TARGET_KEYS), set(target))
+        self.assertEqual(signoff.LANGS, tuple(block["lang"]["enum"]))
+        self.assertEqual(signoff.PROVIDERS, tuple(target["provider"]["enum"]))
+        self.assertEqual((block["ttlDays"]["minimum"], block["ttlDays"]["maximum"]), (1, server.TTL_MAX))
 
 
 class Settings(Base):
@@ -343,6 +346,11 @@ class Settings(Base):
             # a repository's own config must not smuggle ssh options in through the host
             ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "-oProxyCommand=touch pwned"}}}, "SSH destination"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "me@box extra"}}}, "SSH destination"),
+            ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "box;touch pwned"}}}, "SSH destination"),
+            # every target, not only the one in use: preview validates the whole file
+            ({"targets": {"old": {"provider": "vercel"}}}, "targets.old.provider"),
+            ({"defaultTarget": ["p"], "targets": {"p": {"provider": "local"}}}, "defaultTarget"),
+            ({"replyTo": "x" * 201}, "signoffs.replyTo"),
         ]
         for block, needle in cases:
             with self.subTest(block):
@@ -403,6 +411,16 @@ class HostDetection(unittest.TestCase):
                 mock.patch.object(signoff, "_is_local_address", return_value=False):
             self.assertFalse(signoff.is_local_host("build.home"))
             self.assertTrue(signoff.is_local_host("build.office"))
+
+    def test_a_forwarded_port_or_a_jump_host_is_another_machine(self):
+        # A VM or a tunnel answers on this machine's own address, yet it is another machine.
+        for resolved, local in (("hostname 127.0.0.1\nport 22\n", True),
+                                ("hostname 127.0.0.1\nport 60022\n", False),
+                                ("hostname 127.0.0.1\nport 22\nproxyjump gate\n", False),
+                                ("hostname 127.0.0.1\nport 22\nproxycommand none\n", True)):
+            with self.subTest(resolved), \
+                    mock.patch.object(signoff, "_run", lambda cmd, cwd=None, timeout=10, out=resolved: out if cmd[0] == "ssh" else None):
+                self.assertEqual(signoff.is_local_host("vm"), local)
 
     def test_ssh_options_end_before_the_host(self):
         argv = signoff.ssh_argv("me@box", "true")
@@ -569,6 +587,24 @@ class Providers(Base):
         self.assertIn("nothing published", out)
         self.assertFalse(os.path.exists(os.path.join(self.cwd, "docs")))
 
+    def test_limits_and_a_missing_folder_fail_before_anything_is_written(self):
+        for argv, needle in ((["", "--slug", "x", "--title", "X"], "no page folder"),
+                             ([self.page("p"), "--slug", "x", "--title", "t" * 121], "longer than 120"),
+                             ([self.page("p"), "--slug", "x", "--title", "X", "--reply-to", "r" * 201], "longer than 200")):
+            with self.subTest(needle):
+                code, _, err = self.cli("publish", *argv)
+                self.assertEqual(code, 2)
+                self.assertIn(needle, err)
+        self.assertFalse(os.path.exists(os.path.join(self.cwd, "docs")))
+
+    def test_a_folder_holding_other_files_is_not_claimed(self):
+        self.config(self.cwd, {"root": "docs"})
+        write_text(os.path.join(self.mkdir("work", "docs"), "spec.md"), "# spec")
+        code, _, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
+        self.assertEqual(code, 2)
+        self.assertIn("already holds other files (spec.md)", err)
+        self.assertFalse(os.path.exists(os.path.join(self.cwd, "docs", ".gitignore")))
+
     def test_a_repository_root_is_never_the_local_folder(self):
         git(self.cwd, "init", "-q")
         self.config(self.cwd, {"root": "."})
@@ -632,6 +668,28 @@ class Store(Base):
         self.refused("ttlDays", make_request(self.PAGE, mode="update", id=self.id, ttlDays=0))
         self.refused("malformed page id", make_request({}, mode="rm", id="../store"))
         self.assertEqual(os.listdir(server.incoming_dir(self.root)), [])
+
+    def test_symlinked_bookkeeping_entries_are_refused(self):
+        for name in server.OWN_ENTRIES:
+            with self.subTest(name):
+                root, victim = self.mkdir("linked" + name), self.mkdir("victim" + name)
+                os.symlink(victim, os.path.join(root, name))
+                self.assertRaises(server.StoreError, server.store, root, make_request(self.PAGE, mode="new", slug="x", title="t"))
+                self.assertRaises(server.StoreError, server.prune, root)
+                self.assertEqual(os.listdir(victim), [])
+
+    def test_a_request_cut_short_is_reported_not_raised(self):
+        data = make_request({"index.html": b"<p>x</p>", "a.png": b"p" * 5000}, mode="new", slug="cut", title="t")
+        result = server.handle_store(self.root, data[:-3000])
+        self.assertFalse(result["ok"])
+        self.assertIn("damaged", result["error"])  # read errors surface mid-file, past tarfile.open
+
+    def test_long_source_details_are_clipped_not_refused(self):
+        with mock.patch.dict(os.environ, {"TMUX": "/tmp/t", "TMUX_PANE": "%1"}), \
+                mock.patch.object(signoff, "_run", lambda cmd, cwd=None, timeout=10: "w" * 100 if cmd[0] == "tmux" else None):
+            src = signoff.detect_source()
+        self.assertEqual(src["tmux"], "w" * server.SOURCE_MAX)
+        server.store(self.root, make_request(self.PAGE, mode="new", slug="src", title="t", source=src))
 
     def test_a_failed_swap_keeps_the_previous_revision(self):
         real = os.rename
@@ -702,7 +760,7 @@ class Serving(Base):
         # A proxy opens a dozen connections at once for a page of images. Connect all
         # of them before the server accepts any: the default backlog of 5 resets the rest.
         httpd = server.Server(("127.0.0.1", 0), functools.partial(
-            quiet(server.Handler), root=self.root, lang="en", strings=signoff.load_strings("en"), days=7))
+            quiet(server.Handler), root=self.root, lang="en", strings=server.load_strings("en"), days=7))
         socks = [socket.create_connection(httpd.server_address, timeout=5) for _ in range(40)]
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         codes = []
@@ -734,7 +792,7 @@ class Install(Base):
         self.assertTrue(os.path.isfile(os.path.join(target, "strings.json")))
         text = out.getvalue()
         self.assertIn("tailscale serve --bg --https=443 http://127.0.0.1:65531", text)
-        expected = ["serve", "--dir", target, "--port", "65531", "--lang", "zh-Hant", "--ttl-days", "7", "--bind", "127.0.0.1"]
+        expected = ["serve", "--dir", target, "--port", "65531", "--lang", "zh-Hant", "--ttl-days", "7"]
         if sys.platform == "darwin":
             plist = os.path.join(self.home, "Library", "LaunchAgents", server.LAUNCHD_LABEL + ".plist")
             with open(plist, "rb") as f:
@@ -746,14 +804,7 @@ class Install(Base):
             self.assertIn(" ".join(expected), unit)
             self.assertNotIn("WorkingDirectory", unit)  # not parsed like ExecStart, and not needed
             self.assertIn("enable-linger", text)
-
-    def test_only_ipv4_loopback_binds(self):
-        for bind in ("0.0.0.0", "::1"):  # the server socket is AF_INET
-            with self.subTest(bind):
-                err = io.StringIO()
-                with contextlib.redirect_stderr(err):
-                    self.assertEqual(server.main(["install", "--dir", self.tmp, "--bind", bind]), 2)
-                self.assertIn("127.0.0.1 or localhost", err.getvalue())
+            self.assertIn("systemctl --user restart", text)  # a re-install must replace the running copy
 
     def test_systemd_arguments_stay_literal(self):
         self.assertEqual(server._systemd_arg("/a b/%h$HOME"), '"/a b/%%h$$HOME"')

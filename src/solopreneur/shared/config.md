@@ -553,7 +553,8 @@ single-file report would let the migrator silently drop it.
   specific v2 file, so they are stricter: a layer-1 file without a `preview`
   block is reported, and so is a layer-3 file that configures nothing. A
   layer-3 file that carries only another feature's block (`signoffs`) is
-  stepped over: sign-offs' first run may save its settings there.
+  stepped over without being validated: sign-offs' first run may save its
+  settings there, and sign-offs reports that block's errors itself.
 - A relative `root` resolves against **the directory of the config file that
   declared it**, never the git root and never the working directory. This is the
   same anchoring lesson as `deploy.sh`'s `$DIR`-anchored repo key.
@@ -1393,6 +1394,9 @@ Every key is optional:
 | `static` | `dir` on `host` — a folder an existing web server serves, used for nothing else | `<url><id>/` |
 | `server` | `dir` on `host`, default `~/.local/share/solopreneur/sign-offs` | `<url><id>/`, served by the bundled server |
 
+The `static` and `server` index lists every page that has not expired: serve
+them where only the readers can reach them (a tailnet, or behind a login).
+
 ## Resolution
 
 `signoff.py` mirrors preview's layers, per block, anchored at the **current
@@ -1405,12 +1409,16 @@ nothing about the project):
 | 2 | nearest ancestor `.solopreneur.json` that has a `signoffs` block | stepped over |
 | 3 | `~/.config/solopreneur/config.json` | built-in defaults |
 
+The block found is used whole: blocks at different levels never merge, so a
+project's own `signoffs` block replaces the user-level one, targets included.
+
 The same failures stop the lookup as in preview: malformed JSON, a top level
 that is not an object, a file that is not a regular file, and a broken symlink.
 A file whose `signoffs` block is used must say `"schemaVersion": 2`. Unknown keys
 in the block are reported as warnings and ignored, so one config shared by
 machines on different plugin versions keeps working; invalid values of known
-keys are errors that name the file.
+keys — in every target, not only the one in use — are errors that name the
+file.
 
 ## Path rules
 
@@ -1423,12 +1431,15 @@ keys are errors that name the file.
 - With no config, `root` is `docs/solopreneur/sign-offs` under the main working
   tree of the current repository (the current directory outside git).
 - `root` must be a folder dedicated to sign-offs: the publisher drops a
-  `.gitignore` of `*` into it and refuses a repository root, the home directory
-  and `/`.
+  `.gitignore` of `*` into it and refuses a repository root, the home directory,
+  `/`, and a folder that already holds other files.
 - `dir` must be absolute or start with `~/`; `~` expands on the host that holds
   the pages.
-- `host` is any SSH destination; one that starts with `-` is refused, since a
-  cloned repository's config must not pass options to ssh. Omitted, `local`,
+- `host` is an SSH destination of letters, digits and `. _ - @ :`, not starting
+  with `-`: a cloned repository's config must pass neither options to ssh nor
+  shell syntax to a `ProxyCommand` that expands `%h`. The connection never
+  forwards the agent, X11 or ports. A host reached through a non-default port or
+  a jump host (`ssh -G`) is never this machine. Omitted, `local`,
   or a name that resolves to this machine (one of its whole host names, or an
   address it can bind to) means a local write, so one config can be shared by the store host and the machines that
   publish to it. A wrong guess cannot hand out a broken link: every publish
