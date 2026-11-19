@@ -124,8 +124,10 @@ python3 "$SIGNOFF" publish "$W" --slug e2e-sync --title "Cloud Sync e2e, round 2
 The dry run only checks: missing files, `file://`, root-absolute and folder
 links (name the file: `details/index.html`, not `details/`), links leaving the
 folder, symlinks, pipes and other special files, dot files, the 30 MB cap,
-heavy images, duplicate item ids or ids with spaces, `data-item` outside a `<section>`, and the
-title length (120 characters). The slug is lowercase letters, digits and
+heavy images, duplicate item ids or ids with spaces, ids that read as the
+reply's own lines (`sign-off`, or starting with `Pending:` or `Overall:`) and
+choices named `no choice` (these words follow `lang`), `data-item` outside a
+`<section>`, and the title length (120 characters). The slug is lowercase letters, digits and
 hyphens, at most 12 characters; the page id adds a random suffix (`e2e-sync-k3f`).
 
 | Exit | Meaning |

@@ -82,7 +82,6 @@ REF_ATTRS = ("src", "href", "poster", "data-src")
 CSS_URL_RE = re.compile(r"""url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|@import\s*(?:"([^"]*)"|'([^']*)')""", re.I)
 # A commented-out rule is never requested. Each comment ends at its first */.
 CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
-FULL_DOC_RE = re.compile(rb"<\s*(?:!doctype|html|head|body)\b", re.I)
 TOKEN_RE = re.compile(r"\{\{(\w+)\}\}")
 
 
@@ -397,16 +396,23 @@ class _Tags(html.parser.HTMLParser):
     """Attribute values as a browser reads them (quoted or not, character references
     decoded), from start and self-closing tags only: comments and the text of
     <script> and <style> hold no tags. Also the CSS a page carries: <style>
-    elements and style attributes, never its prose, where "URL(s)" is just a word."""
+    elements and style attributes, never its prose, where "URL(s)" is just a word.
+    And whether it is a whole document: a doctype, or an html, head or body tag."""
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.refs, self.items, self.css, self.choices = [], [], [], []
         self._in_style = False
+        self.document = False
+
+    def handle_decl(self, decl):  # <!doctype …>, the only declaration that arrives here
+        self.document = True
 
     def handle_starttag(self, tag, attrs):  # self-closing tags arrive here too
         if tag == "style":
             self._in_style = True
+        elif tag in ("html", "head", "body"):
+            self.document = True
         for name, value in attrs:
             if name == "data-item":
                 self.items.append((tag, value or ""))  # a bare data-item is an empty id
@@ -545,19 +551,20 @@ def collect(src, raw=False):
     return files, warnings
 
 
-def check_content(index, raw):
-    """A content page is a fragment; the publisher supplies the document around it."""
+def check_content(index, raw, strings):
+    """A content page is a fragment; the publisher supplies the document around it.
+    `strings` is the page language's dictionary, which holds the reply's own markers."""
     if raw:
         return
-    if FULL_DOC_RE.search(index):
-        raise PublishError("index.html is a whole HTML document",
-                           "write only the content (an intro and <section data-item> blocks); the review controls, "
-                           "header and styles are added at publish time. For a page with its own UI, pass --raw")
     try:
         text = index.decode("utf-8")
     except UnicodeDecodeError:
         raise PublishError("index.html is not UTF-8")
     tags = _tags(text)
+    if tags.document:  # from the parsed tags: a comment or a script may name <body>
+        raise PublishError("index.html is a whole HTML document",
+                           "write only the content (an intro and <section data-item> blocks); the review controls, "
+                           "header and styles are added at publish time. For a page with its own UI, pass --raw")
     items = tags.items
     others = sorted({tag for tag, _ in items} - {"section"})
     if others:
@@ -571,18 +578,32 @@ def check_content(index, raw):
     if spaced:
         raise PublishError("item ids cannot contain spaces: %s" % ", ".join(json.dumps(i, ensure_ascii=False) for i in spaced),
                            "use short ids such as 1, 2, A3")
+    # The reply's own lines start with these: an item "Overall:" would answer "Overall: Approve".
+    pending, overall = strings["pending"].strip(), strings["overall"].strip()
+    marked = [i for i in ids if i.lower() == "sign-off" or i.lower().startswith((pending.lower(), overall.lower()))]
+    if marked:
+        raise PublishError("item ids cannot be sign-off or start with %s or %s, which begin the reply's own lines: %s"
+                           % (pending, overall, ", ".join(json.dumps(i, ensure_ascii=False) for i in marked)),
+                           "use short ids such as 1, 2, A3")
     dups = sorted({i for i in ids if ids.count(i) > 1})
     if dups:
         raise PublishError("item ids repeat: %s" % ", ".join(dups), "replies name items by id, so each id must be unique")
     # A reply line is "<id> <choice> — <note>": a label holding " — " reads as a choice
     # and a note. Folded as page.html folds it (JavaScript's \s also counts U+FEFF), then
     # padded: the label sits between the space after the id and the " — " before a note.
-    labels = (re.sub(r"[\s\ufeff]+", " ", c).strip() for v in tags.choices for c in v.split("|"))
+    labels = [re.sub(r"[\s\ufeff]+", " ", c).strip() for v in tags.choices for c in v.split("|")]
     dashed = [c for c in labels if " — " in " %s " % c]
     if dashed:
         raise PublishError("choice labels cannot contain \" — \", which starts the note in a reply line: %s"
                            % ", ".join(json.dumps(c, ensure_ascii=False) for c in dict.fromkeys(dashed)),
                            "reword the label, or use a plain hyphen (-)")
+    # "1 no choice — note" is a note left without a choice: a label of that name would read the same.
+    taken = [c for c in labels if c.lower() == strings["notChosen"].lower()]
+    if taken:
+        raise PublishError("choice labels cannot be %s, which the reply writes for a note left without a choice: %s"
+                           % (json.dumps(strings["notChosen"], ensure_ascii=False),
+                              ", ".join(json.dumps(c, ensure_ascii=False) for c in dict.fromkeys(taken))),
+                           "reword the label")
 
 
 # ---------- building the page ----------
@@ -631,7 +652,12 @@ def build_request(files, request):
         ti.size = len(data)
         tf.addfile(ti, io.BytesIO(data))
         for rel in sorted(files):
-            tf.add(files[rel], arcname="payload/" + rel, recursive=False)
+            # A regular member each: tarfile.add() would record a second name of the
+            # same file (a hard link) as a link member, which the store refuses.
+            with open(files[rel], "rb") as f:
+                ti = tarfile.TarInfo("payload/" + rel)
+                ti.size = os.fstat(f.fileno()).st_size
+                tf.addfile(ti, f)
     return buf.getvalue()
 
 
@@ -678,12 +704,12 @@ def call_store(settings, request, files=None):
 
 
 def fetch(url, tries=3):
-    """(body, the address it came from in the end: redirects are followed)."""
+    """(body, the address it came from in the end: redirects are followed, its response headers)."""
     last = None
     for i in range(tries):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={"Cache-Control": "no-cache"}), timeout=20) as r:
-                return r.read(), r.geturl()
+                return r.read(), r.geturl(), r.headers
         except (OSError, http.client.HTTPException) as e:  # URLError is an OSError; a cut response is neither
             last = e
             if hasattr(e, "close"):
@@ -695,16 +721,16 @@ def fetch(url, tries=3):
                        "running and https points at it); do not hand out the link", code=3)
 
 
-def read_back(settings, result, content_id):
+def read_back(settings, result):
     """Fetch the link first, as the reader does, then every published file and
-    meta.json relative to where it landed, and compare checksums. For static and
-    server the link is the folder address <id>/, which a web server without
-    directory indexes refuses while serving <id>/index.html, and which one that
-    strips trailing slashes redirects to <id>."""
+    meta.json relative to where it landed, and compare them with what the store
+    wrote. For static and server the link is the folder address <id>/, which a
+    web server without directory indexes refuses while serving <id>/index.html,
+    and which one that strips trailing slashes redirects to <id>."""
     link = page_url(settings, result["id"])
     hint = "the web server must answer %s with the page's index.html (a directory index); do not hand out the link" % link
     try:
-        page, final = fetch(link)
+        page, final, headers = fetch(link)
     except PublishError as e:
         raise PublishError(str(e), hint, code=3)
     # Another scheme or host (http upgraded to https) is fine; another path is not: the
@@ -715,6 +741,13 @@ def read_back(settings, result, content_id):
                            "do not hand out the link" % link, code=3)
     if hashlib.sha256(page).hexdigest() != result["files"]["index.html"]:
         raise PublishError("read-back mismatch: %s is not the page just published" % link, hint, code=3)
+    # The right bytes are not enough: a browser shows any other type as source and saves
+    # an attachment. A disposition other than inline counts as attachment (RFC 6266, 4.2).
+    disposition = headers.get("Content-Disposition", "").split(";")[0].strip().lower()
+    if settings["provider"] != "local" and (headers.get_content_type() != "text/html" or disposition not in ("", "inline")):
+        raise PublishError("read-back mismatch: %s would not open as a web page (Content-Type: %s, Content-Disposition: %s)"
+                           % (link, headers.get("Content-Type", "none"), headers.get("Content-Disposition", "none")),
+                           "the web server must serve index.html as text/html, inline; do not hand out the link", code=3)
     # The page's folder at the address the reader ends up at: <id>/, or the folder of a file:// index.html.
     base = urllib.parse.urljoin(final, ".")
     for rel, digest in sorted(result["files"].items()):
@@ -722,7 +755,7 @@ def read_back(settings, result, content_id):
         if hashlib.sha256(fetch(url)[0]).hexdigest() != digest:
             raise PublishError("read-back mismatch: %s differs from what was sent" % rel,
                                "a cache may be serving an old copy; do not hand out the link, publish again", code=3)
-    body, meta_url = fetch(base + "meta.json")
+    body, meta_url, _ = fetch(base + "meta.json")
     # The page reads meta.json with fetch(), which a browser refuses across origins.
     if _origin(meta_url) != _origin(final):
         raise PublishError("read-back mismatch: %smeta.json redirects to %s" % (base, meta_url),
@@ -734,9 +767,13 @@ def read_back(settings, result, content_id):
     if not isinstance(meta, dict):
         raise PublishError("read-back found no readable meta.json at %s" % base,
                            "do not hand out the link; check what the url serves, then publish again", code=3)
-    if meta.get("revision") != result["revision"] or meta.get("contentId") != content_id:
-        raise PublishError("read-back found revision %r, not the %r just published" % (meta.get("revision"), result["revision"]),
-                           "someone may have updated the page at the same moment; publish again", code=3)
+    # All of it, not only revision and contentId: without expiresAt, say, the page refuses review.
+    wrote = result["meta"]
+    if meta != wrote:
+        differ = [k for k in sorted(set(meta) | set(wrote)) if k not in meta or k not in wrote or meta[k] != wrote[k]]
+        raise PublishError("read-back mismatch: %smeta.json differs from what was just written in %s" % (base, ", ".join(differ)),
+                           "someone may have updated the page at the same moment, or the web server alters meta.json; "
+                           "publish again", code=3)
     if settings["provider"] == "local":
         # A file:// page reads meta.js instead, written by the store as `window.SIGNOFF_META = <json>;\n`.
         js = fetch(base + "meta.js")[0]
@@ -843,7 +880,7 @@ def cmd_publish(args):
     files, warnings = collect(args.src, args.raw)
     with open(files["index.html"], "rb") as f:
         index = f.read()
-    check_content(index, args.raw)
+    check_content(index, args.raw, strings)
     for w in settings["warnings"] + warnings:
         print("⚠️ " + w, file=sys.stderr)
     if args.dry_run:
@@ -880,7 +917,7 @@ def cmd_publish(args):
     target = " --target " + shlex.quote(args.target) if args.target else ""
     update = "--update %s%s%s" % (result["id"], target, " --raw" if args.raw else "")
     try:
-        meta = read_back(settings, result, content_id)
+        meta = read_back(settings, result)
     except PublishError as e:
         if e.code != 3:
             raise

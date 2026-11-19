@@ -537,7 +537,8 @@ def store(root, data, at=None):
                 raise StoreError("could not swap in the new revision: %s" % e,
                                  "the previous revision is still in place; check free disk space and publish again")
             warning = _after_write(root, index, at)
-        return {"ok": True, "id": page_id, "revision": revision, "expiresAt": meta["expiresAt"],
+        # meta: what meta.json now holds, which the publisher's read-back must find whole.
+        return {"ok": True, "id": page_id, "revision": revision, "meta": meta,
                 "files": req["files"], "warning": warning}
     finally:
         if not keep_work:
