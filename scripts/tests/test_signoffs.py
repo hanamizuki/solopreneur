@@ -214,6 +214,8 @@ class PageChecks(Base):
             ("dot", "<p>x</p>", {".env": b"x"}, "starts with a dot"),
             ("metajson", "<p>x</p>", {"meta.json": b"{}"}, "written at publish time"),
             ("metajs", "<p>x</p>", {"meta.js": b""}, "written at publish time"),
+            # A case-insensitive volume (the macOS default) holds one of meta.js and Meta.js: the same file.
+            ("metajscase", "<p>x</p>", {"Meta.js": b""}, "written at publish time"),
             # over file:// a folder address opens as a listing, not as its index.html
             ("folder", '<a href="details/">d</a>', {"details/index.html": b"<p>d</p>"}, "links the folder details/"),
         ]
@@ -876,8 +878,9 @@ class Providers(Base):
                 self.assertNotIn("Published", out)
                 self.assertIn("text/html, inline", err)
 
-    def test_a_policy_that_blocks_the_inline_script_exits_3(self):
-        # The review UI is one inline <script>: under script-src 'self' the page never leaves "Loading…".
+    def test_a_policy_that_breaks_the_wrapped_page_exits_3(self):
+        # The review UI is one inline <script> that fetches meta.json: under script-src 'self'
+        # the page never leaves "Loading…", and without the fetch it has no id or revision.
         class Policy(SimpleHTTPRequestHandler):
             policy = None
 
@@ -885,39 +888,65 @@ class Providers(Base):
                 self.send_header("Content-Security-Policy", self.policy)
                 super().end_headers()
 
-        for policy, expected in (("script-src 'self'", 3), ("script-src 'self' 'unsafe-inline'", 0)):
+        cases = (("script-src 'self'", "script-src must allow 'unsafe-inline'"),
+                 ("script-src 'self' 'unsafe-inline'", None),
+                 ("script-src 'unsafe-inline'; connect-src 'none'", "connect-src must allow 'self'"),
+                 ("default-src 'self' 'unsafe-inline'", None),
+                 ("connect-src https://other.example", "connect-src must allow 'self'"),
+                 # Without allow-same-origin the origin is opaque: fetch('meta.json') and localStorage fail.
+                 ("sandbox allow-scripts", "sandbox must include allow-scripts and allow-same-origin"),
+                 ("script-src 'unsafe-inline'; sandbox allow-scripts allow-same-origin", None))
+        for i, (policy, hint) in enumerate(cases):
             with self.subTest(policy):
                 Policy.policy = policy
-                store = self.mkdir("store-%d" % expected)
+                store = self.mkdir("store-%d" % i)
                 with http_dir(store, Policy) as url:
                     self.target_config("static", url=url, dir=store)
                     code, out, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
-                self.assertEqual(code, expected, out + err)
-                if expected:
+                self.assertEqual(code, 3 if hint else 0, out + err)
+                if hint:
                     self.assertNotIn("Published", out)
-                    self.assertIn("must allow inline scripts", err)
+                    self.assertIn(hint, err)
 
-    def test_which_policies_block_the_inline_script(self):
-        # CSP3: script-src-elem, else script-src, else default-src decides, and a nonce, a hash
-        # or 'strict-dynamic' makes browsers ignore 'unsafe-inline'. Every policy must allow it.
-        cases = [([], False),
-                 (["img-src 'self'"], False),  # scripts unrestricted
-                 (["default-src 'self'"], True),
-                 (["Default-Src 'self' 'UNSAFE-INLINE'"], False),
-                 (["script-src-elem 'self'; script-src 'unsafe-inline'"], True),
-                 (["script-src 'unsafe-inline' 'nonce-abc'"], True),
-                 (["script-src 'unsafe-inline' 'sha256-abc='"], True),
-                 (["script-src 'unsafe-inline' 'strict-dynamic'"], True),
-                 (["script-src 'unsafe-inline'; script-src 'none'"], False),  # a repeated directive is ignored
-                 (["script-src 'unsafe-inline'", "default-src 'none'"], True),  # two headers
-                 (["script-src 'unsafe-inline', default-src 'none'"], True)]  # two policies in one header
-        for values, blocked in cases:
+    def test_which_policies_break_the_wrapped_page(self):
+        # CSP3, and every policy must allow the page. The inline script: script-src-elem, else
+        # script-src, else default-src decides, and a nonce, a hash or 'strict-dynamic' makes
+        # browsers ignore 'unsafe-inline'. fetch('meta.json'): connect-src, else default-src.
+        # A sandbox needs allow-scripts and allow-same-origin. Each case names the directive
+        # the hint says to change.
+        cases = [([], None),
+                 (["img-src 'self'"], None),  # scripts and fetches unrestricted
+                 (["default-src 'self'"], "default-src"),
+                 (["Default-Src 'self' 'UNSAFE-INLINE'"], None),
+                 (["script-src-elem 'self'; script-src 'unsafe-inline'"], "script-src-elem"),
+                 (["script-src 'unsafe-inline' 'nonce-abc'"], "script-src"),
+                 (["script-src 'unsafe-inline' 'sha256-abc='"], "script-src"),
+                 (["script-src 'unsafe-inline' 'strict-dynamic'"], "script-src"),
+                 (["script-src 'unsafe-inline'; script-src 'none'"], None),  # a repeated directive is ignored
+                 (["script-src 'unsafe-inline'", "default-src 'none'"], "default-src"),  # two headers
+                 (["script-src 'unsafe-inline', default-src 'none'"], "default-src"),  # two policies in one header
+                 (["default-src 'unsafe-inline'"], "default-src"),  # the fetch falls back to it too
+                 (["connect-src 'none'"], "connect-src"),
+                 (["connect-src"], "connect-src"),  # an empty list allows nothing
+                 (["connect-src https://other.example *.box.example"], "connect-src"),  # *. covers subdomains only
+                 (["connect-src 'none' 'self'"], None),  # 'none' beside other sources is ignored
+                 (["connect-src *"], None),
+                 (["connect-src https:"], None),
+                 (["connect-src http:"], None),  # a browser upgrades http: to https:
+                 (["connect-src HTTPS://Box.Example:443/x-abc/"], None),
+                 (["connect-src https://*.example"], None),
+                 (["sandbox"], "sandbox"),
+                 (["sandbox allow-scripts"], "sandbox"),
+                 (["sandbox allow-same-origin"], "sandbox"),
+                 (["SANDBOX Allow-Scripts allow-forms Allow-Same-Origin"], None)]
+        for values, directive in cases:
             with self.subTest(values):
                 headers = email.message.Message()
                 for value in values:
                     headers["Content-Security-Policy"] = value
-                headers["Content-Security-Policy-Report-Only"] = "script-src 'none'"  # reports, never blocks
-                self.assertEqual(signoff._blocking_policy(headers) is not None, blocked)
+                headers["Content-Security-Policy-Report-Only"] = "script-src 'none'; sandbox"  # reports, never blocks
+                found = signoff._blocking_policy(headers, "https://box.example/x-abc/")
+                self.assertEqual(found and found[2].split()[0], directive)
 
     def test_an_existing_gitignore_still_ignores_the_pages(self):
         root = self.mkdir("work", "docs", "solopreneur", "sign-offs")
@@ -1029,6 +1058,8 @@ class Store(Base):
         self.refused("rejected file name", make_request({"index.html": b"x", ".env": b"x"}, mode="new", slug="a", title="t"))
         self.refused("link", odd_tar("payload/index.html", symlink=True))
         self.refused("reserved", make_request({"index.html": b"x", "meta.js": b""}, mode="new", slug="a", title="t"))
+        # In any case: on a case-insensitive volume the generated meta.json would overwrite it, found out after the swap.
+        self.refused("reserved", make_request(dict(self.PAGE, **{"META.JSON": b"{}"}), mode="update", id=self.id))
         self.refused("checksum", make_request({"index.html": b"x"}, mode="new", slug="a", title="t", files={"index.html": "0" * 64}))
         self.refused("no index.html", make_request({"a.html": b"x"}, mode="new", slug="a", title="t"))
         self.refused("slug", make_request(self.PAGE, mode="new", slug="Bad_Slug", title="t"))

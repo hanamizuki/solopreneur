@@ -343,7 +343,9 @@ def _extract(data, work):
                 continue
             if parts[0] != "payload" or len(parts) < 2:
                 raise StoreError("rejected file name: %r" % m.name)
-            if len(parts) == 2 and parts[1] in RESERVED:
+            # In any letter case: on a case-insensitive volume (the macOS default) the meta.json
+            # written below would overwrite a META.JSON, found out only after the swap.
+            if len(parts) == 2 and parts[1].casefold() in RESERVED:
                 raise StoreError("%s is a reserved name" % parts[1], "remove it from the page folder; it is written at publish time")
             total += m.size
             if total > MAX_PAYLOAD:
