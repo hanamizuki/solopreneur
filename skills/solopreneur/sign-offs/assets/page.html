@@ -77,9 +77,9 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
   var overall = document.getElementById('so-overall');
   var gen = document.getElementById('so-gen');
   var items = Array.prototype.slice.call(document.querySelectorAll('section[data-item]'));
-  var meta = null, key = null, state = {};
+  var meta = null, key = null, state = fresh();
 
-  var seen = {}, dups = [];
+  var seen = Object.create(null), dups = [];
   items.forEach(function (s) {
     var k = s.getAttribute('data-item').trim();
     if (seen[k] && dups.indexOf(k) < 0) dups.push(k);
@@ -110,15 +110,25 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
     head.innerHTML = html;
   }
 
-  function load() { try { state = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { state = {}; } }
+  // Item ids come from the page, so they live apart from the overall comment and
+  // in a prototype-free map: an id such as "__proto__" stays an ordinary key.
+  function fresh() { return { items: Object.create(null), overall: '' }; }
+  function load() {
+    state = fresh();
+    try {
+      var saved = JSON.parse(localStorage.getItem(key) || '{}') || {};
+      Object.keys(saved.items || {}).forEach(function (k) { state.items[k] = saved.items[k]; });
+      state.overall = typeof saved.overall === 'string' ? saved.overall : '';
+    } catch (e) {}
+  }
   function save() {
     try { localStorage.setItem(key, JSON.stringify(state)); }
     catch (e) { hint(S.storageBlocked, true); }
   }
-  function entry(k) { return state[k] || (state[k] = { c: '', n: '' }); }
+  function entry(k) { return state.items[k] || (state.items[k] = { c: '', n: '' }); }
 
   function updateProgress() {
-    var done = items.filter(function (s) { var st = state[s.getAttribute('data-item').trim()]; return st && st.c; }).length;
+    var done = items.filter(function (s) { var st = state.items[s.getAttribute('data-item').trim()]; return st && st.c; }).length;
     progress.textContent = items.length ? fmt(S.progress, { done: done, total: items.length }) : '';
   }
 
@@ -140,14 +150,14 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
       note.setAttribute('aria-label', fmt(S.noteLabel, { id: k }));
       note.addEventListener('input', function () { entry(k).n = note.value; save(); });
       function paint() {
-        var st = state[k] || {};
+        var st = state.items[k] || {};
         buttons.forEach(function (b) { b.classList.toggle('on', b.textContent === st.c); });
         note.value = st.n || '';
       }
       s.appendChild(ctl); s.appendChild(note); paint();
     });
-    overall.value = state._overall || '';
-    overall.addEventListener('input', function () { state._overall = overall.value; save(); });
+    overall.value = state.overall;
+    overall.addEventListener('input', function () { state.overall = overall.value; save(); });
     updateProgress();
   }
 
@@ -156,13 +166,13 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
     var pending = [];
     items.forEach(function (s) {
       var k = s.getAttribute('data-item').trim();
-      var st = state[k] || {};
+      var st = state.items[k] || {};
       var note = oneLine(st.n);
       if (!st.c) { pending.push(k); if (note) lines.push(k + ' ' + S.notChosen + ' — ' + note); return; }
       lines.push(k + ' ' + st.c + (note ? ' — ' + note : ''));
     });
     if (pending.length) lines.push(S.pending + pending.join(S.listSep));
-    var ov = (state._overall || '').trim();
+    var ov = state.overall.trim();
     if (ov) lines.push(S.overall + ov);
     return lines.join('\n');
   }
@@ -175,6 +185,8 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
 
   gen.addEventListener('click', function () {
     if (!meta) return;
+    // The page may have been opened before its expiry and left open past it.
+    if (!(Date.parse(meta.expiresAt) > Date.now())) { block(fmt(S.expired, { when: when(meta.expiresAt) }), meta.title); return; }
     var text = compose();
     out.value = text;
     var canCopy = window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText;

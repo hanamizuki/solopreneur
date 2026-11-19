@@ -73,7 +73,7 @@ contracts above when running these skills on Codex.
 
 ### Repository layout
 
-- [`skills/`](./skills/) is the single source for all 94 skills, grouped by
+- [`skills/`](./skills/) is the single source for all 95 skills, grouped by
   plugin so each skill is directly browsable.
 - [`src/`](./src/) holds manifests, agents, shared helpers, vendor metadata,
   and maintainer scripts.

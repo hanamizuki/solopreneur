@@ -340,6 +340,9 @@ class Settings(Base):
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x/", "dir": "srv"}}}, "absolute"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "vercel"}}}, "provider"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "local", "url": "https://x/"}}}, "signoffs.root"),
+            # a repository's own config must not smuggle ssh options in through the host
+            ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "-oProxyCommand=touch pwned"}}}, "SSH destination"),
+            ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "me@box extra"}}}, "SSH destination"),
         ]
         for block, needle in cases:
             with self.subTest(block):
@@ -394,6 +397,16 @@ class HostDetection(unittest.TestCase):
     def test_other_machines_and_other_users(self):
         self.assertFalse(signoff.is_local_host("203.0.113.7"))  # TEST-NET-3, never assigned locally
         self.assertFalse(signoff.is_local_host("someone-else-entirely@localhost"))
+
+    def test_a_shared_first_label_is_not_enough(self):
+        with mock.patch.object(signoff, "_local_names", return_value={"localhost", "build.office"}), \
+                mock.patch.object(signoff, "_is_local_address", return_value=False):
+            self.assertFalse(signoff.is_local_host("build.home"))
+            self.assertTrue(signoff.is_local_host("build.office"))
+
+    def test_ssh_options_end_before_the_host(self):
+        argv = signoff.ssh_argv("me@box", "true")
+        self.assertEqual(argv[-3:], ["--", "me@box", "true"])
 
 
 class Providers(Base):
@@ -507,6 +520,39 @@ class Providers(Base):
             code, _, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
         self.assertEqual(code, 3)
         self.assertIn("do not hand out the link", err)
+
+    def test_an_unreadable_meta_json_exits_3(self):
+        store = self.mkdir("store")
+
+        class Garbled(SimpleHTTPRequestHandler):
+            def do_GET(self):
+                if self.path.endswith("/meta.json"):
+                    body = b"<html>a login page</html>"
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                super().do_GET()
+
+        httpd = QuickServer(("127.0.0.1", 0), functools.partial(quiet(Garbled), directory=store))
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            self.target_config("static", url="http://127.0.0.1:%d/" % httpd.server_address[1], dir=store)
+            code, _, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+        self.assertEqual(code, 3)
+        self.assertIn("no readable meta.json", err)
+
+    def test_an_existing_gitignore_still_ignores_the_pages(self):
+        root = self.mkdir("work", "docs", "solopreneur", "sign-offs")
+        write_text(os.path.join(root, ".gitignore"), "# mine")
+        self.publish(self.page("p"), "--slug", "gi", "--title", "Ignore")
+        self.assertEqual(read_text(os.path.join(root, ".gitignore")), "# mine\n*\n")
+        self.publish(self.page("p"), "--slug", "gi", "--title", "Ignore")
+        self.assertEqual(read_text(os.path.join(root, ".gitignore")), "# mine\n*\n")
 
     def test_dry_run_publishes_nothing(self):
         code, out, _ = self.cli("publish", self.page("p"), "--slug", "dry", "--title", "Dry", "--dry-run")
@@ -689,13 +735,16 @@ class Install(Base):
         else:
             unit = read_text(os.path.join(self.home, ".config", "systemd", "user", server.SYSTEMD_UNIT))
             self.assertIn(" ".join(expected), unit)
+            self.assertNotIn("WorkingDirectory", unit)  # not parsed like ExecStart, and not needed
             self.assertIn("enable-linger", text)
 
-    def test_only_loopback_binds(self):
-        err = io.StringIO()
-        with contextlib.redirect_stderr(err):
-            self.assertEqual(server.main(["install", "--dir", self.tmp, "--bind", "0.0.0.0"]), 2)
-        self.assertIn("loopback", err.getvalue())
+    def test_only_ipv4_loopback_binds(self):
+        for bind in ("0.0.0.0", "::1"):  # the server socket is AF_INET
+            with self.subTest(bind):
+                err = io.StringIO()
+                with contextlib.redirect_stderr(err):
+                    self.assertEqual(server.main(["install", "--dir", self.tmp, "--bind", bind]), 2)
+                self.assertIn("127.0.0.1 or localhost", err.getvalue())
 
     def test_systemd_arguments_stay_literal(self):
         self.assertEqual(server._systemd_arg("/a b/%h$HOME"), '"/a b/%%h$$HOME"')
