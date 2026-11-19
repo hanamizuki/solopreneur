@@ -227,9 +227,21 @@ class PageChecks(Base):
     def test_a_page_over_the_cap_is_refused_before_it_is_read(self):
         d = self.page("big", "<p>%s</p>" % ("x" * 2048))
         with mock.patch.object(server, "MAX_PAYLOAD", signoff.UI_HEADROOM + 1024), \
-                mock.patch.object(signoff, "_refs") as refs:
+                mock.patch.object(signoff, "_refs") as refs, \
+                mock.patch.object(signoff, "open", create=True, side_effect=AssertionError("opened a file")) as opened:
             self.expect_error("MB limit: compress the screenshots", signoff.collect, d)
         refs.assert_not_called()
+        opened.assert_not_called()
+
+    def test_only_a_wrapped_page_needs_room_for_the_ui(self):
+        # A --raw page goes out as it is: the whole cap is its own.
+        d = self.page("between", "<p>%s</p>" % ("x" * 2048))
+        with mock.patch.object(server, "MAX_PAYLOAD", signoff.UI_HEADROOM + 1024):
+            code, out, err = self.cli("publish", d, "--slug", "cap", "--title", "Cap", "--raw", "--dry-run")
+            self.assertEqual(code, 0, out + err)
+            code, _, err = self.cli("publish", d, "--slug", "cap", "--title", "Cap", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("MB limit", err)
 
     def test_a_raw_page_may_load_the_files_written_at_publish_time(self):
         d = self.page("raw", '<!doctype html><script src="meta.js"></script><a href="meta.json">m</a>')
@@ -401,6 +413,7 @@ class Settings(Base):
             ({"ttlDays": "7"}, "signoffs.ttlDays"),
             ({"ttlDays": 0}, "signoffs.ttlDays"),
             ({"ttlDays": True}, "signoffs.ttlDays"),
+            ({"ttlDays": 7.5}, "signoffs.ttlDays"),
             ({"defaultTarget": "nope"}, "no such target"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x/"}}}, "dir"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "ftp://x/", "dir": "/srv"}}}, "url"),
@@ -408,6 +421,7 @@ class Settings(Base):
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x/r?team=a", "dir": "/srv"}}}, "targets.p.url"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x/r#top", "dir": "/srv"}}}, "targets.p.url"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https:///nohost", "dir": "/srv"}}}, "targets.p.url"),
+            ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x:abc/r/", "dir": "/srv"}}}, "targets.p.url"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x/", "dir": "srv"}}}, "absolute"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "vercel"}}}, "provider"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "local", "url": "https://x/"}}}, "signoffs.root"),
@@ -415,6 +429,7 @@ class Settings(Base):
             ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "-oProxyCommand=touch pwned"}}}, "SSH destination"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "me@box extra"}}}, "SSH destination"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "box;touch pwned"}}}, "SSH destination"),
+            ({"defaultTarget": "p", "targets": {"p": {"provider": "server", "url": "https://x/", "host": "box\n"}}}, "SSH destination"),
             # every target, not only the one in use: preview validates the whole file
             ({"targets": {"old": {"provider": "vercel"}}}, "targets.old.provider"),
             ({"targets": {"old": {"provider": "static", "url": "https://x/"}}}, "targets.old.dir"),
@@ -437,6 +452,12 @@ class Settings(Base):
         with open(os.path.join(self.cwd, ".solopreneur.json"), "w") as f:
             json.dump({"schemaVersion": 1, "signoffs": {}}, f)
         self.expect_error("schemaVersion", signoff.resolve, self.cwd)
+
+    def test_a_whole_number_written_with_a_decimal_point_is_accepted(self):
+        # JSON 7.0 is an integer to the schema and to preview; json.load reads it as a float.
+        self.config(self.cwd, {"ttlDays": 7.0})
+        ttl = signoff.resolve(self.cwd)["ttlDays"]
+        self.assertEqual((ttl, type(ttl)), (7, int))  # the store takes whole numbers only
 
     def test_unknown_keys_and_plain_http_only_warn(self):
         self.config(self.cwd, {"ttlDay": 3, "defaultTarget": "p",
@@ -587,6 +608,11 @@ class Providers(Base):
             self.assertEqual(meta["source"], {})  # a portal may be public: no machine or repo names
             self.assertIn(page_id.encode(), get(url)[2])
 
+    def test_the_update_command_keeps_raw(self):
+        # Without --raw, the update would be checked as a content fragment and refused.
+        page_id, out, _ = self.publish(self.page("raw", "<!doctype html><p>own UI</p>"), "--slug", "raw", "--title", "Raw", "--raw")
+        self.assertIn("--update %s --raw\n" % page_id, out)
+
     def test_static_refuses_an_index_it_did_not_write(self):
         portal = self.mkdir("site")
         write_text(os.path.join(portal, "index.html"), "<h1>my real site</h1>")
@@ -626,6 +652,9 @@ class Providers(Base):
             code, _, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
         self.assertEqual(code, 3)
         self.assertIn("do not hand out the link", err)
+        # The page is stored all the same: another --slug publish would leave it behind as a second page.
+        [page_id] = [n for n in os.listdir(store) if server.page_meta(store, n)]
+        self.assertIn("--update %s" % page_id, err)
 
     def test_a_link_the_web_server_refuses_exits_3(self):
         # Every file reads back, but the printed link is a folder address and this
@@ -717,6 +746,43 @@ class Providers(Base):
         self.assertEqual(code, 3)
         self.assertIn("no readable meta.json", err)
 
+    def test_a_meta_json_served_from_another_origin_exits_3(self):
+        # The page reads meta.json with fetch(), which a browser refuses across origins.
+        class OtherOrigin(SimpleHTTPRequestHandler):
+            def do_GET(self):
+                if self.headers["Host"].split(":")[0] == "127.0.0.1" and self.path.endswith("/meta.json"):
+                    self.send_response(301)
+                    self.send_header("Location", "http://localhost:%d%s" % (self.server.server_address[1], self.path))
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                super().do_GET()
+
+        store = self.mkdir("store")
+        with http_dir(store, OtherOrigin) as url:
+            self.target_config("static", url=url, dir=store)
+            code, out, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
+        self.assertEqual(code, 3, out + err)
+        self.assertNotIn("Published", out)
+        self.assertIn("own origin", err)
+
+    def test_a_local_meta_js_that_disagrees_with_meta_json_exits_3(self):
+        # A file:// page reads meta.js, not meta.json.
+        real = signoff.call_store
+
+        def stale_meta_js(settings, request, files=None):
+            result = real(settings, request, files)
+            page = os.path.join(settings["dir"], result["id"])
+            meta = dict(read_json(os.path.join(page, "meta.json")), revision=0)
+            write_text(os.path.join(page, "meta.js"), "window.SIGNOFF_META = %s;\n" % server.script_json(meta))
+            return result
+
+        with mock.patch.object(signoff, "call_store", stale_meta_js):
+            code, out, err = self.cli("publish", self.page("p"), "--slug", "js", "--title", "JS")
+        self.assertEqual(code, 3, out + err)
+        self.assertNotIn("Published", out)
+        self.assertIn("meta.js", err)
+
     def test_an_existing_gitignore_still_ignores_the_pages(self):
         root = self.mkdir("work", "docs", "solopreneur", "sign-offs")
         write_text(os.path.join(root, ".gitignore"), "# mine")
@@ -750,6 +816,8 @@ class Providers(Base):
 
     def test_limits_and_a_missing_folder_fail_before_anything_is_written(self):
         for argv, needle in ((["", "--slug", "x", "--title", "X"], "no page folder"),
+                             # $ would match before the newline: the page would land in a folder nothing finds again
+                             ([self.page("p"), "--slug", "abc\n", "--title", "X"], "malformed slug"),
                              ([self.page("p"), "--slug", "x", "--title", "t" * 121], "longer than 120"),
                              ([self.page("p"), "--slug", "x", "--title", "X", "--reply-to", "r" * 201], "longer than 200")):
             with self.subTest(needle):
@@ -828,8 +896,11 @@ class Store(Base):
         self.refused("checksum", make_request({"index.html": b"x"}, mode="new", slug="a", title="t", files={"index.html": "0" * 64}))
         self.refused("no index.html", make_request({"a.html": b"x"}, mode="new", slug="a", title="t"))
         self.refused("slug", make_request(self.PAGE, mode="new", slug="Bad_Slug", title="t"))
+        self.refused("slug", make_request(self.PAGE, mode="new", slug="abc\n", title="t"))
         self.refused("no page", make_request(self.PAGE, mode="update", id="nope-abc"))
         self.refused("contentId", make_request(self.PAGE, mode="update", id=self.id, contentId="NOT-HEX"))
+        self.refused("contentId", make_request(self.PAGE, mode="update", id=self.id, contentId="a" * 16 + "\n"))
+        self.refused("malformed page id", make_request({}, mode="rm", id=self.id + "\n"))
         self.refused("ttlDays", make_request(self.PAGE, mode="update", id=self.id, ttlDays=0))
         self.refused("malformed page id", make_request({}, mode="rm", id="../store"))
         self.assertEqual(os.listdir(server.incoming_dir(self.root)), [])
@@ -909,12 +980,15 @@ class Store(Base):
     def test_the_sweep_removes_only_its_own_upload_leftovers(self):
         incoming = server.incoming_dir(self.root)
         mine, other = os.path.join(incoming, "rx-old"), os.path.join(incoming, "other.txt")
+        notes = os.path.join(incoming, "rx-notes.txt")  # store() stages in folders only: a file is never its own
         os.makedirs(mine)
         write_text(other, "x")
-        for p in (mine, other):
+        write_text(notes, "x")
+        for p in (mine, other, notes):
             os.utime(p, (time.time() - 2 * 86400,) * 2)
         self.assertEqual(server.prune(self.root, log=lambda *_: None), [mine])
         self.assertTrue(os.path.isfile(other))
+        self.assertTrue(os.path.isfile(notes))
 
     def test_ttl_sets_the_expiry(self):
         server.store(self.root, make_request(self.PAGE, mode="update", id=self.id, ttlDays=2))
