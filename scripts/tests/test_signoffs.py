@@ -554,6 +554,15 @@ class Providers(Base):
         self.publish(self.page("p"), "--slug", "gi", "--title", "Ignore")
         self.assertEqual(read_text(os.path.join(root, ".gitignore")), "# mine\n*\n")
 
+    def test_a_symlinked_gitignore_is_refused(self):
+        root = self.mkdir("work", "docs", "solopreneur", "sign-offs")
+        write_text(os.path.join(self.cwd, ".gitignore"), "node_modules\n")
+        os.symlink(os.path.join(self.cwd, ".gitignore"), os.path.join(root, ".gitignore"))
+        code, _, err = self.cli("publish", self.page("p"), "--slug", "gi", "--title", "Ignore")
+        self.assertEqual(code, 2)
+        self.assertIn("symlink", err)
+        self.assertEqual(read_text(os.path.join(self.cwd, ".gitignore")), "node_modules\n")
+
     def test_dry_run_publishes_nothing(self):
         code, out, _ = self.cli("publish", self.page("p"), "--slug", "dry", "--title", "Dry", "--dry-run")
         self.assertEqual(code, 0)

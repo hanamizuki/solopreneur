@@ -662,6 +662,9 @@ def prepare_local_root(directory):
                            "set signoffs.root to a subfolder such as docs/solopreneur/sign-offs")
     os.makedirs(directory, exist_ok=True)
     ignore = os.path.join(directory, ".gitignore")
+    if os.path.islink(ignore):
+        # Appending through a link could hide every new file of the repository it points into.
+        raise PublishError("%s is a symlink" % ignore, "replace it with a regular file holding the line *")
     try:
         with open(ignore, encoding="utf-8") as f:
             rules = f.read()
