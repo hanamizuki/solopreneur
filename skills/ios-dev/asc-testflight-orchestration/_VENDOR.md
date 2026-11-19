@@ -3,10 +3,10 @@
 This skill is vendored from a third-party source. **Do not edit in place** —
 edits will be overwritten on the next `scripts/sync-vendored.sh` run.
 
-- **Source repo**: https://github.com/rudrankriyam/app-store-connect-cli-skills
+- **Source repo**: https://github.com/rorkai/app-store-connect-cli-skills
 - **Source path**: `skills/asc-testflight-orchestration`
-- **Pinned commit**: fa40a3c466501367f373e92d59c9bc81a8d10891
-- **Synced at**: 2026-08-15T18:42:23Z
+- **Pinned commit**: 6d1c3c55fe4590fcbc3e3115de18c5721a73c23b
+- **Synced at**: 2026-11-19T15:09:57Z
 - **License**: see `../../vendor/LICENSES/app-store-connect-cli-skills-LICENSE` (source repo: `src/ios-dev/vendor/LICENSES/app-store-connect-cli-skills-LICENSE`)
 
 **Not a byte-for-byte mirror.** The sync mechanically rewrites the copied
