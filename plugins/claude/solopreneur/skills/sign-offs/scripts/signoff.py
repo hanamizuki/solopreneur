@@ -397,11 +397,12 @@ class _Tags(html.parser.HTMLParser):
     decoded), from start and self-closing tags only: comments and the text of
     <script> and <style> hold no tags. Also the CSS a page carries: <style>
     elements and style attributes, never its prose, where "URL(s)" is just a word.
-    And whether it is a whole document: a doctype, or an html, head or body tag."""
+    And whether it is a whole document: a doctype, or an html, head or body tag.
+    A <base href> is kept apart from the links: it moves where they all resolve."""
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.refs, self.items, self.css, self.choices = [], [], [], []
+        self.refs, self.items, self.css, self.choices, self.bases = [], [], [], [], []
         self._in_style = False
         self.document = False
 
@@ -414,7 +415,9 @@ class _Tags(html.parser.HTMLParser):
         elif tag in ("html", "head", "body"):
             self.document = True
         for name, value in attrs:
-            if name == "data-item":
+            if tag == "base" and name == "href":
+                self.bases.append(value or "")
+            elif name == "data-item":
                 self.items.append((tag, value or ""))  # a bare data-item is an empty id
             elif value and name == "data-choices":
                 self.choices.append(value)
@@ -448,15 +451,16 @@ def _tags(text):
 
 
 def _refs(text, is_css):
+    """(the URLs a page or stylesheet loads or links, its <base href> values), trimmed."""
     if is_css:
-        found, css = [], [text]
+        found, css, bases = [], [text], []
     else:
         tags = _tags(text)
-        found, css = tags.refs, tags.css
+        found, css, bases = tags.refs, tags.css, tags.bases
     # A space, not nothing: "url/**/(x)" is no url() to a browser.
     found += [next(g for g in m.groups() if g is not None)
               for chunk in css for m in CSS_URL_RE.finditer(CSS_COMMENT_RE.sub(" ", chunk))]
-    return [r.strip() for r in found]
+    return [r.strip() for r in found], [b.strip() for b in bases]
 
 
 def check_ref(ref, from_rel, files):
@@ -540,10 +544,15 @@ def collect(src, raw=False):
         if rel.lower().endswith(REF_FILES) and not over:
             with open(full, encoding="utf-8", errors="replace") as f:
                 text = f.read()
-            for ref in _refs(text, rel.lower().endswith(".css")):
+            refs, bases = _refs(text, rel.lower().endswith(".css"))
+            for ref in refs:
                 err = check_ref(ref, rel, files)
                 if err:
                     errors.append(err)
+            # Every relative URL resolves against a <base href>, meta.json included, while the
+            # read-back checks the page's own folder: only values that stay there pass.
+            errors += ['%s: <base href="%s"> changes where relative links resolve: remove it' % (rel, b)
+                       for b in bases if b not in ("", ".", "./") and not b.startswith("#")]
             if "/Users/" in text or "/home/" in text or "file://" in text:
                 warnings.append("%s mentions a local path (/Users/, /home/ or file://) that readers cannot open; ignore this if it is only prose" % rel)
     if errors:
@@ -722,12 +731,35 @@ def fetch(url, tries=3):
                        "running and https points at it); do not hand out the link", code=3)
 
 
-def read_back(settings, result):
+def _blocking_policy(headers):
+    """The Content-Security-Policy that stops an inline <script> from running, or None.
+    As CSP3 has it: every policy must allow the script (a -Report-Only header only
+    reports); a policy restricts it through script-src-elem, else script-src, else
+    default-src, and with none of these does not restrict scripts; and
+    'unsafe-inline' allows it only without a nonce, a hash or 'strict-dynamic'
+    beside it, which make browsers ignore 'unsafe-inline'. Names and keywords are
+    case-insensitive."""
+    for header in headers.get_all("Content-Security-Policy") or []:
+        for policy in header.split(","):  # one header may carry several policies
+            directives = {}
+            for directive in policy.lower().split(";"):
+                words = directive.split()
+                if words:
+                    directives.setdefault(words[0], words[1:])  # a repeated directive is ignored
+            sources = next((directives[d] for d in ("script-src-elem", "script-src", "default-src") if d in directives), None)
+            if sources is not None and ("'unsafe-inline'" not in sources or any(
+                    s.startswith(("'nonce-", "'sha256-", "'sha384-", "'sha512-", "'strict-dynamic'")) for s in sources)):
+                return policy.strip()
+    return None
+
+
+def read_back(settings, result, raw):
     """Fetch the link first, as the reader does, then every published file and
     meta.json relative to where it landed, and compare them with what the store
     wrote. For static and server the link is the folder address <id>/, which a
     web server without directory indexes refuses while serving <id>/index.html,
-    and which one that strips trailing slashes redirects to <id>."""
+    and which one that strips trailing slashes redirects to <id>. A wrapped page
+    (not `raw`) also needs its inline script allowed to run."""
     link = page_url(settings, result["id"])
     hint = "the web server must answer %s with the page's index.html (a directory index); do not hand out the link" % link
     try:
@@ -749,6 +781,14 @@ def read_back(settings, result):
         raise PublishError("read-back mismatch: %s would not open as a web page (Content-Type: %s, Content-Disposition: %s)"
                            % (link, headers.get("Content-Type", "none"), headers.get("Content-Disposition", "none")),
                            "the web server must serve index.html as text/html, inline; do not hand out the link", code=3)
+    # The shared review UI is one inline <script>: blocked, the page never gets past "Loading…".
+    # A --raw page brings its own UI, and a file:// response carries no policy.
+    policy = None if raw else _blocking_policy(headers)
+    if policy:
+        raise PublishError("read-back mismatch: %s would not run the page's inline script (Content-Security-Policy: %s)"
+                           % (link, policy),
+                           "the web server's Content-Security-Policy must allow inline scripts for this folder; "
+                           "do not hand out the link", code=3)
     # The page's folder at the address the reader ends up at: <id>/, or the folder of a file:// index.html.
     base = urllib.parse.urljoin(final, ".")
     for rel, digest in sorted(result["files"].items()):
@@ -915,10 +955,12 @@ def cmd_publish(args):
         result = call_store(settings, request, files)
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
-    target = " --target " + shlex.quote(args.target) if args.target else ""
+    # The target resolved, not only a --target given: after defaultTarget changes,
+    # these commands must still reach the store that holds the page.
+    target = " --target " + shlex.quote(settings["target"]) if settings["target"] is not None else ""
     update = "--update %s%s%s" % (result["id"], target, " --raw" if args.raw else "")
     try:
-        meta = read_back(settings, result)
+        meta = read_back(settings, result, args.raw)
     except PublishError as e:
         if e.code != 3:
             raise

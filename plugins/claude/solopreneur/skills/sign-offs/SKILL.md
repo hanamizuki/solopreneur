@@ -59,7 +59,13 @@ recommend `local` when nothing fits or the user is unsure. Save the choice in a
 `signoffs` block of `.solopreneur.json`, merged into the file if it exists (keep
 its other top-level keys and `"schemaVersion": 2`). Usually that is the user-level
 file, `~/.config/solopreneur/config.json`: host names and URLs are personal and
-stay out of commits. The nearest `signoffs` block is used whole — blocks never
+stay out of commits. Caution: when that file has no `preview` block, preview
+from a plugin version before sign-offs (one machine may run several, say one per
+harness profile) reports it as broken in every project without a nearer
+`preview` block. Update every installed copy of the plugin first, or save the
+block in a `.solopreneur.json` in a parent directory of the user's projects
+instead (such as `~/.solopreneur.json`): preview's walk-up skips files without a
+`preview` block. The nearest `signoffs` block is used whole — blocks never
 merge — so a project's own block (`<repo>/.solopreneur.json`) replaces the
 user-level one there, targets included; add one only when that project needs
 settings of its own.
@@ -123,7 +129,7 @@ python3 "$SIGNOFF" publish "$W" --slug e2e-sync --title "Cloud Sync e2e, round 2
 
 The dry run only checks: missing files, `file://`, root-absolute and folder
 links (name the file: `details/index.html`, not `details/`), links leaving the
-folder, symlinks, pipes and other special files, dot files, the 30 MB cap,
+folder or a `<base href>` moving them, symlinks, pipes and other special files, dot files, the 30 MB cap,
 heavy images, duplicate item ids or ids with spaces, ids that read as the
 reply's own lines (`sign-off`, or starting with `Pending:` or `Overall:`) and
 choices named `no choice` (these words follow `lang`), `data-item` outside a
@@ -177,7 +183,7 @@ revision N". The reply's first line shows which revision they saw.
 | Provider | For | Needs |
 |---|---|---|
 | `local` (default) | the reader is at this computer | nothing |
-| `static` | the user already serves a folder as a website | a folder used only for sign-offs, served at `url` (https, so the copy button works; without long-lived caching, so an update's images are fetched again) on a network only the readers and the publishing machine can reach, such as a tailnet or a VPN; for a remote `host`, SSH and `python3` 3.9+ there |
+| `static` | the user already serves a folder as a website | a folder used only for sign-offs, served at `url` (https, so the copy button works; without long-lived caching, so an update's images are fetched again; allowing the page's inline script, so no Content-Security-Policy that blocks it) on a network only the readers and the publishing machine can reach, such as a tailnet or a VPN; for a remote `host`, SSH and `python3` 3.9+ there |
 | `server` | the user wants a dedicated service, e.g. behind Tailscale Serve | the bundled server installed on `host`, reachable only by the readers and the publishing machine (Tailscale Serve on a tailnet, or a reverse proxy on a VPN) |
 
 A login page in front of `url` does not work: the read-back fetches every file
