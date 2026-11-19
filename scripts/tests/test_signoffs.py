@@ -181,9 +181,10 @@ class PageChecks(Base):
         d = self.page("good", '<link href="s.css" rel="stylesheet"><img src="shots/a.png" srcset="shots/a.png 1x, shots/a.png 2x">'
                               '<a href="#x">x</a><a href="https://example.com/">e</a><img src="data:image/png;base64,AA==">'
                               '<a href="shots/a.png?v=2#top">q</a>',
-                      {"shots/a.png": b"png", "s.css": b"body{background:url('shots/a.png')}", ".DS_Store": b"junk"})
+                      {"shots/a.png": b"png", "s.css": b"@import \"ok.css\";body{background:url('shots/a.png')}",
+                       "ok.css": b"", ".DS_Store": b"junk"})
         files, _ = signoff.collect(d)
-        self.assertEqual(sorted(files), ["index.html", "s.css", "shots/a.png"])
+        self.assertEqual(sorted(files), ["index.html", "ok.css", "s.css", "shots/a.png"])
 
     def test_srcset_urls_may_hold_commas(self):
         # A srcset candidate's URL runs to the next whitespace, commas included (the HTML spec).
@@ -203,6 +204,10 @@ class PageChecks(Base):
             ("fileurl", '<img src="file:///tmp/x.png">', None, "local file"),
             ("outside", '<img src="../good/a.png">', None, "outside the page folder"),
             ("css", "<style>i{background:url(nope.png)}</style>", None, "not in the page folder"),
+            # CSS names are case-insensitive, and @import takes a bare string as well as url()
+            ("cssupper", "<p>x</p>", {"s.css": b"i{background:URL(missing.png)}"}, "missing.png, which is not in the page folder"),
+            ("cssimport", "<p>x</p>", {"s.css": b'@import "missing.css";'}, "missing.css, which is not in the page folder"),
+            ("styleimport", "<style>@import 'missing.css';</style>", None, "missing.css, which is not in the page folder"),
             ("dot", "<p>x</p>", {".env": b"x"}, "starts with a dot"),
             ("metajson", "<p>x</p>", {"meta.json": b"{}"}, "written at publish time"),
             ("metajs", "<p>x</p>", {"meta.js": b""}, "written at publish time"),
@@ -242,10 +247,12 @@ class PageChecks(Base):
         signoff.check_content(doc, True)
         signoff.check_content(b"<section data-item='1'>x</section>", False)
 
-    def test_item_ids_must_be_present_and_unique(self):
+    def test_item_ids_must_be_present_unique_and_without_spaces(self):
         self.expect_error("repeat: 1", signoff.check_content, b'<section data-item="1"></section><section data-item=" 1 "></section>', False)
         self.expect_error("repeat", signoff.check_content, b"<section data-item=1></section><section data-item=1></section>", False)
         self.expect_error("empty id", signoff.check_content, b'<section data-item=""></section>', False)
+        # A reply line starts with the id: "A 1 Approve" could not say where the id ends.
+        self.expect_error('cannot contain spaces: "A 1"', signoff.check_content, b'<section data-item="A 1"></section>', False)
         # The page builds controls for sections only: a div item would silently drop out of the reply.
         self.expect_error("not on <div>", signoff.check_content, b'<section data-item="1"></section><div data-item="2"></div>', False)
 
@@ -548,8 +555,10 @@ class Providers(Base):
         portal = self.mkdir("portal")
         with http_dir(portal) as url:
             self.target_config("static", url=url, dir=portal)
-            page_id, out, _ = self.publish(self.page("p", extra={"a.png": b"png"}), "--slug", "st", "--title", "Static")
+            page_id, out, _ = self.publish(self.page("p", extra={"a.png": b"png"}), "--slug", "st", "--title", "Static",
+                                           "--target", "t")
             self.assertIn("%s%s/" % (url, page_id), out)
+            self.assertIn("--update %s --target t\n" % page_id, out)  # the update must reach the same target
             meta = json.loads(get(url + page_id + "/meta.json")[2])
             self.assertEqual(meta["source"], {})  # a portal may be public: no machine or repo names
             self.assertIn(page_id.encode(), get(url)[2])
@@ -610,6 +619,29 @@ class Providers(Base):
         self.assertEqual(code, 3)
         self.assertNotIn("Published", out)
         self.assertIn("do not hand out the link", err)
+
+    def test_a_link_redirected_to_another_path_exits_3(self):
+        # A host that strips trailing slashes serves the same index.html at <id>, but
+        # the browser then resolves meta.json and the images against the parent folder.
+        class NoTrailingSlash(SimpleHTTPRequestHandler):
+            def do_GET(self):
+                if self.path != "/" and self.path.endswith("/"):
+                    self.send_response(301)
+                    self.send_header("Location", self.path.rstrip("/"))
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                if os.path.isdir(self.translate_path(self.path)):
+                    self.path += "/index.html"
+                super().do_GET()
+
+        store = self.mkdir("store")
+        with http_dir(store, NoTrailingSlash) as url:
+            self.target_config("static", url=url, dir=store)
+            code, out, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
+        self.assertEqual(code, 3, out + err)
+        self.assertNotIn("Published", out)
+        self.assertIn("redirects to", err)
 
     def test_an_unreadable_meta_json_exits_3(self):
         store = self.mkdir("store")
@@ -786,6 +818,26 @@ class Store(Base):
         with mock.patch("os.rename", failing):
             self.refused("could not swap", make_request(self.PAGE, mode="update", id=self.id))
         self.assertEqual(server.load_meta(os.path.join(self.root, self.id))["revision"], 1)
+
+    def test_a_failed_restore_keeps_the_previous_revision_where_the_error_says(self):
+        real, calls = os.rename, []
+
+        def failing(src, dst):
+            calls.append(src)
+            if len(calls) > 1:  # moving the old revision aside works; the swap and the restore do not
+                raise OSError(5, "Input/output error")
+            return real(src, dst)
+
+        with mock.patch.object(server.os, "rename", failing), self.assertRaises(server.StoreError) as ctx:
+            server.store(self.root, make_request(self.PAGE, mode="update", id=self.id))
+        self.assertEqual(len(calls), 3)
+        [work] = os.listdir(server.incoming_dir(self.root))
+        kept = os.path.join(server.incoming_dir(self.root), work, "previous")
+        self.assertIn(kept, str(ctx.exception))
+        self.assertEqual(server.load_meta(kept)["revision"], 1)
+        # The day-old upload sweep leaves it too: it is the only copy until moved back by hand.
+        server.prune(self.root, at=server.utcnow() + dt.timedelta(days=2), log=lambda *_: None)
+        self.assertEqual(server.load_meta(kept)["revision"], 1)
 
     def test_concurrent_updates_get_distinct_revisions(self):
         data = make_request(self.PAGE, mode="update", id=self.id)
