@@ -76,6 +76,7 @@ INCOMING_MAX_AGE = 86400         # seconds before an upload leftover is cleared
 PRUNE_INTERVAL = 3600            # seconds between `serve` sweeps (expired pages already answer 410)
 GENERATOR = '<meta name="generator" content="solopreneur sign-offs">'
 LOOPBACK = ("127.0.0.1", "::1", "localhost")
+BIND_LOOPBACK = ("127.0.0.1", "localhost")  # Server is an AF_INET socket
 TEXT_TYPES = ("text/", "application/javascript", "application/json", "image/svg+xml")
 LAUNCHD_LABEL = "solopreneur.sign-offs"
 SYSTEMD_UNIT = "solopreneur-sign-offs.service"
@@ -426,17 +427,17 @@ def store(root, data, at=None):
         if mode not in ("new", "update", "rm"):
             raise StoreError("mode must be new, update or rm")
         index = _index_request(req.get("index"))
-        at = at or utcnow()
 
         if mode == "rm":
             page_id = _page_id(req.get("id"))
             with Lock(root):
+                now = at or utcnow()
                 if index:
                     _guard_index(root)
                 if page_meta(root, page_id) is None:
                     raise StoreError("no page %s" % page_id, "check the id; the page may have expired or been removed")
                 shutil.rmtree(os.path.join(root, page_id))
-                warning = _after_write(root, index, at)
+                warning = _after_write(root, index, now)
             return {"ok": True, "id": page_id, "removed": True, "warning": warning}
 
         title = _clean_text(req.get("title"), 120, "title", required=(mode == "new"))
@@ -455,6 +456,9 @@ def store(root, data, at=None):
         _verify_payload(payload, req.get("files"))
 
         with Lock(root):
+            # Read the clock only now: a publish that waited for the lock past a
+            # page's expiry must not update that page.
+            at = at or utcnow()
             if index:
                 _guard_index(root)
             if mode == "new":
@@ -641,8 +645,8 @@ def load_strings(lang):
 
 
 def check_bind(bind):
-    if bind not in LOOPBACK:
-        raise StoreError("--bind must be a loopback address, not %s" % bind,
+    if bind not in BIND_LOOPBACK:
+        raise StoreError("--bind must be 127.0.0.1 or localhost, not %s" % bind,
                          "put Tailscale Serve or a reverse proxy in front for https")
 
 
@@ -707,8 +711,8 @@ def cmd_install(args):
         os.makedirs(os.path.dirname(unit), exist_ok=True)
         with open(unit, "w", encoding="utf-8") as f:
             f.write("[Unit]\nDescription=sign-offs review pages\n\n[Service]\nExecStart=%s\n"
-                    "WorkingDirectory=%s\nRestart=on-failure\n\n[Install]\nWantedBy=default.target\n"
-                    % (" ".join(_systemd_arg(a) for a in argv), _systemd_arg(root)))
+                    "Restart=on-failure\n\n[Install]\nWantedBy=default.target\n"
+                    % " ".join(_systemd_arg(a) for a in argv))
         start = ["systemctl --user daemon-reload", "systemctl --user enable --now %s" % SYSTEMD_UNIT]
         note = 'Run `loginctl enable-linger "$USER"` once, or the service stops when you log out and does not start at boot.'
     else:

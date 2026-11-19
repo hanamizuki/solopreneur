@@ -66,6 +66,7 @@ SSH_OPTIONS = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
 REMOTE_LOADER = 'import sys;b=sys.stdin.buffer;exec(compile(b.read(int(b.readline())),"sign-offs-server","exec"))'
 
 WARN_IMAGE = 1536 * 1024
+UI_HEADROOM = 64 * 1024  # the wrapped UI adds about 15 KB to index.html; the store counts the staged page
 JUNK = {".DS_Store", "Thumbs.db"}
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic")
 REF_FILES = (".html", ".htm", ".css")
@@ -245,6 +246,10 @@ def resolve(cwd, target_name=None):
     for key in ("host", "url", "dir"):
         if key in target and (not isinstance(target[key], str) or not target[key]):
             raise bad("targets.%s.%s" % (name, key), "must be a non-empty string")
+    # A repository can ship its own .solopreneur.json: a host such as
+    # "-oProxyCommand=…" would otherwise reach ssh as an option and run a command.
+    if "host" in target and (target["host"].startswith("-") or re.search(r"\s", target["host"])):
+        raise bad("targets.%s.host" % name, "must be an SSH destination such as me@box")
     settings = {"configPath": path, "target": name, "provider": provider, "lang": lang, "ttlDays": ttl,
                 "replyTo": reply_to if reply_to is not None else load_strings(lang)["defaultReplyTo"]}
 
@@ -278,8 +283,7 @@ def resolve(cwd, target_name=None):
 
 def _local_names():
     names = {"localhost"}
-    host = socket.gethostname().lower()
-    names.update({host, host.split(".")[0]})
+    names.add(socket.gethostname().lower())
     if sys.platform == "darwin":
         local = _run(["scutil", "--get", "LocalHostName"])
         if local:
@@ -315,7 +319,7 @@ def is_local_host(host):
     if user and user != getpass.getuser():
         return False
     names = {name.lower()}
-    resolved = _run(["ssh", "-G", host], timeout=5) or ""
+    resolved = _run(["ssh", "-G", "--", host], timeout=5) or ""
     for line in resolved.splitlines():
         key, _, value = line.partition(" ")
         if key == "hostname" and value:
@@ -329,7 +333,7 @@ def is_local_host(host):
         try:
             ipaddress.ip_address(n)
         except ValueError:
-            if n in mine or n.split(".")[0] in mine:
+            if n in mine:  # whole names only: build.home is not build.office
                 return True
         if _is_local_address(n):
             return True
@@ -430,7 +434,7 @@ def collect(src):
                     errors.append(err)
             if "/Users/" in text or "/home/" in text or "file://" in text:
                 warnings.append("%s mentions a local path (/Users/, /home/ or file://) that readers cannot open; ignore this if it is only prose" % rel)
-    if total > server.MAX_PAYLOAD:
+    if total > server.MAX_PAYLOAD - UI_HEADROOM:
         errors.append("the page is %.1f MB, over the %d MB limit: compress the screenshots" % (total / 1048576, server.MAX_PAYLOAD >> 20))
     if errors:
         raise PublishError("the page did not pass its checks:\n  - " + "\n  - ".join(dict.fromkeys(errors)), "fix these and publish again")
@@ -559,7 +563,7 @@ def build_request(files, request):
 
 def ssh_argv(host, command):
     """The command that runs `command` on `host` (tests swap this for a local shell)."""
-    return ["ssh"] + SSH_OPTIONS + [host, command]
+    return ["ssh"] + SSH_OPTIONS + ["--", host, command]
 
 
 def remote_store(host, directory, data):
@@ -621,7 +625,13 @@ def read_back(settings, result, content_id):
         if hashlib.sha256(fetch(url)).hexdigest() != digest:
             raise PublishError("read-back mismatch: %s differs from what was sent" % rel,
                                "a cache may be serving an old copy; do not hand out the link, publish again", code=3)
-    meta = json.loads(fetch(base + "meta.json").decode("utf-8"))
+    try:
+        meta = json.loads(fetch(base + "meta.json").decode("utf-8"))
+    except ValueError:
+        meta = None
+    if not isinstance(meta, dict):
+        raise PublishError("read-back found no readable meta.json at %s" % base,
+                           "do not hand out the link; check what the url serves, then publish again", code=3)
     if meta.get("revision") != result["revision"] or meta.get("contentId") != content_id:
         raise PublishError("read-back found revision %r, not the %r just published" % (meta.get("revision"), result["revision"]),
                            "someone may have updated the page at the same moment; publish again", code=3)
@@ -652,9 +662,14 @@ def prepare_local_root(directory):
                            "set signoffs.root to a subfolder such as docs/solopreneur/sign-offs")
     os.makedirs(directory, exist_ok=True)
     ignore = os.path.join(directory, ".gitignore")
-    if not os.path.lexists(ignore):
-        with open(ignore, "w", encoding="utf-8") as f:
-            f.write("*\n")
+    try:
+        with open(ignore, encoding="utf-8") as f:
+            rules = f.read()
+    except FileNotFoundError:
+        rules = None
+    if rules is None or "*" not in rules.splitlines():
+        with open(ignore, "a", encoding="utf-8") as f:
+            f.write(("" if not rules or rules.endswith("\n") else "\n") + "*\n")
 
 
 # ---------- commands ----------

@@ -1427,9 +1427,10 @@ keys are errors that name the file.
   and `/`.
 - `dir` must be absolute or start with `~/`; `~` expands on the host that holds
   the pages.
-- `host` is any SSH destination. Omitted, `local`, or a name that resolves to
-  this machine (its host names, or an address it can bind to) means a local
-  write, so one config can be shared by the store host and the machines that
+- `host` is any SSH destination; one that starts with `-` is refused, since a
+  cloned repository's config must not pass options to ssh. Omitted, `local`,
+  or a name that resolves to this machine (one of its whole host names, or an
+  address it can bind to) means a local write, so one config can be shared by the store host and the machines that
   publish to it. A wrong guess cannot hand out a broken link: every publish
   reads its files back from `url` before printing it.
 
