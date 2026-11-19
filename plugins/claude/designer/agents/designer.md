@@ -31,32 +31,15 @@ upstream URLs and pinned commits; `scripts/sync-vendored.sh` re-pulls):
   load, accessibility, performance, responsive behavior, theming, anti-patterns,
   typography, spacing, layout, color, motion, micro-interactions, UX copy,
   error states, edge cases, i18n, design systems, tokens.
-
-The `taste-*` archetype family — pick the one that matches the product's
-personality (override default LLM design biases):
-
-- `designer:taste-skill` — Senior UI/UX engineer baseline:
-  metric-based rules, strict component architecture, CSS hardware acceleration,
-  balanced design engineering.
-- `designer:taste-soft` — High-end agency aesthetic: premium fonts,
-  generous spacing, soft shadows, tasteful animations.
-- `designer:taste-brutalist` — Swiss / military terminal aesthetic:
-  rigid grids, extreme type-scale contrast, utilitarian color, analog
-  degradation effects. Data-heavy dashboards.
-- `designer:taste-minimalist` — Clean editorial: warm monochrome
-  palette, typographic contrast, flat bento grids, muted pastels. No gradients,
-  no heavy shadows.
-- `designer:taste-redesign` — Upgrades existing sites to premium
-  quality without breaking functionality. Works with any CSS framework.
-- `designer:taste-stitch` — Semantic design system for Google
-  Stitch. Generates agent-friendly `DESIGN.md` files.
-- `designer:taste-output` — Overrides default LLM truncation:
-  enforces complete code generation, bans placeholder patterns.
-- `designer:taste-gpt` — Elite UX/UI + advanced GSAP motion:
-  Python-driven layout randomization, strict AIDA structure, wide editorial
-  typography (bans 6-line wraps), gapless scroll.
-- `designer:taste-image-to-code` — Image-to-code workflow for
-  Codex: generate the design image first, deeply analyze, then implement.
+- `designer:taste-skill` — tasteskill 2.5: builds or redesigns a company or
+  product website (landing page, SaaS, AI / developer tool, shop, cafe, hotel,
+  studio, game) as static HTML/CSS or inside an existing React / Next.js /
+  Vue / Svelte / Astro / Tailwind project. The kind of business sets the page
+  plan; palette, type pairing and hero are dealt from its bundled kit (real
+  photographs, UI fragments, icons, motion). A checker and a finish gate
+  render the page in headless Chrome, and the gate also runs as a Stop hook
+  that keeps the agent working while fixable FAILs remain (bounded rounds).
+  Needs Node 22+ and Chrome, Edge or Chromium.
 
 ### Optional: third-party plugins
 
