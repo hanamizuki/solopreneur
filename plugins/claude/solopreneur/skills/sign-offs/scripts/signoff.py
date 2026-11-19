@@ -24,6 +24,7 @@ import argparse
 import getpass
 import hashlib
 import html
+import html.parser
 import http.client
 import io
 import json
@@ -75,12 +76,9 @@ UI_HEADROOM = 64 * 1024  # the wrapped UI adds about 15 KB to index.html; the st
 JUNK = {".DS_Store", "Thumbs.db"}
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic")
 REF_FILES = (".html", ".htm", ".css")
-ATTR_RE = re.compile(r"""(?i)\b(?:src|href|poster|data-src)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
-SRCSET_RE = re.compile(r"""(?i)\bsrcset\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+REF_ATTRS = ("src", "href", "poster", "data-src")
 CSS_URL_RE = re.compile(r"""url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)""")
 FULL_DOC_RE = re.compile(rb"<\s*(?:!doctype|html|head|body)\b", re.I)
-ITEM_RE = re.compile(r"""(?i)\bdata-item\s*=\s*(?:"([^"]*)"|'([^']*)')""")
-ITEM_TAG_RE = re.compile(r"(?is)<([a-z][a-z0-9-]*)\b[^>]*\bdata-item\s*=")
 TOKEN_RE = re.compile(r"\{\{(\w+)\}\}")
 
 
@@ -226,11 +224,13 @@ def resolve(cwd, target_name=None):
     ttl = block.get("ttlDays", server.TTL_DEFAULT)
     if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= server.TTL_MAX:
         raise bad("ttlDays", "must be a whole number from 1 to %d" % server.TTL_MAX)
+    # A key that is present must hold a valid value: null is not "use the default"
+    # (the schema types every key, so preview would refuse the same file).
     reply_to = block.get("replyTo")
-    if reply_to is not None and (not isinstance(reply_to, str) or _too_long(reply_to, server.REPLY_TO_MAX)):
+    if "replyTo" in block and (not isinstance(reply_to, str) or _too_long(reply_to, server.REPLY_TO_MAX)):
         raise bad("replyTo", "must be text of at most %d characters" % server.REPLY_TO_MAX)
     root = block.get("root")
-    if root is not None and (not isinstance(root, str) or not root):
+    if "root" in block and (not isinstance(root, str) or not root):
         raise bad("root", "must be a non-empty path")
     targets = block.get("targets", {})
     if not isinstance(targets, dict):
@@ -249,9 +249,10 @@ def resolve(cwd, target_name=None):
                 raise bad("targets.%s.%s" % (tname, key), "must be a non-empty string")
         if "host" in t and not HOST_RE.match(t["host"]):
             raise bad("targets.%s.host" % tname, "must be an SSH destination such as me@box")
-    name = target_name or block.get("defaultTarget")
-    if name is not None and (not isinstance(name, str) or not name):
+    default = block.get("defaultTarget")
+    if "defaultTarget" in block and (not isinstance(default, str) or not default):
         raise bad("defaultTarget", "must be the name of a target")
+    name = target_name or default
     if name is None:
         target = {"provider": "local"}
     elif name not in targets:
@@ -330,36 +331,63 @@ def is_local_host(host):
     user, _, name = host.rpartition("@")
     if user and user != getpass.getuser():
         return False
-    names = {name.lower()}
+    hostname = None
     resolved = _run(["ssh", "-G", "--", host], timeout=5) or ""
     for line in resolved.splitlines():
         key, _, value = line.partition(" ")
         value = value.strip()
         if key == "hostname" and value:
-            names.add(value.lower())
+            hostname = value.lower()
         elif key == "user" and value and not user:
             user = value
         elif (key == "port" and value != "22") or (key in ("proxyjump", "proxycommand") and value.lower() != "none"):
             return False  # reached through another port or a jump host: a VM or a tunnel, whatever the name
     if user and user != getpass.getuser():
         return False
-    mine = _local_names()
+    # ssh connects to the HostName it resolved, so an alias named after this machine can
+    # still lead elsewhere: the alias itself counts only when ssh could not resolve it.
+    name = hostname or name.lower()
     # Whole names only (build.home is not build.office), or an address this machine holds.
-    return any(n in mine or _is_local_address(n) for n in names)
+    return name in _local_names() or _is_local_address(name)
 
 
 # ---------- page checks ----------
 
+class _Tags(html.parser.HTMLParser):
+    """Attribute values as a browser reads them (quoted or not, character references
+    decoded), from start and self-closing tags only: comments and the text of
+    <script> and <style> hold no tags."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.refs, self.items = [], []
+
+    def handle_starttag(self, tag, attrs):  # self-closing tags arrive here too
+        for name, value in attrs:
+            if name == "data-item":
+                self.items.append((tag, value or ""))  # a bare data-item is an empty id
+            elif value and name in REF_ATTRS:
+                self.refs.append(value)
+            elif value and name == "srcset":
+                self.refs.extend(part.split()[0] for part in value.split(",") if part.strip())
+
+    def error(self, message):  # Python 3.9 reports here; 3.10-3.12 raise AssertionError themselves
+        raise AssertionError(message)
+
+
+def _tags(text):
+    p = _Tags()
+    try:
+        p.feed(text)
+        p.close()
+    except AssertionError as e:  # Python 3.9-3.12 give up on a malformed "<![…"; later ones read it as a comment
+        raise PublishError("cannot parse the HTML: %s" % e, "fix or remove that markup")
+    return p
+
+
 def _refs(text, is_css):
-    found = []
-    if not is_css:
-        for m in ATTR_RE.finditer(text):
-            found.append(m.group(1) if m.group(1) is not None else m.group(2))
-        for m in SRCSET_RE.finditer(text):
-            value = m.group(1) if m.group(1) is not None else m.group(2)
-            found.extend(part.strip().split()[0] for part in value.split(",") if part.strip())
-    for m in CSS_URL_RE.finditer(text):
-        found.append(next(g for g in m.groups() if g is not None))
+    found = [] if is_css else _tags(text).refs
+    found += [next(g for g in m.groups() if g is not None) for m in CSS_URL_RE.finditer(text)]
     return [r.strip() for r in found]
 
 
@@ -461,12 +489,13 @@ def check_content(index, raw):
         text = index.decode("utf-8")
     except UnicodeDecodeError:
         raise PublishError("index.html is not UTF-8")
-    others = sorted({m.group(1).lower() for m in ITEM_TAG_RE.finditer(text)} - {"section"})
+    items = _tags(text).items
+    others = sorted({tag for tag, _ in items} - {"section"})
     if others:
         # The page builds controls for section[data-item] only: any other element would drop out of the reply.
         raise PublishError("data-item is only read on <section> elements, not on <%s>" % ">, <".join(others),
                            'wrap each item in <section data-item="id">')
-    ids = [(m.group(1) if m.group(1) is not None else m.group(2)).strip() for m in ITEM_RE.finditer(text)]
+    ids = [value.strip() for _, value in items]
     if any(not i for i in ids):
         raise PublishError("a <section data-item> has an empty id", "give every item a short unique id, such as 1, 2, A3")
     dups = sorted({i for i in ids if ids.count(i) > 1})
@@ -582,13 +611,23 @@ def fetch(url, tries=3):
 
 
 def read_back(settings, result, content_id):
-    """Fetch every published file from the reader's address and compare checksums."""
+    """Fetch every published file from the reader's address and compare checksums,
+    then the link itself: for static and server it is the folder address <id>/,
+    which a web server without directory indexes refuses while serving <id>/index.html."""
     base = settings["url"] + result["id"] + "/"
     for rel, digest in sorted(result["files"].items()):
         url = base + "/".join(urllib.parse.quote(p) for p in rel.split("/"))
         if hashlib.sha256(fetch(url)).hexdigest() != digest:
             raise PublishError("read-back mismatch: %s differs from what was sent" % rel,
                                "a cache may be serving an old copy; do not hand out the link, publish again", code=3)
+    link = page_url(settings, result["id"])
+    hint = "the web server must answer %s with the page's index.html (a directory index); do not hand out the link" % link
+    try:
+        page = fetch(link)
+    except PublishError as e:
+        raise PublishError(str(e), hint, code=3)
+    if hashlib.sha256(page).hexdigest() != result["files"]["index.html"]:
+        raise PublishError("read-back mismatch: %s is not the page just published" % link, hint, code=3)
     try:
         meta = json.loads(fetch(base + "meta.json").decode("utf-8"))
     except ValueError:
@@ -616,7 +655,7 @@ def index_request(settings, strings):
 
 
 def prepare_local_root(directory):
-    """Create the local folder with a `*` .gitignore, so screenshots never get committed.
+    """Create the local folder with `*` as its .gitignore's last rule, so screenshots never get committed.
     Refuses a folder that is not dedicated to sign-offs (a .gitignore of `*` at a
     repository root would hide every new file)."""
     real = os.path.realpath(directory)
@@ -634,7 +673,11 @@ def prepare_local_root(directory):
             rules = f.read()
     except FileNotFoundError:
         rules = None
-    if rules is None or "*" not in rules.splitlines():
+    # Git applies the last matching rule, so only a final `*` ignores everything: `*`
+    # then `!*.png` brings the screenshots back. As git reads it: a comment starts at
+    # the first column, trailing spaces are dropped, leading ones are part of the pattern.
+    effective = [r.rstrip() for r in (rules or "").splitlines() if r.strip() and not r.startswith("#")]
+    if effective[-1:] != ["*"]:
         # About to claim the folder: `*` would hide every new file in it from git,
         # and would stay behind even when the store then refuses the publish.
         others = sorted(set(os.listdir(directory)) - {".gitignore"} - JUNK)
