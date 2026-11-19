@@ -686,6 +686,8 @@ def fetch(url, tries=3):
                 return r.read(), r.geturl()
         except (OSError, http.client.HTTPException) as e:  # URLError is an OSError; a cut response is neither
             last = e
+            if hasattr(e, "close"):
+                e.close()  # an HTTPError holds the open response; its message survives closing
             if i + 1 < tries:
                 time.sleep(1 + i)
     raise PublishError("cannot read back %s: %s" % (url, last),
