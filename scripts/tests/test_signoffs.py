@@ -289,6 +289,11 @@ class PageChecks(Base):
         # The page builds controls for sections only: a div item would silently drop out of the reply.
         self.expect_error("not on <div>", signoff.check_content, b'<section data-item="1"></section><div data-item="2"></div>', False, EN)
 
+    def test_ids_are_trimmed_as_the_page_trims_them(self):
+        # The page uses JavaScript trim(), which also removes U+FEFF.
+        self.expect_error("repeat: 1", signoff.check_content,
+                          '<section data-item="\ufeff1"></section><section data-item="1"></section>'.encode(), False, server.load_strings("en"))
+
     def test_ids_and_choice_labels_cannot_read_as_reply_markers(self):
         # "Overall: Approve" reads as the overall comment, and "1 No choice — x" as a note left without a choice.
         cases = [("en", '<section data-item="Overall:"></section>', '"Overall:"'),
