@@ -196,6 +196,8 @@ class PageChecks(Base):
             ("dot", "<p>x</p>", {".env": b"x"}, "starts with a dot"),
             ("metajson", "<p>x</p>", {"meta.json": b"{}"}, "written at publish time"),
             ("metajs", "<p>x</p>", {"meta.js": b""}, "written at publish time"),
+            # over file:// a folder address opens as a listing, not as its index.html
+            ("folder", '<a href="details/">d</a>', {"details/index.html": b"<p>d</p>"}, "links the folder details/"),
         ]
         for name, html, extra, needle in cases:
             with self.subTest(name):
@@ -203,6 +205,9 @@ class PageChecks(Base):
         d = self.page("link")
         os.symlink("/etc/hosts", os.path.join(d, "hosts.txt"))
         self.expect_error("symlink", signoff.collect, d)
+        d = self.page("fifo")
+        os.mkfifo(os.path.join(d, "pipe"))  # reading or hashing it would block forever
+        self.expect_error("not a regular file", signoff.collect, d)
 
     def test_a_raw_page_may_load_the_files_written_at_publish_time(self):
         d = self.page("raw", '<!doctype html><script src="meta.js"></script><a href="meta.json">m</a>')
@@ -351,6 +356,10 @@ class Settings(Base):
             ({"defaultTarget": "nope"}, "no such target"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x/"}}}, "dir"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "ftp://x/", "dir": "/srv"}}}, "url"),
+            # the page id is appended to url as text: it needs a host, and no query or fragment
+            ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x/r?team=a", "dir": "/srv"}}}, "targets.p.url"),
+            ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x/r#top", "dir": "/srv"}}}, "targets.p.url"),
+            ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https:///nohost", "dir": "/srv"}}}, "targets.p.url"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "static", "url": "https://x/", "dir": "srv"}}}, "absolute"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "vercel"}}}, "provider"),
             ({"defaultTarget": "p", "targets": {"p": {"provider": "local", "url": "https://x/"}}}, "signoffs.root"),
@@ -646,12 +655,16 @@ class Providers(Base):
         self.assertFalse(os.path.exists(os.path.join(self.cwd, "docs")))
 
     def test_a_folder_holding_other_files_is_not_claimed(self):
-        self.config(self.cwd, {"root": "docs"})
-        write_text(os.path.join(self.mkdir("work", "docs"), "spec.md"), "# spec")
-        code, _, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
-        self.assertEqual(code, 2)
-        self.assertIn("already holds other files (spec.md)", err)
-        self.assertFalse(os.path.exists(os.path.join(self.cwd, "docs", ".gitignore")))
+        # .lock is a generic name: another tool's lock does not make the folder a sign-offs folder
+        for root, names, foreign in (("docs", ["spec.md"], "spec.md"), ("locked", [".lock", "notes.txt"], "notes.txt")):
+            with self.subTest(root):
+                self.config(self.cwd, {"root": root})
+                for name in names:
+                    write_text(os.path.join(self.mkdir("work", root), name), "")
+                code, _, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
+                self.assertEqual(code, 2)
+                self.assertIn("already holds other files (%s)" % foreign, err)
+                self.assertFalse(os.path.exists(os.path.join(self.cwd, root, ".gitignore")))
 
     def test_a_repository_root_is_never_the_local_folder(self):
         git(self.cwd, "init", "-q")
@@ -755,7 +768,18 @@ class Store(Base):
         data = make_request(self.PAGE, mode="update", id=self.id)
         procs = [subprocess.Popen([sys.executable, str(SKILL / "scripts" / "server.py"), "store", "--dir", self.root],
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE) for _ in range(2)]
-        results = [json.loads(p.communicate(data)[0].decode()) for p in procs]
+        results = []
+
+        def run(proc):
+            results.append(json.loads(proc.communicate(data)[0].decode()))
+
+        # One thread per process: communicate() in turn would hand the second its
+        # request only after the first had exited, and the lock would never be contended.
+        threads = [threading.Thread(target=run, args=(p,)) for p in procs]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         self.assertEqual(sorted(r.get("revision") for r in results), [2, 3], results)
 
     def test_ttl_sets_the_expiry(self):
@@ -791,6 +815,20 @@ class Serving(Base):
                     self.assertEqual(get(url + path)[0], 404)
             index = get(url)[2]
             self.assertIn(('href="%s/"' % self.id).encode(), index)
+
+    def test_a_folder_address_never_opens_a_linked_index_outside_the_store(self):
+        # For <id>/ the stock handler opens index.html by itself, after translate_path.
+        outside = os.path.join(self.tmp, "outside.html")
+        write_text(outside, "OUTSIDE-THE-STORE")
+        index = os.path.join(self.root, self.id, "index.html")
+        os.remove(index)
+        os.symlink(outside, index)
+        with signoffs_server(self.root) as url:
+            for path in (self.id + "/", self.id + "/index.html"):
+                with self.subTest(path):
+                    status, _, body = get(url + path)
+                    self.assertEqual(status, 404)
+                    self.assertNotIn(b"OUTSIDE-THE-STORE", body)
 
     def test_an_expired_page_answers_410_and_leaves_the_index(self):
         meta_path = os.path.join(self.root, self.id, "meta.json")

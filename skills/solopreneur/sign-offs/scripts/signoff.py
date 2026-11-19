@@ -272,9 +272,14 @@ def resolve(cwd, target_name=None):
         directory = local_root(path, root, cwd)
         settings.update(host=None, local=True, dir=directory, url=pathlib.Path(directory).as_uri() + "/")
     else:
-        url = target.get("url")
-        if not url or not url.startswith(("http://", "https://")):
-            raise bad("targets.%s.url" % name, "must be the http(s) address the pages are served at")
+        url = target.get("url") or ""
+        try:
+            url_host = urllib.parse.urlsplit(url).hostname
+        except ValueError:  # an unbalanced [ in the host, for one
+            url_host = None
+        # Page ids are appended to url as text: a ?query or #fragment (even an empty one) would swallow them.
+        if not url.startswith(("http://", "https://")) or not url_host or "?" in url or "#" in url:
+            raise bad("targets.%s.url" % name, "must be the http(s) address the pages are served at, without ?query or #fragment")
         directory = target.get("dir", server.DEFAULT_DIR if provider == "server" else None)
         if directory is None:
             raise bad("targets.%s.dir" % name, "is required: the folder the web server serves")
@@ -408,8 +413,9 @@ def check_ref(ref, from_rel, files):
     target = os.path.normpath(os.path.join(os.path.dirname(from_rel), path)).replace(os.sep, "/")
     if target == ".." or target.startswith("../"):
         return "%s links %s outside the page folder: move the file into the folder" % (from_rel, ref)
-    if path.endswith("/"):
-        target = (target + "/index.html").lstrip("./")
+    if path.endswith("/"):  # every provider: the same page may go out as a local one
+        return ("%s links the folder %s: name the file (%sindex.html); over file:// a folder opens as a listing"
+                % (from_rel, ref, path))
     if target not in files and target not in server.RESERVED:  # meta.json and meta.js are written at publish time
         return "%s links %s, which is not in the page folder (looked for %s)" % (from_rel, ref, target)
     return None
@@ -443,6 +449,8 @@ def collect(src):
                     continue
                 if os.path.islink(full):
                     errors.append("%s is a symlink: use a real file" % rel)
+                elif not os.path.isfile(full):  # a named pipe, socket or device: reading a pipe blocks forever
+                    errors.append("%s is not a regular file: use a real file" % rel)
                 elif n.startswith("."):
                     errors.append("%s starts with a dot: dot files are never published; rename or remove it" % rel)
                 elif rel in server.RESERVED:
@@ -654,6 +662,19 @@ def index_request(settings, strings):
             "strings": {k: strings[k] for k in server.INDEX_KEYS}}
 
 
+def _signoffs_entry(directory, name):
+    """Whether <directory>/<name> is something sign-offs keeps in its folder."""
+    if name == ".gitignore" or name in JUNK or name in server.OWN_ENTRIES:
+        return True
+    if name == "index.html":
+        try:
+            server._guard_index(directory)  # raises for an index.html sign-offs did not write
+        except (server.StoreError, OSError):
+            return False
+        return True
+    return server.page_meta(directory, name) is not None
+
+
 def prepare_local_root(directory):
     """Create the local folder with `*` as its .gitignore's last rule, so screenshots never get committed.
     Refuses a folder that is not dedicated to sign-offs (a .gitignore of `*` at a
@@ -679,9 +700,10 @@ def prepare_local_root(directory):
     effective = [r.rstrip() for r in (rules or "").splitlines() if r.strip() and not r.startswith("#")]
     if effective[-1:] != ["*"]:
         # About to claim the folder: `*` would hide every new file in it from git,
-        # and would stay behind even when the store then refuses the publish.
-        others = sorted(set(os.listdir(directory)) - {".gitignore"} - JUNK)
-        if others and ".lock" not in others:  # .lock: sign-offs already writes here
+        # and would stay behind even when the store then refuses the publish. Only
+        # when everything in it is sign-offs' own: other tools name files .lock too.
+        others = sorted(n for n in os.listdir(directory) if not _signoffs_entry(directory, n))
+        if others:
             raise PublishError("%s already holds other files (%s): it cannot be the sign-offs folder"
                                % (directory, ", ".join(others[:3])),
                                "set signoffs.root to a folder of its own, such as docs/solopreneur/sign-offs")

@@ -1395,7 +1395,9 @@ Every key is optional:
 | `server` | `dir` on `host`, default `~/.local/share/solopreneur/sign-offs` | `<url><id>/`, served by the bundled server |
 
 The `static` and `server` index lists every page that has not expired: serve
-them where only the readers can reach them (a tailnet, or behind a login).
+them on a network that only the readers and the publishing machine can reach,
+such as a tailnet or a VPN. A login page does not work: the read-back fetches
+every file from `url` without credentials.
 
 ## Resolution
 
