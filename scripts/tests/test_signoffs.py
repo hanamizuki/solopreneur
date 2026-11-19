@@ -241,6 +241,15 @@ class PageChecks(Base):
         self.expect_error("not in the page folder", signoff.collect,
                           self.page("attr", '<div style="background:url(missing.png)">x</div>'))
 
+    def test_css_comments_hold_no_references(self):
+        # A commented-out rule is never requested, in a stylesheet, a <style> or a style attribute.
+        d = self.page("commented", '<style>/* i{background:url(old.png)} */</style><p style="/* background:url(old.png) */">x</p>',
+                      {"s.css": b"/* i{background:url(old.png)}\n@import 'gone.css'; */ i{color:red}"})
+        self.assertEqual(sorted(signoff.collect(d)[0]), ["index.html", "s.css"])
+        # Each comment ends at its own */: the rule between two comments is still read.
+        self.expect_error("old.png, which is not in the page folder", signoff.collect,
+                          self.page("live", "<p>x</p>", {"s.css": b"/* a */ i{background:url(old.png)} /* b */"}))
+
     def test_a_single_html_file_becomes_index_html(self):
         path = os.path.join(self.tmp, "one.html")
         with open(path, "w", encoding="utf-8") as f:
@@ -261,6 +270,15 @@ class PageChecks(Base):
         self.expect_error('cannot contain spaces: "A 1"', signoff.check_content, b'<section data-item="A 1"></section>', False)
         # The page builds controls for sections only: a div item would silently drop out of the reply.
         self.expect_error("not on <div>", signoff.check_content, b'<section data-item="1"></section><div data-item="2"></div>', False)
+
+    def test_a_choice_label_cannot_hold_the_note_separator(self):
+        # "1 Approve — with changes" would read as the choice Approve with the note "with changes".
+        for choices in ("Approve|Approve — with changes", "Approve|Approve\n  —  with changes",  # folded onto one line by the page
+                        "—|Approve"):  # "1 — — note": the label sits between the id's space and the note's
+            with self.subTest(choices):
+                self.expect_error("plain hyphen", signoff.check_content,
+                                  ('<section data-item="1" data-choices="%s"></section>' % choices).encode(), False)
+        signoff.check_content('<section data-item="1" data-choices="Approve - with changes|Approve—fast"></section>'.encode(), False)
 
     def test_unparsable_markup_is_reported_not_raised(self):
         # Python 3.9-3.12 stop at an unknown "<![" keyword; 3.13 and later read it as a comment.
@@ -648,6 +666,31 @@ class Providers(Base):
         self.assertEqual(code, 3, out + err)
         self.assertNotIn("Published", out)
         self.assertIn("redirects to", err)
+
+    def test_files_are_read_back_from_where_the_link_lands(self):
+        # A proxy may send the link to another host on the same path: the page then
+        # loads meta.json and its images from there, so the read-back follows it.
+        seen = []
+
+        class OtherHost(SimpleHTTPRequestHandler):
+            def do_GET(self):
+                host = self.headers["Host"].split(":")[0]
+                seen.append((host, self.path))
+                if host == "127.0.0.1" and self.path.endswith("/") and self.path != "/":
+                    self.send_response(301)
+                    self.send_header("Location", "http://localhost:%d%s" % (self.server.server_address[1], self.path))
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                super().do_GET()
+
+        store = self.mkdir("store")
+        with http_dir(store, OtherHost) as url:
+            self.target_config("static", url=url, dir=store)
+            page_id, _, _ = self.publish(self.page("p", extra={"a.png": b"png"}), "--slug", "x", "--title", "X")
+        folder = "/%s/" % page_id
+        self.assertEqual(seen, [("127.0.0.1", folder), ("localhost", folder), ("localhost", folder + "a.png"),
+                                ("localhost", folder + "index.html"), ("localhost", folder + "meta.json")])
 
     def test_an_unreadable_meta_json_exits_3(self):
         store = self.mkdir("store")

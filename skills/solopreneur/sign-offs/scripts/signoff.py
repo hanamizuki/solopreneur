@@ -80,6 +80,8 @@ REF_ATTRS = ("src", "href", "poster", "data-src")
 # url(…) in any case (CSS names are case-insensitive), and @import "…", whose bare
 # string is a URL too; @import url(…) is already a url().
 CSS_URL_RE = re.compile(r"""url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|@import\s*(?:"([^"]*)"|'([^']*)')""", re.I)
+# A commented-out rule is never requested. Each comment ends at its first */.
+CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
 FULL_DOC_RE = re.compile(rb"<\s*(?:!doctype|html|head|body)\b", re.I)
 TOKEN_RE = re.compile(r"\{\{(\w+)\}\}")
 
@@ -395,7 +397,7 @@ class _Tags(html.parser.HTMLParser):
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.refs, self.items, self.css = [], [], []
+        self.refs, self.items, self.css, self.choices = [], [], [], []
         self._in_style = False
 
     def handle_starttag(self, tag, attrs):  # self-closing tags arrive here too
@@ -404,6 +406,8 @@ class _Tags(html.parser.HTMLParser):
         for name, value in attrs:
             if name == "data-item":
                 self.items.append((tag, value or ""))  # a bare data-item is an empty id
+            elif value and name == "data-choices":
+                self.choices.append(value)
             elif value and name in REF_ATTRS:
                 self.refs.append(value)
             elif value and name == "srcset":
@@ -439,7 +443,9 @@ def _refs(text, is_css):
     else:
         tags = _tags(text)
         found, css = tags.refs, tags.css
-    found += [next(g for g in m.groups() if g is not None) for chunk in css for m in CSS_URL_RE.finditer(chunk)]
+    # A space, not nothing: "url/**/(x)" is no url() to a browser.
+    found += [next(g for g in m.groups() if g is not None)
+              for chunk in css for m in CSS_URL_RE.finditer(CSS_COMMENT_RE.sub(" ", chunk))]
     return [r.strip() for r in found]
 
 
@@ -546,7 +552,8 @@ def check_content(index, raw):
         text = index.decode("utf-8")
     except UnicodeDecodeError:
         raise PublishError("index.html is not UTF-8")
-    items = _tags(text).items
+    tags = _tags(text)
+    items = tags.items
     others = sorted({tag for tag, _ in items} - {"section"})
     if others:
         # The page builds controls for section[data-item] only: any other element would drop out of the reply.
@@ -562,6 +569,15 @@ def check_content(index, raw):
     dups = sorted({i for i in ids if ids.count(i) > 1})
     if dups:
         raise PublishError("item ids repeat: %s" % ", ".join(dups), "replies name items by id, so each id must be unique")
+    # A reply line is "<id> <choice> — <note>": a label holding " — " reads as a choice
+    # and a note. Folded as page.html folds it (JavaScript's \s also counts U+FEFF), then
+    # padded: the label sits between the space after the id and the " — " before a note.
+    labels = (re.sub(r"[\s\ufeff]+", " ", c).strip() for v in tags.choices for c in v.split("|"))
+    dashed = [c for c in labels if " — " in " %s " % c]
+    if dashed:
+        raise PublishError("choice labels cannot contain \" — \", which starts the note in a reply line: %s"
+                           % ", ".join(json.dumps(c, ensure_ascii=False) for c in dict.fromkeys(dashed)),
+                           "reword the label, or use a plain hyphen (-)")
 
 
 # ---------- building the page ----------
@@ -673,16 +689,11 @@ def fetch(url, tries=3):
 
 
 def read_back(settings, result, content_id):
-    """Fetch every published file from the reader's address and compare checksums,
-    then the link itself: for static and server it is the folder address <id>/,
-    which a web server without directory indexes refuses while serving <id>/index.html,
-    and which one that strips trailing slashes redirects to <id>."""
-    base = settings["url"] + result["id"] + "/"
-    for rel, digest in sorted(result["files"].items()):
-        url = base + "/".join(urllib.parse.quote(p) for p in rel.split("/"))
-        if hashlib.sha256(fetch(url)[0]).hexdigest() != digest:
-            raise PublishError("read-back mismatch: %s differs from what was sent" % rel,
-                               "a cache may be serving an old copy; do not hand out the link, publish again", code=3)
+    """Fetch the link first, as the reader does, then every published file and
+    meta.json relative to where it landed, and compare checksums. For static and
+    server the link is the folder address <id>/, which a web server without
+    directory indexes refuses while serving <id>/index.html, and which one that
+    strips trailing slashes redirects to <id>."""
     link = page_url(settings, result["id"])
     hint = "the web server must answer %s with the page's index.html (a directory index); do not hand out the link" % link
     try:
@@ -697,6 +708,13 @@ def read_back(settings, result, content_id):
                            "do not hand out the link" % link, code=3)
     if hashlib.sha256(page).hexdigest() != result["files"]["index.html"]:
         raise PublishError("read-back mismatch: %s is not the page just published" % link, hint, code=3)
+    # The page's folder at the address the reader ends up at: <id>/, or the folder of a file:// index.html.
+    base = urllib.parse.urljoin(final, ".")
+    for rel, digest in sorted(result["files"].items()):
+        url = base + "/".join(urllib.parse.quote(p) for p in rel.split("/"))
+        if hashlib.sha256(fetch(url)[0]).hexdigest() != digest:
+            raise PublishError("read-back mismatch: %s differs from what was sent" % rel,
+                               "a cache may be serving an old copy; do not hand out the link, publish again", code=3)
     try:
         meta = json.loads(fetch(base + "meta.json")[0].decode("utf-8"))
     except ValueError:

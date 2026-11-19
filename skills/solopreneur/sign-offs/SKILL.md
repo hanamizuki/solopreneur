@@ -98,7 +98,8 @@ the publisher adds the header, buttons, reply builder and styles:
 
 - Each item is a `<section data-item="id">`; ids are short, unique on the
   page, and without spaces (they lead each reply line). Default choices are approve / revise /
-  reject; `data-choices="A|B|C"` sets a single-choice list of your own.
+  reject; `data-choices="A|B|C"` sets a single-choice list of your own (no
+  ` — ` inside a label: it starts the note in the reply).
 - Images live inside `$W`, referenced by relative paths and wrapped in
   `<a href>` so they open full size. Shrink screenshots first (macOS:
   `sips -Z 1600 -s format jpeg -s formatOptions 80 in.png --out "$W/shots/1-ios.jpg"`).
