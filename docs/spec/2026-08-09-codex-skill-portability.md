@@ -364,13 +364,13 @@ update the registry and its behavioral scenarios in the same change.
 
 ## Source-shape inventory
 
-The registry enumerates and validates all 106 canonical skills. Source shape is
+The registry enumerates and validates all 94 canonical skills. Source shape is
 a maintenance classification, not a Codex support claim.
 
 | Source shape | Count | Initial scope |
 | --- | ---: | --- |
-| `shared` | 88 | All Android, iOS, AI engineering, and Neo4j skills; nine designer skills; six marketer skills; `perspective` and `post-mortem` |
-| `shared_with_seams` | 12 | `impeccable`, `slide-design`, `codex-agents-bootstrap`, `handoff`, `merge-pr`, `preview`, `rebuild-skill-index`, `session-retro`, `specialist-review`, `todos-cleanup`, `todos-review`, `worktree-handoff` |
+| `shared` | 77 | All Android, iOS, AI engineering, and Neo4j skills; one designer skill (`taste-skill`); six marketer skills; `perspective` and `post-mortem` |
+| `shared_with_seams` | 11 | `impeccable`, `codex-agents-bootstrap`, `handoff`, `merge-pr`, `preview`, `rebuild-skill-index`, `session-retro`, `specialist-review`, `todos-cleanup`, `todos-review`, `worktree-handoff` |
 | `native_engines` | 6 | `greenlight`, `autopilot`, `mvp`, `plan-review`, `todos-babysit`, `using-marketer` |
 
 `handoff` is at least a seam because delivery tools differ. `plan-review` and

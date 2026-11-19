@@ -31,7 +31,7 @@ core subset plus the four specialist plugins' knowledge skills — no agents, no
 | Plugin | What you get |
 |---|---|
 | [`solopreneur`](#solopreneur-core) | 17 in-house skills (15 product workflows + merge and Codex-agent plumbing) |
-| [`marketer`](#marketer) | `marketer` agent + 8 in-house skills (7 marketing workflows + agent router) |
+| [`marketer`](#marketer) | `marketer` agent + 7 in-house skills (6 marketing workflows + agent router) |
 | [`designer`](#designer) | `designer` agent + 2 vendored design skills (`impeccable` + `taste-skill`) |
 | [`ios-dev`](#ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 24 vendored skills (`apple-design` + `asc-*` + `iphone-apps`) |
 | [`android-dev`](#android-dev) | `android-dev` agent + `android-patterns` + 35 vendored skills (Compose + `gplay-*` + Android official) |
@@ -73,7 +73,7 @@ contracts above when running these skills on Codex.
 
 ### Repository layout
 
-- [`skills/`](./skills/) is the single source for all 103 skills, grouped by
+- [`skills/`](./skills/) is the single source for all 94 skills, grouped by
   plugin so each skill is directly browsable.
 - [`src/`](./src/) holds manifests, agents, shared helpers, vendor metadata,
   and maintainer scripts.
@@ -155,8 +155,8 @@ Start them and walk away. They loop until the job is done.
 
 ### `marketer`
 
-Brand, GTM, content, and writing work. Ships the `marketer` agent plus 8
-in-house skills: 7 domain workflows and one agent router.
+Brand, GTM, content, and writing work. Ships the `marketer` agent plus 7
+in-house skills: 6 domain workflows and one agent router.
 
 | Skill | What it does |
 |---|---|
@@ -166,13 +166,10 @@ in-house skills: 7 domain workflows and one agent router.
 | [`/x-writing`](./skills/marketer/x-writing/SKILL.md) | **Writing Coach.** X/Twitter writing coach for single tweets, threads, and long-form posts. Generates hooks, suggests topics, reviews drafts, and explains craft principles grounded in Aesthetic Writing, RARE hooks, and the algorithmic reality of X |
 | [`/x-growth`](./skills/marketer/x-growth/SKILL.md) | **X Growth Consultant.** Diagnoses X/Twitter profiles, co-creates personalized 12-week growth plans. Covers algorithm mechanics, content strategy, engagement tactics, monetization, and Dream 100 outreach. Integrates with GTM docs |
 | [`/linkedin-growth`](./skills/marketer/linkedin-growth/SKILL.md) | **LinkedIn Growth Consultant.** Diagnoses LinkedIn profiles, co-creates personalized 90-day growth plans. Covers algorithm mechanics, content pillars, engagement engine, audience strategy, and KPI tracking. Integrates with GTM docs |
-| [`/slide-design`](./skills/marketer/slide-design/SKILL.md) | **Presentation Designer.** Wraps `frontend-slides` or `revealjs` with a brand setup phase. Bakes brand colors, typography, and assets in from slide 1. Includes projection-optimized typography scale, Phosphor SVG icon sprite, layered backdrop system, keyboard-driven reveal patterns, fade-in/out background music, 13 reusable layout components, and AI-slop review via `/humanly` (English + Chinese) |
 | [`using-marketer`](./skills/marketer/using-marketer/SKILL.md) | Routes explicit marketer requests and cross-concern marketing work to the `marketer` agent when available, with a bounded inline fallback. |
 
 #### Requirements
 
-- **[frontend-slides](https://github.com/zarazhangrui/frontend-slides)** plugin: single-HTML, animation-rich slide engine. Used by `/slide-design` (recommended).
-- **[revealjs-skill](https://github.com/ryanbbrown/revealjs-skill)** plugin: reveal.js scaffolding (fragments, vertical stacks, speaker notes, Chart.js). Alternative engine for `/slide-design`. Wraps the underlying [reveal.js](https://github.com/hakimel/reveal.js) library.
 - **Antigravity CLI (`agy`)**: optional. Used by `/naming` for parallel multi-model candidate generation (the Gemini-family slot). Without it, `/naming` runs Claude + (optional) Codex CLI only.
 
 ---
@@ -345,8 +342,8 @@ Gemini-family reviewer alongside Codex.
 ### Brand & GTM strategy
 
 `/gtm` analyzes your codebase and interviews you to produce 4 strategy docs.
-Follow up with `/naming` for product names, `/x-writing` and `/linkedin-growth`
-for content strategy, and `/slide-design` for investor or launch decks.
+Follow up with `/naming` for product names, then `/x-writing` and
+`/linkedin-growth` for content strategy.
 
 ### Backlog on auto-pilot
 
@@ -423,7 +420,7 @@ codex plugin marketplace upgrade solopreneur
 | If you build / do… | Install |
 |---|---|
 | Run a one-person engineering org on auto-pilot | `solopreneur` alone |
-| GTM / brand / writing / slides | `solopreneur` + `marketer` |
+| GTM / brand / writing | `solopreneur` + `marketer` |
 | Pure design / UI / UX work | `solopreneur` + `designer` |
 | iOS / macOS SwiftUI apps | `solopreneur` + `ios-dev` |
 | Android / Kotlin apps | `solopreneur` + `android-dev` |

@@ -40,7 +40,7 @@
     {
       "name": "marketer",
       "source": "./plugins/claude/marketer",
-      "description": "Marketing / brand / writing expertise. Ships the marketer agent plus GTM strategy, naming, X/Twitter & LinkedIn growth, AI-pattern removal, and brand-aware slide design.",
+      "description": "Marketing / brand / writing expertise. Ships the marketer agent plus GTM strategy, naming, X/Twitter & LinkedIn growth, and AI-pattern removal.",
       "license": "MIT"
     },
     {

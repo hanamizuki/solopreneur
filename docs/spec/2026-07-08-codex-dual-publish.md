@@ -275,8 +275,6 @@ track resumes, it must resolve at least these verified couplings before full
 parity is claimed:
 
 - `naming` assumes Claude is always the execution harness in its ensemble.
-- `slide-design` contains Claude-specific interaction, multimodal-read, and
-  command vocabulary.
 - `linkedin-growth` uses a Claude configuration path to infer project context.
 
 The same inventory must be repeated for each remaining plugin before its agent

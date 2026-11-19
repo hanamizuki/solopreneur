@@ -95,7 +95,6 @@
     ],
     "shared_with_seams": [
       "designer:impeccable",
-      "marketer:slide-design",
       "solopreneur:codex-agents-bootstrap",
       "solopreneur:handoff",
       "solopreneur:merge-pr",

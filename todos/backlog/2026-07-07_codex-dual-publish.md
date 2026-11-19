@@ -126,7 +126,7 @@
 
 ### Deferred until core V1
 
-- [ ] Audit and port marketer domain-skill seams, including `naming`, `slide-design`, and `linkedin-growth`.
+- [ ] Audit and port marketer domain-skill seams, including `naming` and `linkedin-growth`.
 - [ ] Convert the remaining 5 Claude agents and add the remaining 6 `using-<plugin>` routers one plugin at a time after that plugin's registry entries and skill audit exist.
 - [ ] Promote shared and seam skills in bounded behavioral batches; apply action language or native platform engines only where each selected skill requires it.
 - [ ] Add a generated `docs/skills-catalog.md` with a CI staleness check; this is independent and off the core critical path.

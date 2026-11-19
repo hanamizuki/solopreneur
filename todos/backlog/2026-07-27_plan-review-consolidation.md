@@ -218,7 +218,6 @@ coordinator），合併留下 1 個。它也不解決問題 1（三份 descripti
 | `session-retro/SKILL.md:166` | 舉例 |
 | `todos/backlog/2026-04-29_auto-workflow-plugin-split.md:10,31-32` | 活躍規劃文件的歸屬表 |
 | `todos/backlog/2026-07-07_codex-dual-publish.md:95` | 活躍規劃文件的 skill 清單 |
-| `marketer/skills/slide-design/references/components.md:844` | 投影片範例（可留，非真呼叫） |
 
 **不改 `todos/done/**` 與 `CHANGELOG.md`** — 歷史紀錄不改寫。
 

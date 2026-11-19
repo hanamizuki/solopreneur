@@ -96,8 +96,7 @@ Marketer-specific sources:
    ls "$BASE/plugins/cache/frontend-slides/frontend-slides/" | sort -V | tail -1
    ```
    - Slide-oriented skills — included in the marketer index because
-     presentations are a content/brand output (the `slide-design` curated
-     skill orchestrates them).
+     presentations are a content/brand output.
    - If present: `$BASE/plugins/cache/frontend-slides/frontend-slides/<version>/skills/*/SKILL.md`
    - If absent, skip silently (no warning — this is bonus, not required).
 
@@ -105,8 +104,7 @@ Marketer-specific sources:
    ```bash
    ls "$BASE/plugins/cache/revealjs/revealjs/" | sort -V | tail -1
    ```
-   - Same rationale as frontend-slides — alternative slide engine used by
-     `slide-design`.
+   - Same rationale as frontend-slides — an alternative slide engine.
    - If present: `$BASE/plugins/cache/revealjs/revealjs/<version>/skills/*/SKILL.md`
    - If absent, skip silently.
 
