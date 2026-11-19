@@ -236,7 +236,8 @@ def resolve(cwd, target_name=None):
     if not isinstance(targets, dict):
         raise bad("targets", "must be an object")
     # Every target, not only the one in use: preview validates the whole file
-    # against the schema, so a value let through here would break preview there.
+    # against the schema, so a value let through here would break preview there,
+    # and a broken target must not wait for the day --target picks it.
     for tname, t in targets.items():
         if not isinstance(t, dict):
             raise bad("targets.%s" % tname, "must be an object")
@@ -249,6 +250,22 @@ def resolve(cwd, target_name=None):
                 raise bad("targets.%s.%s" % (tname, key), "must be a non-empty string")
         if "host" in t and not HOST_RE.match(t["host"]):
             raise bad("targets.%s.host" % tname, "must be an SSH destination such as me@box")
+        if t["provider"] == "local":
+            if "host" in t or "url" in t or "dir" in t:
+                raise bad("targets.%s" % tname, "takes no host, url or dir: a local target writes to signoffs.root")
+            continue
+        url = t.get("url") or ""
+        try:
+            url_host = urllib.parse.urlsplit(url).hostname
+        except ValueError:  # an unbalanced [ in the host, for one
+            url_host = None
+        # Page ids are appended to url as text: a ?query or #fragment (even an empty one) would swallow them.
+        if not url.startswith(("http://", "https://")) or not url_host or "?" in url or "#" in url:
+            raise bad("targets.%s.url" % tname, "must be the http(s) address the pages are served at, without ?query or #fragment")
+        if t["provider"] == "static" and "dir" not in t:
+            raise bad("targets.%s.dir" % tname, "is required: the folder the web server serves")
+        if "dir" in t and not (os.path.isabs(t["dir"]) or t["dir"].startswith("~/")):
+            raise bad("targets.%s.dir" % tname, "must be an absolute path or start with ~/ (expanded on the host)")
     default = block.get("defaultTarget")
     if "defaultTarget" in block and (not isinstance(default, str) or not default):
         raise bad("defaultTarget", "must be the name of a target")
@@ -267,24 +284,11 @@ def resolve(cwd, target_name=None):
                 "replyTo": reply_to if reply_to is not None else server.load_strings(lang)["defaultReplyTo"]}
 
     if provider == "local":
-        if "host" in target or "url" in target or "dir" in target:
-            raise bad("targets.%s" % name, "takes no host, url or dir: a local target writes to signoffs.root")
         directory = local_root(path, root, cwd)
         settings.update(host=None, local=True, dir=directory, url=pathlib.Path(directory).as_uri() + "/")
     else:
-        url = target.get("url") or ""
-        try:
-            url_host = urllib.parse.urlsplit(url).hostname
-        except ValueError:  # an unbalanced [ in the host, for one
-            url_host = None
-        # Page ids are appended to url as text: a ?query or #fragment (even an empty one) would swallow them.
-        if not url.startswith(("http://", "https://")) or not url_host or "?" in url or "#" in url:
-            raise bad("targets.%s.url" % name, "must be the http(s) address the pages are served at, without ?query or #fragment")
-        directory = target.get("dir", server.DEFAULT_DIR if provider == "server" else None)
-        if directory is None:
-            raise bad("targets.%s.dir" % name, "is required: the folder the web server serves")
-        if not (os.path.isabs(directory) or directory.startswith("~/")):
-            raise bad("targets.%s.dir" % name, "must be an absolute path or start with ~/ (expanded on the host)")
+        url = target["url"]
+        directory = target.get("dir", server.DEFAULT_DIR)  # a static target always names one (checked above)
         host = target.get("host")
         local = is_local_host(host)
         if local:
@@ -358,6 +362,29 @@ def is_local_host(host):
 
 # ---------- page checks ----------
 
+def _srcset_urls(value):
+    """The candidate URLs of a srcset, split as the HTML spec does: a URL runs to the
+    next whitespace and may hold commas (`a,b.png`, a data: URL). Commas ending it,
+    or else the first comma after its descriptors, start the next candidate."""
+    urls, pos, end = [], 0, len(value)
+    while True:
+        while pos < end and value[pos] in " \t\n\f\r,":
+            pos += 1
+        if pos == end:
+            return urls
+        start = pos
+        while pos < end and value[pos] not in " \t\n\f\r":
+            pos += 1
+        url = value[start:pos]
+        if url.endswith(","):
+            url = url.rstrip(",")
+        else:
+            pos = value.find(",", pos)  # past the descriptors
+            if pos < 0:
+                pos = end
+        urls.append(url)
+
+
 class _Tags(html.parser.HTMLParser):
     """Attribute values as a browser reads them (quoted or not, character references
     decoded), from start and self-closing tags only: comments and the text of
@@ -374,7 +401,7 @@ class _Tags(html.parser.HTMLParser):
             elif value and name in REF_ATTRS:
                 self.refs.append(value)
             elif value and name == "srcset":
-                self.refs.extend(part.split()[0] for part in value.split(",") if part.strip())
+                self.refs.extend(_srcset_urls(value))
 
     def error(self, message):  # Python 3.9 reports here; 3.10-3.12 raise AssertionError themselves
         raise AssertionError(message)
@@ -462,14 +489,18 @@ def collect(src):
     else:
         raise PublishError("not found: %s" % src)
 
-    total = 0
+    # Sizes first: a page over the cap is refused before any of its files is opened.
+    sizes = {rel: os.path.getsize(full) for rel, full in files.items()}
+    total = sum(sizes.values())
+    over = total > server.MAX_PAYLOAD - UI_HEADROOM
+    if over:
+        errors.append("the page is %.1f MB, over the %d MB limit: compress the screenshots" % (total / 1048576, server.MAX_PAYLOAD >> 20))
     for rel, full in sorted(files.items()):
-        size = os.path.getsize(full)
-        total += size
+        size = sizes[rel]
         if rel.lower().endswith(IMAGE_EXT) and size > WARN_IMAGE:
             warnings.append("%s is %.1f MB and will load slowly on a phone; shrink it first (for example "
                             "`sips -Z 1600 -s format jpeg -s formatOptions 80 in.png --out out.jpg` on macOS)" % (rel, size / 1048576))
-        if rel.lower().endswith(REF_FILES):
+        if rel.lower().endswith(REF_FILES) and not over:
             with open(full, encoding="utf-8", errors="replace") as f:
                 text = f.read()
             for ref in _refs(text, rel.lower().endswith(".css")):
@@ -478,8 +509,6 @@ def collect(src):
                     errors.append(err)
             if "/Users/" in text or "/home/" in text or "file://" in text:
                 warnings.append("%s mentions a local path (/Users/, /home/ or file://) that readers cannot open; ignore this if it is only prose" % rel)
-    if total > server.MAX_PAYLOAD - UI_HEADROOM:
-        errors.append("the page is %.1f MB, over the %d MB limit: compress the screenshots" % (total / 1048576, server.MAX_PAYLOAD >> 20))
     if errors:
         raise PublishError("the page did not pass its checks:\n  - " + "\n  - ".join(dict.fromkeys(errors)), "fix these and publish again")
     return files, warnings
@@ -696,8 +725,9 @@ def prepare_local_root(directory):
         rules = None
     # Git applies the last matching rule, so only a final `*` ignores everything: `*`
     # then `!*.png` brings the screenshots back. As git reads it: a comment starts at
-    # the first column, trailing spaces are dropped, leading ones are part of the pattern.
-    effective = [r.rstrip() for r in (rules or "").splitlines() if r.strip() and not r.startswith("#")]
+    # the first column, trailing spaces (not tabs) are dropped, leading ones are part
+    # of the pattern.
+    effective = [r.rstrip(" ") for r in (rules or "").splitlines() if r.strip() and not r.startswith("#")]
     if effective[-1:] != ["*"]:
         # About to claim the folder: `*` would hide every new file in it from git,
         # and would stay behind even when the store then refuses the publish. Only

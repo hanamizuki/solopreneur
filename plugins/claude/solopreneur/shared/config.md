@@ -1396,8 +1396,9 @@ Every key is optional:
 
 The `static` and `server` index lists every page that has not expired: serve
 them on a network that only the readers and the publishing machine can reach,
-such as a tailnet or a VPN. A login page does not work: the read-back fetches
-every file from `url` without credentials.
+such as a tailnet or a VPN; serve a `static` folder without long-lived caching,
+so an update's images are fetched again. A login page does not work: the
+read-back fetches every file from `url` without credentials.
 
 ## Resolution
 
