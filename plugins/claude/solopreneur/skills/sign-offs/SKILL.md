@@ -183,7 +183,7 @@ revision N". The reply's first line shows which revision they saw.
 | Provider | For | Needs |
 |---|---|---|
 | `local` (default) | the reader is at this computer | nothing |
-| `static` | the user already serves a folder as a website | a folder used only for sign-offs, served at `url` (https, so the copy button works; without long-lived caching, so an update's images are fetched again; allowing the page's inline script, so no Content-Security-Policy that blocks it) on a network only the readers and the publishing machine can reach, such as a tailnet or a VPN; for a remote `host`, SSH and `python3` 3.9+ there |
+| `static` | the user already serves a folder as a website | a folder used only for sign-offs, served at `url` (https, so the copy button works; without long-lived caching, so an update's images are fetched again; with no Content-Security-Policy that blocks the page's inline script or same-origin fetches, or sandboxes it without allow-scripts and allow-same-origin) on a network only the readers and the publishing machine can reach, such as a tailnet or a VPN; for a remote `host`, SSH and `python3` 3.9+ there |
 | `server` | the user wants a dedicated service, e.g. behind Tailscale Serve | the bundled server installed on `host`, reachable only by the readers and the publishing machine (Tailscale Serve on a tailnet, or a reverse proxy on a VPN) |
 
 A login page in front of `url` does not work: the read-back fetches every file

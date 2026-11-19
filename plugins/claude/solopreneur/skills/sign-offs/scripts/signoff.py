@@ -521,8 +521,9 @@ def collect(src, raw=False):
                     errors.append("%s is not a regular file: use a real file" % rel)
                 elif n.startswith("."):
                     errors.append("%s starts with a dot: dot files are never published; rename or remove it" % rel)
-                elif rel in server.RESERVED:
-                    errors.append("%s is written at publish time: rename yours" % rel)
+                elif rel.casefold() in server.RESERVED:  # as the store compares: Meta.js is meta.js on most Macs
+                    errors.append("%s is a reserved name (meta.json and meta.js, in any letter case, are written "
+                                  "at publish time): rename yours" % rel)
                 else:
                     files[rel] = full
         if "index.html" not in files:
@@ -731,14 +732,38 @@ def fetch(url, tries=3):
                        "running and https points at it); do not hand out the link", code=3)
 
 
-def _blocking_policy(headers):
-    """The Content-Security-Policy that stops an inline <script> from running, or None.
-    As CSP3 has it: every policy must allow the script (a -Report-Only header only
-    reports); a policy restricts it through script-src-elem, else script-src, else
-    default-src, and with none of these does not restrict scripts; and
-    'unsafe-inline' allows it only without a nonce, a hash or 'strict-dynamic'
-    beside it, which make browsers ignore 'unsafe-inline'. Names and keywords are
-    case-insensitive."""
+# The scheme sources that cover a page's own scheme: CSP3 lets http: and ws: match their
+# secure upgrades too.
+CSP_SCHEMES = {"http": ("http:", "ws:"), "https": ("https:", "http:", "wss:", "ws:")}
+
+
+def _fetch_allowed(source, scheme, host):
+    """Whether one connect-src source lets the page at scheme://host fetch its own
+    meta.json: *, 'self', a scheme source in CSP_SCHEMES, or a host source naming its
+    host (*.example covers subdomains only).
+    ponytail: of a host source only the host is compared, not its scheme, port or path,
+    so a few lists that do block pass; the clear cases ('none', only other hosts) are caught."""
+    if source == "'self'" or source in CSP_SCHEMES.get(scheme, ()):
+        return True
+    # The host of [scheme://]host[:port][/path], where * and *.example are patterns.
+    name = re.split(r"[:/]", re.sub(r"^[a-z][a-z0-9+.-]*://", "", source), maxsplit=1)[0]
+    return name in ("*", host) or (name.startswith("*.") and host.endswith(name[1:]))
+
+
+def _blocking_policy(headers, url):
+    """(policy, what it blocks, the fix) for the first Content-Security-Policy that would
+    break the wrapped page at `url`, or None. As CSP3 has it, every policy must allow the
+    page (a -Report-Only header only reports), and names and keywords are case-insensitive.
+    The page needs:
+    - its inline <script> to run: script-src-elem, else script-src, else default-src
+      restricts it (with none of them, scripts are unrestricted), and 'unsafe-inline'
+      allows it only without a nonce, a hash or 'strict-dynamic' beside it, which make
+      browsers ignore 'unsafe-inline';
+    - fetch('meta.json') from its own origin: connect-src, else default-src restricts it;
+    - under a sandbox, allow-scripts, or nothing runs, and allow-same-origin, or its origin
+      is opaque: fetch('meta.json') then fails and localStorage throws."""
+    split = urllib.parse.urlsplit(url)
+    scheme, host = split.scheme, split.hostname or ""
     for header in headers.get_all("Content-Security-Policy") or []:
         for policy in header.split(","):  # one header may carry several policies
             directives = {}
@@ -746,10 +771,17 @@ def _blocking_policy(headers):
                 words = directive.split()
                 if words:
                     directives.setdefault(words[0], words[1:])  # a repeated directive is ignored
-            sources = next((directives[d] for d in ("script-src-elem", "script-src", "default-src") if d in directives), None)
-            if sources is not None and ("'unsafe-inline'" not in sources or any(
-                    s.startswith(("'nonce-", "'sha256-", "'sha384-", "'sha512-", "'strict-dynamic'")) for s in sources)):
-                return policy.strip()
+            script = next((d for d in ("script-src-elem", "script-src", "default-src") if d in directives), None)
+            if script and ("'unsafe-inline'" not in directives[script] or any(
+                    s.startswith(("'nonce-", "'sha256-", "'sha384-", "'sha512-", "'strict-dynamic'")) for s in directives[script])):
+                return (policy.strip(), "blocks the page's inline script",
+                        "%s must allow 'unsafe-inline', with no nonce, hash or 'strict-dynamic' beside it" % script)
+            connect = next((d for d in ("connect-src", "default-src") if d in directives), None)
+            if connect and not any(_fetch_allowed(s, scheme, host) for s in directives[connect]):
+                return policy.strip(), "blocks the page's fetch of meta.json", "%s must allow 'self'" % connect
+            if "sandbox" in directives and not {"allow-scripts", "allow-same-origin"} <= set(directives["sandbox"]):
+                return (policy.strip(), "sandboxes the page without allow-scripts and allow-same-origin",
+                        "sandbox must include allow-scripts and allow-same-origin")
     return None
 
 
@@ -759,7 +791,8 @@ def read_back(settings, result, raw):
     wrote. For static and server the link is the folder address <id>/, which a
     web server without directory indexes refuses while serving <id>/index.html,
     and which one that strips trailing slashes redirects to <id>. A wrapped page
-    (not `raw`) also needs its inline script allowed to run."""
+    (not `raw`) also needs a Content-Security-Policy that lets its inline script run
+    and fetch meta.json."""
     link = page_url(settings, result["id"])
     hint = "the web server must answer %s with the page's index.html (a directory index); do not hand out the link" % link
     try:
@@ -781,14 +814,15 @@ def read_back(settings, result, raw):
         raise PublishError("read-back mismatch: %s would not open as a web page (Content-Type: %s, Content-Disposition: %s)"
                            % (link, headers.get("Content-Type", "none"), headers.get("Content-Disposition", "none")),
                            "the web server must serve index.html as text/html, inline; do not hand out the link", code=3)
-    # The shared review UI is one inline <script>: blocked, the page never gets past "Loading…".
-    # A --raw page brings its own UI, and a file:// response carries no policy.
-    policy = None if raw else _blocking_policy(headers)
-    if policy:
-        raise PublishError("read-back mismatch: %s would not run the page's inline script (Content-Security-Policy: %s)"
-                           % (link, policy),
-                           "the web server's Content-Security-Policy must allow inline scripts for this folder; "
-                           "do not hand out the link", code=3)
+    # The shared review UI is one inline <script> that fetches meta.json: blocked, the page
+    # never gets past "Loading…" or has no id and revision to reply with. A --raw page
+    # brings its own UI, and a file:// response carries no policy.
+    blocked = None if raw else _blocking_policy(headers, final)
+    if blocked:
+        policy, what, fix = blocked
+        raise PublishError("read-back mismatch: the Content-Security-Policy of %s %s: %s" % (link, what, policy),
+                           "in the web server's Content-Security-Policy for this folder, %s; do not hand out the link" % fix,
+                           code=3)
     # The page's folder at the address the reader ends up at: <id>/, or the folder of a file:// index.html.
     base = urllib.parse.urljoin(final, ".")
     for rel, digest in sorted(result["files"].items()):
