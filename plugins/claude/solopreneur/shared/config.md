@@ -8,7 +8,8 @@ description: |
      write_solopreneur_repo_config — and their per-repo override cascade.
   2. `.solopreneur.json` (v2, keyed by filesystem path): the schema, the
      resolution order, and the path rules used by the preview Library and its
-     config-resolve.mjs resolver.
+     config-resolve.mjs resolver, plus the `signoffs` block read by the
+     sign-offs skill's signoff.py.
   The two files coexist; neither reader touches the other's file.
 
   This file is NOT a skill — it is a reference document. The helpers it
@@ -391,7 +392,10 @@ registered here by hand:
 Everything above describes `solopreneur.json`, the **legacy** per-user feature
 config read through the shell helpers in `config.sh`. This section describes
 `.solopreneur.json` (note the leading dot), a **different file** introduced for
-the preview Library.
+the preview Library. It also carries the `signoffs` block of the sign-offs
+skill; see "The `signoffs` block" at the end of this document. One file may
+configure either feature or both, each in its own top-level block, and each
+reader resolves only its own block.
 
 Preview's **library** delivery — the default — resolves this file for its
 content root, collections and include set, and writes a `preview.json`
@@ -418,7 +422,11 @@ scopes — neither of which a remote-keyed config can express.
 
 `config.schema.json` (next to this file) is the machine-verifiable definition —
 a Draft 2020-12 JSON Schema covering `.solopreneur.json` only. It deliberately
-does not describe the legacy file.
+does not describe the legacy file. `schemaVersion` is the only required key:
+`preview` and `signoffs` are both optional at the schema level, so a file can
+configure one feature without the other. Whatever the file holds is validated
+as a whole — preview's resolver also rejects a malformed `signoffs` block in a
+file it reads.
 
 ```jsonc
 {
@@ -518,7 +526,7 @@ hit wins:
 |---|-------------------------------------------|----------|
 | 1 | `$SOLOPRENEUR_CONFIG`                     | `v2`     |
 | 2 | nearest ancestor `.solopreneur.json` **that has a `preview` block** | `v2` |
-| 3 | `~/.config/solopreneur/config.json`       | `v2`     |
+| 3 | `~/.config/solopreneur/config.json`, unless it configures only another feature | `v2` |
 | 4 | legacy `${CLAUDE_CONFIG_DIR}/solopreneur.json` | `legacy` |
 | 5 | legacy `~/.claude/solopreneur.json`       | `legacy` |
 | — | nothing found                             | `none`   |
@@ -541,9 +549,11 @@ single-file report would let the migrator silently drop it.
   boundaries is deliberate: a repo with no config of its own inherits the
   enclosing scope. It stops at the filesystem root.
 - A `.solopreneur.json` with no `preview` block is **skipped** and the walk
-  continues — that file may configure something else. This applies to the
-  walk-up only: layers 1 and 3 name one specific v2 file, so a file that is
-  there but has no `preview` block is a broken config and is reported.
+  continues — that file may configure something else. Layers 1 and 3 name one
+  specific v2 file, so they are stricter: a layer-1 file without a `preview`
+  block is reported, and so is a layer-3 file that configures nothing. A
+  layer-3 file that carries only another feature's block (`signoffs`) is
+  stepped over: sign-offs' first run may save its settings there.
 - A relative `root` resolves against **the directory of the config file that
   declared it**, never the git root and never the working directory. This is the
   same anchoring lesson as `deploy.sh`'s `$DIR`-anchored repo key.
@@ -1355,3 +1365,80 @@ injects a fake `deps`, so the suite performs **zero real network calls and zero 
 deploys** and spawns no `vercel` or `curl` process.
 
 ---
+
+# The `signoffs` block
+
+The sign-offs skill (`skills/solopreneur/sign-offs/`) publishes temporary review
+pages. Its settings live in the same `.solopreneur.json`, in a `signoffs` block,
+and are read by `scripts/signoff.py` itself — Python standard library, no Node.
+Every key is optional:
+
+```jsonc
+"signoffs": {
+  "root": "./docs/solopreneur/sign-offs", // local provider folder, relative to THIS file
+  "lang": "en",                           // en (default) | zh-Hant
+  "ttlDays": 7,                           // 1–365; every update restarts the clock
+  "replyTo": "Paste it back in the chat", // optional; a per-language sentence otherwise
+  "defaultTarget": "home",                // omitted: the built-in local provider
+  "targets": {
+    "home":   { "provider": "server", "host": "me@box", "url": "https://box.example.ts.net/" },
+    "portal": { "provider": "static", "dir": "/srv/www/sign-offs", "url": "https://portal.example/sign-offs/" }
+  }
+}
+```
+
+| Provider | Writes to | Link |
+|---|---|---|
+| `local` | `signoffs.root` on this machine | `file://…/<id>/index.html` |
+| `static` | `dir` on `host` — a folder an existing web server serves, used for nothing else | `<url><id>/` |
+| `server` | `dir` on `host`, default `~/.local/share/solopreneur/sign-offs` | `<url><id>/`, served by the bundled server |
+
+## Resolution
+
+`signoff.py` mirrors preview's layers, per block, anchored at the **current
+directory** (page sources usually sit in a temporary directory, which says
+nothing about the project):
+
+| # | Source | When it has no `signoffs` block |
+|---|---|---|
+| 1 | `$SOLOPRENEUR_CONFIG` | built-in defaults; never falls through |
+| 2 | nearest ancestor `.solopreneur.json` that has a `signoffs` block | stepped over |
+| 3 | `~/.config/solopreneur/config.json` | built-in defaults |
+
+The same failures stop the lookup as in preview: malformed JSON, a top level
+that is not an object, a file that is not a regular file, and a broken symlink.
+A file whose `signoffs` block is used must say `"schemaVersion": 2`. Unknown keys
+in the block are reported as warnings and ignored, so one config shared by
+machines on different plugin versions keeps working; invalid values of known
+keys are errors that name the file.
+
+## Path rules
+
+- A relative `root` resolves against the directory of the config file. When
+  that directory lies in a **linked git worktree**, the path moves to the same
+  place in the **main working tree** (`git rev-parse --path-format=absolute
+  --git-common-dir`, parent of `<main>/.git`), so pages outlive `git worktree
+  remove`. Submodules and bare repositories are left alone — their common
+  directory has no working tree as its parent.
+- With no config, `root` is `docs/solopreneur/sign-offs` under the main working
+  tree of the current repository (the current directory outside git).
+- `root` must be a folder dedicated to sign-offs: the publisher drops a
+  `.gitignore` of `*` into it and refuses a repository root, the home directory
+  and `/`.
+- `dir` must be absolute or start with `~/`; `~` expands on the host that holds
+  the pages.
+- `host` is any SSH destination. Omitted, `local`, or a name that resolves to
+  this machine (its host names, or an address it can bind to) means a local
+  write, so one config can be shared by the store host and the machines that
+  publish to it. A wrong guess cannot hand out a broken link: every publish
+  reads its files back from `url` before printing it.
+
+## Who renders what
+
+Pages are wrapped at publish time with the review UI in the skill's
+`assets/page.html` and the dictionary in `assets/strings.json`. The `static`
+and `local` stores rewrite their `index.html` on every publish (and refuse to
+overwrite one they did not write); the `server` provider renders its index per
+request in the language given to `install`. Install it on the host with
+`scripts/server.py install --port <port> --lang <lang> --ttl-days <days>`.
+

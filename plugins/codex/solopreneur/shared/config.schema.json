@@ -1,15 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": ".solopreneur.json (schema version 2)",
-  "description": "Path-scoped solopreneur configuration. This schema describes the v2 `.solopreneur.json` file ONLY. The legacy `solopreneur.json` feature config (the `default`/`repos` cascade documented in shared/config.md) is a different file under a different regime and is deliberately not described here. The two coexist.",
+  "description": "Path-scoped solopreneur configuration. This schema describes the v2 `.solopreneur.json` file ONLY. The legacy `solopreneur.json` feature config (the `default`/`repos` cascade documented in shared/config.md) is a different file under a different regime and is deliberately not described here. The two coexist. One file may configure several features, each in its own top-level block; every reader resolves only its own block and steps over files that lack it.",
   "type": "object",
-  "required": ["schemaVersion", "preview"],
+  "required": ["schemaVersion"],
   "properties": {
     "schemaVersion": {
       "description": "Format version of this file. Bumped only on a breaking layout change.",
       "const": 2
     },
-    "preview": { "$ref": "#/$defs/preview" }
+    "preview": { "$ref": "#/$defs/preview" },
+    "signoffs": { "$ref": "#/$defs/signoffs" }
   },
   "$defs": {
     "preview": {
@@ -93,6 +94,66 @@
           "minItems": 1,
           "items": { "type": "string" },
           "description": "Collection keys published to this target, in catalog order."
+        }
+      }
+    },
+    "signoffs": {
+      "type": "object",
+      "description": "Configuration for the sign-offs review pages. Every key is optional; with no block anywhere, pages go to docs/solopreneur/sign-offs/ in the main working tree, in English, for 7 days. Unknown keys are ignored with a warning, so a config shared by machines on different plugin versions keeps working.",
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Folder for the `local` provider. A relative value resolves against the directory of THIS file and, when that lies in a linked git worktree, is moved to the same place in the main working tree so pages outlive the worktree. A leading `~` is NOT expanded. Default: docs/solopreneur/sign-offs under the main working tree."
+        },
+        "lang": {
+          "enum": ["en", "zh-Hant"],
+          "description": "Language of the review UI and of the reply keywords; the first reply line is always `sign-off <id> r<revision>`. Default: en."
+        },
+        "ttlDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "description": "Days a page lives after its latest publish; every update restarts the clock. Default: 7."
+        },
+        "replyTo": {
+          "type": "string",
+          "description": "Where the reader pastes the reply, shown on every new page. Default: a per-language sentence."
+        },
+        "defaultTarget": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Key under `targets` used when no --target is given. Omitted: the built-in local provider."
+        },
+        "targets": {
+          "type": "object",
+          "description": "Publish targets, keyed by name.",
+          "additionalProperties": { "$ref": "#/$defs/signoffsTarget" }
+        }
+      }
+    },
+    "signoffsTarget": {
+      "type": "object",
+      "required": ["provider"],
+      "properties": {
+        "provider": {
+          "enum": ["local", "static", "server"],
+          "description": "`local`: files under signoffs.root, opened over file://. `static`: a folder an existing web server already serves. `server`: the bundled server (install it with scripts/server.py install)."
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "description": "SSH destination holding `dir` (static, server). Omitted or `local`: this machine. A config shared by several machines may name the store host: on that host the publisher writes locally instead of connecting to itself."
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "http(s) address that serves `dir` (static, server); a page is published at <url><id>/. Use https: browsers only allow the copy button in a secure context."
+        },
+        "dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Folder holding the pages on the host: absolute, or starting with `~/` (expanded on the host). Required for static, which must not share it with other content; for server it defaults to ~/.local/share/solopreneur/sign-offs, where install puts the server."
         }
       }
     }

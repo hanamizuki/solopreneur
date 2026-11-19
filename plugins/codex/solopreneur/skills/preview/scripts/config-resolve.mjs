@@ -17,7 +17,8 @@
  *   1. $SOLOPRENEUR_CONFIG                          -> mode "v2"
  *   2. nearest ancestor .solopreneur.json that
  *      contains a `preview` block                   -> mode "v2"
- *   3. ~/.config/solopreneur/config.json            -> mode "v2"
+ *   3. ~/.config/solopreneur/config.json, unless it
+ *      configures only another feature (signoffs)   -> mode "v2"
  *   4. legacy ${CLAUDE_CONFIG_DIR}/solopreneur.json -> mode "legacy"
  *   5. legacy ~/.claude/solopreneur.json            -> mode "legacy"
  *   nothing found                                   -> mode "none"
@@ -75,18 +76,20 @@ const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 // engine. The repo has no package.json and allows no dependencies, and reading
 // the schema file keeps it the single source of truth instead of restating
 // every rule twice. If the schema ever needs more than the keywords below, drop
-// in ajv rather than growing this.
+// in ajv rather than growing this. `integer`, `minimum` and `maximum` are here
+// for the `signoffs` block, whose ttlDays is a bounded whole number; build-library.mjs
+// already implements the same pair for preview-schema.json.
 // ---------------------------------------------------------------------------
 
 /** Keywords the interpreter implements, plus non-validating annotations. */
 const KNOWN_KEYWORDS = new Set([
   '$ref', 'type', 'const', 'enum', 'required', 'properties',
-  'additionalProperties', 'items', 'minItems', 'minLength',
+  'additionalProperties', 'items', 'minItems', 'minLength', 'minimum', 'maximum',
   '$schema', '$defs', 'title', 'description',
 ]);
 
 /** `type` values the interpreter implements. */
-const KNOWN_TYPES = new Set(['object', 'array', 'string']);
+const KNOWN_TYPES = new Set(['object', 'array', 'string', 'integer']);
 
 const schemaBug = (detail) => new Error(
   `${SELF}: ${detail}\n  in ${SCHEMA_PATH}\n`
@@ -131,6 +134,8 @@ function auditSchema(node, defs, where) {
     ['properties', isObject(node.properties)],
     ['minLength', typeof node.minLength === 'number'],
     ['minItems', typeof node.minItems === 'number'],
+    ['minimum', typeof node.minimum === 'number'],
+    ['maximum', typeof node.maximum === 'number'],
   ]) {
     if (keyword in node && !ok) throw schemaBug(`malformed "${keyword}" at ${where}`);
   }
@@ -180,6 +185,10 @@ function validate(value, schema, defs, where, errors) {
     errors.push(`${where}: expected a string`);
     return;
   }
+  if (schema.type === 'integer' && !Number.isInteger(value)) {
+    errors.push(`${where}: expected a whole number`);
+    return;
+  }
   if ('const' in schema && value !== schema.const) {
     errors.push(`${where}: expected ${JSON.stringify(schema.const)}`);
     return;
@@ -193,6 +202,12 @@ function validate(value, schema, defs, where, errors) {
   }
   if ('minItems' in schema && Array.isArray(value) && value.length < schema.minItems) {
     errors.push(`${where}: needs at least ${schema.minItems} item(s)`);
+  }
+  if ('minimum' in schema && typeof value === 'number' && value < schema.minimum) {
+    errors.push(`${where}: must be at least ${schema.minimum}`);
+  }
+  if ('maximum' in schema && typeof value === 'number' && value > schema.maximum) {
+    errors.push(`${where}: must be at most ${schema.maximum}`);
   }
   if ('required' in schema && isObject(value)) {
     for (const key of schema.required) {
@@ -273,6 +288,23 @@ function readJsonIfPresent(file) {
     return JSON.parse(raw);
   } catch (err) {
     throw new ConfigError(`malformed JSON in config: ${file}\n  ${err.message}`);
+  }
+}
+
+/**
+ * Top-level blocks of other features. A layer-3 file that carries one of these
+ * and no `preview` block configures that feature — it is not a broken preview
+ * config. Keep in step with the blocks config.schema.json declares.
+ */
+const OTHER_FEATURE_BLOCKS = ['signoffs'];
+
+/**
+ * The schema no longer requires `preview` (a file may configure only another
+ * feature), so the layers that name one specific file enforce it here.
+ */
+function requirePreviewBlock(config, file) {
+  if (!Object.hasOwn(config, 'preview')) {
+    throw new ConfigError(`invalid config: ${file}\n  preview: required but missing`);
   }
 }
 
@@ -495,6 +527,7 @@ export function resolveConfig({ from } = {}) {
     if (config === undefined) throw new ConfigError(`$SOLOPRENEUR_CONFIG does not exist: ${file}`);
     assertConfigObject(config, file);
     validateV2(config, file);
+    requirePreviewBlock(config, file);
     return decide(resolveV2(file, config));
   }
 
@@ -505,16 +538,21 @@ export function resolveConfig({ from } = {}) {
     return decide(resolveV2(ancestor.file, ancestor.config));
   }
 
-  // Layer 3: the user-global v2 config. Unlike the walk-up, a file here is not
-  // skipped for lacking a `preview` block: there is only one of these, it is a
-  // v2 file, and the schema requires `preview` — so a typo'd or half-written
-  // one is a broken higher-priority config, not a config for another feature.
+  // Layer 3: the user-global v2 config. Unlike the walk-up, a file here is
+  // skipped only when it carries another feature's block instead of `preview`:
+  // there is only one of these, so one that configures nothing — typo'd or
+  // half-written — is a broken higher-priority config and is reported.
   const globalFile = path.join(os.homedir(), '.config', 'solopreneur', 'config.json');
   const globalConfig = readJsonIfPresent(globalFile);
   if (globalConfig !== undefined) {
     assertConfigObject(globalConfig, globalFile);
     validateV2(globalConfig, globalFile);
-    return decide(resolveV2(globalFile, globalConfig));
+    const otherFeatureOnly = !Object.hasOwn(globalConfig, 'preview')
+      && OTHER_FEATURE_BLOCKS.some((key) => Object.hasOwn(globalConfig, key));
+    if (!otherFeatureOnly) {
+      requirePreviewBlock(globalConfig, globalFile);
+      return decide(resolveV2(globalFile, globalConfig));
+    }
   }
 
   // Layers 4-5: the legacy feature config, reported as-is. BOTH files are

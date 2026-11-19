@@ -558,6 +558,43 @@ test('a global v2 config missing preview is reported, not stepped over', () => {
   assert.ok(result.stderr.includes(globalFile), result.stderr);
 });
 
+test('a global config that configures only sign-offs is stepped over', () => {
+  const home = tmp();
+  writeJson(
+    path.join(home, '.config', 'solopreneur', 'config.json'),
+    { schemaVersion: 2, signoffs: { lang: 'en' } },
+  );
+  // Sign-offs' first run offers to save its settings at user level. That file
+  // configures another feature, so preview carries on to the legacy layers.
+  const out = runJson(['--from', mkdirp(tmp(), 'work')], { home });
+  assert.equal(out.mode, 'none');
+});
+
+test('$SOLOPRENEUR_CONFIG that configures only sign-offs still errors for preview', () => {
+  const root = tmp();
+  const explicit = writeJson(path.join(root, 'signoffs-only.json'), { schemaVersion: 2, signoffs: {} });
+
+  const result = run(['--json'], { cwd: root, env: { SOLOPRENEUR_CONFIG: explicit } });
+  assertFailed(result);
+  assert.ok(result.stderr.includes(explicit), result.stderr);
+  assert.ok(result.stderr.includes('preview: required but missing'), result.stderr);
+});
+
+test('a signoffs block in the same file is validated with it', () => {
+  const root = tmp();
+  const repo = mkdirp(root, 'repo');
+  const file = writeJson(path.join(repo, '.solopreneur.json'), { ...v2('both'), signoffs: { ttlDays: 7, lang: 'zh-Hant' } });
+  mkdirp(repo, 'previews');
+  assert.equal(runJson(['--from', path.join(repo, 'previews')]).target.project, 'both');
+
+  for (const [ttlDays, message] of [['7', 'expected a whole number'], [1.5, 'expected a whole number'], [0, 'must be at least 1'], [366, 'must be at most 365']]) {
+    writeJson(file, { ...v2('both'), signoffs: { ttlDays } });
+    const result = run(['--json', '--from', path.join(repo, 'previews')]);
+    assertFailed(result);
+    assert.ok(result.stderr.includes(`signoffs.ttlDays: ${message}`), result.stderr);
+  }
+});
+
 test('a dangling config symlink is reported, not treated as absent', () => {
   const root = tmp();
   writeJson(path.join(root, '.solopreneur.json'), v2('ancestor-project', { root: '.' }));
