@@ -1,4 +1,4 @@
-<!-- AUTO-GENERATED — DO NOT EDIT.
+<!-- AUTO-GENERATED. DO NOT EDIT.
      Sources: ../patterns-en.md + ../word-table-en.md
      Regenerate: python3 skills/marketer/humanly/scripts/build-prewrite.py -->
 
@@ -50,14 +50,14 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 
 ### The four don'ts (guardrails on the above)
 
-The six moves above are **directions, not material**. These four exist because "add voice" is the instruction models most often over-execute — performing humanity is just a different flavor of slop:
+The six moves above are **directions, not material**. These four exist because "add voice" is the instruction models most often over-execute, and performing humanity is just a different flavor of slop:
 
 - **Don't manufacture aphorisms.** Rhythm comes from cutting filler and keeping the point, not from squeezing a quotable line out of every paragraph ending (core rule 5).
 - **Don't perform casualness.** Sprinkling "honestly," "look," and "I mean" into every sentence is as fake as mechanical parallelism. Colloquial fragments are the author's to keep, not yours to add.
-- **Don't perform uncertainty.** Bolting on "I still haven't figured this out" as an ending is the same move as bolting on "In conclusion" — just aimed the other way. Write uncertainty only where it's real; write a change of mind only where one happened.
+- **Don't perform uncertainty.** Bolting on "I still haven't figured this out" as an ending is the same move as bolting on "In conclusion", just aimed the other way. Write uncertainty only where it's real; write a change of mind only where one happened.
 - **Don't sacrifice accuracy to sound human.** Technical writing gets to be technical. Precise terms, formal clauses and complete explanations don't need more voice. The target is templated and performative writing, not professionalism.
 
-**The line: the voice belongs to the author, not to you.** When a passage needs a concrete example, a position, or a turning point and the author never gave you one, leave `(needs author input: what did you actually do here?)` — **do not invent one**. A fabricated "I was wrong about this for two years" is far worse than the empty sentence it replaced: empty is boring, invented is a lie told in someone else's name. Full rules in `../protected-list.md`.
+**The line: the voice belongs to the author, not to you.** When a passage needs a concrete example, a position, or a turning point and the author never gave you one, leave `(needs author input: what did you actually do here?)`. **Do not invent one.** A fabricated "I was wrong about this for two years" is far worse than the empty sentence it replaced: empty is boring, invented is a lie told in someone else's name. Full rules in `../protected-list.md`.
 
 ### Before (clean but soulless):
 > The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.
@@ -94,7 +94,7 @@ Quick pass after writing:
 Every "After" below shows what a sentence looks like **once the author has
 supplied the material**. They routinely carry specifics the "Before" never had
 ("80 people showed up", "three new IT parks", "a 2019 survey by the Chinese
-Academy of Sciences"). That is there to show you the **target shape** — it is
+Academy of Sciences"). That is there to show you the **target shape**. It is
 **not permission to manufacture one**.
 
 When writing or rewriting, if cutting the filler leaves a hole and the author
@@ -227,7 +227,7 @@ Never Invent in `../protected-list.md`.
 
 ---
 
-## Tier 1 — Always Replace
+## Tier 1 (Always Replace)
 
 | Replace | With |
 |---|---|
@@ -251,8 +251,8 @@ Never Invent in `../protected-list.md`.
 | utilize | use |
 | watershed moment | turning point, shift (or describe what changed) |
 | marking a pivotal moment | (state what happened) |
-| the future looks bright | (cut — say something specific or nothing) |
-| only time will tell | (cut — say something specific or nothing) |
+| the future looks bright | (cut, or say something specific instead) |
+| only time will tell | (cut, or say something specific instead) |
 | nestled | is located, sits, is in |
 | vibrant | (describe what makes it active, or cut) |
 | thriving | growing, active (or cite a number) |
@@ -272,7 +272,7 @@ Never Invent in `../protected-list.md`.
 | learnings | lessons, findings, takeaways |
 | thought leader / thought leadership | expert, authority (or describe their actual contribution) |
 | best practices | what works, proven methods, standard approach |
-| at its core | (cut — just state the thing) |
+| at its core | (cut it and just state the thing) |
 | synergy / synergies | (describe the actual combined effect) |
 | interplay | relationship, connection, interaction |
 | additionally / moreover / furthermore | also, and, plus (or just start the sentence) |
@@ -297,45 +297,47 @@ Never Invent in `../protected-list.md`.
 
 Full definitions and before/after examples: `../patterns-en.md`.
 
-- #1 Undue Emphasis on Significance, Legacy, and Broader Trends — don't promote routine events into milestones or broader trends; state what happened
-- #2 Undue Emphasis on Notability and Media Coverage — don't stack media mentions to prove notability; cite one specific source and what it said
-- #3 Superficial Analyses with -ing Endings — don't tack "-ing" phrases (symbolizing, reflecting...) onto sentences for fake depth
-- #4 Promotional and Advertisement-like Language — no tourism-brochure prose; describe, don't sell
-- #5 Vague Attributions and Weasel Words — "experts argue" means nothing; name the source or drop the claim
-- #6 Outline-like "Challenges and Future Prospects" Sections — don't write formulaic "despite challenges... continues to thrive" sections; report specific events
-- #7 Overused "AI Vocabulary" Words — swap high-frequency AI words (additionally, crucial, pivotal...); full table in word-table-en.md
-- #8 Avoidance of "is"/"are" (Copula Avoidance) — prefer plain "is/has" over "serves as / boasts / features"
-- #9 Negative Parallelisms — "it's not X, it's Y" is a crutch; usually just state Y
-- #10 Rule of Three Overuse — don't force ideas into groups of three; two or four reads more natural
-- #11 Elegant Variation (Synonym Cycling) — repeat the clear word instead of cycling synonyms
-- #12 False Ranges — "from X to Y" needs a meaningful scale; otherwise just list the items
-- #13 Em Dash Overuse — em dashes are an AI tell; target zero, use commas or periods
-- #14 Overuse of Boldface — bold is for scanning, not for emphasizing every third phrase
-- #15 Inline-Header Vertical Lists — don't write "**Header:** explanation" bullet lists; fold into prose
-- #16 Title Case in Headings — use sentence case in headings, not Title Case
-- #17 Emojis — don't decorate headings or bullets with emojis
-- #18 Curly Quotation Marks — mixed curly and straight quotes in one piece is the tell; consistent curly quotes are typography, keep them
-- #19 Collaborative Communication Artifacts — "I hope this helps!" is chatbot correspondence, not content; delete
-- #20 Knowledge-Cutoff Disclaimers and Gap Speculation — delete "as of my last update" and "not widely documented" disclaimers; keep the hedge on the guess that follows and mark it for the author, never harden it into a fact
-- #21 Sycophantic/Servile Tone — cut sycophantic openers ("Great question! You're absolutely right")
-- #22 Filler Phrases — openers, announcements, and restatements are filler; if cutting it changes nothing, cut it
-- #23 Excessive Hedging — don't stack qualifiers ("could potentially possibly"); keep one
-- #24 Generic Positive Conclusions — don't wrap up with a neat upbeat conclusion; stop when the point is made
-- #25 Novelty Inflation — don't present established concepts as brand-new discoveries
-- #26 Emotional Flatline — don't claim emotions ("what surprised me most"); convey them with concrete facts
-- #27 False Concession — "while X is impressive, Y remains a challenge" weighs nothing; give specifics
-- #28 Rhetorical Question Openers — don't stall with rhetorical questions; lead with the point
-- #29 Parenthetical Hedging — parenthetical asides "(and, increasingly, Z)" are fake nuance; cut or inline
-- #30 Numbered List Inflation — don't default to "N reasons why" lists; tell one or two concrete things
-- #31 Reasoning Chain Artifacts — "let me break this down" is reasoning scaffolding; keep it out of prose
-- #32 Acknowledgment Loops — don't restate the question before answering; just answer
-- #33 "Let's" Constructions — "let's explore..." is a false-collaborative opener; start with the point
-- #34 Excessive Structure — don't pack short text with headers, tiny tables or --- dividers; 3+ headers under 300 words is too many
-- #35 Rhythm and Uniformity — uniform sentence and paragraph length is the #1 AI signal; break the meter
-- #36 Rewrite-vs-Patch Threshold — 5+ word flags, 3+ pattern categories, uniform rhythm → rewrite, don't patch
-- #37 Therapy-Speak (Emotional Validation) — don't certify feelings ("your anxiety is valid" → "of course you're anxious"); cut absolving lines
-- #38 Reframing as a Substitute for Reasoning — "on the surface X, deeper down Y" / "the real problem is" fakes insight through tone escalation; cut the frame, add the reasoning
-- #39 Hallucinated Citations — a decimal-precise study that doesn't exist, a quote pinned on the wrong person — mark `[source unverified]` and hand it back, never verify or invent for the author
-- #40 AI Tool Residue — `utm_source=chatgpt.com` and `turn0search0` are hard proof of unproofread AI output; grep before publishing
-- #41 Unfilled Template Placeholders — `[Product Name]`, `[Company]`, `{{name}}` — flag each one for the author, never fill them in
-- #42 Vague Association — "associated with" or "connected to" standing in for a person's or organization's role hides the fact; ask the author for the role, and leave technical links and research correlations alone
+| # | Pattern | Summary |
+|---|---|---|
+| #1 | Undue Emphasis on Significance, Legacy, and Broader Trends | don't promote routine events into milestones or broader trends; state what happened |
+| #2 | Undue Emphasis on Notability and Media Coverage | don't stack media mentions to prove notability; cite one specific source and what it said |
+| #3 | Superficial Analyses with -ing Endings | don't tack "-ing" phrases (symbolizing, reflecting...) onto sentences for fake depth |
+| #4 | Promotional and Advertisement-like Language | no tourism-brochure prose; describe, don't sell |
+| #5 | Vague Attributions and Weasel Words | "experts argue" means nothing; name the source or drop the claim |
+| #6 | Outline-like "Challenges and Future Prospects" Sections | don't write formulaic "despite challenges... continues to thrive" sections; report specific events |
+| #7 | Overused "AI Vocabulary" Words | swap high-frequency AI words (additionally, crucial, pivotal...); full table in word-table-en.md |
+| #8 | Avoidance of "is"/"are" (Copula Avoidance) | prefer plain "is/has" over "serves as / boasts / features" |
+| #9 | Negative Parallelisms | "it's not X, it's Y" is a crutch; usually just state Y |
+| #10 | Rule of Three Overuse | don't force ideas into groups of three; two or four reads more natural |
+| #11 | Elegant Variation (Synonym Cycling) | repeat the clear word instead of cycling synonyms |
+| #12 | False Ranges | "from X to Y" needs a meaningful scale; otherwise just list the items |
+| #13 | Em Dash Overuse | em dashes are an AI tell; target zero, use commas or periods |
+| #14 | Overuse of Boldface | bold is for scanning, not for emphasizing every third phrase |
+| #15 | Inline-Header Vertical Lists | don't write "**Header:** explanation" bullet lists; fold into prose |
+| #16 | Title Case in Headings | use sentence case in headings, not Title Case |
+| #17 | Emojis | don't decorate headings or bullets with emojis |
+| #18 | Curly Quotation Marks | mixed curly and straight quotes in one piece is the tell; consistent curly quotes are typography, keep them |
+| #19 | Collaborative Communication Artifacts | "I hope this helps!" is chatbot correspondence, not content; delete |
+| #20 | Knowledge-Cutoff Disclaimers and Gap Speculation | delete "as of my last update" and "not widely documented" disclaimers; keep the hedge on the guess that follows and mark it for the author, never harden it into a fact |
+| #21 | Sycophantic/Servile Tone | cut sycophantic openers ("Great question! You're absolutely right") |
+| #22 | Filler Phrases | openers, announcements, and restatements are filler; if cutting it changes nothing, cut it |
+| #23 | Excessive Hedging | don't stack qualifiers ("could potentially possibly"); keep one |
+| #24 | Generic Positive Conclusions | don't wrap up with a neat upbeat conclusion; stop when the point is made |
+| #25 | Novelty Inflation | don't present established concepts as brand-new discoveries |
+| #26 | Emotional Flatline | don't claim emotions ("what surprised me most"); convey them with concrete facts |
+| #27 | False Concession | "while X is impressive, Y remains a challenge" weighs nothing; give specifics |
+| #28 | Rhetorical Question Openers | don't stall with rhetorical questions; lead with the point |
+| #29 | Parenthetical Hedging | parenthetical asides "(and, increasingly, Z)" are fake nuance; cut or inline |
+| #30 | Numbered List Inflation | don't default to "N reasons why" lists; tell one or two concrete things |
+| #31 | Reasoning Chain Artifacts | "let me break this down" is reasoning scaffolding; keep it out of prose |
+| #32 | Acknowledgment Loops | don't restate the question before answering; just answer |
+| #33 | "Let's" Constructions | "let's explore..." is a false-collaborative opener; start with the point |
+| #34 | Excessive Structure | don't pack short text with headers, tiny tables or --- dividers; 3+ headers under 300 words is too many |
+| #35 | Rhythm and Uniformity | uniform sentence and paragraph length is the #1 AI signal; break the meter |
+| #36 | Rewrite-vs-Patch Threshold | 5+ word flags, 3+ pattern categories, uniform rhythm → rewrite, don't patch |
+| #37 | Therapy-Speak (Emotional Validation) | don't certify feelings ("your anxiety is valid" → "of course you're anxious"); cut absolving lines |
+| #38 | Reframing as a Substitute for Reasoning | "on the surface X, deeper down Y" / "the real problem is" fakes insight through tone escalation; cut the frame, add the reasoning |
+| #39 | Hallucinated Citations | for a decimal-precise study that doesn't exist or a quote pinned on the wrong person, mark `[source unverified]` and hand it back, never verify or invent for the author |
+| #40 | AI Tool Residue | `utm_source=chatgpt.com` and `turn0search0` are hard proof of unproofread AI output; grep before publishing |
+| #41 | Unfilled Template Placeholders | flag each `[Product Name]`, `[Company]` or `{{name}}` for the author, never fill them in |
+| #42 | Vague Association | "associated with" or "connected to" standing in for a person's or organization's role hides the fact; ask the author for the role, and leave technical links and research correlations alone |
