@@ -17,14 +17,14 @@ Load this when debugging a syntax error or validating a query before returning i
 | `FILTER x IN list WHERE ...` | `[x IN list WHERE ...]` — `FILTER` clause exists (Cypher 25 / 2025.06) but is not a list-comprehension form |
 | `LET x = expr` | `LET` clause valid in Cypher 25 (Neo4j 2025.06+); on older versions use `WITH expr AS x` |
 | `INSERT (p:Person {name:'A'})` | `INSERT` is a Cypher 25 synonym for `CREATE` (Neo4j 2025.06+) but multi-labels must use `&` not `:` and dynamic labels/types are not supported; on older versions use `CREATE (p:Person {name: 'A'})` |
-| `shortestPath((a)-[*]->(b))` | `SHORTEST 1 (a)(()-[]->()){1,}(b)` |
-| `allShortestPaths((a)-[*]->(b))` | `ALL SHORTEST (a)(()-[]->()){1,}(b)` |
+| `shortestPath((a)-[*]->(b))` (still valid) | Prefer `SHORTEST 1 (a)(()-[]->()){1,}(b)` |
+| `allShortestPaths((a)-[*]->(b))` (still valid) | Prefer `ALL SHORTEST (a)(()-[]->()){1,}(b)` |
 | `id(n)` | `elementId(n)` |
-| `[:REL*1..5]` | `(()-[:REL]->()){1,5}` |
+| `[:REL*1..5]` (still valid) | Prefer `(()-[:REL]->()){1,5}` |
 | `CALL { WITH x ... }` | `CALL (x) { ... }` — importing WITH is deprecated |
 | `apoc.coll.sort(list)` | `coll.sort(list)` — native Cypher 25 built-in |
 | `n.dateProp >= date('2025-01-01')` on ZONED DATETIME | Use `.year` accessor or `datetime()` literal |
-| `duration.between(d1,d2).inDays` | `duration.between(d1,d2).days` — `.inDays` does not exist |
+| `duration.between(d1,d2).inDays` (error) or `.days` for total days | `duration.inDays(d1,d2).days` — total days; `.days` alone is component (Jan 1 → Mar 15 = 14) |
 | `WHERE n.x = null` | `WHERE n.x IS NULL` |
 | `WHERE n.x <> null` | `WHERE n.x IS NOT NULL` |
 | `MATCH (n:A) MATCH (m:A)` without join predicate | Causes CartesianProduct — add `WHERE` join condition |
