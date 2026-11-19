@@ -571,7 +571,8 @@ def check_content(index, raw, strings):
         # The page builds controls for section[data-item] only: any other element would drop out of the reply.
         raise PublishError("data-item is only read on <section> elements, not on <%s>" % ">, <".join(others),
                            'wrap each item in <section data-item="id">')
-    ids = [value.strip() for _, value in items]
+    # Trimmed as the page's String.prototype.trim() does: Python's strip() keeps U+FEFF.
+    ids = [re.sub(r"^[\s\ufeff]+|[\s\ufeff]+$", "", value) for _, value in items]
     if any(not i for i in ids):
         raise PublishError("a <section data-item> has an empty id", "give every item a short unique id, such as 1, 2, A3")
     spaced = [i for i in ids if len(i.split()) > 1]  # a reply line starts with the id: it must end at the first space
