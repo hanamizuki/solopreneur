@@ -235,6 +235,12 @@ class PageChecks(Base):
         d = self.page("raw", '<!doctype html><script src="meta.js"></script><a href="meta.json">m</a>')
         self.assertEqual(list(signoff.collect(d)[0]), ["index.html"])
 
+    def test_css_is_read_from_style_elements_and_attributes_not_prose(self):
+        d = self.page("prose", "<p>Check the URL(s) and the url(x) helper.</p>")
+        self.assertEqual(list(signoff.collect(d)[0]), ["index.html"])
+        self.expect_error("not in the page folder", signoff.collect,
+                          self.page("attr", '<div style="background:url(missing.png)">x</div>'))
+
     def test_a_single_html_file_becomes_index_html(self):
         path = os.path.join(self.tmp, "one.html")
         with open(path, "w", encoding="utf-8") as f:

@@ -390,13 +390,17 @@ def _srcset_urls(value):
 class _Tags(html.parser.HTMLParser):
     """Attribute values as a browser reads them (quoted or not, character references
     decoded), from start and self-closing tags only: comments and the text of
-    <script> and <style> hold no tags."""
+    <script> and <style> hold no tags. Also the CSS a page carries: <style>
+    elements and style attributes, never its prose, where "URL(s)" is just a word."""
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.refs, self.items = [], []
+        self.refs, self.items, self.css = [], [], []
+        self._in_style = False
 
     def handle_starttag(self, tag, attrs):  # self-closing tags arrive here too
+        if tag == "style":
+            self._in_style = True
         for name, value in attrs:
             if name == "data-item":
                 self.items.append((tag, value or ""))  # a bare data-item is an empty id
@@ -404,6 +408,16 @@ class _Tags(html.parser.HTMLParser):
                 self.refs.append(value)
             elif value and name == "srcset":
                 self.refs.extend(_srcset_urls(value))
+            elif value and name == "style":
+                self.css.append(value)
+
+    def handle_endtag(self, tag):
+        if tag == "style":
+            self._in_style = False
+
+    def handle_data(self, data):
+        if self._in_style:
+            self.css.append(data)
 
     def error(self, message):  # Python 3.9 reports here; 3.10-3.12 raise AssertionError themselves
         raise AssertionError(message)
@@ -420,8 +434,12 @@ def _tags(text):
 
 
 def _refs(text, is_css):
-    found = [] if is_css else _tags(text).refs
-    found += [next(g for g in m.groups() if g is not None) for m in CSS_URL_RE.finditer(text)]
+    if is_css:
+        found, css = [], [text]
+    else:
+        tags = _tags(text)
+        found, css = tags.refs, tags.css
+    found += [next(g for g in m.groups() if g is not None) for chunk in css for m in CSS_URL_RE.finditer(chunk)]
     return [r.strip() for r in found]
 
 
