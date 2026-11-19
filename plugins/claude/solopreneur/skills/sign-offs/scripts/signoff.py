@@ -64,8 +64,8 @@ SSH_OPTIONS = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
                "-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "ClearAllForwardings=yes"]
 # A repository can ship its own .solopreneur.json: a host such as "-oProxyCommand=…"
 # would reach ssh as an option, and shell syntax would reach any ProxyCommand that
-# expands %h. Plain destinations only.
-HOST_RE = re.compile(r"^[A-Za-z0-9_.@:][A-Za-z0-9_.@:-]*$")
+# expands %h. Plain destinations only (\Z: $ would let a final newline through).
+HOST_RE = re.compile(r"^[A-Za-z0-9_.@:][A-Za-z0-9_.@:-]*\Z")
 # Runs on the host: read "<length>\n<server.py source>", execute it, and leave the
 # request tar that follows on stdin for its `store` command.
 # No single quotes inside, so shlex.quote() yields one plain '…' word for any login shell.
@@ -226,6 +226,8 @@ def resolve(cwd, target_name=None):
     if lang not in LANGS:
         raise bad("lang", "must be one of: %s" % ", ".join(LANGS))
     ttl = block.get("ttlDays", server.TTL_DEFAULT)
+    if isinstance(ttl, float) and ttl.is_integer():
+        ttl = int(ttl)  # JSON 7.0: a whole number to the schema (and preview), a float to json.load
     if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= server.TTL_MAX:
         raise bad("ttlDays", "must be a whole number from 1 to %d" % server.TTL_MAX)
     # A key that is present must hold a valid value: null is not "use the default"
@@ -260,8 +262,10 @@ def resolve(cwd, target_name=None):
             continue
         url = t.get("url") or ""
         try:
-            url_host = urllib.parse.urlsplit(url).hostname
-        except ValueError:  # an unbalanced [ in the host, for one
+            split = urllib.parse.urlsplit(url)
+            split.port  # raises ValueError for a port that is not a number from 0 to 65535
+            url_host = split.hostname
+        except ValueError:  # an unbalanced [ in the host, or a port such as :abc
             url_host = None
         # Page ids are appended to url as text: a ?query or #fragment (even an empty one) would swallow them.
         if not url.startswith(("http://", "https://")) or not url_host or "?" in url or "#" in url:
@@ -474,8 +478,9 @@ def check_ref(ref, from_rel, files):
     return None
 
 
-def collect(src):
-    """({relative path: absolute path}, warnings) for a page folder or one html file."""
+def collect(src, raw=False):
+    """({relative path: absolute path}, warnings) for a page folder or one html file.
+    A `raw` page goes out as it is, so it needs no room for the wrapped UI."""
     src = os.path.abspath(os.path.expanduser(src))
     files, warnings, errors = {}, [], []
     if os.path.islink(src):
@@ -518,7 +523,7 @@ def collect(src):
     # Sizes first: a page over the cap is refused before any of its files is opened.
     sizes = {rel: os.path.getsize(full) for rel, full in files.items()}
     total = sum(sizes.values())
-    over = total > server.MAX_PAYLOAD - UI_HEADROOM
+    over = total > server.MAX_PAYLOAD - (0 if raw else UI_HEADROOM)
     if over:
         errors.append("the page is %.1f MB, over the %d MB limit: compress the screenshots" % (total / 1048576, server.MAX_PAYLOAD >> 20))
     for rel, full in sorted(files.items()):
@@ -715,8 +720,13 @@ def read_back(settings, result, content_id):
         if hashlib.sha256(fetch(url)[0]).hexdigest() != digest:
             raise PublishError("read-back mismatch: %s differs from what was sent" % rel,
                                "a cache may be serving an old copy; do not hand out the link, publish again", code=3)
+    body, meta_url = fetch(base + "meta.json")
+    # The page reads meta.json with fetch(), which a browser refuses across origins.
+    if _origin(meta_url) != _origin(final):
+        raise PublishError("read-back mismatch: %smeta.json redirects to %s" % (base, meta_url),
+                           "meta.json must be served from the page's own origin; do not hand out the link", code=3)
     try:
-        meta = json.loads(fetch(base + "meta.json")[0].decode("utf-8"))
+        meta = json.loads(body.decode("utf-8"))
     except ValueError:
         meta = None
     if not isinstance(meta, dict):
@@ -725,7 +735,24 @@ def read_back(settings, result, content_id):
     if meta.get("revision") != result["revision"] or meta.get("contentId") != content_id:
         raise PublishError("read-back found revision %r, not the %r just published" % (meta.get("revision"), result["revision"]),
                            "someone may have updated the page at the same moment; publish again", code=3)
+    if settings["provider"] == "local":
+        # A file:// page reads meta.js instead, written by the store as `window.SIGNOFF_META = <json>;\n`.
+        js = fetch(base + "meta.js")[0]
+        prefix, suffix = b"window.SIGNOFF_META = ", b";\n"
+        try:
+            same = js.startswith(prefix) and js.endswith(suffix) and json.loads(js[len(prefix):-len(suffix)].decode("utf-8")) == meta
+        except ValueError:
+            same = False
+        if not same:
+            raise PublishError("read-back mismatch: meta.js at %s does not match meta.json" % base,
+                               "do not hand out the link; publish again", code=3)
     return meta
+
+
+def _origin(url):
+    """Scheme, host and port, as a browser compares origins."""
+    split = urllib.parse.urlsplit(url)
+    return split.scheme, split.hostname, split.port or {"http": 80, "https": 443}.get(split.scheme)
 
 
 def page_url(settings, page_id):
@@ -811,7 +838,7 @@ def cmd_publish(args):
         raise PublishError("--reply-to is longer than %d characters" % server.REPLY_TO_MAX)
     settings = resolve(os.getcwd(), args.target)
     strings = server.load_strings(settings["lang"])
-    files, warnings = collect(args.src)
+    files, warnings = collect(args.src, args.raw)
     with open(files["index.html"], "rb") as f:
         index = f.read()
     check_content(index, args.raw)
@@ -848,13 +875,22 @@ def cmd_publish(args):
         result = call_store(settings, request, files)
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
-    meta = read_back(settings, result, content_id)
+    target = " --target " + shlex.quote(args.target) if args.target else ""
+    update = "--update %s%s%s" % (result["id"], target, " --raw" if args.raw else "")
+    try:
+        meta = read_back(settings, result, content_id)
+    except PublishError as e:
+        if e.code != 3:
+            raise
+        # The page is stored already: another --slug publish would add a second page beside it.
+        raise PublishError(str(e), "%s. The page is stored as %s: once that is fixed, publish the same folder again with %s, "
+                           "or remove it with `signoff.py rm %s%s` before starting over" % (e.hint, result["id"], update, result["id"], target),
+                           code=3)
     print("✅ Published revision %d: %s" % (result["revision"], page_url(settings, result["id"])))
     print("Expires: %s (%d days after this publish; every update restarts the clock)"
           % (meta["expiresAt"][:16].replace("T", " "), settings["ttlDays"]))
     print("Reply to: %s" % (meta.get("replyTo") or "-"))
-    print("Update: publish the same folder again with --update %s%s"
-          % (result["id"], " --target " + shlex.quote(args.target) if args.target else ""))
+    print("Update: publish the same folder again with %s" % update)
     return 0
 
 

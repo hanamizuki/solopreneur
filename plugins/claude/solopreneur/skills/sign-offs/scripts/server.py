@@ -63,10 +63,11 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 DEFAULT_DIR = "~/.local/share/solopreneur/sign-offs"
 DEFAULT_PORT = 8791
-SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+# \Z, not $: $ also matches before a final newline, and "abc\n" would name a folder nothing finds again.
+SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 SLUG_MAX = 12  # id = slug + "-xyz": at most 16 characters, so a link fits one line in a phone terminal
-ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*-[a-z0-9]{3}$")
-CONTENT_ID_RE = re.compile(r"^[a-f0-9]{16,64}$")
+ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*-[a-z0-9]{3}\Z")
+CONTENT_ID_RE = re.compile(r"^[a-f0-9]{16,64}\Z")
 RESERVED = ("meta.json", "meta.js")
 SOURCE_KEYS = ("machine", "config", "tmux", "repo")
 INDEX_KEYS = ("indexTitle", "indexSubtitle", "indexEmpty", "indexRow", "sep")
@@ -208,9 +209,9 @@ def _prune_locked(root, at):
     incoming = incoming_dir(root)
     if os.path.isdir(incoming):
         for name in sorted(os.listdir(incoming)):
-            if not name.startswith("rx-"):
-                continue  # store() stages in rx-* folders; anything else is not this store's to delete
             p = os.path.join(incoming, name)
+            if not name.startswith("rx-") or os.path.islink(p) or not os.path.isdir(p):
+                continue  # store() stages in rx-* folders (mkdtemp); anything else is not this store's to delete
             try:
                 if at.timestamp() - os.lstat(p).st_mtime < INCOMING_MAX_AGE:
                     continue
@@ -218,11 +219,8 @@ def _prune_locked(root, at):
                 continue  # an upload just removed itself: store() stages outside the lock
             if os.path.isdir(os.path.join(p, "previous")):
                 continue  # an update that could not put its previous revision back: the only copy, moved back by hand
-            if os.path.isdir(p) and not os.path.islink(p):
-                if inside(p, incoming):
-                    shutil.rmtree(p)
-            else:
-                os.unlink(p)
+            if inside(p, incoming):
+                shutil.rmtree(p)
             removed.append(p)
     return removed
 

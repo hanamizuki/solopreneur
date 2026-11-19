@@ -132,7 +132,7 @@ hyphens, at most 12 characters; the page id adds a random suffix (`e2e-sync-k3f`
 |---|---|
 | 0 | Published and read back: hand out the printed link |
 | 2 | A check or the publish failed: fix what the `→` line says |
-| 3 | Published, but the read-back did not match: **do not hand out the link**; publish again |
+| 3 | Published, but the read-back did not match: **do not hand out the link**; fix what the `→` line says, then publish again with `--update <id>`, using the id the error names, or `rm` it before starting over |
 
 Write the link out in full (not as a Markdown link), and say in the message
 itself what the reader is deciding: the page holds the detail, not the question.
@@ -235,7 +235,7 @@ python3 "$SOLO_SKILL_DIR/scripts/server.py" install --port 8791 --lang en --ttl-
 | `cannot reach <host> over SSH` | This machine cannot publish there: fix SSH (key, known host) or publish from one that can |
 | `unreadable answer from <host>` | The host needs `python3` 3.9+ on the PATH of a non-interactive SSH session |
 | `… was not written by sign-offs` | `dir` points at a real site: give sign-offs a folder of its own |
-| `cannot read back …` / `read-back mismatch` (exit 3) | Do not hand out the link. Check that the service runs and `url` reaches it (or that the web server serves `dir`), then publish again |
+| `cannot read back …` / `read-back mismatch` (exit 3) | Do not hand out the link. Check that the service runs and `url` reaches it (or that the web server serves `dir`), then publish again with `--update <id>` |
 | `<id> has expired` | Publish a new page with `--slug` |
 
 ## Limits
