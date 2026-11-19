@@ -7,45 +7,13 @@
       "branch": "main",
       "rev": "e988add20dab0fa97d7a76781c48961c8184288e",
       "synced_at": "2026-08-15T02:12:18Z",
-      "license": "Unspecified (no LICENSE file in upstream as of 2026-04-26)",
-      "license_path": null,
-      "license_file": null,
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "license_file": "LICENSES/taste-skill-LICENSE",
       "skills": [
         {
           "from": "skills/taste-skill",
           "to": "taste-skill"
-        },
-        {
-          "from": "skills/soft-skill",
-          "to": "taste-soft"
-        },
-        {
-          "from": "skills/brutalist-skill",
-          "to": "taste-brutalist"
-        },
-        {
-          "from": "skills/minimalist-skill",
-          "to": "taste-minimalist"
-        },
-        {
-          "from": "skills/redesign-skill",
-          "to": "taste-redesign"
-        },
-        {
-          "from": "skills/stitch-skill",
-          "to": "taste-stitch"
-        },
-        {
-          "from": "skills/output-skill",
-          "to": "taste-output"
-        },
-        {
-          "from": "skills/gpt-tasteskill",
-          "to": "taste-gpt"
-        },
-        {
-          "from": "skills/image-to-code-skill",
-          "to": "taste-image-to-code"
         }
       ]
     },

@@ -18,7 +18,7 @@ if ! command -v vercel >/dev/null 2>&1; then
   info ""
   info "Install one of these ways (you must run this yourself — needs sudo / network):"
   info "  npm i -g vercel"
-  info "  # or: brew install vercel-cli"
+  info "  # or: brew install --cask vercel"
   info ""
   info "Then re-run the deploy."
   exit 1

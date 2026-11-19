@@ -32,7 +32,7 @@ core subset plus the four specialist plugins' knowledge skills — no agents, no
 |---|---|
 | [`solopreneur`](#solopreneur-core) | 17 in-house skills (15 product workflows + merge and Codex-agent plumbing) |
 | [`marketer`](#marketer) | `marketer` agent + 8 in-house skills (7 marketing workflows + agent router) |
-| [`designer`](#designer) | `designer` agent + 10 vendored design skills (`taste-*` family + `impeccable`) |
+| [`designer`](#designer) | `designer` agent + 2 vendored design skills (`impeccable` + `taste-skill`) |
 | [`ios-dev`](#ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 24 vendored skills (`apple-design` + `asc-*` + `iphone-apps`) |
 | [`android-dev`](#android-dev) | `android-dev` agent + `android-patterns` + 35 vendored skills (Compose + `gplay-*` + Android official) |
 | [`ai-engineer`](#ai-engineer) | `ai-engineer` agent + `ai-app-templates` + 1 vendored skill (`senior-prompt-engineer`) |
@@ -180,12 +180,12 @@ in-house skills: 7 domain workflows and one agent router.
 ### `designer`
 
 The `designer` agent for UI/UX work that spans web, iOS, and Android. Ships
-10 vendored design skills.
+2 vendored design skills.
 
 #### Bundled skills
 
 - [**`impeccable`**](./skills/designer/impeccable/SKILL.md): vendored from [pbakaus/impeccable](https://github.com/pbakaus/impeccable). Polish / critique / redesign frontend interfaces.
-- [**`taste-skill`**](./skills/designer/taste-skill/SKILL.md) + 8 archetype skills ([`taste-soft`](./skills/designer/taste-soft/SKILL.md), [`taste-brutalist`](./skills/designer/taste-brutalist/SKILL.md), [`taste-minimalist`](./skills/designer/taste-minimalist/SKILL.md), [`taste-redesign`](./skills/designer/taste-redesign/SKILL.md), [`taste-stitch`](./skills/designer/taste-stitch/SKILL.md), [`taste-output`](./skills/designer/taste-output/SKILL.md), [`taste-gpt`](./skills/designer/taste-gpt/SKILL.md), [`taste-image-to-code`](./skills/designer/taste-image-to-code/SKILL.md)): vendored from [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill). The `taste-*` archetype family overrides default LLM design biases.
+- [**`taste-skill`**](./skills/designer/taste-skill/SKILL.md): vendored from [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) (tasteskill 2.5). Builds or redesigns company and product websites, as static HTML/CSS or inside an existing React / Next.js / Vue / Svelte / Astro project, from a bundled kit of photographs, UI fragments, icons and motion. A checker and a finish gate render the page in headless Chrome; the gate also runs as a Stop hook (a no-op unless a build is armed). Needs Node 22+ and Chrome, Edge or Chromium.
 
 #### Requirements
 
@@ -206,7 +206,7 @@ build/debug/ship.
 
 - [**`ios-patterns`**](./skills/ios-dev/ios-patterns/SKILL.md) (in-house): SwiftUI conventions: i18n, date parsing, Previews, state management, sheet & navigation, list spacing, expandable animation, keyboard Done button.
 - [**`ios-app-templates`**](./skills/ios-dev/ios-app-templates/SKILL.md) (in-house): reference implementations for common app categories (currently `photo-analysis-app` and `portfolio-tracker`).
-- **`asc-cli` skills** (22): vendored from [rudrankriyam/app-store-connect-cli-skills](https://github.com/rudrankriyam/app-store-connect-cli-skills). End-to-end App Store Connect workflows: TestFlight, releases, metadata, IAP, signing, screenshots, crash triage, ASO audit, RevenueCat catalog sync, notarization, submission health. ([`asc-app-create-ui`](./skills/ios-dev/asc-app-create-ui/SKILL.md), [`asc-aso-audit`](./skills/ios-dev/asc-aso-audit/SKILL.md), [`asc-build-lifecycle`](./skills/ios-dev/asc-build-lifecycle/SKILL.md), [`asc-cli-usage`](./skills/ios-dev/asc-cli-usage/SKILL.md), [`asc-crash-triage`](./skills/ios-dev/asc-crash-triage/SKILL.md), [`asc-id-resolver`](./skills/ios-dev/asc-id-resolver/SKILL.md), [`asc-localize-metadata`](./skills/ios-dev/asc-localize-metadata/SKILL.md), [`asc-metadata-sync`](./skills/ios-dev/asc-metadata-sync/SKILL.md), [`asc-notarization`](./skills/ios-dev/asc-notarization/SKILL.md), [`asc-ppp-pricing`](./skills/ios-dev/asc-ppp-pricing/SKILL.md), [`asc-release-flow`](./skills/ios-dev/asc-release-flow/SKILL.md), [`asc-revenuecat-catalog-sync`](./skills/ios-dev/asc-revenuecat-catalog-sync/SKILL.md), [`asc-screenshot-resize`](./skills/ios-dev/asc-screenshot-resize/SKILL.md), [`asc-shots-pipeline`](./skills/ios-dev/asc-shots-pipeline/SKILL.md), [`asc-signing-setup`](./skills/ios-dev/asc-signing-setup/SKILL.md), [`asc-submission-health`](./skills/ios-dev/asc-submission-health/SKILL.md), [`asc-subscription-localization`](./skills/ios-dev/asc-subscription-localization/SKILL.md), [`asc-testflight-orchestration`](./skills/ios-dev/asc-testflight-orchestration/SKILL.md), [`asc-wall-submit`](./skills/ios-dev/asc-wall-submit/SKILL.md), [`asc-whats-new-writer`](./skills/ios-dev/asc-whats-new-writer/SKILL.md), [`asc-workflow`](./skills/ios-dev/asc-workflow/SKILL.md), [`asc-xcode-build`](./skills/ios-dev/asc-xcode-build/SKILL.md))
+- **`asc-cli` skills** (22): vendored from [rorkai/app-store-connect-cli-skills](https://github.com/rorkai/app-store-connect-cli-skills). End-to-end App Store Connect workflows: TestFlight, releases, metadata, IAP, signing, screenshots, crash triage, ASO audit, RevenueCat catalog sync, notarization, submission health. ([`asc-app-create-ui`](./skills/ios-dev/asc-app-create-ui/SKILL.md), [`asc-aso-audit`](./skills/ios-dev/asc-aso-audit/SKILL.md), [`asc-build-lifecycle`](./skills/ios-dev/asc-build-lifecycle/SKILL.md), [`asc-cli-usage`](./skills/ios-dev/asc-cli-usage/SKILL.md), [`asc-crash-triage`](./skills/ios-dev/asc-crash-triage/SKILL.md), [`asc-id-resolver`](./skills/ios-dev/asc-id-resolver/SKILL.md), [`asc-localize-metadata`](./skills/ios-dev/asc-localize-metadata/SKILL.md), [`asc-metadata-sync`](./skills/ios-dev/asc-metadata-sync/SKILL.md), [`asc-notarization`](./skills/ios-dev/asc-notarization/SKILL.md), [`asc-ppp-pricing`](./skills/ios-dev/asc-ppp-pricing/SKILL.md), [`asc-release-flow`](./skills/ios-dev/asc-release-flow/SKILL.md), [`asc-revenuecat-catalog-sync`](./skills/ios-dev/asc-revenuecat-catalog-sync/SKILL.md), [`asc-screenshot-resize`](./skills/ios-dev/asc-screenshot-resize/SKILL.md), [`asc-shots-pipeline`](./skills/ios-dev/asc-shots-pipeline/SKILL.md), [`asc-signing-setup`](./skills/ios-dev/asc-signing-setup/SKILL.md), [`asc-submission-health`](./skills/ios-dev/asc-submission-health/SKILL.md), [`asc-subscription-localization`](./skills/ios-dev/asc-subscription-localization/SKILL.md), [`asc-testflight-orchestration`](./skills/ios-dev/asc-testflight-orchestration/SKILL.md), [`asc-wall-submit`](./skills/ios-dev/asc-wall-submit/SKILL.md), [`asc-whats-new-writer`](./skills/ios-dev/asc-whats-new-writer/SKILL.md), [`asc-workflow`](./skills/ios-dev/asc-workflow/SKILL.md), [`asc-xcode-build`](./skills/ios-dev/asc-xcode-build/SKILL.md))
 - [**`apple-design`**](./skills/ios-dev/apple-design/SKILL.md): vendored from [emilkowalski/skills](https://github.com/emilkowalski/skills/tree/main/skills/apple-design). Apple's fluid interface design principles translated for the web — spring animations, gesture-driven UI, momentum projection, translucent materials, typography, reduced-motion.
 - [**`iphone-apps`**](./skills/ios-dev/iphone-apps/SKILL.md): vendored from [glittercowboy/taches-cc-resources](https://github.com/glittercowboy/taches-cc-resources/tree/main/skills/expertise/iphone-apps). CLI-only iPhone app workflow (build, debug, test, ship).
 
@@ -330,9 +330,9 @@ and implementation. Dispatches `ios-dev` or `android-dev` for platform work.
 ### Call the designer to polish a page
 
 Ask the `designer` agent to critique or redesign a frontend page. It uses
-`impeccable` for interface polish and the `taste-*` family to override
-generic AI aesthetics with a specific design archetype. Works across web,
-iOS, and Android.
+`impeccable` for interface polish and critique, and `taste-skill` to build
+company and product websites that pass a browser-checked finish gate. Works
+across web, iOS, and Android.
 
 ### Review code until it's clean
 

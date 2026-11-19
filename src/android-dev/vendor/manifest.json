@@ -189,8 +189,7 @@
         },
         {
           "from": "performance/r8-analyzer",
-          "to": "r8-analyzer",
-          "patch": "patches/r8-analyzer.patch"
+          "to": "r8-analyzer"
         },
         {
           "from": "play/play-billing-library-version-upgrade",
