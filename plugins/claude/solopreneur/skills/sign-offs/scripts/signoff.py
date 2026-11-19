@@ -77,7 +77,9 @@ JUNK = {".DS_Store", "Thumbs.db"}
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic")
 REF_FILES = (".html", ".htm", ".css")
 REF_ATTRS = ("src", "href", "poster", "data-src")
-CSS_URL_RE = re.compile(r"""url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)""")
+# url(…) in any case (CSS names are case-insensitive), and @import "…", whose bare
+# string is a URL too; @import url(…) is already a url().
+CSS_URL_RE = re.compile(r"""url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|@import\s*(?:"([^"]*)"|'([^']*)')""", re.I)
 FULL_DOC_RE = re.compile(rb"<\s*(?:!doctype|html|head|body)\b", re.I)
 TOKEN_RE = re.compile(r"\{\{(\w+)\}\}")
 
@@ -535,6 +537,10 @@ def check_content(index, raw):
     ids = [value.strip() for _, value in items]
     if any(not i for i in ids):
         raise PublishError("a <section data-item> has an empty id", "give every item a short unique id, such as 1, 2, A3")
+    spaced = [i for i in ids if len(i.split()) > 1]  # a reply line starts with the id: it must end at the first space
+    if spaced:
+        raise PublishError("item ids cannot contain spaces: %s" % ", ".join(json.dumps(i, ensure_ascii=False) for i in spaced),
+                           "use short ids such as 1, 2, A3")
     dups = sorted({i for i in ids if ids.count(i) > 1})
     if dups:
         raise PublishError("item ids repeat: %s" % ", ".join(dups), "replies name items by id, so each id must be unique")
@@ -633,11 +639,12 @@ def call_store(settings, request, files=None):
 
 
 def fetch(url, tries=3):
+    """(body, the address it came from in the end: redirects are followed)."""
     last = None
     for i in range(tries):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={"Cache-Control": "no-cache"}), timeout=20) as r:
-                return r.read()
+                return r.read(), r.geturl()
         except (OSError, http.client.HTTPException) as e:  # URLError is an OSError; a cut response is neither
             last = e
             if i + 1 < tries:
@@ -650,23 +657,30 @@ def fetch(url, tries=3):
 def read_back(settings, result, content_id):
     """Fetch every published file from the reader's address and compare checksums,
     then the link itself: for static and server it is the folder address <id>/,
-    which a web server without directory indexes refuses while serving <id>/index.html."""
+    which a web server without directory indexes refuses while serving <id>/index.html,
+    and which one that strips trailing slashes redirects to <id>."""
     base = settings["url"] + result["id"] + "/"
     for rel, digest in sorted(result["files"].items()):
         url = base + "/".join(urllib.parse.quote(p) for p in rel.split("/"))
-        if hashlib.sha256(fetch(url)).hexdigest() != digest:
+        if hashlib.sha256(fetch(url)[0]).hexdigest() != digest:
             raise PublishError("read-back mismatch: %s differs from what was sent" % rel,
                                "a cache may be serving an old copy; do not hand out the link, publish again", code=3)
     link = page_url(settings, result["id"])
     hint = "the web server must answer %s with the page's index.html (a directory index); do not hand out the link" % link
     try:
-        page = fetch(link)
+        page, final = fetch(link)
     except PublishError as e:
         raise PublishError(str(e), hint, code=3)
+    # Another scheme or host (http upgraded to https) is fine; another path is not: the
+    # page loads meta.json and its images relative to the address it ends up at.
+    if urllib.parse.urlsplit(final).path != urllib.parse.urlsplit(link).path:
+        raise PublishError("read-back mismatch: %s redirects to %s" % (link, final),
+                           "the web server must serve %s without redirecting it to another path; "
+                           "do not hand out the link" % link, code=3)
     if hashlib.sha256(page).hexdigest() != result["files"]["index.html"]:
         raise PublishError("read-back mismatch: %s is not the page just published" % link, hint, code=3)
     try:
-        meta = json.loads(fetch(base + "meta.json").decode("utf-8"))
+        meta = json.loads(fetch(base + "meta.json")[0].decode("utf-8"))
     except ValueError:
         meta = None
     if not isinstance(meta, dict):
@@ -803,7 +817,8 @@ def cmd_publish(args):
     print("Expires: %s (%d days after this publish; every update restarts the clock)"
           % (meta["expiresAt"][:16].replace("T", " "), settings["ttlDays"]))
     print("Reply to: %s" % (meta.get("replyTo") or "-"))
-    print("Update: publish the same folder again with --update %s" % result["id"])
+    print("Update: publish the same folder again with --update %s%s"
+          % (result["id"], " --target " + shlex.quote(args.target) if args.target else ""))
     return 0
 
 

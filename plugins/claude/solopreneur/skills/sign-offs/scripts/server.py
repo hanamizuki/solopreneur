@@ -14,7 +14,8 @@ Store layout, the same for every provider:
 
   <dir>/<id>/        one page: the published files + meta.json + meta.js
   <dir>/index.html   static and local providers: rewritten on every write
-  <dir>/.incoming/   upload staging; never served, cleared after a day
+  <dir>/.incoming/   upload staging; never served, cleared after a day (except a
+                     previous revision an update could not put back)
   <dir>/.lock        serializes writes (fcntl)
 
 Commands:
@@ -215,6 +216,8 @@ def _prune_locked(root, at):
                     continue
             except FileNotFoundError:
                 continue  # an upload just removed itself: store() stages outside the lock
+            if os.path.isdir(os.path.join(p, "previous")):
+                continue  # an update that could not put its previous revision back: the only copy, moved back by hand
             if os.path.isdir(p) and not os.path.islink(p):
                 if inside(p, incoming):
                     shutil.rmtree(p)
@@ -440,6 +443,7 @@ def store(root, data, at=None):
     check_own_entries(root)
     os.makedirs(incoming_dir(root), exist_ok=True)
     work = tempfile.mkdtemp(prefix="rx-", dir=incoming_dir(root))
+    keep_work = False
     try:
         req = _extract(data, work)
         mode = req.get("mode")
@@ -525,14 +529,21 @@ def store(root, data, at=None):
                 os.rename(payload, target)
             except OSError as e:
                 if aside is not None:
-                    os.rename(aside, target)  # a failed update must not take the working link down
+                    try:
+                        os.rename(aside, target)  # a failed update must not take the working link down
+                    except OSError as e2:
+                        keep_work = True  # `aside` is now the previous revision's only copy
+                        raise StoreError("could not swap in the new revision (%s) nor put the previous one back (%s): "
+                                         "it is kept in %s" % (e, e2, aside),
+                                         "move %s back to %s by hand, then publish again" % (aside, target))
                 raise StoreError("could not swap in the new revision: %s" % e,
                                  "the previous revision is still in place; check free disk space and publish again")
             warning = _after_write(root, index, at)
         return {"ok": True, "id": page_id, "revision": revision, "expiresAt": meta["expiresAt"],
                 "files": req["files"], "warning": warning}
     finally:
-        shutil.rmtree(work, ignore_errors=True)
+        if not keep_work:
+            shutil.rmtree(work, ignore_errors=True)
 
 
 def handle_store(root, data, at=None):

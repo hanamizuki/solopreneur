@@ -135,7 +135,8 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
   function build() {
     items.forEach(function (s) {
       var k = s.getAttribute('data-item').trim();
-      var raw = (s.getAttribute('data-choices') || '').split('|').map(function (x) { return x.trim(); }).filter(Boolean);
+      // A label wrapped across lines in the source must not split its reply line.
+      var raw = (s.getAttribute('data-choices') || '').split('|').map(oneLine).filter(Boolean);
       var choices = raw.length ? raw : S.choices;
       var ctl = document.createElement('div'); ctl.className = 'so-ctl';
       var buttons = choices.map(function (c) {
@@ -222,7 +223,8 @@ th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
     // A reply naming a repeated id could not say which item it means.
     if (dups.length) { block(fmt(S.duplicateIds, { ids: dups.join(S.listSep) }), m.title); return; }
     meta = m;
-    key = 'signoff:' + m.id + ':r' + m.revision;
+    // Scoped to this publish: an id issued again after removal or expiry starts at r1 too.
+    key = 'signoff:' + m.id + ':r' + m.revision + (contentId ? ':' + contentId : '');
     load(); renderHead(); build();
   }
   if (location.protocol === 'file:') {
