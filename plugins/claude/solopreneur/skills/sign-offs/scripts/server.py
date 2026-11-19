@@ -612,7 +612,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def translate_path(self, path):
         p = super().translate_path(path)
-        if not inside(p, self.root):
+        checked = [p]
+        if os.path.isdir(p):
+            # The stock handler then opens the folder's index.html (or index.htm) by
+            # itself, following a link there: those must stay inside the store too.
+            checked += [c for c in (os.path.join(p, "index.html"), os.path.join(p, "index.htm")) if os.path.lexists(c)]
+        if not all(inside(c, self.root) for c in checked):
             return os.path.join(self.root, ".does-not-exist")  # symlink escapes and the like → 404
         return p
 
