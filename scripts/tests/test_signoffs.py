@@ -36,6 +36,8 @@ sys.path.insert(0, str(SKILL / "scripts"))
 import server  # noqa: E402
 import signoff  # noqa: E402
 
+EN = server.load_strings("en")  # check_content takes the reply's markers from the page's language
+
 GIT_ENV = {
     "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@example.com",
     "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.com",
@@ -269,19 +271,38 @@ class PageChecks(Base):
         self.assertEqual(list(signoff.collect(path)[0]), ["index.html"])
 
     def test_content_must_be_a_fragment_unless_raw(self):
-        doc = b"<!doctype html><html><body><p>x</p></body></html>"
-        self.expect_error("--raw", signoff.check_content, doc, False)
-        signoff.check_content(doc, True)
-        signoff.check_content(b"<section data-item='1'>x</section>", False)
+        for doc in (b"<!doctype html><html><body><p>x</p></body></html>", b"<!DOCTYPE html><p>x</p>", b"<p>x</p><BODY>"):
+            with self.subTest(doc):
+                self.expect_error("--raw", signoff.check_content, doc, False, EN)
+                signoff.check_content(doc, True, EN)
+        signoff.check_content(b"<section data-item='1'>x</section>", False, EN)
+        # Read from the parsed markup: a comment or a script may name the tags.
+        signoff.check_content(b"<!-- the <body> is added for us --><section data-item='1'>x</section>", False, EN)
+        signoff.check_content(b'<script>var s = "<body>";</script><section data-item="1">x</section>', False, EN)
 
     def test_item_ids_must_be_present_unique_and_without_spaces(self):
-        self.expect_error("repeat: 1", signoff.check_content, b'<section data-item="1"></section><section data-item=" 1 "></section>', False)
-        self.expect_error("repeat", signoff.check_content, b"<section data-item=1></section><section data-item=1></section>", False)
-        self.expect_error("empty id", signoff.check_content, b'<section data-item=""></section>', False)
+        self.expect_error("repeat: 1", signoff.check_content, b'<section data-item="1"></section><section data-item=" 1 "></section>', False, EN)
+        self.expect_error("repeat", signoff.check_content, b"<section data-item=1></section><section data-item=1></section>", False, EN)
+        self.expect_error("empty id", signoff.check_content, b'<section data-item=""></section>', False, EN)
         # A reply line starts with the id: "A 1 Approve" could not say where the id ends.
-        self.expect_error('cannot contain spaces: "A 1"', signoff.check_content, b'<section data-item="A 1"></section>', False)
+        self.expect_error('cannot contain spaces: "A 1"', signoff.check_content, b'<section data-item="A 1"></section>', False, EN)
         # The page builds controls for sections only: a div item would silently drop out of the reply.
-        self.expect_error("not on <div>", signoff.check_content, b'<section data-item="1"></section><div data-item="2"></div>', False)
+        self.expect_error("not on <div>", signoff.check_content, b'<section data-item="1"></section><div data-item="2"></div>', False, EN)
+
+    def test_ids_and_choice_labels_cannot_read_as_reply_markers(self):
+        # "Overall: Approve" reads as the overall comment, and "1 No choice — x" as a note left without a choice.
+        cases = [("en", '<section data-item="Overall:"></section>', '"Overall:"'),
+                 ("en", '<section data-item="pending:1"></section>', '"pending:1"'),
+                 ("en", '<section data-item="Sign-Off"></section>', '"Sign-Off"'),
+                 ("en", '<section data-item="1" data-choices="Approve|No  choice"></section>', '"No choice"'),
+                 ("zh-Hant", '<section data-item="整體："></section>', '"整體："'),
+                 ("zh-Hant", '<section data-item="未批：1"></section>', '"未批：1"'),
+                 ("zh-Hant", '<section data-item="1" data-choices="通過|未選"></section>', '"未選"')]
+        for lang, page, needle in cases:
+            with self.subTest(page):
+                self.expect_error(needle, signoff.check_content, page.encode(), False, server.load_strings(lang))
+        # The markers are the page language's own.
+        signoff.check_content('<section data-item="整體：" data-choices="未選|No choice yet"></section>'.encode(), False, EN)
 
     def test_a_choice_label_cannot_hold_the_note_separator(self):
         # "1 Approve — with changes" would read as the choice Approve with the note "with changes".
@@ -289,13 +310,13 @@ class PageChecks(Base):
                         "—|Approve"):  # "1 — — note": the label sits between the id's space and the note's
             with self.subTest(choices):
                 self.expect_error("plain hyphen", signoff.check_content,
-                                  ('<section data-item="1" data-choices="%s"></section>' % choices).encode(), False)
-        signoff.check_content('<section data-item="1" data-choices="Approve - with changes|Approve—fast"></section>'.encode(), False)
+                                  ('<section data-item="1" data-choices="%s"></section>' % choices).encode(), False, EN)
+        signoff.check_content('<section data-item="1" data-choices="Approve - with changes|Approve—fast"></section>'.encode(), False, EN)
 
     def test_unparsable_markup_is_reported_not_raised(self):
         # Python 3.9-3.12 stop at an unknown "<![" keyword; 3.13 and later read it as a comment.
         for check in (lambda: signoff.collect(self.page("decl", "<![foo]><p>x</p>")),
-                      lambda: signoff.check_content(b"<![foo]><section data-item='1'></section>", False)):
+                      lambda: signoff.check_content(b"<![foo]><section data-item='1'></section>", False, EN)):
             try:
                 check()
             except signoff.PublishError:
@@ -571,6 +592,14 @@ class Providers(Base):
         self.assertFalse(os.path.exists(page))
         self.assertNotIn(page_id, read_text(os.path.join(root, "index.html")))
 
+    def test_hard_linked_files_go_out_as_regular_files(self):
+        # tarfile.add() records a second name of the same file as a link member, which the store refuses.
+        src = self.page("p", extra={"shots/a.png": b"png"})
+        os.link(os.path.join(src, "shots", "a.png"), os.path.join(src, "shots", "b.png"))
+        page_id, _, _ = self.publish(src, "--slug", "hl", "--title", "Linked")
+        shots = os.path.join(self.cwd, "docs", "solopreneur", "sign-offs", page_id, "shots")
+        self.assertEqual([read_text(os.path.join(shots, n)) for n in ("a.png", "b.png")], ["png", "png"])
+
     def test_expiry_prunes_only_pages_this_store_wrote(self):
         root = os.path.join(self.cwd, "docs", "solopreneur", "sign-offs")
         old_id, _, _ = self.publish(self.page("old"), "--slug", "old", "--title", "Old")
@@ -782,6 +811,51 @@ class Providers(Base):
         self.assertEqual(code, 3, out + err)
         self.assertNotIn("Published", out)
         self.assertIn("meta.js", err)
+
+    def test_a_meta_json_altered_on_the_way_exits_3(self):
+        # Revision and content id still match, but without expiresAt the page refuses
+        # review: meta.json must be the whole metadata the store wrote.
+        class NoExpiry(SimpleHTTPRequestHandler):
+            def do_GET(self):
+                if not self.path.endswith("/meta.json"):
+                    return super().do_GET()
+                meta = read_json(self.translate_path(self.path))
+                del meta["expiresAt"]
+                body = json.dumps(meta).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        store = self.mkdir("store")
+        with http_dir(store, NoExpiry) as url:
+            self.target_config("static", url=url, dir=store)
+            code, out, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
+        self.assertEqual((code, out), (3, ""), err)
+        self.assertIn("expiresAt", err)
+
+    def test_a_link_that_would_not_open_as_a_page_exits_3(self):
+        # The bytes match, but a browser shows text/plain as source and saves an attachment.
+        class PlainText(SimpleHTTPRequestHandler):
+            def guess_type(self, path):
+                return "text/plain" if path.endswith(".html") else super().guess_type(path)
+
+        class Download(SimpleHTTPRequestHandler):
+            def end_headers(self):
+                if self.path.endswith("/"):
+                    self.send_header("Content-Disposition", "attachment")
+                super().end_headers()
+
+        for handler in (PlainText, Download):
+            with self.subTest(handler.__name__):
+                store = self.mkdir("store-" + handler.__name__)
+                with http_dir(store, handler) as url:
+                    self.target_config("static", url=url, dir=store)
+                    code, out, err = self.cli("publish", self.page("p"), "--slug", "x", "--title", "X")
+                self.assertEqual(code, 3, out + err)
+                self.assertNotIn("Published", out)
+                self.assertIn("text/html, inline", err)
 
     def test_an_existing_gitignore_still_ignores_the_pages(self):
         root = self.mkdir("work", "docs", "solopreneur", "sign-offs")
