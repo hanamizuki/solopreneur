@@ -30,7 +30,7 @@ core subset plus the four specialist plugins' knowledge skills — no agents, no
 
 | Plugin | What you get |
 |---|---|
-| [`solopreneur`](#solopreneur-core) | 17 in-house skills (15 product workflows + merge and Codex-agent plumbing) |
+| [`solopreneur`](#solopreneur-core) | 18 in-house skills (16 product workflows + merge and Codex-agent plumbing) |
 | [`marketer`](#marketer) | `marketer` agent + 7 in-house skills (6 marketing workflows + agent router) |
 | [`designer`](#designer) | `designer` agent + 2 vendored design skills (`impeccable` + `taste-skill`) |
 | [`ios-dev`](#ios-dev) | `ios-dev` agent + `ios-patterns` + `ios-app-templates` (reference apps) + 24 vendored skills (`apple-design` + `asc-*` + `iphone-apps`) |
@@ -73,7 +73,7 @@ contracts above when running these skills on Codex.
 
 ### Repository layout
 
-- [`skills/`](./skills/) is the single source for all 94 skills, grouped by
+- [`skills/`](./skills/) is the single source for all 95 skills, grouped by
   plugin so each skill is directly browsable.
 - [`src/`](./src/) holds manifests, agents, shared helpers, vendor metadata,
   and maintainer scripts.
@@ -89,8 +89,8 @@ explicitly; everything else is recommended and degrades gracefully if absent.
 
 ### `solopreneur` (core)
 
-The foundation. Every other plugin depends on this one. No agent, just 17
-skills: 15 product workflows plus merge and Codex-agent plumbing.
+The foundation. Every other plugin depends on this one. No agent, just 18
+skills: 16 product workflows plus merge and Codex-agent plumbing.
 
 #### Your Virtual Product Team
 
@@ -101,6 +101,7 @@ skills: 15 product workflows plus merge and Codex-agent plumbing.
 | [`/worktree-handoff`](./skills/solopreneur/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
 | [`/handoff`](./skills/solopreneur/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). Also saved under `/tmp/handoff/`. No worktree |
 | [`/preview`](./skills/solopreneur/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into an interactive page in your private **Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments) — built locally by default and opened over `file://`, no deployment. Explicitly temporary work (or a repo with no Library config) gets one self-contained HTML file instead; explicit Vercel, online, cross-device, or external-sharing requests publish the same Library, or an isolated **Share**, on Claude Code. Codex supports both local modes and fails closed on Vercel |
+| [`/sign-offs`](./skills/solopreneur/sign-offs/SKILL.md) | **Approver's desk.** Publishes a temporary review page when a decision needs screenshots or item-by-item rulings: the reader taps approve / revise / reject (or your own choices) per item, adds notes, and copies one structured reply back. Pages expire after 7 days by default and every link is read back before it is handed out. Publishes to a local folder until configured, to a folder your web server already serves, or to a bundled server behind Tailscale Serve or any reverse proxy; first use inspects your setup and proposes options. English or Traditional Chinese UI. Claude Code only for now |
 | [`/specialist-review`](./skills/solopreneur/specialist-review/SKILL.md) | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
 | [`/post-mortem`](./skills/solopreneur/post-mortem/SKILL.md) | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
 | [`/session-retro`](./skills/solopreneur/session-retro/SKILL.md) | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |
@@ -138,7 +139,7 @@ Start them and walk away. They loop until the job is done.
 
 - **`git`**, **`gh`** (GitHub CLI), **`jq`**: required CLIs. Used across `/greenlight`, `/autopilot`, `/post-mortem`, `/todos-babysit`, and `scripts/sync-vendored.sh`; `jq` is also required by `codex-agents-bootstrap`.
 - **[Codex CLI](https://github.com/openai/codex)**: **required** for `codex-agents-bootstrap` and `/greenlight` uncommitted mode (the only path on `main` with uncommitted changes). Also used by `/plan-review` on Claude Code (stage 3, the external reviewer), `/greenlight` PR mode (one reviewer option), and `/naming` (multi-model candidate generation). On Codex, `/plan-review` uses a subscription-authenticated Claude CLI for stage 3 instead. The custom-agent bootstrap and delegation pilot is validated against Codex CLI 0.147.0.
-- **Python 3.9+**: **required by** `codex-agents-bootstrap` to validate agent TOML before installation. Its fixed Tomli 2.4.1 parser is bundled, so no `pip` install or network access is required. Other workflows may also invoke `python3`, but do not establish this bootstrap-specific minimum version.
+- **Python 3.9+**: **required by** `codex-agents-bootstrap` to validate agent TOML before installation, and by `/sign-offs`, whose publisher and server use the standard library only. The bootstrap's fixed Tomli 2.4.1 parser is bundled, so no `pip` install or network access is required. Other workflows may also invoke `python3`, but do not establish this minimum version.
 - **Node.js 20+**: **required by** `/preview` to resolve delivery mode and reserve a collision-safe local output path before writing HTML.
 - **[superpowers](https://github.com/obra/superpowers)** plugin: strongly recommended. `/greenlight` and `/specialist-review` use `superpowers:requesting-code-review` and `receiving-code-review` for the review framework. Graceful fallback if absent.
 - **[Ponytail](https://github.com/DietrichGebert/ponytail)** plugin: optional. `/greenlight` uses `ponytail:ponytail-review` for over-engineering, dead-code, YAGNI, and simplification findings. The current runtime skips it when unavailable.
@@ -297,6 +298,7 @@ Idea
  │       triggers: Codex bot · Gemini bot (when active) · CodeRabbit
  │
  ├─ /preview ──────────── Create local HTML; deploy only when explicit
+ ├─ /sign-offs ────────── Temporary review page; the reply comes back as text
  │
  ├─ /post-mortem ──────── Trace the root cause when something breaks
  ├─ /session-retro ────── Capture lessons from this session

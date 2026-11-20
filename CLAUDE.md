@@ -46,9 +46,11 @@ skills `source`; see `src/solopreneur/shared/config.md` for the
 cascade documentation and a sample migrated config.
 
 There is a **second, separate config file**: `.solopreneur.json` (leading
-dot), used by the preview Library. It is keyed by **filesystem path**
+dot), used by the preview Library and by the sign-offs skill, each in its
+own top-level block. It is keyed by **filesystem path**
 rather than by git remote, is read by
-`skills/solopreneur/preview/scripts/config-resolve.mjs` rather
+`skills/solopreneur/preview/scripts/config-resolve.mjs` and
+`skills/solopreneur/sign-offs/scripts/signoff.py` rather
 than by the shell helpers, and is validated against
 `src/solopreneur/shared/config.schema.json`. The two files coexist
 and neither reader touches the other's file — same `config.md` covers
