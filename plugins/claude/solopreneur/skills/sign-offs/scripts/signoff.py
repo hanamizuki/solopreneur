@@ -153,7 +153,12 @@ def find_configs(cwd):
     none = (None, None)
     explicit = os.environ.get("SOLOPRENEUR_CONFIG")
     if explicit:
-        path = os.path.abspath(explicit)
+        path = os.path.expanduser(explicit)
+        if not os.path.isabs(path):
+            # Relative, it would name a different file in every project: a checkout's own file could become the
+            # trusted user config and choose where pages go.
+            raise PublishError("$SOLOPRENEUR_CONFIG must be an absolute path, not %r" % explicit,
+                               "set it to the full path of your config file, or unset it")
         data = _read_config(path)
         if data is None:
             raise PublishError("$SOLOPRENEUR_CONFIG does not exist: %s" % path)
@@ -240,7 +245,8 @@ def resolve(cwd, target_name=None):
             "%s: signoffs.%s cannot be set in a project's .solopreneur.json: a repository must not choose where "
             "pages are sent, so targets and defaultTarget are read only from %s or the file $SOLOPRENEUR_CONFIG names"
             % (ppath, " and signoffs.".join(named), GLOBAL_CONFIG),
-            "move them to %s; keep only root, lang, ttlDays and replyTo in the project file" % GLOBAL_CONFIG)
+            "remove them from the project file (it may set only root, lang, ttlDays and replyTo); move them to "
+            "%s only after the user confirms those hosts and URLs are theirs, never unasked" % GLOBAL_CONFIG)
 
     # Every key a file sets is checked in that file, used or not: preview validates
     # whole files, so a value let through here would break preview there.
@@ -311,8 +317,10 @@ def resolve(cwd, target_name=None):
     if "defaultTarget" in block and (not isinstance(default, str) or not default):
         raise bad(path, "defaultTarget", "must be the name of a target")
     name = target_name or default
-    if name is None:
-        target = {"provider": "local"}
+    if name is None or (name == "local" and "local" not in targets):
+        # The built-in local store, also reachable as --target local: a user-level remote default
+        # applies in every project, so a page published locally must stay reachable by name.
+        name, target = "local", {"provider": "local"}
     elif name not in targets:
         where = "--target %s" % name if target_name else "signoffs.defaultTarget %r" % name
         raise PublishError("%s: no such target (have: %s)" % (where, ", ".join(sorted(targets)) or "none"),

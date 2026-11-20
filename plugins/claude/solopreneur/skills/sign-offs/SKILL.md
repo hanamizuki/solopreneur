@@ -184,7 +184,7 @@ revision N". The reply's first line shows which revision they saw.
 
 | Provider | For | Needs |
 |---|---|---|
-| `local` (default) | the reader is at this computer | nothing |
+| `local` (default; `--target local` selects it by name) | the reader is at this computer | nothing |
 | `static` | the user already serves a folder as a website | a folder used only for sign-offs, served at `url` (https, so the copy button works; without long-lived caching, so an update's images are fetched again; with no Content-Security-Policy that blocks the page's inline script or same-origin fetches, sandboxes it without allow-scripts and allow-same-origin, or requires Trusted Types for scripts) on a network only the readers and the publishing machine can reach, such as a tailnet or a VPN; for a remote `host`, SSH and `python3` 3.9+ there |
 | `server` | the user wants a dedicated service, e.g. behind Tailscale Serve | the bundled server installed on `host`, reachable only by the readers and the publishing machine (Tailscale Serve on a tailnet, or a reverse proxy on a VPN) |
 
@@ -247,6 +247,8 @@ python3 "$SOLO_SKILL_DIR/scripts/server.py" install --port 8791 --lang en --ttl-
 | `… was not written by sign-offs` | `dir` points at a real site: give sign-offs a folder of its own |
 | `cannot read back …` / `read-back mismatch` (exit 3) | Do not hand out the link. Check that the service runs and `url` reaches it (or that the web server serves `dir`), then publish again with `--update <id>` |
 | `<id> has expired` | Publish a new page with `--slug` |
+| `… cannot be set in a project's .solopreneur.json` | A repository's file named where pages go. Never copy those targets on your own: ask the user whether the hosts and URLs are theirs before moving them to the user config, and remove the keys from the project file |
+| `$SOLOPRENEUR_CONFIG must be an absolute path` | Ask the user to set it to the full path of their config file |
 
 ## Limits
 
