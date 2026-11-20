@@ -441,11 +441,14 @@ class Settings(Base):
                 self.assertEqual(code, 2, out + err)
                 self.assertIn(path, err)
                 self.assertIn("cannot be set in a project's .solopreneur.json", err)
-                self.assertIn("move them to ~/.config/solopreneur/config.json", err)
+                self.assertIn("move them to ~/.config/solopreneur/config.json only after the user confirms", err)
         # The same block in the user config is what it is for.
         os.remove(os.path.join(self.cwd, ".solopreneur.json"))
         self.user_config({"defaultTarget": "t", "targets": {"t": target}})
         self.assertEqual(signoff.resolve(self.cwd)["target"], "t")
+        # A user-level remote default applies everywhere; the built-in local store stays reachable by name.
+        s = signoff.resolve(self.cwd, "local")
+        self.assertEqual((s["target"], s["provider"]), ("local", "local"))
 
     def test_an_explicit_config_never_falls_through(self):
         self.config(self.cwd, {"ttlDays": 5})
@@ -463,6 +466,9 @@ class Settings(Base):
             self.assertEqual(signoff.resolve(self.cwd)["ttlDays"], 7)  # built-in default, not the ancestor's 5
         with mock.patch.dict(os.environ, {"SOLOPRENEUR_CONFIG": os.path.join(self.tmp, "nope.json")}):
             self.expect_error("does not exist", signoff.resolve, self.cwd)
+        # Relative, it would name the checkout's own file in every project.
+        with mock.patch.dict(os.environ, {"SOLOPRENEUR_CONFIG": ".solopreneur.json"}):
+            self.expect_error("absolute path", signoff.resolve, self.cwd)
 
     def test_broken_files_stop_the_walk(self):
         self.config(self.tmp, {"ttlDays": 5})
@@ -622,6 +628,7 @@ class Providers(Base):
         page_id, out, _ = self.publish(src, "--slug", "demo", "--title", "Demo")
         self.assertIn("file://", out)
         self.assertIn("/%s/index.html" % page_id, out)
+        self.assertIn("--update %s --target local" % page_id, out)  # stays right if a remote default is added later
         page = os.path.join(root, page_id)
         meta = read_json(os.path.join(page, "meta.json"))
         self.assertEqual((meta["revision"], meta["title"]), (1, "Demo"))
@@ -695,7 +702,7 @@ class Providers(Base):
     def test_the_update_command_keeps_raw(self):
         # Without --raw, the update would be checked as a content fragment and refused.
         page_id, out, _ = self.publish(self.page("raw", "<!doctype html><p>own UI</p>"), "--slug", "raw", "--title", "Raw", "--raw")
-        self.assertIn("--update %s --raw\n" % page_id, out)
+        self.assertIn("--update %s --target local --raw\n" % page_id, out)
 
     def test_static_refuses_an_index_it_did_not_write(self):
         portal = self.mkdir("site")

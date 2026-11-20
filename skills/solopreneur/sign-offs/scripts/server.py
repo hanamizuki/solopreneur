@@ -762,8 +762,8 @@ def cmd_install(args):
     if root != os.path.abspath(os.path.expanduser(DEFAULT_DIR)):
         target["dir"] = root
     # Targets are read only from the user config: a repository's own file cannot name one.
-    print("Add this under signoffs.targets in ~/.config/solopreneur/config.json on each publishing machine: %s"
-          % json.dumps(target))
+    print("Add this under signoffs.targets in the user config of each publishing machine (the file "
+          "$SOLOPRENEUR_CONFIG names, else ~/.config/solopreneur/config.json): %s" % json.dumps(target))
     return 0
 
 

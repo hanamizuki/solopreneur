@@ -1423,7 +1423,12 @@ project):
   user config: a cloned repository must not choose the host or folder pages are
   sent to. With neither, pages go to the built-in `local` provider.
 - With `$SOLOPRENEUR_CONFIG` set, that file is the only one read; it never falls
-  through to a project config.
+  through to a project config. It must be an absolute path (or start with `~/`):
+  a relative one would name a different file in every project.
+- `--target local` always selects the built-in `local` provider (unless the user
+  config names a target `local`), and the update and recovery commands the
+  publisher prints always carry `--target`, so adding a remote default later
+  never strands a page.
 
 Preview from a plugin version before sign-offs reports a user config without a
 `preview` block as broken, so update every installed copy of the plugin before
