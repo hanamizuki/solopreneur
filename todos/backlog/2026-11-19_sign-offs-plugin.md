@@ -1,7 +1,7 @@
 # sign-offs as a solopreneur skill, and configurable publish targets for preview
 
-> **Status (2026-11-19):** planned, not started. Phase 1 = sign-offs. Phase 2 =
-> preview publish targets (separate plan before work starts).
+> **Status (2026-11-20):** Phase 1 (sign-offs) shipped in #207. Phase 2 =
+> preview publish targets, not started (separate plan before work starts).
 
 ## Why
 
