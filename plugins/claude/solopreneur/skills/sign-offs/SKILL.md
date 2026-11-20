@@ -144,6 +144,9 @@ hyphens, at most 12 characters; the page id adds a random suffix (`e2e-sync-k3f`
 | 2 | A check or the publish failed: fix what the `→` line says |
 | 3 | Published, but the read-back did not match: **do not hand out the link**; fix what the `→` line says, then publish again with `--update <id>`, using the id the error names, or `rm` it before starting over |
 
+Whatever fails, publish only where the settings point: never switch the
+target, `root` or config to get a page out. Ask the user instead.
+
 Write the link out in full (not as a Markdown link), and say in the message
 itself what the reader is deciding: the page holds the detail, not the question.
 `--reply-to "…"` overrides where the page tells the reader to paste the reply
@@ -240,7 +243,7 @@ python3 "$SOLO_SKILL_DIR/scripts/server.py" install --port 8791 --lang en --ttl-
 
 | Message | What to do |
 |---|---|
-| Any message with `Operation not permitted` | A sandbox blocked a write outside the workspace (a `static` folder, a `server` store, or the main working tree from a linked worktree) or the network SSH and the read-back use. Rerun the same command with the user's permission (an approval prompt, or a session allowed to write there and reach `url`), adding `--update <id>` if the `→` line names one. Never redirect the page to another target, `root` or config instead |
+| In a sandboxed session, any message with `Operation not permitted`, `Permission denied` or `Read-only file system` | The sandbox blocked a write outside the workspace (a `static` folder, a `server` store, or the main working tree from a linked worktree) or the network SSH and the read-back use. Ask the user to allow it (an approval prompt, or a session that may write there and reach `url`), then rerun the publish; when the `→` line names a stored page, run its `--update <id>` command instead of `--slug` |
 | `the page did not pass its checks` | Fix each listed file |
 | `index.html is a whole HTML document` | Keep only the content, or publish with `--raw` |
 | `cannot reach <host> over SSH` | This machine cannot publish there: fix SSH (key, known host) or publish from one that can |
