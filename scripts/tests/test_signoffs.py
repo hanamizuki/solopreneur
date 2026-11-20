@@ -161,6 +161,13 @@ class Base(unittest.TestCase):
             json.dump(dict({"schemaVersion": 2, "signoffs": block}, **extra), f)
         return path
 
+    def user_config(self, block, **extra):
+        """~/.config/solopreneur/config.json under the test HOME: the only place targets are read."""
+        path = os.path.join(self.mkdir("home", ".config", "solopreneur"), "config.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(dict({"schemaVersion": 2, "signoffs": block}, **extra), f)
+        return path
+
     def cli(self, *argv):
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -398,7 +405,7 @@ class Settings(Base):
         git(repo, "init", "-q")
         os.chdir(self.mkdir("repo", "sub"))
         s = signoff.resolve(os.getcwd())
-        self.assertEqual((s["provider"], s["lang"], s["ttlDays"], s["configPath"]), ("local", "en", 7, None))
+        self.assertEqual((s["provider"], s["lang"], s["ttlDays"], s["userConfig"], s["projectConfig"]), ("local", "en", 7, None, None))
         self.assertEqual(s["dir"], os.path.join(repo, "docs", "solopreneur", "sign-offs"))
         self.assertTrue(s["url"].startswith("file://"))
 
@@ -408,24 +415,47 @@ class Settings(Base):
         with open(os.path.join(mid, ".solopreneur.json"), "w") as f:
             json.dump({"schemaVersion": 2, "preview": {"root": "."}}, f)
         s = signoff.resolve(self.mkdir("work", "mid", "deeper"))
-        self.assertEqual((s["configPath"], s["lang"]), (outer, "zh-Hant"))
+        self.assertEqual((s["projectConfig"], s["lang"]), (outer, "zh-Hant"))
 
-    def test_the_nearest_block_wins_and_replaces_the_farther_one(self):
-        self.config(self.tmp, {"lang": "zh-Hant", "ttlDays": 3})
+    def test_settings_come_key_by_key_from_the_nearest_project_file_then_the_user_config(self):
+        self.config(self.tmp, {"replyTo": "farther"})  # only the nearest project file counts
         near = self.config(self.cwd, {"ttlDays": 5})
+        user = self.user_config({"lang": "zh-Hant", "ttlDays": 3, "defaultTarget": "t",
+                                 "targets": {"t": {"provider": "static", "url": "https://x/", "dir": "/srv"}}})
         s = signoff.resolve(self.cwd)
-        self.assertEqual((s["configPath"], s["lang"], s["ttlDays"]), (near, "en", 5))
+        self.assertEqual((s["projectConfig"], s["userConfig"]), (near, user))
+        self.assertEqual((s["lang"], s["ttlDays"], s["provider"], s["target"]), ("zh-Hant", 5, "static", "t"))
+        self.assertNotEqual(s["replyTo"], "farther")
 
     def test_the_user_level_file_is_the_last_layer(self):
-        path = self.config(self.mkdir("home", ".config", "solopreneur"), {"ttlDays": 2})
-        os.rename(path, os.path.join(os.path.dirname(path), "config.json"))
+        self.user_config({"ttlDays": 2})
         self.assertEqual(signoff.resolve(self.cwd)["ttlDays"], 2)
+
+    def test_a_project_file_cannot_say_where_pages_go(self):
+        # A cloned repository's own file must not send pages to a host the user never chose.
+        target = {"provider": "server", "host": "me@elsewhere", "url": "https://elsewhere.example/"}
+        for block in ({"defaultTarget": "t", "targets": {"t": target}}, {"targets": {}}, {"defaultTarget": "t"}):
+            with self.subTest(block):
+                path = self.config(self.cwd, block)
+                code, out, err = self.cli("config")
+                self.assertEqual(code, 2, out + err)
+                self.assertIn(path, err)
+                self.assertIn("cannot be set in a project's .solopreneur.json", err)
+                self.assertIn("move them to ~/.config/solopreneur/config.json", err)
+        # The same block in the user config is what it is for.
+        os.remove(os.path.join(self.cwd, ".solopreneur.json"))
+        self.user_config({"defaultTarget": "t", "targets": {"t": target}})
+        self.assertEqual(signoff.resolve(self.cwd)["target"], "t")
 
     def test_an_explicit_config_never_falls_through(self):
         self.config(self.cwd, {"ttlDays": 5})
         explicit = self.config(self.mkdir("elsewhere"), {"ttlDays": 9})
         with mock.patch.dict(os.environ, {"SOLOPRENEUR_CONFIG": explicit}):
             self.assertEqual(signoff.resolve(self.cwd)["ttlDays"], 9)
+        # The file the user names is a user config: it may say where pages go.
+        named = self.config(self.mkdir("named"), {"defaultTarget": "t", "targets": {"t": {"provider": "local"}}})
+        with mock.patch.dict(os.environ, {"SOLOPRENEUR_CONFIG": named}):
+            self.assertEqual(signoff.resolve(self.cwd)["target"], "t")
         other = os.path.join(self.tmp, "preview-only.json")
         with open(other, "w") as f:
             json.dump({"schemaVersion": 2, "preview": {}}, f)
@@ -483,12 +513,19 @@ class Settings(Base):
             ({"ttlDays": None}, "signoffs.ttlDays"),
             ({"targets": None}, "signoffs.targets"),
         ]
+        project = os.path.join(self.cwd, ".solopreneur.json")
+        user = os.path.join(self.home, ".config", "solopreneur", "config.json")
         for block, needle in cases:
-            with self.subTest(block):
-                path = self.config(self.cwd, block)
-                self.expect_error(needle, signoff.resolve, self.cwd)
-                self.expect_error(path, signoff.resolve, self.cwd)
-        with open(os.path.join(self.cwd, ".solopreneur.json"), "w") as f:
+            for where in (["user"] if set(block) & set(signoff.USER_ONLY_KEYS) else ["project", "user"]):
+                with self.subTest(block=block, where=where):
+                    for leftover in (project, user):
+                        if os.path.exists(leftover):
+                            os.remove(leftover)
+                    path = self.config(self.cwd, block) if where == "project" else self.user_config(block)
+                    self.expect_error(needle, signoff.resolve, self.cwd)
+                    self.expect_error(path, signoff.resolve, self.cwd)
+        os.remove(user)
+        with open(project, "w") as f:
             json.dump({"schemaVersion": 1, "signoffs": {}}, f)
         self.expect_error("schemaVersion", signoff.resolve, self.cwd)
 
@@ -499,8 +536,8 @@ class Settings(Base):
         self.assertEqual((ttl, type(ttl)), (7, int))  # the store takes whole numbers only
 
     def test_unknown_keys_and_plain_http_only_warn(self):
-        self.config(self.cwd, {"ttlDay": 3, "defaultTarget": "p",
-                               "targets": {"p": {"provider": "static", "url": "http://portal.example/so", "dir": "/srv/so"}}})
+        self.user_config({"ttlDay": 3, "defaultTarget": "p",
+                          "targets": {"p": {"provider": "static", "url": "http://portal.example/so", "dir": "/srv/so"}}})
         s = signoff.resolve(self.cwd)
         self.assertEqual(s["url"], "http://portal.example/so/")
         self.assertTrue(any("ttlDay" in w for w in s["warnings"]))
@@ -577,7 +614,7 @@ class Providers(Base):
     """Publish, update, expire and remove through the CLI, for every provider."""
 
     def target_config(self, provider, **target):
-        self.config(self.cwd, {"defaultTarget": "t", "targets": {"t": dict(provider=provider, **target)}})
+        self.user_config({"defaultTarget": "t", "targets": {"t": dict(provider=provider, **target)}})
 
     def test_local_publish_update_and_remove(self):
         root = os.path.join(self.cwd, "docs", "solopreneur", "sign-offs")

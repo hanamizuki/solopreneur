@@ -761,7 +761,9 @@ def cmd_install(args):
     target = {"provider": "server", "host": "<this machine as an SSH destination>", "url": "https://<host name>/"}
     if root != os.path.abspath(os.path.expanduser(DEFAULT_DIR)):
         target["dir"] = root
-    print("Config target: %s" % json.dumps(target))
+    # Targets are read only from the user config: a repository's own file cannot name one.
+    print("Add this under signoffs.targets in ~/.config/solopreneur/config.json on each publishing machine: %s"
+          % json.dumps(target))
     return 0
 
 

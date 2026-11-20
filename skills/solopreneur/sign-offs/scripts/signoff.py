@@ -57,6 +57,7 @@ DEFAULT_ROOT = os.path.join("docs", "solopreneur", "sign-offs")
 LANGS = ("en", "zh-Hant")
 PROVIDERS = ("local", "static", "server")
 BLOCK_KEYS = ("root", "lang", "ttlDays", "replyTo", "defaultTarget", "targets")
+USER_ONLY_KEYS = ("defaultTarget", "targets")  # where pages go: never from a repository's own file
 TARGET_KEYS = ("provider", "host", "url", "dir")
 # The store needs no agent, X11 or port forwarding: never hand them to a host that a
 # repository's own config may have chosen.
@@ -139,34 +140,39 @@ def _read_config(path):
     return data
 
 
-def find_config(cwd):
-    """(path, parsed file) of the config whose `signoffs` block applies, or (None, None).
+def find_configs(cwd):
+    """((path, data) of the project config, (path, data) of the user config); a
+    missing one is (None, None).
 
-    $SOLOPRENEUR_CONFIG names the one file to use; otherwise the nearest ancestor
-    .solopreneur.json that has a `signoffs` block (files configuring only other
-    features are stepped over), then ~/.config/solopreneur/config.json."""
+    The user config is the file $SOLOPRENEUR_CONFIG names, which is then the only
+    file read, else ~/.config/solopreneur/config.json. The project config is the
+    nearest ancestor .solopreneur.json that has a `signoffs` block (files
+    configuring only other features are stepped over). Only the user config may
+    say where pages go: a cloned repository's own file must not send them to a
+    host the user never chose."""
+    none = (None, None)
     explicit = os.environ.get("SOLOPRENEUR_CONFIG")
     if explicit:
         path = os.path.abspath(explicit)
         data = _read_config(path)
         if data is None:
             raise PublishError("$SOLOPRENEUR_CONFIG does not exist: %s" % path)
-        return (path, data) if "signoffs" in data else (None, None)
+        return none, ((path, data) if "signoffs" in data else none)
+    project = none
     d = os.path.realpath(cwd)
     while True:
         path = os.path.join(d, CONFIG_NAME)
         data = _read_config(path)
         if data is not None and "signoffs" in data:
-            return path, data
+            project = (path, data)
+            break
         parent = os.path.dirname(d)
         if parent == d:
             break
         d = parent
     path = os.path.expanduser(GLOBAL_CONFIG)
     data = _read_config(path)
-    if data is not None and "signoffs" in data:
-        return path, data
-    return None, None
+    return project, ((path, data) if data is not None and "signoffs" in data else none)
 
 
 def to_main_worktree(path):
@@ -206,58 +212,86 @@ def local_root(config_path, root, cwd):
 
 
 def resolve(cwd, target_name=None):
-    """Everything a publish needs, from the config or the built-in defaults."""
-    path, data = find_config(cwd)
-    block, warnings = {}, []
+    """Everything a publish needs. root, lang, ttlDays and replyTo come key by key
+    from the project config, else the user config, else the defaults; targets and
+    defaultTarget come from the user config only."""
+    (ppath, pdata), (upath, udata) = find_configs(cwd)
+    warnings = []
 
-    def bad(field, why):
+    def bad(path, field, why):
         return PublishError("invalid config: %s: signoffs%s %s" % (path, "." + field if field else "", why),
                             "fix the signoffs block")
 
-    if data is not None:
+    def block_of(path, data):
+        if data is None:
+            return {}
         if data.get("schemaVersion") != 2:
             raise PublishError("invalid config: %s: schemaVersion must be 2" % path)
         block = data["signoffs"]
         if not isinstance(block, dict):
-            raise bad("", "must be an object")
-        warnings += ["%s: signoffs.%s is not a known setting and is ignored" % (path, k) for k in block if k not in BLOCK_KEYS]
-    lang = block.get("lang", "en")
-    if lang not in LANGS:
-        raise bad("lang", "must be one of: %s" % ", ".join(LANGS))
-    ttl = block.get("ttlDays", server.TTL_DEFAULT)
-    if isinstance(ttl, float) and ttl.is_integer():
-        ttl = int(ttl)  # JSON 7.0: a whole number to the schema (and preview), a float to json.load
-    if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= server.TTL_MAX:
-        raise bad("ttlDays", "must be a whole number from 1 to %d" % server.TTL_MAX)
-    # A key that is present must hold a valid value: null is not "use the default"
-    # (the schema types every key, so preview would refuse the same file).
-    reply_to = block.get("replyTo")
-    if "replyTo" in block and (not isinstance(reply_to, str) or _too_long(reply_to, server.REPLY_TO_MAX)):
-        raise bad("replyTo", "must be text of at most %d characters" % server.REPLY_TO_MAX)
-    root = block.get("root")
-    if "root" in block and (not isinstance(root, str) or not root):
-        raise bad("root", "must be a non-empty path")
+            raise bad(path, "", "must be an object")
+        warnings.extend("%s: signoffs.%s is not a known setting and is ignored" % (path, k) for k in block if k not in BLOCK_KEYS)
+        return block
+
+    pblock, ublock = block_of(ppath, pdata), block_of(upath, udata)
+    named = [k for k in USER_ONLY_KEYS if k in pblock]
+    if named:
+        raise PublishError(
+            "%s: signoffs.%s cannot be set in a project's .solopreneur.json: a repository must not choose where "
+            "pages are sent, so targets and defaultTarget are read only from %s or the file $SOLOPRENEUR_CONFIG names"
+            % (ppath, " and signoffs.".join(named), GLOBAL_CONFIG),
+            "move them to %s; keep only root, lang, ttlDays and replyTo in the project file" % GLOBAL_CONFIG)
+
+    # Every key a file sets is checked in that file, used or not: preview validates
+    # whole files, so a value let through here would break preview there.
+    for path, block in ((ppath, pblock), (upath, ublock)):
+        if "lang" in block and block["lang"] not in LANGS:
+            raise bad(path, "lang", "must be one of: %s" % ", ".join(LANGS))
+        if "ttlDays" in block:
+            ttl = block["ttlDays"]
+            if isinstance(ttl, float) and ttl.is_integer():
+                ttl = int(ttl)  # JSON 7.0: a whole number to the schema (and preview), a float to json.load
+            if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= server.TTL_MAX:
+                raise bad(path, "ttlDays", "must be a whole number from 1 to %d" % server.TTL_MAX)
+        # A key that is present must hold a valid value: null is not "use the default".
+        if "replyTo" in block and (not isinstance(block["replyTo"], str) or _too_long(block["replyTo"], server.REPLY_TO_MAX)):
+            raise bad(path, "replyTo", "must be text of at most %d characters" % server.REPLY_TO_MAX)
+        if "root" in block and (not isinstance(block["root"], str) or not block["root"]):
+            raise bad(path, "root", "must be a non-empty path")
+
+    def pick(key, default):
+        """(value, file that set it): the project config first, then the user config."""
+        for path, block in ((ppath, pblock), (upath, ublock)):
+            if key in block:
+                return block[key], path
+        return default, None
+
+    lang = pick("lang", "en")[0]
+    ttl = int(pick("ttlDays", server.TTL_DEFAULT)[0])
+    reply_to = pick("replyTo", None)[0]
+    root, root_path = pick("root", None)
+    path, block = upath, ublock  # from here on: where pages go, the user config only
     targets = block.get("targets", {})
     if not isinstance(targets, dict):
-        raise bad("targets", "must be an object")
+        raise bad(path, "targets", "must be an object")
     # Every target, not only the one in use: preview validates the whole file
     # against the schema, so a value let through here would break preview there,
     # and a broken target must not wait for the day --target picks it.
     for tname, t in targets.items():
         if not isinstance(t, dict):
-            raise bad("targets.%s" % tname, "must be an object")
+            raise bad(path, "targets.%s" % tname, "must be an object")
         warnings += ["%s: signoffs.targets.%s.%s is not a known setting and is ignored" % (path, tname, k)
                      for k in t if k not in TARGET_KEYS]
         if t.get("provider") not in PROVIDERS:
-            raise bad("targets.%s.provider" % tname, "must be one of: %s" % ", ".join(PROVIDERS))
+            raise bad(path, "targets.%s.provider" % tname, "must be one of: %s" % ", ".join(PROVIDERS))
         for key in ("host", "url", "dir"):
             if key in t and (not isinstance(t[key], str) or not t[key]):
-                raise bad("targets.%s.%s" % (tname, key), "must be a non-empty string")
+                raise bad(path, "targets.%s.%s" % (tname, key), "must be a non-empty string")
         if "host" in t and not HOST_RE.match(t["host"]):
-            raise bad("targets.%s.host" % tname, "must be an SSH destination such as me@box")
+            raise bad(path, "targets.%s.host" % tname, "must be an SSH destination such as me@box")
         if t["provider"] == "local":
             if "host" in t or "url" in t or "dir" in t:
-                raise bad("targets.%s" % tname, "takes no host, url or dir: a local target writes to signoffs.root")
+                raise bad(path, "targets.%s" % tname, "takes no host, url or dir: a local target writes to signoffs.root")
             continue
         url = t.get("url") or ""
         try:
@@ -268,30 +302,30 @@ def resolve(cwd, target_name=None):
             url_host = None
         # Page ids are appended to url as text: a ?query or #fragment (even an empty one) would swallow them.
         if not url.startswith(("http://", "https://")) or not url_host or "?" in url or "#" in url:
-            raise bad("targets.%s.url" % tname, "must be the http(s) address the pages are served at, without ?query or #fragment")
+            raise bad(path, "targets.%s.url" % tname, "must be the http(s) address the pages are served at, without ?query or #fragment")
         if t["provider"] == "static" and "dir" not in t:
-            raise bad("targets.%s.dir" % tname, "is required: the folder the web server serves")
+            raise bad(path, "targets.%s.dir" % tname, "is required: the folder the web server serves")
         if "dir" in t and not (os.path.isabs(t["dir"]) or t["dir"].startswith("~/")):
-            raise bad("targets.%s.dir" % tname, "must be an absolute path or start with ~/ (expanded on the host)")
+            raise bad(path, "targets.%s.dir" % tname, "must be an absolute path or start with ~/ (expanded on the host)")
     default = block.get("defaultTarget")
     if "defaultTarget" in block and (not isinstance(default, str) or not default):
-        raise bad("defaultTarget", "must be the name of a target")
+        raise bad(path, "defaultTarget", "must be the name of a target")
     name = target_name or default
     if name is None:
         target = {"provider": "local"}
     elif name not in targets:
         where = "--target %s" % name if target_name else "signoffs.defaultTarget %r" % name
         raise PublishError("%s: no such target (have: %s)" % (where, ", ".join(sorted(targets)) or "none"),
-                           "add it under signoffs.targets in %s" % (path or "a .solopreneur.json"))
+                           "add it under signoffs.targets in %s" % (path or GLOBAL_CONFIG))
     else:
         target = targets[name]
 
     provider = target["provider"]
-    settings = {"configPath": path, "target": name, "provider": provider, "lang": lang, "ttlDays": ttl,
+    settings = {"userConfig": upath, "projectConfig": ppath, "target": name, "provider": provider, "lang": lang, "ttlDays": ttl,
                 "replyTo": reply_to if reply_to is not None else server.load_strings(lang)["defaultReplyTo"]}
 
     if provider == "local":
-        directory = local_root(path, root, cwd)
+        directory = local_root(root_path, root, cwd)
         settings.update(host=None, local=True, dir=directory, url=pathlib.Path(directory).as_uri() + "/")
     else:
         url = target["url"]

@@ -123,11 +123,11 @@
         "defaultTarget": {
           "type": "string",
           "minLength": 1,
-          "description": "Key under `targets` used when no --target is given. Omitted: the built-in local provider."
+          "description": "Key under `targets` used when no --target is given. Read only from the user config ($SOLOPRENEUR_CONFIG, else ~/.config/solopreneur/config.json); sign-offs refuses a project .solopreneur.json that sets it. Omitted: the built-in local provider."
         },
         "targets": {
           "type": "object",
-          "description": "Publish targets, keyed by name.",
+          "description": "Publish targets, keyed by name. Read only from the user config ($SOLOPRENEUR_CONFIG, else ~/.config/solopreneur/config.json); sign-offs refuses a project .solopreneur.json that sets it.",
           "additionalProperties": { "$ref": "#/$defs/signoffsTarget" }
         }
       }

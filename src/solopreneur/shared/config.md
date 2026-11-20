@@ -1370,9 +1370,11 @@ deploys** and spawns no `vercel` or `curl` process.
 # The `signoffs` block
 
 The sign-offs skill (`skills/solopreneur/sign-offs/`) publishes temporary review
-pages. Its settings live in the same `.solopreneur.json`, in a `signoffs` block,
-and are read by `scripts/signoff.py` itself — Python standard library, no Node.
-Every key is optional:
+pages. Its settings live in a `signoffs` block, read by `scripts/signoff.py`
+itself (Python standard library, no Node). Where pages go — `targets` and
+`defaultTarget` — is read only from the user config; a project's
+`.solopreneur.json` may set `root`, `lang`, `ttlDays` and `replyTo`. Every key is
+optional:
 
 ```jsonc
 "signoffs": {
@@ -1380,8 +1382,8 @@ Every key is optional:
   "lang": "en",                           // en (default) | zh-Hant
   "ttlDays": 7,                           // 1–365; every update restarts the clock
   "replyTo": "Paste it back in the chat", // optional; a per-language sentence otherwise
-  "defaultTarget": "home",                // omitted: the built-in local provider
-  "targets": {
+  "defaultTarget": "home",                // user config only; omitted: the built-in local provider
+  "targets": {                            // user config only
     "home":   { "provider": "server", "host": "me@box", "url": "https://box.example.ts.net/" },
     "portal": { "provider": "static", "dir": "/srv/www/sign-offs", "url": "https://portal.example/sign-offs/" }
   }
@@ -1405,30 +1407,35 @@ work: the read-back fetches every file from `url` without credentials.
 
 ## Resolution
 
-`signoff.py` mirrors preview's layers, per block, anchored at the **current
-directory** (page sources usually sit in a temporary directory, which says
-nothing about the project):
+`signoff.py` reads two files, anchored at the **current directory** (page
+sources usually sit in a temporary directory, which says nothing about the
+project):
 
-| # | Source | When it has no `signoffs` block |
+| File | Found at | May set |
 |---|---|---|
-| 1 | `$SOLOPRENEUR_CONFIG` | built-in defaults; never falls through |
-| 2 | nearest ancestor `.solopreneur.json` that has a `signoffs` block | stepped over |
-| 3 | `~/.config/solopreneur/config.json` | built-in defaults |
+| user config | the file `$SOLOPRENEUR_CONFIG` names, else `~/.config/solopreneur/config.json` | every key |
+| project config | the nearest ancestor `.solopreneur.json` that has a `signoffs` block (others are stepped over) | `root`, `lang`, `ttlDays`, `replyTo` |
 
-The block found is used whole: blocks at different levels never merge, so a
-project's own `signoffs` block replaces the user-level one, targets included.
-Preview from a plugin version before sign-offs reports a user-level file without
-a `preview` block as broken, so until every installed copy is updated, a
-`signoffs` block meant for every project belongs in a `.solopreneur.json` in a
-parent directory of them, which preview's walk-up skips.
+- `root`, `lang`, `ttlDays` and `replyTo` come key by key from the project
+  config, else the user config, else the defaults.
+- `targets` and `defaultTarget` come from the user config only. A project config
+  that sets either is refused, naming the file and saying to move them to the
+  user config: a cloned repository must not choose the host or folder pages are
+  sent to. With neither, pages go to the built-in `local` provider.
+- With `$SOLOPRENEUR_CONFIG` set, that file is the only one read; it never falls
+  through to a project config.
+
+Preview from a plugin version before sign-offs reports a user config without a
+`preview` block as broken, so update every installed copy of the plugin before
+writing one.
 
 The same failures stop the lookup as in preview: malformed JSON, a top level
 that is not an object, a file that is not a regular file, and a broken symlink.
 A file whose `signoffs` block is used must say `"schemaVersion": 2`. Unknown keys
 in the block are reported as warnings and ignored, so one config shared by
 machines on different plugin versions keeps working; invalid values of known
-keys — in every target, not only the one in use — are errors that name the
-file.
+keys — in both files and in every target, not only the ones in use — are errors
+that name the file.
 
 ## Path rules
 
@@ -1447,13 +1454,14 @@ file.
 - `dir` must be absolute or start with `~/`; `~` expands on the host that holds
   the pages.
 - `host` is an SSH destination of letters, digits and `. _ - @ :`, not starting
-  with `-`: a cloned repository's config must pass neither options to ssh nor
-  shell syntax to a `ProxyCommand` that expands `%h`. The connection never
+  with `-`, so a pasted value can pass neither options to ssh nor shell syntax
+  to a `ProxyCommand` that expands `%h` (only the user config names hosts at
+  all). The connection never
   forwards the agent, X11 or ports. A host reached through a non-default port or
   a jump host (`ssh -G`) is never this machine. Omitted, `local`,
   or a name that resolves to this machine (one of its whole host names, or an
-  address it can bind to) means a local write, so one config can be shared by the store host and the machines that
-  publish to it. A wrong guess cannot hand out a broken link: every publish
+  address it can bind to) means a local write, so one user config can be shared
+  by the store host and the machines that publish to it. A wrong guess cannot hand out a broken link: every publish
   reads its files back from `url` before printing it.
 
 ## Who renders what
