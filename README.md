@@ -182,11 +182,12 @@ The `designer` agent for UI/UX work that spans web, iOS, and Android. Ships
 
 #### Bundled skills
 
-- [**`impeccable`**](./skills/designer/impeccable/SKILL.md): vendored from [pbakaus/impeccable](https://github.com/pbakaus/impeccable). Polish / critique / redesign frontend interfaces.
+- [**`impeccable`**](./skills/designer/impeccable/SKILL.md): vendored from [pbakaus/impeccable](https://github.com/pbakaus/impeccable) (4.10). Designs, critiques, audits, polishes and animates frontends: websites, dashboards, app UI, native iOS / Android screens, and `DESIGN.md` design systems. Runs a prebuilt engine binary that it downloads on first use from the upstream GitHub releases into `~/.impeccable/bin/`, checked against SHA-256 sums pinned in this plugin.
 - [**`taste-skill`**](./skills/designer/taste-skill/SKILL.md): vendored from [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) (tasteskill 2.5). Builds or redesigns company and product websites, as static HTML/CSS or inside an existing React / Next.js / Vue / Svelte / Astro project, from a bundled kit of photographs, UI fragments, icons and motion. A checker and a finish gate render the page in headless Chrome; the gate also runs as a Stop hook (a no-op unless a build is armed). Needs Node 22+ and Chrome, Edge or Chromium.
 
 #### Requirements
 
+- **Node.js 22+** and **Chrome, Edge or Chromium**: **required by** `taste-skill`, whose checker and finish gate render pages in a headless browser.
 - **[frontend-design](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design)** plugin: creative, polished frontend code generation that avoids generic AI aesthetics. Auto-classified into the design extended index by `/rebuild-skill-index`.
 - **[ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)** plugin: UI/UX intelligence library: 50+ styles, 161 color palettes, font pairings, product types, UX guidelines, chart types across 10 stacks. Auto-classified.
 - **[Pencil MCP](https://www.pencil.dev/downloads)**: optional. If `mcp__pencil__*` tools are available, the `designer` agent prefers them for `.pen` design file access (layout, variables, guidelines, export).
@@ -259,14 +260,14 @@ skills.
 
 #### Bundled skills
 
-- [**`neo4j-cypher`**](./skills/neo4j-dev/neo4j-cypher/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). 4.x/5.x → 2025.x upgrade. Covers removed/deprecated syntax and modern replacements.
+- [**`neo4j-cypher`**](./skills/neo4j-dev/neo4j-cypher/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). Writes, optimizes and validates Cypher 25 queries for Neo4j 2025.x / 2026.x: pattern matching, vector and fulltext search, subqueries, batch writes, indexes.
 - [**`neo4j-cypher-guide`**](./skills/neo4j-dev/neo4j-cypher-guide/SKILL.md): vendored from [tomasonjo/blogs](https://github.com/tomasonjo/blogs/tree/master/claude-skills/neo4j-cypher-guide). Modern Cypher read patterns (QPP, CALL subqueries, sorting).
-- [**`neo4j-migration`**](./skills/neo4j-dev/neo4j-migration/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). Driver upgrade across .NET / Go / Java / JS / Python.
-- [**`neo4j-cli-tools`**](./skills/neo4j-dev/neo4j-cli-tools/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). `neo4j-admin`, `cypher-shell`, `aura-cli`, MCP server setup.
+- [**`neo4j-migration`**](./skills/neo4j-dev/neo4j-migration/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). Upgrades driver code and Cypher from 4.x / 5.x to 2025.x / 2026.x (Cypher 25) across .NET / Go / Java / JS / Python.
+- [**`neo4j-cli-tools`**](./skills/neo4j-dev/neo4j-cli-tools/SKILL.md): vendored from [neo4j-contrib/neo4j-skills](https://github.com/neo4j-contrib/neo4j-skills). `neo4j-cli` (one CLI for queries, schema, Aura, Docker and credentials), `neo4j-admin`, `cypher-shell`, and quick `neo4j-mcp` setup; the legacy `aura-cli` is still covered.
 
 #### Requirements
 
-- **`neo4j-admin`**, **`cypher-shell`**, **`aura-cli`**: Neo4j first-party CLIs. Install per the `neo4j-cli-tools` skill's guidance, depending on which workflow (admin / query / cloud) applies.
+- **`neo4j-cli`**, **`neo4j-admin`**, **`cypher-shell`**: Neo4j's command-line tools (`neo4j-cli` replaces the legacy `aura-cli` for Aura work). Install per the `neo4j-cli-tools` skill's guidance, depending on which workflow (admin / query / cloud) applies.
 
 ---
 
