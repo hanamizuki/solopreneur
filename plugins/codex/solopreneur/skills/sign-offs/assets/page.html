@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="signoff-content" content="{{contentId}}">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{title}}</title>
+<!--
+  sign-offs review UI: the single source every published page is wrapped in.
+  signoff.py fills the double-brace tokens from assets/strings.json at publish
+  time (with this publish's content id) and puts the agent's content in place
+  of the content token, so a
+  published page always carries the UI of the plugin version that published it,
+  never a stale copy.
+  Reply format, first line: "sign-off <id> r<revision>". The id and revision
+  come from meta.json over http(s), or from meta.js under file:// (browsers
+  refuse fetch() on file:// pages, but still load a classic <script src>).
+-->
+<style>
+:root{--bg:#fff;--fg:#1d1d1f;--muted:#6e6e73;--line:#d2d2d7;--card:#f5f5f7;--accent:#0a66ff;--bad:#cf222e}
+@media (prefers-color-scheme: dark){:root{--bg:#111;--fg:#f2f2f2;--muted:#a1a1a6;--line:#3a3a3c;--card:#1c1c1e;--accent:#4c8dff;--bad:#f85149}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;-webkit-text-size-adjust:100%}
+main{max-width:760px;margin:0 auto;padding:16px 16px 24px}
+#so-head{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card);font-size:14px;color:var(--muted)}
+#so-head b{display:block;color:var(--fg);font-size:18px;line-height:1.4;margin-bottom:4px}
+#so-head .err{color:var(--bad);font-weight:600}
+section[data-item],section.so-overall{border:1px solid var(--line);border-radius:12px;padding:14px;margin:16px 0}
+section h2{font-size:17px;line-height:1.4;margin:0 0 8px}
+p{margin:0 0 8px}
+img{max-width:100%;height:auto;border-radius:8px;border:1px solid var(--line);display:block}
+.shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0}
+.shots figure{margin:0}.shots figcaption{font-size:13px;color:var(--muted);margin-top:4px}
+table{border-collapse:collapse;width:100%;font-size:15px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.so-ctl{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.so-ctl button{font:inherit;font-size:15px;min-height:44px;padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.so-ctl button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.so-note,#so-overall,#so-out{width:100%;font:inherit;font-size:16px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.so-note{margin-top:8px}
+#so-out{margin-top:8px;font:14px/1.5 ui-monospace,Menlo,monospace;min-height:6em;max-height:35vh}
+.so-foot{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.so-foot .row{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px}
+#so-progress{color:var(--muted);font-size:14px;flex:1}
+#so-gen{font:inherit;font-size:16px;font-weight:600;min-height:44px;padding:8px 18px;border-radius:999px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+#so-gen:disabled{opacity:.4;cursor:not-allowed}
+#so-hint{max-width:760px;margin:6px auto 0;font-size:14px}
+#so-hint.warn{color:var(--bad);font-weight:600}
+.so-outwrap{max-width:760px;margin:0 auto}
+</style>
+<script src="meta.js"></script>
+</head>
+<body>
+<main>
+<header id="so-head"><b>{{loading}}</b></header>
+
+{{content}}
+
+<section class="so-overall">
+  <h2>{{overallHeading}}</h2>
+  <textarea id="so-overall" rows="3" placeholder="{{overallPlaceholder}}"></textarea>
+</section>
+</main>
+
+<div class="so-foot">
+  <div class="row"><span id="so-progress"></span><button id="so-gen" type="button">{{generate}}</button></div>
+  <p id="so-hint" role="status"></p>
+  <div class="so-outwrap"><textarea id="so-out" hidden aria-label="{{replyLabel}}"></textarea></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var S = {{strings}};
+  var head = document.getElementById('so-head');
+  var progress = document.getElementById('so-progress');
+  var hintEl = document.getElementById('so-hint');
+  var out = document.getElementById('so-out');
+  var overall = document.getElementById('so-overall');
+  var gen = document.getElementById('so-gen');
+  var items = Array.prototype.slice.call(document.querySelectorAll('section[data-item]'));
+  var meta = null, key = null, state = fresh();
+
+  var seen = Object.create(null), dups = [];
+  items.forEach(function (s) {
+    var k = s.getAttribute('data-item').trim();
+    if (seen[k] && dups.indexOf(k) < 0) dups.push(k);
+    seen[k] = true;
+  });
+
+  function fmt(text, vars) {
+    return String(text).replace(/\{(\w+)\}/g, function (m, k) {
+      return Object.prototype.hasOwnProperty.call(vars || {}, k) ? String(vars[k]) : m;
+    });
+  }
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function when(iso) {
+    var d = new Date(iso);
+    return isNaN(d) ? '' : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function hint(msg, warn) { hintEl.textContent = msg; hintEl.className = warn ? 'warn' : ''; }
+  function oneLine(s) { return (s || '').replace(/\s+/g, ' ').trim(); }
+
+  function renderHead() {
+    var title = meta.title || document.title;
+    document.title = title;
+    var lines = [fmt(S.revisionLine, { revision: meta.revision, when: when(meta.expiresAt) })];
+    if (meta.replyTo) lines.push(fmt(S.replyToLine, { replyTo: meta.replyTo }));
+    head.innerHTML = '<b>' + esc(title) + '</b>' + lines.map(esc).join('<br>');
+  }
+
+  // Item ids come from the page, so they live apart from the overall comment and
+  // in a prototype-free map: an id such as "__proto__" stays an ordinary key.
+  function fresh() { return { items: Object.create(null), overall: '' }; }
+  function load() {
+    state = fresh();
+    try {
+      var saved = JSON.parse(localStorage.getItem(key) || '{}') || {};
+      Object.keys(saved.items || {}).forEach(function (k) { state.items[k] = saved.items[k]; });
+      state.overall = typeof saved.overall === 'string' ? saved.overall : '';
+    } catch (e) {}
+  }
+  function save() {
+    try { localStorage.setItem(key, JSON.stringify(state)); }
+    catch (e) { hint(S.storageBlocked, true); }
+  }
+  function entry(k) { return state.items[k] || (state.items[k] = { c: '', n: '' }); }
+
+  function updateProgress() {
+    var done = items.filter(function (s) { var st = state.items[s.getAttribute('data-item').trim()]; return st && st.c; }).length;
+    progress.textContent = items.length ? fmt(S.progress, { done: done, total: items.length }) : '';
+  }
+
+  function build() {
+    items.forEach(function (s) {
+      var k = s.getAttribute('data-item').trim();
+      // A label wrapped across lines in the source must not split its reply line.
+      var raw = (s.getAttribute('data-choices') || '').split('|').map(oneLine).filter(Boolean);
+      var choices = raw.length ? raw : S.choices;
+      var ctl = document.createElement('div'); ctl.className = 'so-ctl';
+      var buttons = choices.map(function (c) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = c;
+        b.addEventListener('click', function () {
+          var st = entry(k); st.c = st.c === c ? '' : c; save(); paint(); updateProgress();
+        });
+        ctl.appendChild(b); return b;
+      });
+      var note = document.createElement('input');
+      note.className = 'so-note'; note.type = 'text'; note.placeholder = S.notePlaceholder;
+      note.setAttribute('aria-label', fmt(S.noteLabel, { id: k }));
+      note.addEventListener('input', function () { entry(k).n = note.value; save(); });
+      function paint() {
+        var st = state.items[k] || {};
+        buttons.forEach(function (b) {
+          var on = b.textContent === st.c;
+          b.classList.toggle('on', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');  // the choice, for screen readers too
+        });
+        note.value = st.n || '';
+      }
+      s.appendChild(ctl); s.appendChild(note); paint();
+    });
+    overall.value = state.overall;
+    overall.addEventListener('input', function () { state.overall = overall.value; save(); });
+    updateProgress();
+  }
+
+  function compose() {
+    var lines = ['sign-off ' + meta.id + ' r' + meta.revision];
+    var pending = [];
+    items.forEach(function (s) {
+      var k = s.getAttribute('data-item').trim();
+      var st = state.items[k] || {};
+      var note = oneLine(st.n);
+      if (!st.c) { pending.push(k); if (note) lines.push(k + ' ' + S.notChosen + ' — ' + note); return; }
+      lines.push(k + ' ' + st.c + (note ? ' — ' + note : ''));
+    });
+    if (pending.length) lines.push(S.pending + pending.join(S.listSep));
+    var ov = state.overall.trim();
+    if (ov) lines.push(S.overall + ov);
+    return lines.join('\n');
+  }
+
+  function manualCopy(why) {
+    out.hidden = false; out.focus(); out.select();
+    try { out.setSelectionRange(0, out.value.length); } catch (e) {}
+    hint(fmt(S.manualCopy, { why: why }), true);
+  }
+
+  gen.addEventListener('click', function () {
+    if (!meta) return;
+    // The page may have been opened before its expiry and left open past it.
+    if (!(Date.parse(meta.expiresAt) > Date.now())) { block(fmt(S.expired, { when: when(meta.expiresAt) }), meta.title); return; }
+    var text = compose();
+    out.value = text;
+    var canCopy = window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText;
+    if (!canCopy) { manualCopy(S.cannotCopy); return; }
+    // writeText must run inside the click handler itself (no await before it),
+    // or mobile browsers stop treating it as a user gesture.
+    navigator.clipboard.writeText(text).then(function () {
+      out.hidden = true;  // copied: fold the box away; on failure it stays for a manual copy
+      hint(fmt(S.copied, { lines: text.split('\n').length, replyTo: meta.replyTo || S.defaultReplyTo }));
+    }, function () { manualCopy(S.copyRefused); });
+  });
+
+  // Refuse review rather than produce a reply that names the wrong revision.
+  function block(msg, title) {
+    if (title) document.title = title;
+    head.innerHTML = '<b>' + esc(document.title) + '</b><div class="err">' + esc(msg) + '</div>';
+    gen.disabled = true;
+    hint(msg, true);
+  }
+  var tag = document.querySelector('meta[name="signoff-content"]');
+  var contentId = tag ? tag.getAttribute('content') : '';
+  function check(m) {
+    if (!m || !m.id) { block(S.noMeta); return; }
+    // The questions on screen and the revision in meta.json must be the same
+    // publish: a reload during an update can pair old content with a new revision.
+    if (contentId && m.contentId && m.contentId !== contentId) { block(S.stale, m.title); return; }
+    // The only expiry guard for local and static pages, which have no server to answer 410.
+    if (!(Date.parse(m.expiresAt) > Date.now())) { block(fmt(S.expired, { when: when(m.expiresAt) }), m.title); return; }
+    // A reply naming a repeated id could not say which item it means.
+    if (dups.length) { block(fmt(S.duplicateIds, { ids: dups.join(S.listSep) }), m.title); return; }
+    meta = m;
+    // Scoped to this publish: an id issued again after removal or expiry starts at r1 too.
+    key = 'signoff:' + m.id + ':r' + m.revision + (contentId ? ':' + contentId : '');
+    load(); renderHead(); build();
+  }
+  if (location.protocol === 'file:') {
+    check(window.SIGNOFF_META);
+  } else {
+    fetch('meta.json', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(check, function () { block(S.noMeta); });
+  }
+})();
+</script>
+</body>
+</html>

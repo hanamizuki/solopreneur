@@ -73,9 +73,10 @@ profile) reports it as broken in every project without a nearer `preview` block.
 Update every installed copy of the plugin before writing it.
 
 Never start services, change Tailscale, or open ports without the user's
-explicit go-ahead. Full key reference: `../../shared/config.md` relative to this
-skill inside an installed package (canonical source:
-`src/solopreneur/shared/config.md`), "The `signoffs` block".
+explicit go-ahead. Full key reference: "The `signoffs` block" of
+`src/solopreneur/shared/config.md` in the solopreneur repository; a Claude Code
+package carries it at `../../shared/config.md` relative to this skill, the
+Codex package does not.
 
 ## Write the page
 
@@ -143,6 +144,9 @@ hyphens, at most 12 characters; the page id adds a random suffix (`e2e-sync-k3f`
 | 0 | Published and read back: hand out the printed link |
 | 2 | A check or the publish failed: fix what the `→` line says |
 | 3 | Published, but the read-back did not match: **do not hand out the link**; fix what the `→` line says, then publish again with `--update <id>`, using the id the error names, or `rm` it before starting over |
+
+Whatever fails, publish only where the settings point: never switch the
+target, `root` or config to get a page out. Ask the user instead.
 
 Write the link out in full (not as a Markdown link), and say in the message
 itself what the reader is deciding: the page holds the detail, not the question.
@@ -240,6 +244,7 @@ python3 "$SOLO_SKILL_DIR/scripts/server.py" install --port 8791 --lang en --ttl-
 
 | Message | What to do |
 |---|---|
+| In a sandboxed session: `Operation not permitted`, `Read-only file system`, `No usable temporary directory found`, or `Permission denied` on a local path | The sandbox blocked a write outside the workspace (a `static` folder, a `server` store, the temporary folder, or a `local` root outside it, such as the main working tree from a linked worktree) or the network SSH and the read-back use. Ask the user to allow it (an approval prompt, or a session that may write there and reach `url`), then rerun the publish; when the `→` line names a stored page, run its `--update <id>` command instead of `--slug`. `Permission denied (publickey)` from SSH is a login problem: see `cannot reach <host> over SSH` |
 | `the page did not pass its checks` | Fix each listed file |
 | `index.html is a whole HTML document` | Keep only the content, or publish with `--raw` |
 | `cannot reach <host> over SSH` | This machine cannot publish there: fix SSH (key, known host) or publish from one that can |
