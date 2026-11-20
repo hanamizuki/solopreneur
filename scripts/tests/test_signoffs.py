@@ -895,7 +895,10 @@ class Providers(Base):
                  ("connect-src https://other.example", "connect-src must allow 'self'"),
                  # Without allow-same-origin the origin is opaque: fetch('meta.json') and localStorage fail.
                  ("sandbox allow-scripts", "sandbox must include allow-scripts and allow-same-origin"),
-                 ("script-src 'unsafe-inline'; sandbox allow-scripts allow-same-origin", None))
+                 ("script-src 'unsafe-inline'; sandbox allow-scripts allow-same-origin", None),
+                 # The page assigns plain strings to innerHTML, which Trusted Types make throw.
+                 ("script-src 'unsafe-inline'; require-trusted-types-for 'script'",
+                  "require-trusted-types-for must not list 'script'"))
         for i, (policy, hint) in enumerate(cases):
             with self.subTest(policy):
                 Policy.policy = policy
@@ -912,8 +915,8 @@ class Providers(Base):
         # CSP3, and every policy must allow the page. The inline script: script-src-elem, else
         # script-src, else default-src decides, and a nonce, a hash or 'strict-dynamic' makes
         # browsers ignore 'unsafe-inline'. fetch('meta.json'): connect-src, else default-src.
-        # A sandbox needs allow-scripts and allow-same-origin. Each case names the directive
-        # the hint says to change.
+        # A sandbox needs allow-scripts and allow-same-origin, and Trusted Types must not be
+        # required for scripts. Each case names the directive the hint says to change.
         cases = [([], None),
                  (["img-src 'self'"], None),  # scripts and fetches unrestricted
                  (["default-src 'self'"], "default-src"),
@@ -933,19 +936,30 @@ class Providers(Base):
                  (["connect-src *"], None),
                  (["connect-src https:"], None),
                  (["connect-src http:"], None),  # a browser upgrades http: to https:
+                 (["connect-src wss:"], "connect-src"),  # Chrome lets no ws: or wss: cover a fetch
+                 (["connect-src ws:"], "connect-src"),
                  (["connect-src HTTPS://Box.Example:443/x-abc/"], None),
                  (["connect-src https://*.example"], None),
                  (["sandbox"], "sandbox"),
                  (["sandbox allow-scripts"], "sandbox"),
                  (["sandbox allow-same-origin"], "sandbox"),
-                 (["SANDBOX Allow-Scripts allow-forms Allow-Same-Origin"], None)]
+                 (["SANDBOX Allow-Scripts allow-forms Allow-Same-Origin"], None),
+                 (["require-trusted-types-for 'script'"], "require-trusted-types-for")]
         for values, directive in cases:
             with self.subTest(values):
                 headers = email.message.Message()
                 for value in values:
                     headers["Content-Security-Policy"] = value
-                headers["Content-Security-Policy-Report-Only"] = "script-src 'none'; sandbox"  # reports, never blocks
+                headers["Content-Security-Policy-Report-Only"] = (  # reports, never blocks
+                    "script-src 'none'; sandbox; require-trusted-types-for 'script'")
                 found = signoff._blocking_policy(headers, "https://box.example/x-abc/")
+                self.assertEqual(found and found[2].split()[0], directive)
+        # An http page: only http: covers the fetch.
+        for source, directive in (("http:", None), ("ws:", "connect-src")):
+            with self.subTest("http page", source=source):
+                headers = email.message.Message()
+                headers["Content-Security-Policy"] = "connect-src " + source
+                found = signoff._blocking_policy(headers, "http://box.example/x-abc/")
                 self.assertEqual(found and found[2].split()[0], directive)
 
     def test_an_existing_gitignore_still_ignores_the_pages(self):
@@ -1210,10 +1224,18 @@ class Serving(Base):
         meta = read_json(meta_path)
         meta["expiresAt"] = server.iso(server.utcnow() - dt.timedelta(minutes=1))
         write_json(meta_path, meta)
+        os.makedirs(os.path.join(self.root, self.id, "shots"))
+        write_text(os.path.join(self.root, self.id, "shots", "a.png"), "png")
         with signoffs_server(self.root, lang="zh-Hant") as url:
             status, _, body = get(url + self.id + "/")
             self.assertEqual(status, 410)
             self.assertIn("這張批閱頁已過期".encode(), body)
+            # The link back to the index is relative to the requested address, at any depth.
+            for path, home in ((self.id + "/", "../"), (self.id + "/shots/a.png", "../../"), (self.id, "./")):
+                with self.subTest(path):
+                    status, _, body = get(url + path)
+                    self.assertEqual(status, 410)
+                    self.assertIn(('href="%s"' % home).encode(), body)
             self.assertNotIn(self.id.encode(), get(url)[2])
         self.assertEqual(server.prune(self.root, log=lambda *_: None), [os.path.join(self.root, self.id)])
 

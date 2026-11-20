@@ -284,12 +284,13 @@ def render_index(root, lang, strings, days, link_suffix, at=None, generator=Fals
     return html_page(lang, strings["indexTitle"], body, generator)
 
 
-def render_expired(meta, lang, strings):
-    body = "<h1>%s</h1><p class=\"sub\">%s</p><p><a href=\"../\">%s</a></p>" % (
+def render_expired(meta, lang, strings, home):
+    """The 410 page; `home` is the index, relative to the requested address."""
+    body = "<h1>%s</h1><p class=\"sub\">%s</p><p><a href=\"%s\">%s</a></p>" % (
         html.escape(strings["expiredHeading"]),
         fill(strings["expiredBody"], title=meta.get("title") or meta.get("id", ""),
              revision=meta.get("revision", "?"), when=short_time(meta.get("expiresAt"))),
-        html.escape(strings["expiredLink"]))
+        html.escape(home), html.escape(strings["expiredLink"]))
     return html_page(lang, strings["expiredTitle"], body)
 
 
@@ -613,7 +614,10 @@ class Handler(SimpleHTTPRequestHandler):
         if meta is None:
             return self.send_error(404)
         if is_expired(meta):
-            return self._send(410, render_expired(meta, self.lang, self.strings), head)
+            # One ../ per folder below the root: ../ from /<id>/, ../../ from /<id>/shots/a.png,
+            # ./ from /<id>. Relative, so the link keeps a proxy's mount prefix.
+            home = "../" * (raw.count("/") - 1) or "./"
+            return self._send(410, render_expired(meta, self.lang, self.strings, home), head)
         if len(parts) == 1 and not raw.endswith("/"):
             # Relative, unlike the stock directory redirect: it stays right behind
             # a proxy that mounts this server under a sub-path.

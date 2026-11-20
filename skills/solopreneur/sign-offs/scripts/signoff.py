@@ -732,9 +732,10 @@ def fetch(url, tries=3):
                        "running and https points at it); do not hand out the link", code=3)
 
 
-# The scheme sources that cover a page's own scheme: CSP3 lets http: and ws: match their
-# secure upgrades too.
-CSP_SCHEMES = {"http": ("http:", "ws:"), "https": ("https:", "http:", "wss:", "ws:")}
+# The scheme sources that let a page fetch its own meta.json: http: covers https too (a
+# secure upgrade). ws: and wss: never do: Chrome refuses the fetch under them, although
+# CSP3's scheme-part matching lists them.
+CSP_SCHEMES = {"http": ("http:",), "https": ("https:", "http:")}
 
 
 def _fetch_allowed(source, scheme, host):
@@ -761,7 +762,9 @@ def _blocking_policy(headers, url):
       browsers ignore 'unsafe-inline';
     - fetch('meta.json') from its own origin: connect-src, else default-src restricts it;
     - under a sandbox, allow-scripts, or nothing runs, and allow-same-origin, or its origin
-      is opaque: fetch('meta.json') then fails and localStorage throws."""
+      is opaque: fetch('meta.json') then fails and localStorage throws;
+    - plain strings assigned to innerHTML: a require-trusted-types-for listing 'script'
+      makes those assignments throw, and the page stays on "Loading…"."""
     split = urllib.parse.urlsplit(url)
     scheme, host = split.scheme, split.hostname or ""
     for header in headers.get_all("Content-Security-Policy") or []:
@@ -782,6 +785,9 @@ def _blocking_policy(headers, url):
             if "sandbox" in directives and not {"allow-scripts", "allow-same-origin"} <= set(directives["sandbox"]):
                 return (policy.strip(), "sandboxes the page without allow-scripts and allow-same-origin",
                         "sandbox must include allow-scripts and allow-same-origin")
+            if "'script'" in directives.get("require-trusted-types-for", ()):
+                return (policy.strip(), "requires Trusted Types for scripts, which the page's script does not use",
+                        "require-trusted-types-for must not list 'script'")
     return None
 
 

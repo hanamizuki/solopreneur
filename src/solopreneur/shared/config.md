@@ -1398,8 +1398,9 @@ The `static` and `server` index lists every page that has not expired: serve
 them on a network that only the readers and the publishing machine can reach,
 such as a tailnet or a VPN; serve a `static` folder without long-lived caching,
 so an update's images are fetched again. The web server's Content-Security-Policy,
-if any, must allow the page's inline script and same-origin fetches, and must not
-sandbox the page without `allow-scripts` and `allow-same-origin`. A login page does not
+if any, must allow the page's inline script and same-origin fetches, must not
+sandbox the page without `allow-scripts` and `allow-same-origin`, and must not
+require Trusted Types for scripts. A login page does not
 work: the read-back fetches every file from `url` without credentials.
 
 ## Resolution
