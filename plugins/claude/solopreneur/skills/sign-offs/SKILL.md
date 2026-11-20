@@ -40,7 +40,7 @@ the project directory: settings are looked up from the current directory.
 python3 "$SIGNOFF" config
 ```
 
-`"configPath": null` means nothing is configured: pages go to
+`"userConfig": null` means no target is configured: pages go to
 `docs/solopreneur/sign-offs/` in the main working tree and open over `file://`,
 on this machine only. That is fine when the reader sits at this computer. When
 they need the page elsewhere (a phone, another machine), look before asking:
@@ -55,20 +55,22 @@ they need the page elsewhere (a phone, another machine), look before asking:
 4. SSH destinations the user already uses for that machine.
 
 Offer the options you found, each with what it needs (see Providers), and
-recommend `local` when nothing fits or the user is unsure. Save the choice in a
-`signoffs` block of `.solopreneur.json`, merged into the file if it exists (keep
-its other top-level keys and `"schemaVersion": 2`). Usually that is the user-level
-file, `~/.config/solopreneur/config.json`: host names and URLs are personal and
-stay out of commits. Caution: when that file has no `preview` block, preview
-from a plugin version before sign-offs (one machine may run several, say one per
-harness profile) reports it as broken in every project without a nearer
-`preview` block. Update every installed copy of the plugin first, or save the
-block in a `.solopreneur.json` in a parent directory of the user's projects
-instead (such as `~/.solopreneur.json`): preview's walk-up skips files without a
-`preview` block. The nearest `signoffs` block is used whole — blocks never
-merge — so a project's own block (`<repo>/.solopreneur.json`) replaces the
-user-level one there, targets included; add one only when that project needs
-settings of its own.
+recommend `local` when nothing fits or the user is unsure. Save the choice in the
+`signoffs` block of the user config, `~/.config/solopreneur/config.json` (or the
+file `$SOLOPRENEUR_CONFIG` names), merged into the file if it exists: keep its
+other top-level keys and `"schemaVersion": 2`. `targets` and `defaultTarget` are
+read from nowhere else, so a remote target always goes there: a cloned
+repository's own `.solopreneur.json` must never choose where pages are sent, and
+one that sets `targets` or `defaultTarget` is refused.
+
+A project's `.solopreneur.json` (the nearest one with a `signoffs` block) may set
+only `root`, `lang`, `ttlDays` and `replyTo`, each overriding the user config's
+value for that project.
+
+Caution: when the user config has no `preview` block, preview from a plugin
+version before sign-offs (one machine may run several, say one per harness
+profile) reports it as broken in every project without a nearer `preview` block.
+Update every installed copy of the plugin before writing it.
 
 Never start services, change Tailscale, or open ports without the user's
 explicit go-ahead. Full key reference: `../../shared/config.md` relative to this
