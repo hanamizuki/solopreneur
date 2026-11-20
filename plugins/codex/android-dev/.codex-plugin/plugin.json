@@ -1,7 +1,7 @@
 {
   "name": "android-dev",
-  "version": "0.4.13",
-  "description": "Android/Kotlin expertise. Ships the android-dev agent, android-patterns, and 37 vendored third-party skills (Compose / architecture / Gradle + 16 gplay-* Google Play Console CLI + 6 official Android team skills).",
+  "version": "0.4.14",
+  "description": "Android/Kotlin expertise. Ships the android-dev agent, android-patterns, and 35 vendored third-party skills (Compose / architecture / Gradle + 16 gplay-* Google Play Console CLI + 6 official Android team skills).",
   "license": "MIT",
   "author": {
     "name": "Hana Chang"
@@ -9,8 +9,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Android Dev",
-    "shortDescription": "Android/Kotlin expertise. Ships the android-dev agent, android-patterns, and 37 vendored third-party skills (Compose / architecture / Gradle + 16 gplay-* Google Play Console CLI + 6 official Android team skills).",
-    "longDescription": "Android/Kotlin expertise. Ships the android-dev agent, android-patterns, and 37 vendored third-party skills (Compose / architecture / Gradle + 16 gplay-* Google Play Console CLI + 6 official Android team skills).",
+    "shortDescription": "Android/Kotlin expertise. Ships the android-dev agent, android-patterns, and 35 vendored third-party skills (Compose / architecture / Gradle + 16 gplay-* Google Play Console CLI + 6 official Android team skills).",
+    "longDescription": "Android/Kotlin expertise. Ships the android-dev agent, android-patterns, and 35 vendored third-party skills (Compose / architecture / Gradle + 16 gplay-* Google Play Console CLI + 6 official Android team skills).",
     "developerName": "Hana Chang",
     "category": "Developer Tools",
     "capabilities": [

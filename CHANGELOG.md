@@ -8,6 +8,139 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-11-20
+
+### solopreneur 0.6.3 → 0.6.4
+
+New `/sign-offs` skill publishes a temporary review page for decisions that
+need screenshots or a ruling on several items. The reader opens one link on a
+phone or desktop, taps approve, revise or reject (or choices you define) on
+each item, adds notes, and copies a single structured reply back into the
+chat. Pages expire after 7 days by default, and every link is read back before
+it is handed out. With no setup, pages go to a local folder and open over
+`file://`. Configured, they go to a folder an existing web server already
+serves, or to a bundled server behind Tailscale Serve or any reverse proxy,
+on this machine or another one over SSH. On first use the skill looks at what
+your setup offers and proposes options. The UI is in English or Traditional
+Chinese. Claude Code only for now; it needs Python 3.9+ and nothing beyond the
+standard library.
+
+Settings go in a new `signoffs` block of `.solopreneur.json`. Where pages go
+(`targets` and `defaultTarget`) is read only from your user-level config,
+`~/.config/solopreneur/config.json` or the absolute path in
+`$SOLOPRENEUR_CONFIG`; a repo's own `.solopreneur.json` may set only `root`,
+`lang`, `ttlDays` and `replyTo`, so a cloned repo cannot send your pages
+anywhere. `/preview` now skips a user-level config that only configures
+other features. If you save sign-offs settings in
+`~/.config/solopreneur/config.json` without a `preview` block, update every
+installed copy of this plugin first: older `/preview` versions report that
+file as broken.
+
+When the Vercel CLI is missing, `/preview` now suggests
+`brew install --cask vercel`. Homebrew moved the Vercel CLI to a cask, so the
+old `brew install vercel-cli` hint failed. (#205, #206, #207)
+
+### designer 0.1.11 → 0.1.12
+
+`taste-skill` moves to tasteskill 2.5.1, and upstream folded its eight style
+variants into it: `taste-soft`, `taste-brutalist`, `taste-minimalist`,
+`taste-redesign`, `taste-stitch`, `taste-output`, `taste-gpt` and
+`taste-image-to-code` are removed, so anything that calls them by name stops
+resolving. The new `taste-skill` builds or redesigns company and product
+websites, as static HTML/CSS or inside an existing React, Next.js, Vue, Svelte
+or Astro project, from a bundled kit of photographs, UI fragments, icons and
+motion. A checker and a finish gate render each page in headless Chrome. The
+gate also runs as a Stop hook that keeps the agent working while fixable
+failures remain; it does nothing unless a build is in progress. It needs
+Node 22+ and Chrome, Edge or Chromium.
+
+`impeccable` goes from 4.1.1 to 4.10.0 and now also covers native iOS and
+Android screens and `DESIGN.md` design systems. Its Node scripts are replaced
+by a prebuilt engine binary, downloaded on first use from the upstream GitHub
+releases into `~/.impeccable/bin/` and checked against SHA-256 sums pinned in
+this plugin. Its commands are no longer pre-approved, so Claude Code may ask
+before running them. `init` now suggests `npx impeccable login`, which lets it
+save critiques to an Impeccable account; signing in is optional.
+
+The taste-skill kit makes the designer package about 41 MB. Every plugin
+installs from the same clone of this repo, so the marketplace download grows
+from about 26 MB to about 129 MB for everyone. (#206)
+
+### marketer 0.0.12 → 0.0.13
+
+`/slide-design` is removed. It wrapped two slide engines you had to install
+separately, and its AI-pattern review is what `/humanly` already does. For
+HTML presentations, install
+[frontend-slides](https://github.com/zarazhangrui/frontend-slides) or
+[revealjs-skill](https://github.com/ryanbbrown/revealjs-skill) directly;
+`/rebuild-skill-index` still adds them to the marketer index when they are
+installed. The `marketer` agent no longer advertises presentation design.
+`/humanly`'s prewrite briefs now follow their own rule against em dashes: the
+appendix index is a table and the dashes in the briefs are rewritten. Output
+did not change measurably. (#199, #205)
+
+### ios-dev 0.4.13 → 0.4.14
+
+The `ios-dev` agent now starts without your user, project and local
+`CLAUDE.md` files. Subagents don't share the main session's prompt cache, so
+every spawn paid for those files in full; in one measured repo the agent's
+starting prompt drops from about 58k to 19k tokens. When a task depends on
+repository conventions, the agent reads the repo's `CLAUDE.md` itself. Rules
+that live only in your personal `CLAUDE.md` no longer reach it, so put
+anything it must follow in the task prompt.
+
+Re-syncs the vendored App Store Connect skills (the upstream repo moved to
+`rorkai/app-store-connect-cli-skills`) and `apple-design`. New workflows cover
+Asset Library media (product-page headers, search creative, screenshots,
+previews, event artwork), compiling and packaging a prepared Swift package
+without an Xcode project (`asc builds compile` / `package`), an experimental
+read-only Apple Search plan in the ASO audit, per-territory price reads with
+`--resolved`, and `derive` to keep one subscription priced near a multiple of
+another. Also new: API-key login from a JSON file, App Store Server API reads
+under `asc storekit`, `asc status --until review-done`, and `--env-file` for
+workflows. Notarization troubleshooting now verifies the existing signature
+instead of removing trust overrides or re-signing the app.
+(#198, #204, #206)
+
+### android-dev 0.4.13 → 0.4.14
+
+The `android-dev` agent now starts without your user, project and local
+`CLAUDE.md` files, which keeps its starting prompt small for every spawn. When
+a task depends on repository conventions, it reads the repo's `CLAUDE.md`
+itself. Rules that live only in your personal `CLAUDE.md` no longer reach it,
+so put anything it must follow in the task prompt.
+
+The six official Android skills get their first update since August.
+`r8-analyzer` now ships its own analysis scripts and uses the
+`analyze<Variant>R8Config` Gradle task on AGP 9.3+; on older AGP it
+temporarily pins a newer R8 in `settings.gradle`, asking first, and reverts it
+afterwards. It needs Python with `protobuf` 6.33.4 or later. `agp-9-upgrade`
+now includes the two reference docs its steps link to (the AGP 9.0 release
+notes and the built-in Kotlin migration guide), which an ignore rule in this
+repo had left out since the skill was added. `navigation-3`,
+`migrate-xml-views-to-jetpack-compose`, `play-billing-library-version-upgrade`
+and `edge-to-edge` pick up the current upstream docs. (#204, #206)
+
+### ai-engineer 0.3.16 → 0.3.17
+
+Re-syncs the vendored `senior-prompt-engineer` skill. Upstream rewrote only
+its trigger description, so it now also activates when your prompts, chatbot
+or RAG answers are unreliable, or when you ask how to test them. The skill's
+content is unchanged. (#197)
+
+### neo4j-dev 0.0.10 → 0.0.11
+
+Re-syncs the vendored Neo4j skills through the 2026.10 release.
+`neo4j-cypher` adds Cypher 25 string interpolation, the `UUID` type and
+`uuid()` functions (2026.08), fulltext search through the `SEARCH` clause and
+map comprehensions (2026.09), and map addition (2026.10), and corrects its
+advice on counting days between dates. `neo4j-migration` adds upgrade notes up
+to the 2026 LTS: skip the 2026.07.0 and 2026.08.0 patch releases, move
+`high_limit` stores to the `block` format and servers to Java 25 before the
+LTS, use newer drivers for `UUID` values, and expect a 16-character minimum
+for native-user passwords. `neo4j-cli-tools` covers splitting `neo4j-admin`
+backups and dumps into parts. (#196)
+
 ## 2026-11-03
 
 ### solopreneur 0.6.2 → 0.6.3

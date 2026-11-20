@@ -1,6 +1,6 @@
 {
   "name": "designer",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "UI/UX design expertise. Ships the designer agent and 2 vendored third-party design skills (impeccable + taste-skill).",
   "license": "MIT",
   "dependencies": [
