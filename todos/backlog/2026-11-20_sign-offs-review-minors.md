@@ -17,3 +17,14 @@
 6. SKILL.md, exit 3 handling: tell the agent to run the full command the CLI
    prints.
 7. `connect-src` matching compares the host only, not the path.
+
+## Follow-ups from #208 (Codex support)
+
+8. When a sandbox blocks the store write, the publisher dies with a Python
+   traceback and exit 1; the documented code for that failure is 2.
+9. The Codex package does not carry `shared/config.md`, which both preview and
+   sign-offs point to (preview had the gap first).
+10. Check for network permission before writing the page, so a sandbox with a
+    writable store but no network does not store a page it cannot read back.
+11. CodeRabbit's remaining comments on #208 target the generated Codex copy of
+    unchanged sign-offs code; compare them with items 1–7 before acting.
