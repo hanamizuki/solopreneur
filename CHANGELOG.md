@@ -8,6 +8,25 @@ or updates that plugin.
 > 2026-05-17 section below) predate this changelog — see the repo's git
 > tags / GitHub Releases for earlier history.
 
+## 2026-11-20 — sign-offs on Codex
+
+### solopreneur 0.6.4 → 0.6.5
+
+`/sign-offs` now ships in the Codex package too
+(`codex plugin add solopreneur@solopreneur`) and runs in `codex exec`, the TUI
+and the Codex App. Publishing to the default local folder works inside Codex's
+workspace-write sandbox, which a trusted project gets in the TUI; `codex exec`
+starts read-only, so pass `--sandbox workspace-write`. Publishing to a static
+folder or the bundled server writes outside the workspace and reads the page
+back over the network, and so does local when its folder lies outside the
+workspace (from a linked worktree, pages go to the main working tree). The TUI
+and the App ask for your approval once per publish; `codex exec` cannot ask, so
+start it with that access (`--add-dir <folder>`, plus
+`-c sandbox_workspace_write.network_access=true` for static and server) or with
+`--dangerously-bypass-approvals-and-sandbox`. A blocked publish never hands out
+a link, and on every host the skill now tells the agent to rerun it with your
+permission instead of sending the page somewhere else. (#208)
+
 ## 2026-11-20
 
 ### solopreneur 0.6.3 → 0.6.4
