@@ -43,8 +43,9 @@ On Claude Code, installing any sub-plugin auto-pulls `solopreneur`. Requires Cla
 
 Codex currently publishes the compatible `solopreneur` core subset:
 `autopilot`, `greenlight`, `handoff`, `merge-pr`, `perspective`,
-`plan-review`, `post-mortem`, `preview`, and `specialist-review`; the
-specialist plugins publish their own vendored knowledge skills alongside it,
+`plan-review`, `post-mortem`, `preview`, `sign-offs`, and
+`specialist-review`; the specialist plugins publish their own vendored
+knowledge skills alongside it,
 which is what `specialist-review` reads there.
 `skills-compatibility.json` is the source of truth for what ships.
 Unsupported skills stay out of the Codex package instead of appearing and
@@ -63,6 +64,7 @@ Codex V1 is intentionally a smaller, fail-closed surface:
 | `$solopreneur:plan-review` | Full review with a Claude CLI outside opinion, then user adjudication and approved write-back. Requires a Claude subscription for the outside opinion; skips it when unavailable. |
 | `$solopreneur:post-mortem` | Same git archaeology and report. In `codex exec`, put the bug description in the prompt; the run stops at the printed report. |
 | `$solopreneur:preview` | Local delivery only — the `file://` Library and the single-file ephemeral mode. An explicit Vercel, online, cross-device, or external-sharing request fails closed before any file, config, network, or deployment action. |
+| `$solopreneur:sign-offs` | Same review pages and reply. `local` publishes inside the sandbox. `static` and `server` (and `local` from a linked worktree) write outside the workspace and read back over the network, so the TUI and App ask for one approval per publish, and `codex exec` needs that access at launch (`--add-dir` plus network access, or `--dangerously-bypass-approvals-and-sandbox`). A blocked publish never hands out a link. |
 | `$solopreneur:specialist-review` | Same stack detection and review. No specialist agents exist on Codex yet, so every stack drops to a generic reviewer — reading that stack's knowledge skills when its plugin is installed (`marketer` and `designer` publish none), or reviewing inline when no subagent can be spawned. Every path names its degradation in a banner. |
 
 The skill descriptions below document the full Claude Code surface. Use the
@@ -101,7 +103,7 @@ skills: 16 product workflows plus merge and Codex-agent plumbing.
 | [`/worktree-handoff`](./skills/solopreneur/worktree-handoff/SKILL.md) | **Coworker.** Creates an isolated git worktree with a CONTEXT.md so the next session picks up exactly where you left off |
 | [`/handoff`](./skills/solopreneur/handoff/SKILL.md) | **Scribe.** Packages the current session into a self-contained markdown context doc, printed inline so you can copy and paste it into any other agent (Codex, ChatGPT, a fresh Claude session, an agent on another machine). Also saved under `/tmp/handoff/`. No worktree |
 | [`/preview`](./skills/solopreneur/preview/SKILL.md) | **Presenter.** Turns any proposal / plan / idea into an interactive page in your private **Library** (path-scoped config, catalog sidebar, provenance footer, in-page comments) — built locally by default and opened over `file://`, no deployment. Explicitly temporary work (or a repo with no Library config) gets one self-contained HTML file instead; explicit Vercel, online, cross-device, or external-sharing requests publish the same Library, or an isolated **Share**, on Claude Code. Codex supports both local modes and fails closed on Vercel |
-| [`/sign-offs`](./skills/solopreneur/sign-offs/SKILL.md) | **Approver's desk.** Publishes a temporary review page when a decision needs screenshots or item-by-item rulings: the reader taps approve / revise / reject (or your own choices) per item, adds notes, and copies one structured reply back. Pages expire after 7 days by default and every link is read back before it is handed out. Publishes to a local folder until configured, to a folder your web server already serves, or to a bundled server behind Tailscale Serve or any reverse proxy; first use inspects your setup and proposes options. English or Traditional Chinese UI. Claude Code only for now |
+| [`/sign-offs`](./skills/solopreneur/sign-offs/SKILL.md) | **Approver's desk.** Publishes a temporary review page when a decision needs screenshots or item-by-item rulings: the reader taps approve / revise / reject (or your own choices) per item, adds notes, and copies one structured reply back. Pages expire after 7 days by default and every link is read back before it is handed out. Publishes to a local folder until configured, to a folder your web server already serves, or to a bundled server behind Tailscale Serve or any reverse proxy; first use inspects your setup and proposes options. English or Traditional Chinese UI. On Codex, `static` and `server` publishing needs your approval to leave the sandbox |
 | [`/specialist-review`](./skills/solopreneur/specialist-review/SKILL.md) | **Code Reviewer.** Detects your tech stack, dispatches matching expert agents, and reviews against best-practice skill indices |
 | [`/post-mortem`](./skills/solopreneur/post-mortem/SKILL.md) | **SRE.** Traces a bug through git history, finds the root cause commit, produces a structured post-mortem report |
 | [`/session-retro`](./skills/solopreneur/session-retro/SKILL.md) | **Coach.** Reviews the current conversation for mistakes, traces root causes, proposes durable process improvements |

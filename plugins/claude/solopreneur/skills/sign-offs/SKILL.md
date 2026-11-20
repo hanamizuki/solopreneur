@@ -240,6 +240,7 @@ python3 "$SOLO_SKILL_DIR/scripts/server.py" install --port 8791 --lang en --ttl-
 
 | Message | What to do |
 |---|---|
+| Any message with `Operation not permitted` | A sandbox blocked a write outside the workspace (a `static` folder, a `server` store, or the main working tree from a linked worktree) or the network SSH and the read-back use. Rerun the same command with the user's permission (an approval prompt, or a session allowed to write there and reach `url`), adding `--update <id>` if the `→` line names one. Never redirect the page to another target, `root` or config instead |
 | `the page did not pass its checks` | Fix each listed file |
 | `index.html is a whole HTML document` | Keep only the content, or publish with `--raw` |
 | `cannot reach <host> over SSH` | This machine cannot publish there: fix SSH (key, known host) or publish from one that can |

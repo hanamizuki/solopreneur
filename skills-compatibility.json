@@ -988,7 +988,13 @@
     },
     "solopreneur:sign-offs": {
       "support": {
-        "claude-code": "full"
+        "claude-code": "full",
+        "codex-exec": "degraded",
+        "codex-tui": "degraded",
+        "codex-app": "degraded"
+      },
+      "publication": {
+        "codex": "include"
       },
       "sharedContract": "skills/solopreneur/sign-offs/SKILL.md",
       "platformResources": [
@@ -999,16 +1005,48 @@
         "skills/solopreneur/sign-offs/assets/strings.json",
         "src/solopreneur/shared/config.schema.json"
       ],
+      "limitations": {
+        "codex-exec": "docs/spec/2026-11-19-sign-offs.md",
+        "codex-tui": "docs/spec/2026-11-19-sign-offs.md",
+        "codex-app": "docs/spec/2026-11-19-sign-offs.md"
+      },
       "acceptance": {
         "claude-code": [
           "docs/spec/2026-11-19-sign-offs.md#a1-contract-and-regression-suite",
           "docs/spec/2026-11-19-sign-offs.md#a2-claude-code",
+          "scripts/tests/test_signoffs.py"
+        ],
+        "codex-exec": [
+          "docs/spec/2026-11-19-sign-offs.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-11-19-sign-offs.md#a3-codex-exec",
+          "scripts/tests/test_signoffs.py"
+        ],
+        "codex-tui": [
+          "docs/spec/2026-11-19-sign-offs.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-11-19-sign-offs.md#a4-codex-tui",
+          "scripts/tests/test_signoffs.py"
+        ],
+        "codex-app": [
+          "docs/spec/2026-11-19-sign-offs.md#a1-contract-and-regression-suite",
+          "docs/spec/2026-11-19-sign-offs.md#a5-codex-app",
           "scripts/tests/test_signoffs.py"
         ]
       },
       "dependencies": [],
       "requiredCapabilities": {
         "claude-code": [
+          "python>=3.9",
+          "local-filesystem-write-access"
+        ],
+        "codex-exec": [
+          "python>=3.9",
+          "local-filesystem-write-access"
+        ],
+        "codex-tui": [
+          "python>=3.9",
+          "local-filesystem-write-access"
+        ],
+        "codex-app": [
           "python>=3.9",
           "local-filesystem-write-access"
         ]
